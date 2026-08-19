@@ -29,7 +29,7 @@ func TestRepositoryCatalogPasses(t *testing.T) {
 	expected := []string{
 		"platform", "tenancy", "migration_framework", "security_eventing", "commerce_core",
 		"operations_foundation", "commerce_extensions", "regulated_integrations", "control_plane",
-		"legacy_contract", "runtime_operations", "ai_advisory", "ai_provider_credential_class",
+		"legacy_contract", "runtime_operations", "ai_advisory", "ai_provider_credential_class", "mcp_client_accounts",
 	}
 	if len(catalog.Migrations) != len(expected) {
 		t.Fatalf("catalog migration count = %d, want %d", len(catalog.Migrations), len(expected))

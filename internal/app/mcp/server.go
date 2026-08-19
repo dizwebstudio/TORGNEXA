@@ -25,6 +25,8 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
 )
 
@@ -468,10 +470,28 @@ func governedMeta(agent agentgovernance.Agent, decision agentgovernance.Decision
 }
 
 // Run starts the transport with a deliberately fail-closed runtime composition.
-// Production wiring must replace the deny resolver with the same trusted identity
-// and authorization adapter used by the REST boundary; Task 084 owns federated IAM.
+// IdentityResolver is now the real Postgres-backed mcp_client_accounts adapter
+// (see identity.go); Governor and Auditor remain the unavailable/deny
+// baseline. Task 079's real AgentGovernor (internal/platform/agentgovernance,
+// backed by the already-implemented internal/platform/postgres/agentgovernancerepo)
+// was never composed anywhere in this repository either, so even a valid
+// identity currently cannot pass tools/list or tools/call until that gap is
+// closed too and a policy is installed for the calling agent.
 func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
-	server, err := NewServer(logger, Dependencies{IdentityResolver: denyIdentityResolver{}, Authorizer: ExactPermissionAuthorizer{}, Governor: unavailableGovernor{}, Auditor: unavailableAuditor{}})
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return fmt.Errorf("mcp database: %w", err)
+	}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("database pool close failed", "event", "database.pool_close_failed")
+		}
+	}()
+	mcpAccounts, err := mcpaccountsrepo.New(db)
+	if err != nil {
+		return fmt.Errorf("mcp accounts repository: %w", err)
+	}
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: unavailableGovernor{}, Auditor: unavailableAuditor{}})
 	if err != nil {
 		return err
 	}
@@ -482,7 +502,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	httpServer := &http.Server{Handler: server.Handler(), ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout, MaxHeaderBytes: cfg.HTTP.MaxHeaderBytes, ErrorLog: log.New(mcpLogWriter{logger}, "", 0)}
 	errc := make(chan error, 1)
 	go func() { errc <- httpServer.Serve(listener) }()
-	logger.Info("mcp server ready", "event", "mcp.server_ready", "address", listener.Addr().String(), "protocol", ProtocolVersion, "auth", "fail_closed_unconfigured")
+	logger.Info("mcp server ready", "event", "mcp.server_ready", "address", listener.Addr().String(), "protocol", ProtocolVersion, "auth", "identity_configured", "governance", "unavailable")
 	select {
 	case err := <-errc:
 		if errors.Is(err, http.ErrServerClosed) {
@@ -505,12 +525,6 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return nil
 	}
 	return err
-}
-
-type denyIdentityResolver struct{}
-
-func (denyIdentityResolver) ResolveMCPIdentity(*http.Request) (Identity, error) {
-	return Identity{}, ErrUnauthorized
 }
 
 type unavailableGovernor struct{}

@@ -34,6 +34,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/legalpartyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
@@ -184,6 +185,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("ai_advisory_repository_startup_failed", err)
 	}
+	mcpAccountsRepository, err := mcpaccountsrepo.New(db)
+	if err != nil {
+		return newRuntimeError("mcp_accounts_repository_startup_failed", err)
+	}
 	inventoryRepository, err := inventoryrepo.New(db)
 	if err != nil {
 		return newRuntimeError("inventory_repository_startup_failed", err)
@@ -327,7 +332,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
-		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(),
+		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository,
 	})
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes)
 	if err != nil {

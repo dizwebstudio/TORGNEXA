@@ -260,6 +260,10 @@
       "kind": "platform_capability"
     },
     {
+      "path": "internal/platform/mcpaccounts",
+      "kind": "platform_capability"
+    },
+    {
       "path": "internal/platform/migration",
       "kind": "platform_capability"
     },
@@ -361,6 +365,10 @@
     },
     {
       "path": "internal/platform/postgres/lineagerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/mcpaccountsrepo",
       "kind": "infrastructure_adapter"
     },
     {

@@ -289,6 +289,28 @@
       },
       "backfill": null,
       "sha256": "1e3b5fa994d5c4f56676e132548abfbd1971a490b79e44452f29b1bf62277a4b"
+    },
+    {
+      "version": 14,
+      "name": "mcp_client_accounts",
+      "file": "000014_mcp_client_accounts.sql",
+      "phase": "expand",
+      "risk": "medium",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [
+        13
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "ef98de3aa3e4bee96df50c4cf3365d568d98e66ff60baec40db55bb22e2946bd"
     }
   ]
 }

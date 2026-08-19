@@ -3,9 +3,9 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "28a3456f8045536742ba829482a7a14008839b1c4f994bfcb9f70a984d81bc94",
+    "sha256": "bf76a645a37e5e53928699b1473fa2679d928cd133b5d26c3991a4ad750028cc",
     "openapi_version": "3.1.0",
-    "api_version": "0.16.0",
+    "api_version": "0.17.0",
     "server_path": "/api/v1"
   },
   "operations": [
@@ -80,6 +80,11 @@
       "path": "/inventory/warehouses"
     },
     {
+      "operation_id": "createMCPAccount",
+      "method": "POST",
+      "path": "/settings/mcp-accounts"
+    },
+    {
       "operation_id": "createOfferPrice",
       "method": "POST",
       "path": "/products/{product_id}/prices/{offer_or_price_id}"
@@ -143,6 +148,11 @@
       "operation_id": "disableConnectorAccount",
       "method": "POST",
       "path": "/connector-accounts:disable"
+    },
+    {
+      "operation_id": "disableMCPAccount",
+      "method": "POST",
+      "path": "/settings/mcp-accounts:disable"
     },
     {
       "operation_id": "disableSettingsIdentityProvider",
@@ -343,6 +353,11 @@
       "operation_id": "listInventoryWarehouses",
       "method": "GET",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "listMCPAccounts",
+      "method": "GET",
+      "path": "/settings/mcp-accounts"
     },
     {
       "operation_id": "listNotificationDeliveries",

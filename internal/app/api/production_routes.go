@@ -18,6 +18,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
@@ -70,6 +71,7 @@ type productionRouteDependencies struct {
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
 	aiRegistry         *builtinruntime.Registry
+	mcpAccounts        *mcpaccountsrepo.Repository
 	oidc               config.OIDC
 }
 
@@ -95,6 +97,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newEntitlementRoutes(deps.entitlements, deps.quotas)...)
 	routes = append(routes, newWebhookRoutes(deps.webhooks)...)
 	routes = append(routes, newAIAdvisoryRoutes(deps.aiAdvisory, deps.secretProvider, deps.aiRegistry, deps.auditService)...)
+	routes = append(routes, newMCPAccountRoutes(deps.mcpAccounts, deps.auditService)...)
 	routes = append(routes, newReservedContractRoutes(deps, capabilityGuard)...)
 	return routes
 }
