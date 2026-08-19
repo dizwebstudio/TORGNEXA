@@ -1,22 +1,35 @@
-# TORGNEXA handoff — P4 + Enterprise UX + pre-v1 migration baseline
+# TORGNEXA handoff — AI provider connectors + P4 + Enterprise UX + pre-v1 migration baseline
 
-Date: 2026-08-18
+Date: 2026-08-19
 
 ## Current state
 
-Tasks `001`–`121` are repository-implemented. Task 118 adds the fail-closed P4 go-live evidence/publication layer; Task 119 closes the base operator UI/UX gap; Task 120 upgrades enterprise operations with server-owned grids, realtime invalidation, unified incidents, deep/server search and reporting-backed analytics; Task 121 replaces the 74-file development migration install path with an 11-file pre-v1 baseline and verified legacy rebaseline.
+Tasks `001`–`125` are repository-implemented. Task 118 adds the fail-closed P4 go-live evidence/publication layer; Task 119 closes the base operator UI/UX gap; Task 120 upgrades enterprise operations with server-owned grids, realtime invalidation, unified incidents, deep/server search and reporting-backed analytics; Task 121 replaces the 74-file development migration install path with an 11-file pre-v1 baseline and verified legacy rebaseline; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers on the same capability.
 
 Current repository inventory:
 
-- architecture: **117 registered modules / 32 provider modules / 112 reviews**;
-- active PostgreSQL baseline: **11 migrations**, latest `000011_runtime_operations.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
-- public OpenAPI/generated SDK surface: **108 operations / OpenAPI 0.15.0**;
-- connector catalog: **32 connectors**;
+- architecture: **119 registered modules / 36 provider modules / 116 reviews**;
+- active PostgreSQL baseline: **13 migrations**, latest `000013_ai_provider_credential_class.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
+- public OpenAPI/generated SDK surface: **112 operations / OpenAPI 0.16.0**;
+- connector catalog: **36 connectors**;
 - repository license: **Apache-2.0**.
 
 Repository completion is still distinct from release-topology qualification. Task 117 makes runtime qualification mandatory in the release workflow, but this source archive cannot manufacture Docker, OIDC, GitHub Ruleset or live provider evidence.
 
 
+
+## Tasks 122–125 AI provider settings and connectors
+
+`ai_provider_accounts` (migration `000012_ai_advisory.sql`, RLS forced, `DELETE`/`TRUNCATE` revoked) lets a tenant configure an external AI provider account — label/model/base_url/folder_id/enabled/version plus a `secrets.Reference` — and trigger a bounded analytics completion through it. Credential bytes never reach Postgres; migration `000013_ai_provider_credential_class.sql` additively widens `secret_references.class` with `ai_provider_credential` for this purpose. Four additive OpenAPI 0.16.0 operations sit under `/settings/ai-providers(:disable|:analyze)`: account management is gated by `settings.ai_providers.read`/`write` (admin), triggering a completion is gated separately by `ai.analyze` (admin/manager/operator). `internal/platform/aiadvisory` is a non-branching port; `internal/platform/builtinruntime.Registry.AICompletion` remains the sole `switch account.ConnectorID` dispatch point for the capability, exactly as ADR 0090 requires for every other built-in provider.
+
+Four `ai`-family providers are admitted on this capability, each through Connector SDK v1 with only `ai.completion.generate` and no `net/*` import — all socket I/O is host-mediated:
+
+- `openai-compatible` (Task 122) — the first admitted provider; establishes the capability itself (ADR 0097);
+- `kimi` (Task 123) — Moonshot AI, OpenAI-compatible wire format re-declared locally (connector packages may not import each other), default host `api.moonshot.ai`;
+- `gigachat` (Task 124) — Sber; `Complete()` performs a per-call OAuth exchange against `ngw.devices.sberbank.ru` followed by a Bearer completion call against `gigachat.devices.sberbank.ru`; the exchanged token is used once and never persisted;
+- `yandexgpt` (Task 125) — folder-scoped `gpt://<folder_id>/<model>` URIs against `llm.api.cloud.yandex.net`; `Health()` keeps the frozen 3-argument `sdk.Connector` shape, with the live folder-scoped probe exposed separately as `HealthCheckWithFolder` inside `builtinruntime` only.
+
+Create/disable/analyze audit entries are write_sensitive and record only actor, correlation id and a bounded outcome summary (provider, label, ok) — prompt/response text is never audited, so the capability cannot become an unbounded data-egress channel through audit storage. Each of the four providers has its own `ARCH-12{2,3,4,5}` architecture review, ADR 0097 (123–125 reuse it rather than reopening it), capability audit/spec docs and a Task-064 conformance report, each independently 13/13 PASS.
 
 ## Task 121 Pre-v1 migration baseline
 
@@ -109,10 +122,11 @@ Available local checks for the P4 repository delta:
 - P4 fail-closed policy tests: **PASS — 5 tests**;
 - deterministic release-evidence packaging: **PASS**;
 - P3→P4 architecture diff: **PASS — 33 changed files / exact ARCH-118 scope**;
-- migration catalog/baseline: **PASS — 11 active migrations / latest 000011; legacy 74-file head pinned and archived**;
-- architecture policy: **PASS — 117 modules / 32 providers / 109 reviews**;
-- generated public SDKs: **PASS — 108 operations / OpenAPI 0.15.0**;
-- frontend shell/catalog/static policy: **PASS — 18/18 / 32 connectors**;
+- migration catalog/baseline: **PASS — 13 active migrations / latest 000013; legacy 74-file head pinned and archived**;
+- architecture policy: **PASS — 119 modules / 36 providers / 116 reviews**;
+- generated public SDKs: **PASS — 112 operations / OpenAPI 0.16.0**;
+- frontend shell/catalog/static policy: **PASS — 18/18 / 36 connectors**;
+- Task-064 provider conformance for the four new `ai`-family connectors (`openai-compatible`, `kimi`, `gigachat`, `yandexgpt`): **PASS — 13/13 each**;
 - JS supply-chain repository/lock and Community deployment policies: **PASS**;
 - release and required-workflow YAML/P4 static invariants: **PASS**;
 - all new P4 shell/Python source syntax checks: **PASS**.
