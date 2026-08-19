@@ -14,7 +14,9 @@ The command shares the normal `TORGNEXA_HTTP_*` timeout/address controls. Produc
 
 `IdentityResolver` is the trusted ingress adapter. Its result contains actor id, canonical `tenancy.Scope`, permissions, and trusted Task-079 agent metadata (`agent_id`, `model_id`, `run_id`, `integration_id`). Tool JSON never accepts organization/workspace or agent-authority selectors.
 
-The repository baseline deliberately wires `cmd/mcp` to a deny resolver/governor until the production identity and policy adapters are composed. This prevents an accidental anonymous or ungoverned MCP deployment. Task `084` owns Enterprise IAM/federation and trusted control-plane composition; Tasks `018`/`079` define the application/governance boundaries it must satisfy.
+Task `126` (ADR 0098) replaced the baseline deny `IdentityResolver` with `internal/app/mcp.PostgresIdentityResolver`, backed by a new tenant-scoped `mcp_client_accounts` table (`internal/platform/mcpaccounts`, `internal/platform/postgres/mcpaccountsrepo`, `/settings/mcp-accounts` REST operations, and a frontend settings tab). An operator issues a bearer token once at account creation; the token embeds organization/workspace/account routing IDs so the resolver can build a `tenancy.Scope` before any RLS-scoped query runs (MCP carries no JWT the way REST does), then authenticates by comparing a SHA-256 hash of the presented secret against the stored `token_hash` — the embedded IDs are only a routing hint, never trusted alone. Task `084`'s Enterprise IAM/federation (`internal/platform/enterpriseiam`) was evaluated and rejected for this purpose: it has no Postgres persistence anywhere in the repository and solves a different problem (mapping external SSO identities to roles), not verifying a self-contained machine credential.
+
+`Governor`/`Auditor` remain the deny/unavailable baseline (`unavailableGovernor{}`/`unavailableAuditor{}`): Task `079`'s real `agentgovernance.Service`, backed by the already-implemented and tested `internal/platform/postgres/agentgovernancerepo`, was never composed into `cmd/mcp` either — a gap discovered while implementing Task 126, not yet closed. Concretely, with a valid `mcp_client_accounts` token today, `tools/list` returns an empty tool array and `tools/call` is denied, verified live against a running Community stack. See ADR 0098 for the follow-up scope.
 
 ## Authorization
 
@@ -64,4 +66,4 @@ The approval repository independently writes its own Task-017 audit/outbox evide
 
 ## Publication boundary
 
-Tasks `018` and `079` are repository-complete, so the AI-governance publication gate is closed. Production exposure is still not claimed: Task `084` must provide trusted federated identity plus policy/control-plane composition, and the current `cmd/mcp` remains deny-by-default until that wiring is qualified.
+Tasks `018` and `079` are repository-complete as domain logic, and Task `126` closes the identity half of the deny-by-default gate (real `IdentityResolver`, verified live end-to-end). Production exposure is still not claimed: `Governor`/`Auditor` remain the deny/unavailable baseline until Task 079's already-implemented `agentgovernance.Service`/`agentgovernancerepo` are composed into `cmd/mcp` the same way, and until an operational answer exists for provisioning a matching `agentgovernance.Policy` per MCP client account.

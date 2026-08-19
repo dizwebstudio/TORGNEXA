@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-126",
+  "task": "126",
+  "change_class": "pillar_change",
+  "summary": "Add a tenant-scoped MCP client account capability (settings CRUD, one-time bearer token issuance) and wire it as cmd/mcp's first non-deny IdentityResolver, closing the deny-by-default gap left open since Task 018 without inventing a second IAM system or touching the Connector SDK boundary.",
+  "scopes": [
+    "adr/0098-mcp-client-accounts-and-identity-resolver.md",
+    "architecture/policy.json",
+    "architecture/reviews/126-mcp-client-accounts.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "deploy/postgres/catalog.tsv",
+    "docs/70-mcp-server.md",
+    "frontend/src/features/settings/MCPAccountSettings.tsx",
+    "frontend/src/features/settings/settings-tabs.ts",
+    "frontend/src/pages/SettingsPage.tsx",
+    "frontend/src/styles.css",
+    "frontend/test/settings-tabs.test.mjs",
+    "internal/app/api/api.go",
+    "internal/app/api/mcp_accounts.go",
+    "internal/app/api/oidc_security.go",
+    "internal/app/api/openapi_runtime_parity_test.go",
+    "internal/app/api/production_routes.go",
+    "internal/app/mcp/identity.go",
+    "internal/app/mcp/identity_test.go",
+    "internal/app/mcp/server.go",
+    "internal/platform/mcpaccounts/mcpaccounts.go",
+    "internal/platform/mcpaccounts/mcpaccounts_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/mcpaccountsrepo/repository.go",
+    "migrations/000014_mcp_client_accounts.sql",
+    "migrations/catalog.json",
+    "tasks/issues/126-mcp-client-accounts.md"
+  ],
+  "frozen_pillars": [
+    "privacy-secrets-security-governance",
+    "developer-surfaces"
+  ],
+  "adr": "adr/0098-mcp-client-accounts-and-identity-resolver.md",
+  "existing_adrs": [
+    "adr/0006-approval-security.md",
+    "adr/0008-mcp-openclaw.md",
+    "adr/0021-ai-agent-guardrails.md",
+    "adr/0026-enterprise-iam-federation.md",
+    "adr/0097-ai-provider-settings-and-openai-compatible-admission.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "mcp_client_accounts is a new tenant-scoped table (organization_id/workspace_id, RLS forced); the resolver parses org/workspace/account IDs from the presented bearer token to build a tenancy.Scope before ever querying the table, since Postgres RLS has no scope to enforce before one is known and MCP carries no JWT the way REST does."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Only a SHA-256 token_hash is persisted; the raw bearer token is generated and returned exactly once, at creation, and is never logged or stored again. The create/disable audit summary excludes the token."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Three additive OpenAPI 0.17.0 operations under /settings/mcp-accounts(:disable); no existing operation changed. contracts/sdk/generated-manifest.json and all three SDKs regenerated (115 operations)."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is published or consumed by this capability."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "This change is entirely inside the application/settings surface (internal/app/api, internal/app/mcp) and a new platform_capability/infrastructure_adapter pair; it does not touch the Connector SDK, connectors/, or internal/platform/builtinruntime."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Migration 000014_mcp_client_accounts.sql is a normal post-baseline expand migration adding one table; the immutable 000001-000011 pre-v1 squash and 000012-000013 are unchanged. deploy/postgres/catalog.tsv (the file the community deployment migrate.sh entrypoint actually reads) was regenerated to match migrations/catalog.json; scripts/check-community-deployment.sh verifies this drift can't recur silently."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Authentication is a constant-time (crypto/subtle) comparison of the presented secret's SHA-256 hash against the stored token_hash; the token's embedded organization/workspace/account IDs are only a routing hint, never trusted on their own. Verified live: a tampered token and a disabled account's previously-valid token both return 401."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Account create/disable are audited as write_sensitive. settings.mcp_accounts.write (create/disable) is admin-only; settings.mcp_accounts.read extends to manager/operator/viewer, matching the settings.ai_providers.* pattern. This capability does not itself grant tool execution: cmd/mcp's Governor remains unavailableGovernor{}, a pre-existing, separately tracked gap (see ADR 0098) confirmed still open by this task's live verification (tools/list returns an empty array; tools/call is denied)."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every create/disable call is captured with actor, correlation id and a bounded summary (label, permissions) that excludes the token."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This capability performs no remote-state synchronization; there is nothing to reconcile."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No outbound call is made by this capability; it only authenticates inbound MCP callers. No inbound webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "No new SLO/latency-bearing remote dependency is introduced; the resolver performs one indexed Postgres lookup per MCP call."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disabling an mcp_client_accounts row (soft-disable; DELETE is revoked at the schema level) immediately stops further authentication for that account, verified live; no other component depends on this table."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "internal/platform/mcpaccounts and internal/app/mcp/identity_test.go cover token encode/decode round-trip, ValidateCreate rejection paths, and the resolver's accepted/missing-header/tampered-secret/disabled-account/wrong-tenant paths. No Connector SDK conformance suite applies (this task does not touch connectors/); live verification against the running Docker stack with a real Keycloak-issued token is recorded in tasks/issues/126-mcp-client-accounts.md instead."
+    }
+  ],
+  "follow_up_tasks": []
+}

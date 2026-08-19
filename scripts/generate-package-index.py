@@ -23,11 +23,11 @@ OUTPUT = ROOT / "PACKAGE_INDEX.md"
 SUMMARY_HEADING = "## Summary"
 FILES_HEADING = "## Files"
 
-# Mirrors .gitignore: build/dependency/cache trees and generated evidence are
-# not part of the package. .git and .claude are not in .gitignore (git never
-# needs to ignore itself, and .claude is local session tooling) so they are
-# listed explicitly.
-SKIP_DIR_NAMES = {".git", ".claude", "node_modules", "dist", "__pycache__", "reports", ".security-tools"}
+# Mirrors .gitignore (root and frontend/.gitignore): build/dependency/cache
+# trees and generated evidence are not part of the package. .git and .claude
+# are not in either .gitignore (git never needs to ignore itself, and
+# .claude is local session tooling) so they are listed explicitly.
+SKIP_DIR_NAMES = {".git", ".claude", "node_modules", "dist", "__pycache__", "reports", ".security-tools", ".repository-test"}
 SKIP_PATH_PREFIXES = ("qualification/evidence/",)
 SKIP_FILE_SUFFIXES = (".pyc", ".pyo", ".pyd", ".test")
 SKIP_FILE_NAMES = {"coverage.out"}

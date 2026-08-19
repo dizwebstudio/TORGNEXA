@@ -1,6 +1,6 @@
-# Package status — 2026-08-19
+# Package status — 2026-08-20
 
-**Tasks 001–125 are repository-implemented.** P4 adds final go-live evidence/publication controls; Tasks 119–120 close the operator/enterprise UX backlog; Task 121 compacts the pre-v1 database install path; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers. Architecture policy: **119 modules / 36 providers / 116 reviews**. Active migrations are **13**, latest `000013`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **112 operations / 0.16.0**.
+**Tasks 001–126 are repository-implemented.** P4 adds final go-live evidence/publication controls; Tasks 119–120 close the operator/enterprise UX backlog; Task 121 compacts the pre-v1 database install path; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers; Task 126 adds MCP client accounts and `cmd/mcp`'s first non-deny `IdentityResolver`. Architecture policy: **121 modules / 36 providers / 117 reviews**. Active migrations are **14**, latest `000014`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **115 operations / 0.17.0**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `HANDOFF.md` and `VALIDATION_REPORT.md`.
 
@@ -11,15 +11,24 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 374
-- adrs: 97
-- tasks: 127
+- adrs: 98
+- tasks: 128
 - milestones: 14
 - codex_skills: 28
 - contracts: 216
 - prompts: 13
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2176
+- total source files (excluding local secrets/build/dependency/cache trees): 2187
 
+
+## Task 126 additions
+
+- `mcp_client_accounts` (migration `000014_mcp_client_accounts.sql`, RLS forced) plus three additive OpenAPI 0.17.0 operations under `/settings/mcp-accounts(:disable)`, gated by `settings.mcp_accounts.read`/`write`;
+- `internal/platform/mcpaccounts` is a non-branching validation port that also owns bearer-token encoding/hashing; `internal/platform/postgres/mcpaccountsrepo` is its repository;
+- `internal/app/mcp/identity.go`'s `PostgresIdentityResolver` replaces `denyIdentityResolver{}` in `cmd/mcp`'s `Run()` — the first non-deny `IdentityResolver` this repository has ever had composed;
+- frontend: new "MCP-агенты" settings tab (`MCPAccountSettings.tsx`) with per-account tool-permission selection and a one-time token-reveal dialog;
+- verified live against the running Community Docker stack with a real Keycloak-authenticated session: account create/list/disable via REST, and the first-ever accepted `POST /mcp` request with the issued token (tampered and disabled-account tokens correctly rejected);
+- discovered and documented (ADR 0098), not closed by this task: Task 079's real `AgentGovernor`/`Auditor` were never composed into `cmd/mcp` either, so `tools/list`/`tools/call` remain governor-denied even with a valid identity.
 
 ## Tasks 122–125 additions
 
@@ -322,6 +331,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0095-enterprise-operations-ux-and-realtime-invalidation.md`
 - `adr/0096-pre-v1-migration-baseline-and-verified-rebaseline.md`
 - `adr/0097-ai-provider-settings-and-openai-compatible-admission.md`
+- `adr/0098-mcp-client-accounts-and-identity-resolver.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -439,6 +449,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/123-kimi-connector.json`
 - `architecture/reviews/124-gigachat-connector.json`
 - `architecture/reviews/125-yandexgpt-connector.json`
+- `architecture/reviews/126-mcp-client-accounts.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1449,6 +1460,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/features/settings/ConnectorBootstrapControls.tsx`
 - `frontend/src/features/settings/IdentityProviderSettings.tsx`
 - `frontend/src/features/settings/IntegrationCatalog.tsx`
+- `frontend/src/features/settings/MCPAccountSettings.tsx`
 - `frontend/src/features/settings/MemberSettings.tsx`
 - `frontend/src/features/settings/NotificationSettings.tsx`
 - `frontend/src/features/settings/SecuritySettings.tsx`
@@ -1538,6 +1550,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/legalparty_test.go`
 - `internal/app/api/lineage.go`
 - `internal/app/api/lineage_test.go`
+- `internal/app/api/mcp_accounts.go`
 - `internal/app/api/member_settings.go`
 - `internal/app/api/notification_delivery.go`
 - `internal/app/api/notification_routes.go`
@@ -1563,6 +1576,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/webhooks.go`
 - `internal/app/api/webhooks_test.go`
 - `internal/app/api/workspace_settings.go`
+- `internal/app/mcp/identity.go`
+- `internal/app/mcp/identity_test.go`
 - `internal/app/mcp/price_request.go`
 - `internal/app/mcp/price_request_test.go`
 - `internal/app/mcp/server.go`
@@ -1731,6 +1746,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/logistics/logistics_test.go`
 - `internal/platform/marking/marking.go`
 - `internal/platform/marking/marking_test.go`
+- `internal/platform/mcpaccounts/mcpaccounts.go`
+- `internal/platform/mcpaccounts/mcpaccounts_test.go`
 - `internal/platform/migration/backfill.go`
 - `internal/platform/migration/backfill_test.go`
 - `internal/platform/migration/baseline_test.go`
@@ -1799,6 +1816,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/legalpartyrepo/repository.go`
 - `internal/platform/postgres/lineagerepo/migration_test.go`
 - `internal/platform/postgres/lineagerepo/repository.go`
+- `internal/platform/postgres/mcpaccountsrepo/repository.go`
 - `internal/platform/postgres/notificationrepo/destinations.go`
 - `internal/platform/postgres/notificationrepo/migration_test.go`
 - `internal/platform/postgres/notificationrepo/repository.go`
@@ -1930,6 +1948,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000011_runtime_operations.sql`
 - `migrations/000012_ai_advisory.sql`
 - `migrations/000013_ai_provider_credential_class.sql`
+- `migrations/000014_mcp_client_accounts.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2265,6 +2284,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/123-kimi-connector.md`
 - `tasks/issues/124-gigachat-connector.md`
 - `tasks/issues/125-yandexgpt-connector.md`
+- `tasks/issues/126-mcp-client-accounts.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

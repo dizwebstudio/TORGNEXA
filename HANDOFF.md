@@ -1,22 +1,32 @@
-# TORGNEXA handoff — AI provider connectors + P4 + Enterprise UX + pre-v1 migration baseline
+# TORGNEXA handoff — MCP identity + AI provider connectors + P4 + Enterprise UX + pre-v1 migration baseline
 
-Date: 2026-08-19
+Date: 2026-08-20
 
 ## Current state
 
-Tasks `001`–`125` are repository-implemented. Task 118 adds the fail-closed P4 go-live evidence/publication layer; Task 119 closes the base operator UI/UX gap; Task 120 upgrades enterprise operations with server-owned grids, realtime invalidation, unified incidents, deep/server search and reporting-backed analytics; Task 121 replaces the 74-file development migration install path with an 11-file pre-v1 baseline and verified legacy rebaseline; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers on the same capability.
+Tasks `001`–`126` are repository-implemented. Task 118 adds the fail-closed P4 go-live evidence/publication layer; Task 119 closes the base operator UI/UX gap; Task 120 upgrades enterprise operations with server-owned grids, realtime invalidation, unified incidents, deep/server search and reporting-backed analytics; Task 121 replaces the 74-file development migration install path with an 11-file pre-v1 baseline and verified legacy rebaseline; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers on the same capability; Task 126 gives `cmd/mcp` its first non-deny `IdentityResolver` via a new tenant-scoped MCP client account capability.
 
 Current repository inventory:
 
-- architecture: **119 registered modules / 36 provider modules / 116 reviews**;
-- active PostgreSQL baseline: **13 migrations**, latest `000013_ai_provider_credential_class.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
-- public OpenAPI/generated SDK surface: **112 operations / OpenAPI 0.16.0**;
+- architecture: **121 registered modules / 36 provider modules / 117 reviews**;
+- active PostgreSQL baseline: **14 migrations**, latest `000014_mcp_client_accounts.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
+- public OpenAPI/generated SDK surface: **115 operations / OpenAPI 0.17.0**;
 - connector catalog: **36 connectors**;
 - repository license: **Apache-2.0**.
 
 Repository completion is still distinct from release-topology qualification. Task 117 makes runtime qualification mandatory in the release workflow, but this source archive cannot manufacture Docker, OIDC, GitHub Ruleset or live provider evidence.
 
 
+
+## Task 126 MCP client accounts and identity resolver
+
+Since Task 018 shipped, `cmd/mcp`'s `Run()` hardcoded `IdentityResolver: denyIdentityResolver{}` — every `POST /mcp` request was rejected. The blame fell on Task 084 (Enterprise IAM federation), but Task 084 (`internal/platform/enterpriseiam`) turned out to only implement in-memory SSO claim-to-role mapping for human identities, with no Postgres persistence anywhere and no concept of a machine credential.
+
+`mcp_client_accounts` (migration `000014_mcp_client_accounts.sql`, RLS forced) is a new tenant-scoped capability built for this instead: `internal/platform/mcpaccounts` (validation + bearer-token encode/hash) and `internal/platform/postgres/mcpaccountsrepo`, exposed through three additive OpenAPI 0.17.0 operations under `/settings/mcp-accounts(:disable)`. Unlike every other credential in this repository, the token is inbound (an agent presents it *to* TORGNEXA), so only a SHA-256 `token_hash` is stored and the raw token is shown exactly once, at creation. Because MCP carries no JWT the way REST does, the token itself embeds organization/workspace/account IDs so `internal/app/mcp/identity.go`'s `PostgresIdentityResolver` can build a `tenancy.Scope` before any RLS-scoped query — the embedded IDs are only a routing hint; a constant-time hash comparison is what actually authenticates. `PostgresIdentityResolver` now replaces `denyIdentityResolver{}` in `cmd/mcp`'s `Run()`.
+
+Verified live against the running Community Docker stack with a real Keycloak-authenticated PKCE session (not a stub): created/listed/disabled an MCP account via REST, and `POST /mcp tools/list` with the issued token returned **HTTP 200 with a resolved identity** — the first request this repository's MCP endpoint has ever accepted. A tampered token and a disabled account's token both correctly returned 401.
+
+Discovered while implementing this, and explicitly left open (ADR 0098): Task 079's real `AgentGovernor` (`internal/platform/agentgovernance`, backed by the already-implemented and tested `internal/platform/postgres/agentgovernancerepo`) was never composed into `cmd/mcp` either. With only Task 126 applied, `tools/list` returns an empty tool array and `tools/call` is denied even for a valid, enabled account — confirmed live, not just inferred. Frontend: new "MCP-агенты" settings tab (`MCPAccountSettings.tsx`) with per-account tool-permission checkboxes and a one-time token-reveal dialog.
 
 ## Tasks 122–125 AI provider settings and connectors
 
@@ -122,11 +132,12 @@ Available local checks for the P4 repository delta:
 - P4 fail-closed policy tests: **PASS — 5 tests**;
 - deterministic release-evidence packaging: **PASS**;
 - P3→P4 architecture diff: **PASS — 33 changed files / exact ARCH-118 scope**;
-- migration catalog/baseline: **PASS — 13 active migrations / latest 000013; legacy 74-file head pinned and archived**;
-- architecture policy: **PASS — 119 modules / 36 providers / 116 reviews**;
-- generated public SDKs: **PASS — 112 operations / OpenAPI 0.16.0**;
-- frontend shell/catalog/static policy: **PASS — 18/18 / 36 connectors**;
+- migration catalog/baseline: **PASS — 14 active migrations / latest 000014; legacy 74-file head pinned and archived**;
+- architecture policy: **PASS — 121 modules / 36 providers / 117 reviews**;
+- generated public SDKs: **PASS — 115 operations / OpenAPI 0.17.0**;
+- frontend shell/catalog/static policy: **PASS — 23/23 / 36 connectors**;
 - Task-064 provider conformance for the four new `ai`-family connectors (`openai-compatible`, `kimi`, `gigachat`, `yandexgpt`): **PASS — 13/13 each**;
+- Task 126 MCP client account identity path: **PASS — verified live** (real Keycloak-authenticated session, real issued MCP bearer token accepted end-to-end, tampered/disabled tokens correctly rejected), not only unit tests;
 - JS supply-chain repository/lock and Community deployment policies: **PASS**;
 - release and required-workflow YAML/P4 static invariants: **PASS**;
 - all new P4 shell/Python source syntax checks: **PASS**.
