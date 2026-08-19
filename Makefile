@@ -3,7 +3,7 @@ SHELL := /bin/bash
 export GOTOOLCHAIN := local
 export GOWORK := off
 
-.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance performance production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-down community-status check build
+.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance performance production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-down community-status package-index package-index-check check build
 fmt:
 	find . -type f -name '*.go' -not -path './vendor/*' -print0 | xargs -0 -r gofmt -w
 fmt-check:
@@ -71,6 +71,10 @@ community-down:
 	docker compose --env-file .env down
 community-status:
 	docker compose --env-file .env ps
-check: fmt-check test vet contracts architecture migrations policy sandbox conformance performance sdk-check frontend-check js-policy p4-policy community-check
+package-index:
+	python3 scripts/generate-package-index.py
+package-index-check:
+	python3 scripts/generate-package-index.py --check
+check: fmt-check test vet contracts architecture migrations policy sandbox conformance performance sdk-check frontend-check js-policy p4-policy community-check package-index-check
 build:
 	go build -trimpath -buildvcs=false ./cmd/...

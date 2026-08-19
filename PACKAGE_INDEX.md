@@ -1,6 +1,6 @@
-# Package status — 2026-08-18
+# Package status — 2026-08-19
 
-**Tasks 001–121 are repository-implemented.** P4 adds final go-live evidence/publication controls; Tasks 119–120 close the operator/enterprise UX backlog; Task 121 compacts the pre-v1 database install path. Architecture policy: **117 modules / 32 providers / 112 reviews**. Active migrations are **11**, latest `000011`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **108 operations / 0.15.0**.
+**Tasks 001–125 are repository-implemented.** P4 adds final go-live evidence/publication controls; Tasks 119–120 close the operator/enterprise UX backlog; Task 121 compacts the pre-v1 database install path; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers. Architecture policy: **119 modules / 36 providers / 116 reviews**. Active migrations are **13**, latest `000013`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **112 operations / 0.16.0**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `HANDOFF.md` and `VALIDATION_REPORT.md`.
 
@@ -10,16 +10,24 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 358
-- adrs: 96
-- tasks: 126
+- docs: 374
+- adrs: 97
+- tasks: 127
 - milestones: 14
 - codex_skills: 28
 - contracts: 216
 - prompts: 13
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2126
+- total source files (excluding local secrets/build/dependency/cache trees): 2176
 
+
+## Tasks 122–125 additions
+
+- `ai_provider_accounts` (migration `000012_ai_advisory.sql`, RLS forced) plus four additive OpenAPI 0.16.0 operations under `/settings/ai-providers(:disable|:analyze)`, gated by `settings.ai_providers.read`/`write` and a separate `ai.analyze` capability;
+- migration `000013_ai_provider_credential_class.sql` additively admits `ai_provider_credential` into `secret_references.class`;
+- `internal/platform/aiadvisory` is a non-branching port; `internal/platform/builtinruntime.Registry.AICompletion` is the sole `switch account.ConnectorID` dispatch point for the capability;
+- four `ai`-family providers admitted through Connector SDK v1 with only `ai.completion.generate`, each with no `net/*` import: `connectors/openai-compatible` (Task 122, establishes the capability, ADR 0097), `connectors/kimi` (Task 123, Moonshot AI), `connectors/gigachat` (Task 124, Sber, per-call OAuth exchange), `connectors/yandexgpt` (Task 125, folder-scoped `gpt://` URIs);
+- Task-064 provider conformance for all four: 13/13 PASS each; task cards `122`–`125`: `repository-complete`; provider count becomes 36.
 
 ## Task 121 additions
 
@@ -216,7 +224,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `Makefile`
 - `PACKAGE_INDEX.md`
 - `README.md`
-- `SECURITY_HIGH_BLOCKERS_CLOSURE.md`
 - `VALIDATION_REPORT.md`
 - `adr/0001-modular-monolith.md`
 - `adr/0002-kafka-event-platform.md`
@@ -314,6 +321,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0094-operator-oriented-ui-and-browser-state.md`
 - `adr/0095-enterprise-operations-ux-and-realtime-invalidation.md`
 - `adr/0096-pre-v1-migration-baseline-and-verified-rebaseline.md`
+- `adr/0097-ai-provider-settings-and-openai-compatible-admission.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -427,6 +435,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/119-ui-product-experience-closure.json`
 - `architecture/reviews/120-enterprise-operations-ux.json`
 - `architecture/reviews/121-pre-v1-migration-baseline.json`
+- `architecture/reviews/122-openai-compatible-connector.json`
+- `architecture/reviews/123-kimi-connector.json`
+- `architecture/reviews/124-gigachat-connector.json`
+- `architecture/reviews/125-yandexgpt-connector.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -518,6 +530,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/egais/connector_test.go`
 - `connectors/egais/manifest.json`
 - `connectors/egais/operations.go`
+- `connectors/gigachat/conformance.go`
+- `connectors/gigachat/connector.go`
+- `connectors/gigachat/connector_test.go`
+- `connectors/gigachat/manifest.json`
 - `connectors/instagram/config.go`
 - `connectors/instagram/conformance.go`
 - `connectors/instagram/connector.go`
@@ -528,6 +544,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/instagram/fixtures/status.json`
 - `connectors/instagram/manifest.json`
 - `connectors/instagram/social.go`
+- `connectors/kimi/conformance.go`
+- `connectors/kimi/connector.go`
+- `connectors/kimi/connector_test.go`
+- `connectors/kimi/manifest.json`
 - `connectors/magnit-market/config.go`
 - `connectors/magnit-market/conformance.go`
 - `connectors/magnit-market/connector.go`
@@ -611,6 +631,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/onec/inventory.go`
 - `connectors/onec/manifest.json`
 - `connectors/onec/odata.go`
+- `connectors/openai-compatible/conformance.go`
+- `connectors/openai-compatible/connector.go`
+- `connectors/openai-compatible/connector_test.go`
+- `connectors/openai-compatible/manifest.json`
 - `connectors/opencart/config.go`
 - `connectors/opencart/conformance.go`
 - `connectors/opencart/connector.go`
@@ -760,6 +784,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/yandex-market/prices.go`
 - `connectors/yandex-market/products.go`
 - `connectors/yandex-market/write.go`
+- `connectors/yandexgpt/conformance.go`
+- `connectors/yandexgpt/connector.go`
+- `connectors/yandexgpt/connector_test.go`
+- `connectors/yandexgpt/manifest.json`
 - `connectors/yookassa/candidate_transport.go`
 - `connectors/yookassa/conformance.go`
 - `connectors/yookassa/connector.go`
@@ -1152,12 +1180,20 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/egais/conformance-report.json`
 - `docs/connectors/egais/reconciliation.md`
 - `docs/connectors/egais/spec.md`
+- `docs/connectors/gigachat/capability-audit.md`
+- `docs/connectors/gigachat/conformance-plan.md`
+- `docs/connectors/gigachat/conformance-report.json`
+- `docs/connectors/gigachat/spec.md`
 - `docs/connectors/instagram/README.md`
 - `docs/connectors/instagram/capability-audit.md`
 - `docs/connectors/instagram/conformance-plan.md`
 - `docs/connectors/instagram/conformance-report.json`
 - `docs/connectors/instagram/reconciliation.md`
 - `docs/connectors/instagram/spec.md`
+- `docs/connectors/kimi/capability-audit.md`
+- `docs/connectors/kimi/conformance-plan.md`
+- `docs/connectors/kimi/conformance-report.json`
+- `docs/connectors/kimi/spec.md`
 - `docs/connectors/magnit-market/README.md`
 - `docs/connectors/magnit-market/capability-audit.md`
 - `docs/connectors/magnit-market/conformance-plan.md`
@@ -1194,6 +1230,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/onec/conformance-report.json`
 - `docs/connectors/onec/reconciliation.md`
 - `docs/connectors/onec/spec.md`
+- `docs/connectors/openai-compatible/capability-audit.md`
+- `docs/connectors/openai-compatible/conformance-plan.md`
+- `docs/connectors/openai-compatible/conformance-report.json`
+- `docs/connectors/openai-compatible/spec.md`
 - `docs/connectors/opencart/README.md`
 - `docs/connectors/opencart/bridge-v1.md`
 - `docs/connectors/opencart/capability-audit.md`
@@ -1271,6 +1311,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/yandex-market/conformance-report.json`
 - `docs/connectors/yandex-market/reconciliation.md`
 - `docs/connectors/yandex-market/spec.md`
+- `docs/connectors/yandexgpt/capability-audit.md`
+- `docs/connectors/yandexgpt/conformance-plan.md`
+- `docs/connectors/yandexgpt/conformance-report.json`
+- `docs/connectors/yandexgpt/spec.md`
 - `docs/connectors/yookassa/README.md`
 - `docs/connectors/yookassa/capability-audit.md`
 - `docs/connectors/yookassa/conformance-plan.md`
@@ -1401,6 +1445,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/features/catalog/ProductList.tsx`
 - `frontend/src/features/notifications/NotificationList.tsx`
 - `frontend/src/features/orders/OrderList.tsx`
+- `frontend/src/features/settings/AIProviderSettings.tsx`
 - `frontend/src/features/settings/ConnectorBootstrapControls.tsx`
 - `frontend/src/features/settings/IdentityProviderSettings.tsx`
 - `frontend/src/features/settings/IntegrationCatalog.tsx`
@@ -1466,6 +1511,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `integrations/n8n-nodes-torgnexa/tsconfig.release.json`
 - `integrations/n8n-nodes-torgnexa/types/n8n-workflow/index.d.ts`
 - `integrations/n8n-nodes-torgnexa/types/node/index.d.ts`
+- `internal/app/api/ai_advisory.go`
+- `internal/app/api/ai_advisory_test.go`
 - `internal/app/api/api.go`
 - `internal/app/api/api_test.go`
 - `internal/app/api/approvals.go`
@@ -1523,6 +1570,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/mcp/tools.go`
 - `internal/app/worker/connector_registry.go`
 - `internal/app/worker/reconciliation_actions.go`
+- `internal/app/worker/reporting_batch.go`
+- `internal/app/worker/reporting_batch_test.go`
 - `internal/app/worker/worker.go`
 - `internal/app/worker/worker_test.go`
 - `internal/core/catalog/catalog.go`
@@ -1551,6 +1600,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/agentgovernance/governance.go`
 - `internal/platform/agentgovernance/governance_test.go`
 - `internal/platform/agentgovernance/prompt_injection_test.go`
+- `internal/platform/aiadvisory/aiadvisory.go`
 - `internal/platform/approval/approval.go`
 - `internal/platform/approval/approval_test.go`
 - `internal/platform/architecture/checker.go`
@@ -1702,6 +1752,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/pluginsecurity/boundary_test.go`
 - `internal/platform/postgres/agentgovernancerepo/migration_test.go`
 - `internal/platform/postgres/agentgovernancerepo/repository.go`
+- `internal/platform/postgres/aiadvisoryrepo/repository.go`
 - `internal/platform/postgres/approvalrepo/migration_test.go`
 - `internal/platform/postgres/approvalrepo/repository.go`
 - `internal/platform/postgres/auditrepo/migration_test.go`
@@ -1877,6 +1928,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000009_control_plane.sql`
 - `migrations/000010_legacy_contract.sql`
 - `migrations/000011_runtime_operations.sql`
+- `migrations/000012_ai_advisory.sql`
+- `migrations/000013_ai_provider_credential_class.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2008,6 +2061,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/dzen-content-transformer.py`
 - `scripts/ensure-community-secrets-key.sh`
 - `scripts/generate-frontend-connector-catalog.py`
+- `scripts/generate-package-index.py`
 - `scripts/generate-pre-v1-baseline.py`
 - `scripts/generate-release-evidence.sh`
 - `scripts/generate-release-sboms.sh`
@@ -2207,6 +2261,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/119-ui-product-experience-closure.md`
 - `tasks/issues/120-enterprise-operations-ux.md`
 - `tasks/issues/121-pre-v1-migration-baseline.md`
+- `tasks/issues/122-ai-advisory-openai-compatible-connector.md`
+- `tasks/issues/123-kimi-connector.md`
+- `tasks/issues/124-gigachat-connector.md`
+- `tasks/issues/125-yandexgpt-connector.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`
