@@ -4,7 +4,7 @@ This document summarizes current repository coverage, not deployment evidence. T
 
 ## Repository implementation
 
-Tasks `001`–`121` are repository-implemented. P0 runtime closure is Task 114, P1 operations closure is Task 115, P2 production qualification is Task 116, P3 transactional warehouse execution/release closure is Task 117, and P4 go-live evidence/publication closure is Task 118.
+Tasks `001`–`125` are repository-implemented. P0 runtime closure is Task 114, P1 operations closure is Task 115, P2 production qualification is Task 116, P3 transactional warehouse execution/release closure is Task 117, P4 go-live evidence/publication closure is Task 118, and Tasks 122–125 add the tenant-scoped AI provider settings/analyze capability plus the `openai-compatible`/`kimi`/`gigachat`/`yandexgpt` connectors (see `HANDOFF.md`).
 
 ## Closed cross-cutting gaps
 
@@ -20,7 +20,8 @@ Tasks `001`–`121` are repository-implemented. P0 runtime closure is Task 114, 
 - protected release output can be staged as a non-public draft, independently rebound to Sigstore/SLSA identity and GitHub asset digests, and promoted only from retained P4 PASS evidence;
 - hosted branch protection and required-workflow facts are measured through GitHub applied rules rather than asserted locally;
 - live connector qualification is performed through the public API without retaining credentials.
-- the pre-v1 PostgreSQL development chain is compacted to an 11-file active baseline while the original 74-file lineage remains immutable checksum evidence with a verified one-time development rebaseline path.
+- the pre-v1 PostgreSQL development chain is compacted to an 11-file active baseline while the original 74-file lineage remains immutable checksum evidence with a verified one-time development rebaseline path;
+- AI provider account credentials never reach Postgres (`secrets.Reference` only) and all four admitted `ai`-family connectors dispatch through the single `builtinruntime.Registry.AICompletion` switch point.
 
 ## Remaining external/operational execution
 
@@ -36,3 +37,31 @@ These are not missing repository modules and must not be "closed" by source edit
 ## Intentional capability limits
 
 Provider write support remains capability-truthful. Yandex Market has qualified `prices.write`, WooCommerce supports its reviewed write surface, while providers whose warehouse/listing semantics cannot be represented safely by the current provider-neutral contract remain read-only rather than receiving guessed generic writes.
+
+## Closed: HIGH security blockers (2026-08-12)
+
+### Production API security composition
+
+- one production composition root;
+- health is the only public API route;
+- all configured application routes require authn -> tenant resolution -> authz;
+- private route registration without any required security dependency fails at startup;
+- security edge wraps the route table before application handlers;
+- feature-specific handler factories are package-private;
+- AST regression test rejects future exported handler factories that could bypass the root;
+- production trusted-proxy configuration is explicit and validated.
+
+### Unsafe JavaScript supply-chain publication
+
+- floating `@n8n/node-cli: *` and `n8n-workflow: *` removed;
+- n8n release build graph reduced to exact `typescript@5.9.3`;
+- `n8n-workflow` exact peer is `2.16.0`;
+- committed npm lock records SHA-512 integrity;
+- release/CI policy rejects floating/ranged dependencies and lock drift;
+- CI uses `npm ci --ignore-scripts`, pinned Node 22.16.0 and a full-SHA pinned setup-node action;
+- frontend is explicitly source-only until its own reviewed lockfile is committed, so an
+  unlocked transitive frontend graph cannot enter production release bytes.
+
+This closed the original HIGH condition: neither an uncomposed private HTTP endpoint nor an
+unlocked JavaScript dependency graph can be silently introduced into the current production
+release path.
