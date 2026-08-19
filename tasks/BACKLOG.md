@@ -47,8 +47,19 @@ Priority may move, but dependency gates in milestones and contracts must be resp
   findings and 15 High plus 1 Critical PostgreSQL finding per platform. A
   2026-08-18 re-scan (`qualification/evidence/supply-chain-scan-2026-08-18/`,
   trivy v0.70.0 against the exact pinned digests) found the PostgreSQL image
-  has regressed to 22 High plus 1 Critical (new Go stdlib CVEs since the last
-  snapshot); Kafka is unchanged at 10 High. Remediation is still outstanding.
+  had regressed to 22 High plus 1 Critical (new Go stdlib CVEs since the last
+  snapshot); Kafka was unchanged at 10 High. A 2026-08-19 re-check
+  (`qualification/evidence/supply-chain-scan-2026-08-19/`) found and applied
+  the one fix available: `postgres:18-alpine` had a newer upstream rebuild
+  that closes `CVE-2026-33630` (22 High → 21 High); `docker-compose.yml` and
+  `supply-chain/release-artifacts.json` are now pinned to that digest. The
+  remaining 1 Critical / 21 High on PostgreSQL is a Go-stdlib-v1.24.6 helper
+  binary bundled by the upstream image (fix requires an upstream rebuild with
+  Go ≥1.24.13, not fixable by any digest/tag choice available today); Kafka's
+  10 High is unchanged because `apache/kafka:4.3.1` is still upstream's
+  newest non-RC tag. Both remain genuinely blocked on upstream rebuilds, not
+  on anything in this repository; re-run the scan periodically to catch the
+  next rebuild of either image.
 - Obtain legal review of the package-level license inventory for every pinned
   runtime image. Do not infer approval from an image's top-level license and do
   not relax the default-deny SPDX policy to make the gate green. The

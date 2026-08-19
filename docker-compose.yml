@@ -57,7 +57,7 @@ x-app-common: &app-common
 
 services:
   postgres:
-    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: unless-stopped
     environment:
       POSTGRES_DB: torgnexa
@@ -76,7 +76,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   keycloak-db-init:
-    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: "no"
     depends_on:
       postgres:
@@ -94,7 +94,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   migrate:
-    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: "no"
     depends_on:
       postgres:
@@ -178,7 +178,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   garage-config:
-    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: "no"
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?run scripts/init-community-env.sh}
