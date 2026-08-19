@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-125",
+  "task": "125",
+  "change_class": "new_provider",
+  "summary": "Register YandexGPT as a fourth ai-family provider for the Task-122 AI provider account capability, using folder-scoped model URIs and a boundary-only Health that cannot carry the tenant FolderID.",
+  "scopes": [
+    "architecture/policy.json",
+    "architecture/reviews/125-yandexgpt-connector.json",
+    "connectors/yandexgpt/capability-audit.md",
+    "connectors/yandexgpt/conformance.go",
+    "connectors/yandexgpt/connector.go",
+    "connectors/yandexgpt/connector_test.go",
+    "connectors/yandexgpt/manifest.json",
+    "docs/connectors/yandexgpt/capability-audit.md",
+    "docs/connectors/yandexgpt/conformance-plan.md",
+    "docs/connectors/yandexgpt/conformance-report.json",
+    "docs/connectors/yandexgpt/spec.md",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "tasks/issues/125-yandexgpt-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "YandexGPT reuses the Task-122 ai_provider_accounts table (including its folder_id column) and secret binding; it adds no tenant persistence of its own."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "The only tenant text that leaves TORGNEXA through this provider is the caller-assembled analytics prompt at analyze-call time; FolderID is non-secret tenant configuration, not credential material."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "YandexGPT is reached through the existing Task-122 /settings/ai-providers:analyze operation; no new public operation is added."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is published or consumed."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Adds the yandexgpt provider under the existing ai family/ai.completion.generate capability; dispatch by provider id is confined to internal/platform/builtinruntime. Health satisfies the frozen sdk.Connector boundary (no FolderID) and reports account/manifest validity only; the live folder-scoped probe (HealthCheckWithFolder) is reachable only through builtinruntime."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No schema change; folder_id already exists on ai_provider_accounts from Task-122."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider code has no direct network authority; the completion call is host-mediated through builtinruntime's DNS-pinned, public-IP-only transport. Credential bytes are read only inside a host-owned UseSecret callback."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 ai.analyze / settings.ai_providers.* capability gates unchanged."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 audit entries unchanged."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This capability performs no remote-state synchronization."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound calls use a host-injected transport to a fixed host (llm.api.cloud.yandex.net); no inbound webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Remote non-2xx responses and empty/malformed completions normalize to a bounded error; the manifest's rate_limit/retry policy bounds concurrency and backoff."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disabling the account row immediately stops further YandexGPT analyze calls; no other component depends on this provider."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Package tests cover the missing-FolderID rejection and gpt://<folder_id>/<model> URI construction; the canonical Task-064 conformance suite passes all thirteen checks (docs/connectors/yandexgpt/conformance-report.json), including sandbox_isolation verified under a privileged Linux runner."
+    }
+  ],
+  "provider": {
+    "id": "yandexgpt",
+    "route": "connector_sdk",
+    "manifest": "connectors/yandexgpt/manifest.json",
+    "connector_spec": "docs/connectors/yandexgpt/spec.md",
+    "capability_audit": "docs/connectors/yandexgpt/capability-audit.md",
+    "conformance_plan": "docs/connectors/yandexgpt/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

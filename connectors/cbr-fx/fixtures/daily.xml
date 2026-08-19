@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<ValCurs Date="11.08.2026" name="Foreign Currency Market">
+  <Valute ID="R01235"><NumCode>840</NumCode><CharCode>USD</CharCode><Nominal>1</Nominal><Name>US Dollar</Name><Value>80,5000</Value></Valute>
+  <Valute ID="R01239"><NumCode>978</NumCode><CharCode>EUR</CharCode><Nominal>1</Nominal><Name>Euro</Name><Value>93,2500</Value></Valute>
+  <Valute ID="R01820"><NumCode>392</NumCode><CharCode>JPY</CharCode><Nominal>100</Nominal><Name>Yen</Name><Value>54,1200</Value></Valute>
+</ValCurs>

@@ -1,0 +1,11 @@
+{
+  "id": "threads",
+  "name": "Threads",
+  "family": "social",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["social.post.media", "social.post.text", "social.post.video"],
+  "auth": [{"kind": "oauth2", "secret_class": "social.user-oauth", "required": true, "oauth2": {"grant_type": "authorization_code", "authorization_url": "https://threads.net/oauth/authorize", "token_url": "https://graph.threads.net/oauth/access_token", "scopes": ["threads_basic", "threads_content_publish"], "client_auth_method": "client_secret_post"}}],
+  "connection_test": {"url": "https://graph.threads.net/v1.0/me?fields=id,username", "method": "GET", "headers": {"Authorization": "Bearer ${access_token}"}},
+  "rate_limit": {"max_concurrency": 1, "min_interval_ms": 500, "request_timeout_ms": 120000, "retry": {"max_attempts": 5, "base_backoff_ms": 1000, "max_backoff_ms": 60000}}
+}

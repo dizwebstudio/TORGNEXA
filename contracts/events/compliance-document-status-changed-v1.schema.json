@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/compliance-document-status-changed-v1.json",
+  "title": "compliance.document.status_changed.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "document_id",
+    "status"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "document_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

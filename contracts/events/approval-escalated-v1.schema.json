@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "governance.approval.escalated.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$id": "https://torgnexa.local/schemas/events/approval-escalated-v1.json",
+  "required": [
+    "request_id",
+    "stage",
+    "escalation_count",
+    "state",
+    "version"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "stage": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "escalation_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "state": {
+      "const": "pending"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 2
+    }
+  }
+}

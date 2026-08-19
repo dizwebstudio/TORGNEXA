@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/transport/inbox-receipt.json",
+  "title": "TORGNEXA Inbox Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "organization_id",
+    "workspace_id",
+    "consumer",
+    "event_id",
+    "event_type",
+    "event_fingerprint",
+    "first_observed_at",
+    "processed_at",
+    "processed_attempt"
+  ],
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "consumer": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._:-]{0,127}$"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.v[1-9][0-9]{0,2}$"
+    },
+    "event_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "first_observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "processed_attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    }
+  },
+  "description": "Immutable tenant/consumer/event receipt. It stores only a canonical envelope fingerprint and delivery metadata, not the business payload. Duplicate delivery with the same fingerprint is success; different content for the same identity is a collision."
+}

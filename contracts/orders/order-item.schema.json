@@ -1,0 +1,17 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/orders/order-item.json",
+  "title":"TORGNEXA Canonical OrderItem v1",
+  "type":"object","additionalProperties":false,
+  "required":["id","order_id","offer_id","position","sku","quantity","unit_price","subtotal","discount_total","tax_total","line_total","tax","created_at"],
+  "properties":{
+    "id":{"$ref":"#/$defs/id"},"order_id":{"$ref":"#/$defs/id"},"offer_id":{"$ref":"#/$defs/id"},"position":{"type":"integer","minimum":1},"sku":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "quantity":{"$ref":"#/$defs/quantity"},"unit_price":{"$ref":"#/$defs/money"},"subtotal":{"$ref":"#/$defs/money"},"discount_total":{"$ref":"#/$defs/money"},"tax_total":{"$ref":"#/$defs/money"},"line_total":{"$ref":"#/$defs/money"},"tax":{"$ref":"#/$defs/tax"},"created_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  },
+  "$defs":{
+    "id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "money":{"type":"object","additionalProperties":false,"required":["minor_units","currency"],"properties":{"minor_units":{"type":"integer","minimum":0},"currency":{"type":"string","pattern":"^[A-Z]{3}$"}}},
+    "quantity":{"type":"object","additionalProperties":false,"required":["value","unit"],"properties":{"value":{"type":"string","pattern":"^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?$"},"unit":{"type":"string","pattern":"^[A-Z][A-Z0-9._-]{0,15}$"}}},
+    "tax":{"type":"object","additionalProperties":false,"required":["jurisdiction","category","rate_fraction","price_includes_tax"],"properties":{"jurisdiction":{"type":"string","pattern":"^[A-Z]{2}(?:-[A-Z0-9]{1,12})?$"},"category":{"enum":["standard","reduced","zero"]},"rate_fraction":{"type":"string","pattern":"^(?:0(?:\\.[0-9]{1,9})?|1)$"},"price_includes_tax":{"type":"boolean"}}}
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/privacy-request-created-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "privacy.request.created.v1",
+  "required": [
+    "request_id",
+    "request_type",
+    "status"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "request_type": {
+      "enum": [
+        "access",
+        "export",
+        "correction",
+        "deletion",
+        "restriction"
+      ]
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

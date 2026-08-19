@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/legal-party-record-changed-v1.json",
+  "title": "enterprise.legal_party.record_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_type",
+    "entity_id",
+    "version",
+    "change"
+  ],
+  "properties": {
+    "entity_type": {
+      "enum": [
+        "legal_entity",
+        "individual_entrepreneur",
+        "branch",
+        "counterparty",
+        "address",
+        "bank_account",
+        "contract",
+        "authority_reference",
+        "merge_preview"
+      ]
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "enum": [
+        "created",
+        "updated"
+      ]
+    }
+  }
+}

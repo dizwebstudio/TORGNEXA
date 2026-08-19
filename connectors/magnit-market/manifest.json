@@ -1,0 +1,11 @@
+{
+  "id": "magnit-market",
+  "name": "Magnit Market",
+  "family": "marketplace",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["inventory.read", "orders.read", "prices.read", "products.read"],
+  "auth": [{"kind": "api_key", "secret_class": "marketplace.api-key", "required": true}],
+  "connection_test": {"url": "https://b2b-api.magnit.ru/api/seller/v1/shops", "method": "GET", "headers": {"X-Api-Key": "${secret}"}},
+  "rate_limit": {"max_concurrency": 2, "min_interval_ms": 500, "request_timeout_ms": 15000, "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}}
+}

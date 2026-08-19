@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/price-changed-v1.json",
+  "title": "commerce.pricing.price_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "price_id",
+    "offer_id",
+    "kind",
+    "amount",
+    "version",
+    "change"
+  ],
+  "properties": {
+    "price_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "offer_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "kind": {
+      "enum": [
+        "regular",
+        "compare_at",
+        "cost"
+      ]
+    },
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minor_units",
+        "currency"
+      ],
+      "properties": {
+        "minor_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "enum": [
+        "created",
+        "updated"
+      ]
+    }
+  }
+}

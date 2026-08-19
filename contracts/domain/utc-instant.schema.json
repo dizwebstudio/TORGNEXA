@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/domain/utc-instant.json",
+  "title": "TORGNEXA UTC Instant",
+  "type": "string",
+  "format": "date-time",
+  "pattern": "Z$",
+  "description": "Persisted/event timestamps are canonical RFC3339/RFC3339Nano UTC values. Local wall time is resolved at scheduling/presentation edges before persistence."
+}

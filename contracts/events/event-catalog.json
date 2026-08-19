@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "event_type": "billing.subscription.state_changed.v1",
+      "payload_schema": "events/billing-subscription-state-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.catalog.offer_changed.v1",
+      "payload_schema": "events/offer-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.catalog.product_changed.v1",
+      "payload_schema": "events/product-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.claim.created.v1",
+      "payload_schema": "events/claim-created-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.fulfillment.allocation_changed.v1",
+      "payload_schema": "events/fulfillment-allocation-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.inventory.position_changed.v1",
+      "payload_schema": "events/inventory-position-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.inventory.stock_changed.v1",
+      "payload_schema": "events/stock-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.inventory.warehouse_changed.v1",
+      "payload_schema": "events/warehouse-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.orders.order_changed.v1",
+      "payload_schema": "events/order-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.orders.order_created.v1",
+      "payload_schema": "events/order-created-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.pim.record_changed.v1",
+      "payload_schema": "events/pim-record-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.pricing.price_changed.v1",
+      "payload_schema": "events/price-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.social.channel_account_changed.v1",
+      "payload_schema": "events/social-channel-account-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.social.content_changed.v1",
+      "payload_schema": "events/social-content-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.social.publication_status_changed.v1",
+      "payload_schema": "events/social-publication-status-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.social.variant_changed.v1",
+      "payload_schema": "events/social-variant-changed-v1.schema.json"
+    },
+    {
+      "event_type": "compliance.document.status_changed.v1",
+      "payload_schema": "events/compliance-document-status-changed-v1.schema.json"
+    },
+    {
+      "event_type": "compliance.product.record_changed.v1",
+      "payload_schema": "events/product-compliance-record-changed-v1.schema.json"
+    },
+    {
+      "event_type": "enterprise.legal_party.record_changed.v1",
+      "payload_schema": "events/legal-party-record-changed-v1.schema.json"
+    },
+    {
+      "event_type": "finance.fx_rate.published.v1",
+      "payload_schema": "events/fx-rate-published-v1.schema.json"
+    },
+    {
+      "event_type": "finance.fx_rate.published.v2",
+      "payload_schema": "events/fx-rate-published-v2.schema.json"
+    },
+    {
+      "event_type": "finance.settlement_entry.created.v1",
+      "payload_schema": "events/settlement-entry-created-v1.schema.json"
+    },
+    {
+      "event_type": "governance.approval.decided.v1",
+      "payload_schema": "events/approval-decided-v1.schema.json"
+    },
+    {
+      "event_type": "governance.approval.escalated.v1",
+      "payload_schema": "events/approval-escalated-v1.schema.json"
+    },
+    {
+      "event_type": "governance.approval.policy_changed.v1",
+      "payload_schema": "events/approval-policy-changed-v1.schema.json"
+    },
+    {
+      "event_type": "governance.approval.requested.v1",
+      "payload_schema": "events/approval-requested-v1.schema.json"
+    },
+    {
+      "event_type": "governance.approval.state_changed.v1",
+      "payload_schema": "events/approval-state-changed-v1.schema.json"
+    },
+    {
+      "event_type": "governance.entitlement.quota_policy_changed.v1",
+      "payload_schema": "events/entitlement-quota-policy-changed-v1.schema.json"
+    },
+    {
+      "event_type": "governance.entitlement.rule_changed.v1",
+      "payload_schema": "events/entitlement-rule-changed-v1.schema.json"
+    },
+    {
+      "event_type": "party.counterparty.updated.v1",
+      "payload_schema": "events/counterparty-updated-v1.schema.json"
+    },
+    {
+      "event_type": "platform.notifications.notification_created.v1",
+      "payload_schema": "events/notification-created-v1.schema.json"
+    },
+    {
+      "event_type": "privacy.request.created.v1",
+      "payload_schema": "events/privacy-request-created-v1.schema.json"
+    },
+    {
+      "event_type": "security.upload.decision.v1",
+      "payload_schema": "events/upload-security-decision-v1.schema.json"
+    },
+    {
+      "event_type": "security.upload.quarantined.v1",
+      "payload_schema": "events/upload-quarantined-v1.schema.json"
+    },
+    {
+      "event_type": "security.upload.released.v1",
+      "payload_schema": "events/upload-released-v1.schema.json"
+    },
+    {
+      "event_type": "security.upload.rescan_requested.v1",
+      "payload_schema": "events/upload-rescan-requested-v1.schema.json"
+    },
+    {
+      "event_type": "warehouse.stock.moved.v1",
+      "payload_schema": "events/warehouse-stock-moved-v1.schema.json"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "outDir": ".offline-dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [],
+    "typeRoots": ["./types"]
+  },
+  "include": ["credentials/**/*.ts", "nodes/**/*.ts", "types/**/*.d.ts"],
+  "exclude": ["dist", ".offline-dist", "node_modules"]
+}

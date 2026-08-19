@@ -1,0 +1,16 @@
+{
+  "id": "rb-storage",
+  "title": "Storage incident",
+  "trigger_codes": [
+    "object_store_unavailable"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Switch only to a pre-qualified storage endpoint or stop writes fail-closed.",
+      "validation": "Verify upload quarantine, read-after-write and checksum integrity.",
+      "rollback": "Return traffic to the primary endpoint after integrity checks.",
+      "evidence": "object checksums, endpoint health and upload evidence"
+    }
+  ]
+}

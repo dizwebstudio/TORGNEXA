@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-065B",
+  "task": "065",
+  "stage": "b",
+  "change_class": "pillar_change",
+  "summary": "Closes the JavaScript supply-chain HIGH finding by removing floating n8n build dependencies, committing a minimal integrity-pinned npm lock, enforcing exact dependency policy and making unlocked frontend publication fail closed.",
+  "scopes": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/security.yml",
+    ".npmrc",
+    "Makefile",
+    "SECURITY_HIGH_BLOCKERS_CLOSURE.md",
+    "adr/0084-javascript-release-dependency-locking.md",
+    "architecture/reviews/065b-js-supply-chain-locking.json",
+    "docs/security/js-supply-chain-locking.md",
+    "frontend/package.json",
+    "integrations/n8n-nodes-torgnexa/package-lock.json",
+    "integrations/n8n-nodes-torgnexa/package.json",
+    "integrations/n8n-nodes-torgnexa/scripts",
+    "integrations/n8n-nodes-torgnexa/tsconfig.release.json",
+    "scripts/build-release.sh",
+    "scripts/check-frontend-shell.sh",
+    "scripts/check-js-supply-chain.sh",
+    "scripts/check-supply-chain.sh",
+    "sdk/typescript/package.json",
+    "supply-chain/action-pins.json",
+    "supply-chain/js-artifacts.json",
+    "tools/contractcheck/internal/checker/supplychain.go",
+    "tools/contractcheck/internal/checker/supplychain_test.go"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "privacy-secrets-security-governance",
+    "developer-surfaces"
+  ],
+  "adr": "adr/0084-javascript-release-dependency-locking.md",
+  "existing_adrs": [
+    "adr/0017-release-supply-chain-security.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0047-frontend-shell-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Dependency installation uses no application credentials; lifecycle scripts are disabled for the locked install qualification path."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "The n8n community package keeps its public node/credential metadata while replacing only the development build toolchain; Connector SDK contracts are unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Floating npm ranges are rejected, release-enabled JS requires a committed integrity-bearing lock, CI uses npm ci --ignore-scripts and the Node bootstrap Action is full-SHA pinned."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The policy is source/release gating only; rollback restores prior manifests but production publication remains controlled by the release inventory."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Repository policy checks, npm lock structural validation, offline n8n tests, package-content verification and network-enabled npm ci in CI cover the new boundary."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

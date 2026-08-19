@@ -1,0 +1,26 @@
+flowchart TB
+  UI[React Web UI] --> API[Go API]
+  N8N[n8n] --> API
+  MCP[OpenClaw / MCP] --> API
+  API --> PG[(PostgreSQL)]
+  API --> OUT[Transactional Outbox]
+  OUT --> K[(Kafka)]
+  K --> W[Workers]
+  W --> CH[(ClickHouse)]
+  W --> CONN[Connector Runtime]
+  CONN --> MKT[Marketplaces / Classified]
+  CONN --> SOC[Social Channels]
+  CONN --> ERP[1C / MoySklad]
+  CONN --> GOV[ChZ / EDO / VetIS / Fiscal]
+  CONN --> PAY[Payments]
+  CONN --> LOG[Logistics / PUDO]
+  API --> SEC[Approval / Secrets / Privacy / Audit]
+  API --> DOM[Commerce Domains]
+  DOM --> PIM[PIM / Pricing / Orders]
+  DOM --> GROW[Growth / Ads / Promotions]
+  DOM --> SUP[Procurement / WMS]
+  DOM --> CS[Customer Service / Claims]
+  DOM --> LEDGER[Settlement Ledger]
+  W --> REC[Sync / Reconciliation]
+  API --> WH[Durable Signed Webhooks]
+  K --> WH

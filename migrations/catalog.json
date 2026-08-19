@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "migrations": [
+    {
+      "version": 1,
+      "name": "platform",
+      "file": "000001_platform.sql",
+      "phase": "expand",
+      "risk": "medium",
+      "transaction": "embedded",
+      "policy": "legacy",
+      "history_mode": "bootstrap",
+      "requires_backup": false,
+      "dependencies": [],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "923a35e6490908ed1a7ddb48d44f241ec480febaa01bc119cf6addd8fce54aac"
+    },
+    {
+      "version": 2,
+      "name": "tenancy",
+      "file": "000002_tenancy.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "bootstrap",
+      "requires_backup": true,
+      "dependencies": [
+        1
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "56ab7dd3ff1a8eedcf4f7038ed0841ceb7d52563bb5f56656064061837cea24e"
+    },
+    {
+      "version": 3,
+      "name": "migration_framework",
+      "file": "000003_migration_framework.sql",
+      "phase": "expand",
+      "risk": "medium",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "bootstrap",
+      "requires_backup": false,
+      "dependencies": [
+        2
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "a055d1fce3a198ad00435a96063d51674634a55c00d252a5172d30c5f7c1c7b1"
+    },
+    {
+      "version": 4,
+      "name": "security_eventing",
+      "file": "000004_security_eventing.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        3
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "b03963f22ab41740f5d204c34b57fc16cac3c36ac9bd8ade403541721d048867"
+    },
+    {
+      "version": 5,
+      "name": "commerce_core",
+      "file": "000005_commerce_core.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        4
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "43887e4d7b78afe80337d969432baca6c948fb67a0adeb9954f7c6393a3c801e"
+    },
+    {
+      "version": 6,
+      "name": "operations_foundation",
+      "file": "000006_operations_foundation.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        5
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "b6f6775a1e5fd8ea3d578c79c3f5f711929caae37abaa745162138fbe3aba355"
+    },
+    {
+      "version": 7,
+      "name": "commerce_extensions",
+      "file": "000007_commerce_extensions.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        6
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "9ac95ebecd73e8f256c9bbf5590b87b634cf12df48dfb9527d33c7a14e1b8945"
+    },
+    {
+      "version": 8,
+      "name": "regulated_integrations",
+      "file": "000008_regulated_integrations.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        7
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "dd8e366e13882a98680bd9db724e729d55140d9777da4cc0c91084a5a88e81d0"
+    },
+    {
+      "version": 9,
+      "name": "control_plane",
+      "file": "000009_control_plane.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        8
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "151e1f68179539d93e1c68ec66fa642592c1f547b82d56ef4009cc6454a9393d"
+    },
+    {
+      "version": 10,
+      "name": "legacy_contract",
+      "file": "000010_legacy_contract.sql",
+      "phase": "contract",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        9
+      ],
+      "compatibility": {
+        "old_readers": false,
+        "old_writers": false,
+        "new_binary_on_old_schema": false,
+        "contract_preconditions": [
+          "backup_checkpoint_verified",
+          "inbox_events_empty",
+          "inbox_events_traffic_zero",
+          "minimum_binary_inbox_receipts_v1"
+        ]
+      },
+      "backfill": null,
+      "sha256": "fdc093ddd22321202c0b30913b40d82c626100be6672b330326a7e399821c5fb"
+    },
+    {
+      "version": 11,
+      "name": "runtime_operations",
+      "file": "000011_runtime_operations.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [
+        10
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "e7a3b366ae642ac7f1895f8034b5aa02181822610011753c5c2d323205d2cebf"
+    },
+    {
+      "version": 12,
+      "name": "ai_advisory",
+      "file": "000012_ai_advisory.sql",
+      "phase": "expand",
+      "risk": "medium",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [
+        11
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "1600d7641b951e26ad797b4231dc8b6f105ed9dd1db2707ba2ba7f6c911a818d"
+    },
+    {
+      "version": 13,
+      "name": "ai_provider_credential_class",
+      "file": "000013_ai_provider_credential_class.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [
+        12
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "1e3b5fa994d5c4f56676e132548abfbd1971a490b79e44452f29b1bf62277a4b"
+    }
+  ]
+}

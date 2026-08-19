@@ -1,0 +1,17 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/import-export/result-report-v1.json",
+  "title":"TORGNEXA Import Result Report v1",
+  "type":"object","additionalProperties":false,
+  "required":["source_sha256","mapping_fingerprint","total_rows","created_rows","unchanged_rows","failed_rows","errors_truncated","errors"],
+  "properties":{
+    "source_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "mapping_fingerprint":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "total_rows":{"type":"integer","minimum":1,"maximum":100000},
+    "created_rows":{"type":"integer","minimum":0,"maximum":100000},
+    "unchanged_rows":{"type":"integer","minimum":0,"maximum":100000},
+    "failed_rows":{"type":"integer","minimum":0,"maximum":100000},
+    "errors_truncated":{"type":"boolean"},
+    "errors":{"type":"array","maxItems":10000,"items":{"type":"object","additionalProperties":false,"required":["row","code"],"properties":{"row":{"type":"integer","minimum":1},"field":{"type":"string","maxLength":128},"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}}}
+  }
+}

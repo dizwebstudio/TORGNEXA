@@ -1,0 +1,19 @@
+syntax = "proto3";
+package torgnexa.events.v1;
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+message EventEnvelope {
+  string event_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  string organization_id = 4;
+  string workspace_id = 5;
+  string entity_type = 6;
+  string entity_id = 7;
+  string source = 8;
+  string correlation_id = 9;
+  string causation_id = 10;
+  string actor_id = 11;
+  string trace_id = 12;
+  google.protobuf.Struct data = 13;
+}

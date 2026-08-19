@@ -1,0 +1,15 @@
+sequenceDiagram
+  participant M as Marketplace
+  participant C as TORGNEXA
+  participant P as PostgreSQL
+  participant K as Kafka
+  participant E as ERP
+  participant R as Reporting
+  M->>C: Order event/poll result
+  C->>P: Normalize order + outbox event (one tx)
+  P-->>C: Commit
+  C->>K: Outbox relay publishes
+  K->>E: order.created.v1
+  K->>R: order.created.v1
+  E-->>C: ERP sync result
+  C->>P: Update sync state/audit

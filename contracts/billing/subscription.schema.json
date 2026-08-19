@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/billing/subscription.json",
+  "title": "CloudSubscription",
+  "type": "object",
+  "required": [
+    "id",
+    "organization_id",
+    "plan_version_id",
+    "status",
+    "period_start",
+    "period_end"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "plan_version_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "trial",
+        "active",
+        "past_due",
+        "grace",
+        "suspended",
+        "cancelled"
+      ]
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "grace_until": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "auto_renew": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

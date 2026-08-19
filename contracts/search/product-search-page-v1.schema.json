@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/search/product-search-page-v1.json",
+  "title": "Product search page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/hit"}
+    },
+    "next_cursor": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^v1\\.[A-Za-z0-9_-]+$"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "code", "title", "status", "updated_at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "code": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 300},
+        "status": {"type": "string", "enum": ["draft", "active", "archived"]},
+        "updated_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+      }
+    }
+  }
+}

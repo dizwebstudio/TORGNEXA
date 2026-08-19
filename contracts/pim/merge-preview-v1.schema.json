@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/pim/merge-preview-v1.json",
+  "title": "TORGNEXA PIM Merge Preview v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "organization_id",
+    "workspace_id",
+    "entity_type",
+    "target_id",
+    "source_id",
+    "target_version",
+    "source_version",
+    "fields",
+    "has_conflicts",
+    "fingerprint_sha256"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^merge\\.[0-9a-f]{64}$"
+    },
+    "entity_type": {
+      "enum": [
+        "brand",
+        "category",
+        "attribute"
+      ]
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "target_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field_path",
+          "target_value",
+          "source_value",
+          "winner_source",
+          "reason",
+          "decision"
+        ],
+        "properties": {
+          "field_path": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]{0,127}$"
+          },
+          "target_value": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "source_value": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "winner_source": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "reason": {
+            "enum": [
+              "equal_values",
+              "target_missing",
+              "source_missing",
+              "source_authority",
+              "target_authority",
+              "equal_authority"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "keep_target",
+              "take_source",
+              "conflict",
+              "equal"
+            ]
+          }
+        }
+      }
+    },
+    "has_conflicts": {
+      "type": "boolean"
+    },
+    "fingerprint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "organization_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    }
+  }
+}

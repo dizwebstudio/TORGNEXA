@@ -1,0 +1,1 @@
+Read AGENTS.md, docs/31-russia-compliance.md, docs/36-privacy-data-governance.md and the connector task. Implement only documented/sandboxed capabilities. Keep official remote status authoritative, require approvals for legally significant writes, isolate signing keys and add reconciliation/audit fixtures.

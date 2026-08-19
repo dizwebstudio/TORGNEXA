@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title": "TORGNEXA approval policy v1",
+  "$id":"https://torgnexa.local/schemas/approval/policy-v1.json",
+  "type":"object","additionalProperties":false,
+  "required":["id","organization_id","workspace_id","version","name","action","resource_type","minimum_risk","request_ttl_seconds","escalate_after_seconds","separation_of_duties","stages","active"],
+  "properties":{
+    "id":{"type":"string","minLength":26,"maxLength":36},"organization_id":{"type":"string","minLength":26,"maxLength":36},"workspace_id":{"type":"string","minLength":26,"maxLength":36},
+    "version":{"type":"integer","minimum":1},"name":{"$ref":"#/$defs/token"},"action":{"$ref":"#/$defs/token"},"resource_type":{"$ref":"#/$defs/token"},
+    "minimum_risk":{"enum":["read","write_safe","write_sensitive","legally_significant"]},
+    "request_ttl_seconds":{"type":"integer","minimum":60,"maximum":2592000},"escalate_after_seconds":{"type":"integer","minimum":0,"maximum":2591999},"separation_of_duties":{"type":"boolean"},"active":{"type":"boolean"},
+    "stages":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["number","name","required_approvals","eligible_scopes"],"properties":{"number":{"type":"integer","minimum":1,"maximum":16},"name":{"$ref":"#/$defs/token"},"required_approvals":{"type":"integer","minimum":1,"maximum":32},"eligible_scopes":{"type":"array","minItems":1,"maxItems":64,"uniqueItems":true,"items":{"$ref":"#/$defs/token"}}}}}
+  },
+  "$defs":{"token":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"}}
+}

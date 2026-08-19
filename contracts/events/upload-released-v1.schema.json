@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/upload-released-v1.json",
+  "title": "security.upload.released.v1",
+  "type": "object",
+  "required": ["event_id", "object_id", "evidence_id", "sha256", "size_bytes"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "object_id": {"type": "string", "pattern": "^upl_[0-9a-f]{32}$"},
+    "evidence_id": {"type": "string", "pattern": "^uev_[0-9a-f]{32}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "size_bytes": {"type": "integer", "minimum": 0, "maximum": 10737418240}
+  },
+  "additionalProperties": false
+}

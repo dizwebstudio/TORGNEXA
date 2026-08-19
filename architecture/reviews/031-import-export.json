@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-031",
+  "task": "031",
+  "change_class": "implementation",
+  "summary": "Implement the frozen provider-neutral import/export capability as a release-gated CSV/JSON Product pipeline with versioned mappings, deterministic preview evidence, fail-closed commit and canonical export encoding.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/031-import-export.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/import-export/README.md",
+    "contracts/import-export/mapping-v1.schema.json",
+    "contracts/import-export/preview-report-v1.schema.json",
+    "contracts/import-export/result-report-v1.schema.json",
+    "docs/33-import-export.md",
+    "internal/platform/importexport/importexport.go",
+    "internal/platform/importexport/importexport_test.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/031-import-export.md",
+    "tasks/issues/088-upload-security-pipeline.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0030-upload-quarantine.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Import uses authenticated tenancy.Scope only; ReleasedObjectRef storage keys must carry the same organization/workspace prefix and Catalog writes receive the same validated scope."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "The engine does not copy raw source bytes into reports. Preview/result evidence contains bounded canonical product fields, row/error codes and SHA-256 fingerprints only."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 031 adds no public HTTP operation. The internal engine remains unavailable to uploaded content until Task 088b can produce a security-evidenced ReleasedObjectRef."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Committed Products use the existing Catalog repository mutation port and therefore preserve existing versioned Catalog outbox event contracts; no new event type is introduced."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Import mappings are provider-neutral source-field bindings and do not enter Connector SDK v1 or provider implementations."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "The Task-031 skeleton adds no persistence table or migration. Mapping persistence and durable import jobs remain later extensions rather than an implicit new source of truth."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Importer input is only a private-field ReleasedObjectRef, not client filenames, URLs or object keys. Exact released size/SHA-256 is verified before preview and again immediately before commit; invalid previews cannot be committed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "The first bounded Product slice is preview-before-commit and fail-closed on any row validation error. Approval thresholds for large or sensitive future import classes remain explicitly outside this skeleton and continue to route through Task 017."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Preview and result reports bind source SHA-256 and mapping fingerprint; each Product mutation uses the existing Catalog event boundary. Durable import-run audit/lineage persistence is not falsely claimed in this repository slice."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Duplicate Product IDs/codes inside a source are rejected. Replaying a prepared import treats an already-existing exact Product as unchanged and divergent conflicts as bounded row failures without overwrite."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Task 031 performs no network egress or webhook delivery. Released bytes are read only through a host-supplied ReleasedReader port."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Import size/row/column/error limits are explicit and deterministic; no production throughput or latency SLO is claimed before real storage and 088b integration qualification."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "No schema rollback is required. Disable the import entrypoint to stop new commits; Catalog mutations retain their existing immutable event/audit semantics and are not destructively rolled back by this engine."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover CSV/JSON mapping, duplicate rejection, non-committable invalid preview, tampered released bytes, idempotent replay, export encoding, stable mapping fingerprints and quarantine fail-closed behavior."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "088"
+  ]
+}

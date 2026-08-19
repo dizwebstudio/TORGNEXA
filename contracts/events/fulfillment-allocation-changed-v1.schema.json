@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-allocation-changed-v1.json",
+  "title": "commerce.fulfillment.allocation_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["allocation_id", "order_id", "order_item_id", "offer_id", "warehouse_id", "quantity", "status", "version", "reason"],
+  "properties": {
+    "allocation_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "order_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "order_item_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "offer_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "warehouse_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "quantity": {
+      "type": "object", "additionalProperties": false, "required": ["value", "unit"],
+      "properties": {
+        "value": {"type": "string", "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?$"},
+        "unit": {"type": "string", "pattern": "^[A-Z][A-Z0-9._-]{0,15}$"}
+      }
+    },
+    "status": {"enum": ["reserved", "released", "consumed", "cancelled"]},
+    "version": {"type": "integer", "minimum": 1},
+    "reason": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+    "incident_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "replaces_allocation_id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}
+  }
+}

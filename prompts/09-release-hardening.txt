@@ -1,0 +1,1 @@
+Read docs/45-release-supply-chain-security.md, docs/47-upgrade-migrations.md and templates/release-checklist.md. Perform release-hardening checks, generate required security/compatibility artifacts, rehearse migration/rollback where applicable and report blockers.

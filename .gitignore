@@ -1,0 +1,19 @@
+# Local secrets and developer overrides. Keep only the synthetic template.
+.env
+.env.*
+!.env.example
+
+# Generated release/security evidence must be recreated in an isolated temp
+# directory and uploaded by CI, never committed with source.
+dist/
+reports/
+.security-tools/
+coverage.out
+*.test
+node_modules/
+
+# Python interpreter bytecode caches are local generated artifacts.
+__pycache__/
+*.py[cod]
+
+qualification/evidence/

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/revocation-v1.json",
+  "title": "TORGNEXA plugin revocation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "actor_id", "reason", "revoked_at"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "kind": {"enum": ["artifact", "publisher_key", "installation"]},
+    "extension_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "publisher_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+    "publisher_key_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"},
+    "organization_id": {"type": "string", "minLength": 26, "maxLength": 36},
+    "workspace_id": {"type": "string", "minLength": 26, "maxLength": 36},
+    "consent_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "actor_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512},
+    "revoked_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "artifact"}}}, "then": {"required": ["extension_id", "artifact_sha256"], "not": {"anyOf": [{"required": ["publisher_id"]}, {"required": ["publisher_key_id"]}, {"required": ["consent_id"]}]}}},
+    {"if": {"properties": {"kind": {"const": "publisher_key"}}}, "then": {"required": ["publisher_id", "publisher_key_id"], "not": {"anyOf": [{"required": ["extension_id"]}, {"required": ["artifact_sha256"]}, {"required": ["consent_id"]}]}}},
+    {"if": {"properties": {"kind": {"const": "installation"}}}, "then": {"required": ["organization_id", "workspace_id", "consent_id"], "not": {"anyOf": [{"required": ["extension_id"]}, {"required": ["artifact_sha256"]}, {"required": ["publisher_id"]}, {"required": ["publisher_key_id"]}]}}}
+  ],
+  "description": "Append-only global artifact/publisher-key or tenant installation revocation evidence."
+}

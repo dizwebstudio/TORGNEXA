@@ -1,0 +1,10 @@
+flowchart TB
+  REQ[Privacy/Tenant Deletion Request] --> POL[Policy + Legal Hold Check]
+  POL -->|allowed| JOB[Resumable Deletion/Anonymization Job]
+  POL -->|hold| HOLD[Record Hold / Restrict Processing]
+  JOB --> PG[(PostgreSQL)]
+  JOB --> CH[(ClickHouse)]
+  JOB --> S3[(S3)]
+  JOB --> SRCH[Search]
+  JOB --> CACHE[Cache]
+  JOB --> AUD[Audit Evidence]

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/domain/quantity.json",
+  "title": "TORGNEXA Quantity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["value", "unit"],
+  "properties": {
+    "value": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]{1,9})?$",
+      "description": "Exact fixed-point decimal string with at most nine fractional digits. Producers MUST emit normalized form without trailing fractional zeros or negative zero."
+    },
+    "unit": {"type": "string", "pattern": "^[A-Z][A-Z0-9._-]{0,15}$"}
+  }
+}

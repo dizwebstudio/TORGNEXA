@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-078",
+  "task": "078",
+  "change_class": "pillar_change",
+  "summary": "Add reviewed plugin marketplace trust metadata, exact-artifact tenant consent, privilege-escalation disclosure and append-only artifact/publisher/installation revocation while reusing the existing Task-025/029 execution boundary.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0051-plugin-marketplace-governance.md",
+    "architecture/policy.json",
+    "architecture/reviews/078-plugin-marketplace-governance.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "contracts/plugins/install-consent-v1.schema.json",
+    "contracts/plugins/marketplace-listing-v1.schema.json",
+    "contracts/plugins/marketplace-page-v1.schema.json",
+    "contracts/plugins/revocation-v1.schema.json",
+    "contracts/sdk/generated-manifest.json",
+    "docs/07-plugin-sdk.md",
+    "docs/22-plugin-security.md",
+    "docs/45-release-supply-chain-security.md",
+    "docs/51-plugin-marketplace-governance.md",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/pluginmarketplace/governance.go",
+    "internal/platform/pluginmarketplace/governance_test.go",
+    "internal/platform/postgres/pluginmarketplacerepo/migration_test.go",
+    "internal/platform/postgres/pluginmarketplacerepo/repository.go",
+    "migrations/000028_plugin_marketplace_governance.sql",
+    "migrations/catalog.json",
+    "sdk/go/torgnexa/client.gen.go",
+    "sdk/python/torgnexa_sdk/client_gen.py",
+    "sdk/typescript/src/client.gen.d.mts",
+    "sdk/typescript/src/client.gen.mjs",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/078-plugin-marketplace-governance.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "privacy-secrets-security-governance",
+    "developer-surfaces"
+  ],
+  "adr": "adr/0051-plugin-marketplace-governance.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0050-external-n8n-node-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Private plugin versions, installation consents and installation revocations are organization/workspace scoped with explicit composite keys and FORCE RLS. A private listing is accepted only for the exact owner tenant."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Marketplace listings contain publisher/trust/license/requested-authority metadata only. Credentials, secret values, private signing keys and raw provider payloads are forbidden; only secret class names are disclosed for consent."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Existing GET /plugins is additively typed as a marketplace listing page and OpenAPI advances from 0.7.0 to 0.7.1. Operation inventory stays at 30 and existing operation identifiers/paths are unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 078 adds no EventBus type and changes no envelope/event catalog entry."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK v1 root interfaces and capability vocabulary are unchanged. Marketplace governance composes the existing signed Task-025 Descriptor/PermissionGrant and inert AdmissionPlan instead of adding a runtime API."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Migration 000028 adds immutable public/private listing, exact-artifact consent and global/tenant revocation evidence. Tenant tables use composite workspace foreign keys and forced RLS; no existing row is rewritten."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Admission is fail-closed across review evidence, explicit tenant consent, artifact/key/installation revocation, then Task-025 SHA-256/Ed25519/request-vs-grant verification before Task-029 sandbox creation. Official/verified listings require SBOM/provenance evidence."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "A new version/digest never inherits an old installation grant. Update assessment explicitly identifies capability, secret, network and resource-ceiling escalation plus publisher identity change/trust downgrade; fresh consent is required even without escalation."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Listings, consents and revocations are immutable evidence keyed by publisher identity, exact digest/version and tenant consent. Revocation appends history instead of mutating/deleting prior marketplace decisions."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "No synchronization/reconciliation algorithm changes. Exact-artifact identity prevents update ambiguity but does not alter Task-013/014 semantics."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Requested outbound authority is visible as exact TLS host/port destinations and any newly requested destination is an explicit update escalation. Task-029 remains the DNS-rebinding/egress enforcement boundary."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Marketplace listing exposes bounded isolation ceilings and update assessment flags increases; operational runtime measurements remain Task-029/066 concerns."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The migration is additive and governance evidence is append-only. Rollback can stop new marketplace admission without invalidating existing connector data; security revocation evidence must not be rolled back or deleted."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover visible trust/requested authority, required verified review evidence, exact-digest reconsent, capability escalation, cryptographic tamper rejection, three revocation scopes, private-tenant isolation, migration RLS/append-only constraints and unchanged SDK operation inventory."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "040",
+    "041",
+    "042",
+    "084"
+  ]
+}

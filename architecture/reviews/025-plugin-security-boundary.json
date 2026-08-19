@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-025",
+  "task": "025",
+  "change_class": "pillar_change",
+  "summary": "Stabilize Connector SDK v1 by adding a signed, least-privilege, non-executing third-party plugin security boundary and strengthening provider import isolation without opening provider admission.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "architecture/policy.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/plugins/admission-plan-v1.schema.json",
+    "contracts/plugins/permission-grant-v1.schema.json",
+    "contracts/plugins/security-descriptor-v1.schema.json",
+    "docs/03-module-boundaries.md",
+    "docs/07-plugin-sdk.md",
+    "docs/51-plugin-marketplace-governance.md",
+    "internal/platform/architecture/checker_test.go",
+    "internal/platform/architecture/go_tree.go",
+    "internal/platform/connectors/connectors.go",
+    "internal/platform/connectors/sdk_test.go",
+    "internal/platform/pluginsecurity/boundary.go",
+    "internal/platform/pluginsecurity/boundary_test.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/010-connector-sdk.md",
+    "tasks/issues/025-plugin-security-boundary.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities"
+  ],
+  "adr": "adr/0037-isolated-plugin-security-boundary.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Permission grants are installation authority bound to an immutable artifact identity; tenant persistence is deliberately deferred, while existing connector accounts remain tenant scoped and no ambient host authority is introduced."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Descriptors and grants contain only bounded manifest, publisher, capability, secret-class, network and limit metadata; raw secret bytes, arbitrary remote bodies and PII payloads are absent."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Three additive Draft 2020-12 plugin security contracts are introduced. Existing Connector SDK v1 manifest/account/health/error contracts remain unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 025 adds no EventBus event type and changes no existing event envelope or payload contract."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK major v1 is stabilized: root Connector, Runtime and SecretAccessor method surfaces are frozen by regression tests, while the isolated plugin boundary is separately versioned as v1."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Task 025 introduces no database migration and does not modify connector account, secret, catalog, order or event persistence."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Artifact SHA-256, Ed25519 publisher verification, exact permission grants, egress allowlists and resource ceilings are validated before an inert plan is produced; provider direct execution/network/filesystem escape imports are rejected by architecture checks."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Installation permission grants can only narrow the signed request and are bound to an exact version/digest. Sensitive operation approval remains owned by Task 017 and runtime enforcement by Task 029."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Stable publisher, key, artifact digest, connector version and grant metadata provide deterministic future audit identifiers without persisting raw credentials or provider response content."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "No sync, reconciliation, inbox or idempotency algorithm changes. The security boundary only constrains how a future plugin may be admitted."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Third-party egress is declared as exact lower-case DNS host plus port and cannot use direct network imports. Actual DNS-resolution and egress enforcement remains Task 029."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Versioned memory, CPU time, wall time, output-size and concurrency ceilings define future sandbox observability/enforcement inputs without claiming runtime enforcement yet."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The change is code/contracts/docs only with no data migration. Rollback removes Task-025 verification support while provider admission remains disabled, so no executable third-party runtime state exists to migrate."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover digest/signature tamper, publisher trust, capability/secret/network escalation, exact network validation, frozen SDK root interfaces and architecture rejection of direct process/network/filesystem provider imports."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "029",
+    "064",
+    "078"
+  ]
+}

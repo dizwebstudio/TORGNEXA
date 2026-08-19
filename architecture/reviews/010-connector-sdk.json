@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-010",
+  "task": "010",
+  "change_class": "pillar_change",
+  "summary": "Extend the frozen connector-plugin runtime pillar with the provider-neutral Connector SDK v1 host/runtime/account boundary while keeping provider admission fail-closed until Tasks 025, 029 and 064.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "architecture/policy.json",
+    "contracts/connectors/account.schema.json",
+    "contracts/connectors/health.schema.json",
+    "contracts/connectors/remote-error.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/plugins/manifest-v2.schema.json",
+    "docs/03-module-boundaries.md",
+    "docs/05-database.md",
+    "docs/07-plugin-sdk.md",
+    "docs/migrations/000012-connector-sdk.md",
+    "internal/platform/connectorruntime/runtime.go",
+    "internal/platform/connectorruntime/runtime_test.go",
+    "internal/platform/connectors/account.go",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/connectors.go",
+    "internal/platform/connectors/errors.go",
+    "internal/platform/connectors/manager.go",
+    "internal/platform/connectors/mapping.go",
+    "internal/platform/connectors/mapping_test.go",
+    "internal/platform/connectors/registry.go",
+    "internal/platform/connectors/sdk_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/connectorrepo/migration_test.go",
+    "internal/platform/postgres/connectorrepo/repository.go",
+    "internal/platform/postgres/connectorrepo/repository_test.go",
+    "migrations/000012_connector_sdk.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/010-connector-sdk.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities"
+  ],
+  "adr": "adr/0036-connector-sdk-v1-runtime-boundary.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Connector accounts remain organization/workspace scoped; the PostgreSQL account repository sets transaction-local tenant settings and migration 000012 retains forced RLS."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "SDK health/error metadata is bounded to machine codes; raw provider response text is not durable account state, reducing accidental PII/credential persistence."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "New manifest-v2/account/health/error contracts are additive. The older manifest schema is retained unchanged instead of being silently rewritten."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 010 changes no domain event type or EventBus envelope. Connector operation events remain owned by later capability/domain tasks."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "SDK v1 now has executable family/capability validation, account/secret/runtime boundaries, normalized errors and a strict root Connector interface; provider admission remains disabled until 025/029/064."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000012 adds account version/health metadata and constraints without renaming provider or removing old-reader columns; all new columns have compatibility defaults."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider credentials remain opaque sec:v1 references; the SDK runtime exposes callback-only secret use, raw provider errors are discarded, and connector_accounts hard delete/truncate is blocked."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Task 010 defines capabilities but does not authorize sensitive writes; Tasks 017 and 029 remain mandatory approval/dry-run gates before mutating provider operations."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Stable connector/account identity and normalized machine reason codes provide safe audit identifiers; Task 010 deliberately avoids persisting raw remote bodies."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Stable account/manifest identity and normalized retry semantics establish inputs for later sync/reconciliation/conformance; Task 009 remains the consumer duplicate-effect boundary."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook delivery or signing behavior is introduced by the root Connector SDK task."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Account health is normalized to unknown/healthy/degraded/unavailable with UTC check time and safe reason code; rate-limit/retry policy is explicit manifest metadata."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration 000012 is additive. Rollback disables Task-010 writers while preserving connector accounts, mappings and secret references; physical provider-column rename is deferred."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover manifest/family/capability drift, FX/SMS vocabulary, account/secret validation, safe errors, retry bounds, registry duplicates, scoped secret bridging, migration guards and JSON Schema fixtures."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "025",
+    "029",
+    "064",
+    "089",
+    "091"
+  ]
+}

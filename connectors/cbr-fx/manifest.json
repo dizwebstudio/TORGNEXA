@@ -1,0 +1,11 @@
+{
+  "id": "cbr-fx",
+  "name": "Bank of Russia FX",
+  "family": "fx",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["fx.rates.read"],
+  "auth": [{"kind": "none", "required": false}],
+  "connection_test": {"url": "https://www.cbr.ru/scripts/XML_daily.asp", "method": "GET"},
+  "rate_limit": {"max_concurrency": 2, "min_interval_ms": 200, "request_timeout_ms": 15000, "retry": {"max_attempts": 4, "base_backoff_ms": 500, "max_backoff_ms": 10000}}
+}

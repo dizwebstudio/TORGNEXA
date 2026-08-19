@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sync/propagation-metadata-v1.json",
+  "title": "TORGNEXA Sync Propagation Metadata v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["idempotency_key","source","correlation_id","causation_id","origin_event_id"],
+  "properties": {
+    "idempotency_key": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "source": {"type":"string","pattern":"^[a-z][a-z0-9._-]{0,127}$"},
+    "correlation_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "causation_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "origin_event_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"}
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/security-descriptor-v1.json",
+  "title": "TORGNEXA isolated plugin security descriptor v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["boundary_version", "execution_mode", "trust", "manifest", "artifact", "requested_permissions", "isolation_limits"],
+  "properties": {
+    "boundary_version": {"const": 1},
+    "execution_mode": {"const": "isolated_process_v1"},
+    "trust": {"enum": ["official", "verified", "community", "private"]},
+    "manifest": {"$ref": "https://torgnexa.local/schemas/plugins/manifest-v2.json"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes", "publisher_id", "key_id", "key_fingerprint_sha256", "signature_base64"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 268435456},
+        "publisher_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+        "key_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"},
+        "key_fingerprint_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "signature_base64": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$"}
+      }
+    },
+    "requested_permissions": {"$ref": "#/$defs/permissions"},
+    "isolation_limits": {"$ref": "#/$defs/limits"}
+  },
+  "$defs": {
+    "capability": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{1,95}$"
+    },
+    "secretClass": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "networkDestination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": {"type": "string", "minLength": 3, "maxLength": 253, "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilities"],
+      "properties": {
+        "capabilities": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/capability"}},
+        "secret_classes": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/secretClass"}},
+        "network": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/networkDestination"}}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory_mib", "cpu_time_ms", "wall_time_ms", "max_output_bytes", "max_concurrent_calls"],
+      "properties": {
+        "memory_mib": {"type": "integer", "minimum": 16, "maximum": 4096},
+        "cpu_time_ms": {"type": "integer", "minimum": 100, "maximum": 300000},
+        "wall_time_ms": {"type": "integer", "minimum": 100, "maximum": 300000},
+        "max_output_bytes": {"type": "integer", "minimum": 1024, "maximum": 16777216},
+        "max_concurrent_calls": {"type": "integer", "minimum": 1, "maximum": 64}
+      }
+    }
+  },
+  "description": "Signed, non-executing Task-025 security descriptor for a future isolated Connector SDK plugin. Runtime enforcement is owned by Task 029."
+}

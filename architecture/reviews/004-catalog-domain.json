@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-004",
+  "task": "004",
+  "change_class": "new_domain",
+  "summary": "Implement the frozen canonical catalog/PIM core with tenant-scoped Product and Offer aggregates, forward-only lifecycle and optimistic versions, strict GTIN/SKU invariants, atomic Transactional-Outbox event intent, and a separate generic connector mapping boundary so provider identifiers never enter Core.",
+  "scopes": [
+    "architecture/policy.json",
+    "contracts/catalog/connector-entity-mapping.schema.json",
+    "contracts/catalog/offer.schema.json",
+    "contracts/catalog/product.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/offer-changed-v1.schema.json",
+    "contracts/events/product-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "internal/core/catalog/catalog.go",
+    "internal/core/catalog/catalog_test.go",
+    "internal/platform/connectors/mapping.go",
+    "internal/platform/connectors/mapping_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/catalogrepo/events_test.go",
+    "internal/platform/postgres/catalogrepo/migration_test.go",
+    "internal/platform/postgres/catalogrepo/repository.go",
+    "internal/platform/postgres/connectormaprepo/migration_test.go",
+    "internal/platform/postgres/connectormaprepo/repository.go",
+    "migrations/000009_catalog_domain.sql",
+    "migrations/catalog.json"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "extend_existing_capability"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Products, offers, and connector mappings carry organization/workspace ownership, composite workspace/account/product foreign keys, forced RLS, and tenant-scoped repository queries."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Catalog descriptions are business content and events intentionally retain only identity/version/status/change rather than duplicating full product text; no customer PII is introduced."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Canonical Draft 2020-12 Product, Offer, and connector-mapping contracts establish provider-neutral v1 wire shapes before Task 006/API expansion."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Two versioned catalog events are registered: commerce.catalog.product_changed.v1 and commerce.catalog.offer_changed.v1. Every catalog mutation persists its event intent in the same PostgreSQL transaction."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Remote identity is isolated behind connectors.MappingRepository and connector_entity_mappings. No provider-specific IDs or branches are added to Product/Offer."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Atomic high-risk expand migration 000009 creates Product/Offer/mapping tables, lifecycle/GTIN guards, forced RLS and immutable identity constraints while preserving old readers/writers."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Bounded canonical code/SKU/title/description/remote-ID validation, GS1 check digits, RLS, no hard delete, immutable identities and optimistic versions fail closed against malformed or cross-tenant state."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Catalog lifecycle itself does not grant sensitive publication approval. Task 017 remains the authorization gate for sensitive external writes."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Stable local IDs, monotonic aggregate versions and durable versioned event intents establish deterministic lineage; Task 003 audit remains available to API/application commands without copying remote IDs into Core."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Optimistic versions prevent lost updates, outbox uses stable event IDs, and the separate local/remote mapping table creates the canonical identity bridge needed by Tasks 013/014."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook delivery surface is introduced. Future webhook projections consume canonical catalog events rather than database tables."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Version/change events and mapping versions provide deterministic mutation/reconciliation counters without logging full product payloads or provider credentials."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration 000009 is additive. Rollback disables the catalog-aware binary while retaining rows/events; hard deletion is intentionally not an application rollback mechanism."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover canonical validation, GS1 check digits, forward-only lifecycle, migration/RLS/remote-mapping shape, event/contract fixtures and full repository regression; PostgreSQL smoke exercises atomic domain+outbox behavior."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "005",
+    "006",
+    "013",
+    "014",
+    "023",
+    "076"
+  ]
+}

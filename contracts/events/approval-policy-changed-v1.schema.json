@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "governance.approval.policy_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$id": "https://torgnexa.local/schemas/events/approval-policy-changed-v1.json",
+  "required": [
+    "policy_id",
+    "policy_version",
+    "action",
+    "resource_type",
+    "minimum_risk",
+    "stage_count",
+    "change"
+  ],
+  "properties": {
+    "policy_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action": {
+      "type": "string"
+    },
+    "resource_type": {
+      "type": "string"
+    },
+    "minimum_risk": {
+      "enum": [
+        "read",
+        "write_safe",
+        "write_sensitive",
+        "legally_significant"
+      ]
+    },
+    "stage_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "change": {
+      "const": "installed"
+    }
+  }
+}

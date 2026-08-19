@@ -1,0 +1,83 @@
+version: 2
+capabilities:
+  classified.listings.read: Read classified listings
+  classified.publications.status.read: Read asynchronous classified publication/import status
+  classified.publications.write: Submit classified publication/import source
+  classified.leads.read: Read classified leads/chats
+  classified.messages.read: Read classified lead messages
+  classified.messages.reply: Reply to classified lead messages
+  classified.stats.read: Read classified listing statistics
+  products.read: Read products/listings
+  products.write: Create/update products/listings
+  prices.read: Read prices
+  prices.write: Change prices
+  inventory.read: Read stock
+  inventory.write: Change stock
+  orders.read: Read orders
+  notifications.receive: Receive and normalize marketplace/classified notifications
+  orders.status.write: Change order state
+  returns.read: Read returns
+  reviews.read: Read reviews/questions
+  reviews.reply: Reply to reviews/questions
+  messages.read: Read messages/leads
+  messages.reply: Reply to messages
+  ads.read: Read advertising campaigns/stats
+  ads.manage: Manage campaigns/bids/budgets
+  promotions.read: Read promotion calendar/participation
+  promotions.manage: Change promotion participation
+  finance.settlements.read: Read settlement/fee/payout data
+  social.post.text: Publish text
+  social.post.media: Publish media
+  social.post.video: Publish video
+  social.post.buttons: Publish URL buttons
+  social.post.edit: Edit publication
+  social.post.delete: Delete publication
+  social.comments.read: Read comments
+  social.comments.reply: Reply to comments
+  social.analytics.read: Read channel/publication analytics
+  social.webhooks: Receive verified and deduplicated social-provider webhooks
+  erp.catalog.read: Read ERP catalog
+  erp.catalog.write: Write ERP catalog/documents
+  erp.inventory.read: Read ERP stock
+  erp.orders.read: Read ERP customer orders
+  erp.orders.write: Write orders/documents
+  edo.documents.read: Read EDO documents/status
+  edo.documents.send: Send EDO documents
+  edo.documents.sign_request: Request signing workflow
+  marking.status.read: Read marking status
+  marking.documents.write: Submit regulated marking documents
+  fiscal.receipts.write: Create fiscal receipt/refund/correction
+  vetis.documents.read: Read VetIS/Mercury documents
+  vetis.documents.write: Write regulated VetIS/Mercury documents
+  payments.create: Create payment/QR/link
+  payments.refund: Refund payment
+  payments.reconcile: Read/reconcile settlements
+  logistics.rates.read: Calculate delivery rates/SLA
+  logistics.shipment.create: Create shipment
+  logistics.track.read: Track shipment
+  logistics.webhooks.verify: Verify and normalize logistics webhook
+  logistics.return.create: Create return
+  pickup.points.read: Read pickup points
+  pickup.capacity.read: Read PUDO capacity
+  pickup.orders.write: Receive/issue/return PUDO orders
+  compliance.documents.read: Read product compliance evidence/status
+  compliance.documents.write: Create/update compliance evidence metadata
+  compliance.evaluate: Evaluate listing/product compliance policy
+  government.identity.read: Read regulated system organization/location identity
+  government.documents.read: Read government-system documents/status
+  government.documents.write: Submit regulated government documents
+  government.inventory.read: Read regulated-system balances when supported
+  government.references.read: Read regulated reference directories
+  government.reconciliation.run: Reconcile remote regulated state
+  payments.status.read: Read acquiring/payment status
+  payments.webhooks: Receive normalized payment callbacks
+  logistics.shipment.cancel: Cancel shipment
+  logistics.label.read: Obtain shipping label/waybill
+  fx.rates.read: Read current/historical exchange rates
+  notifications.sms.send: Send transactional SMS
+  notifications.sms.status.read: Read SMS delivery status
+  crm.entities.read: Read CRM leads, deals, contacts and companies
+  crm.entities.write: Create/update CRM leads, deals, contacts and companies
+  crm.productrows.read: Read CRM entity product rows
+  crm.productrows.write: Replace CRM entity product rows
+  ai.completion.generate: Send a bounded analytics prompt to the configured AI provider and return its completion

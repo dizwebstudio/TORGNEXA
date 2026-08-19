@@ -1,0 +1,21 @@
+{
+  "operation": {
+    "request_id": "req-029-replay",
+    "connector_id": "synthetic-shop",
+    "connector_version": "1.2.3",
+    "capability": "products.read",
+    "resource_type": "product",
+    "resource_id": "product-1"
+  },
+  "emulator": {
+    "secret_class": "marketplace.oauth",
+    "destination": {"host": "api.synthetic.example", "port": 443},
+    "route_template": "/v1/products/{id}"
+  },
+  "expected": {
+    "status": "planned",
+    "before_sha256": "2430f1a2ad2982d0067885488a4c89e21ad1d7c83b115ba8f1b20acc88dfaea8",
+    "after_sha256": "732322c128ed67841ef5aa42c7cd04ffcd74a61b2d17d710cd502b713d62930d",
+    "external_action_count": 1
+  }
+}

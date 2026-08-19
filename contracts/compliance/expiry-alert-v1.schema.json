@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "$id": "https://torgnexa.local/schemas/compliance/expiry-alert-v1.json",
+  "title": "Compliance Expiry Alert v1",
+  "type": "object",
+  "required": [
+    "id",
+    "document_id",
+    "expires_at",
+    "due_at",
+    "lead_hours"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^expiry\\.[0-9a-f]{64}$"
+    },
+    "document_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "lead_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/connectors/remote-error.json",
+  "title": "Normalized Connector Remote Error v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category",
+    "code"
+  ],
+  "properties": {
+    "category": {
+      "enum": [
+        "invalid_request",
+        "unauthorized",
+        "forbidden",
+        "not_found",
+        "conflict",
+        "rate_limited",
+        "transient",
+        "unavailable",
+        "timeout",
+        "unsupported",
+        "internal"
+      ]
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "remote_request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "retry_after_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    }
+  },
+  "description": "Safe normalized error metadata. Raw provider messages, response bodies, URLs and headers are forbidden."
+}

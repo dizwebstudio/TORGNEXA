@@ -1,0 +1,4 @@
+import type {ReactNode} from "react";
+import {useEffect} from "react";
+import {Icon} from "./Icon";
+export function Dialog({open,title,description,onClose,children}:{open:boolean;title:string;description?:string;onClose:()=>void;children:ReactNode}){useEffect(()=>{if(!open)return;const fn=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose()};window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn)},[open,onClose]);if(!open)return null;return <div className="dialog-layer" role="presentation"><button className="dialog-backdrop" onClick={onClose} aria-label="Закрыть"/><section className="dialog" role="dialog" aria-modal="true" aria-label={title}><header><div><h2>{title}</h2>{description?<p>{description}</p>:null}</div><button className="icon-button" onClick={onClose} aria-label="Закрыть"><Icon name="close"/></button></header><div className="dialog-body">{children}</div></section></div>}

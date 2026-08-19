@@ -1,0 +1,49 @@
+version: 1
+classes:
+  public:
+    pii: false
+    secret: false
+    logs: allow
+    events: allow
+    analytics: allow
+    support: allow
+  internal:
+    pii: false
+    secret: false
+    logs: minimize
+    events: minimize
+    analytics: allow
+    support: minimize
+  confidential:
+    pii: false
+    secret: false
+    logs: redact
+    events: minimize
+    analytics: minimize
+    support: redact
+  personal:
+    pii: true
+    secret: false
+    logs: redact
+    events: minimize
+    analytics: minimize
+    support: redact
+  sensitive_operational:
+    pii: true
+    secret: false
+    logs: redact
+    events: minimize
+    analytics: minimize
+    support: redact
+  secret:
+    pii: false
+    secret: true
+    logs: forbid
+    events: forbid
+    analytics: forbid
+    support: forbid
+rules:
+  - "secret data is forbidden in Kafka, logs, ClickHouse, support output and webhook payloads"
+  - "personal and sensitive-operational data require processing-purpose and retention metadata"
+  - "PII must be minimized in events and analytics and redacted from default logs/support output"
+  - "production PII fixtures are forbidden; tests use synthetic reserved-domain/address data only"

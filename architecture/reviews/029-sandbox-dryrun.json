@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-029",
+  "task": "029",
+  "change_class": "pillar_change",
+  "summary": "Turn the signed Connector SDK plugin security plan into a host-owned dry-run/test sandbox with production-credential isolation, mediated DNS-pinned egress and executable resource-limit evidence without opening provider admission.",
+  "scopes": [
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "architecture/policy.json",
+    "cmd/torgnexa-connector-emulator/main.go",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/sandbox/dry-run-result-v1.schema.json",
+    "contracts/sandbox/fixtures/synthetic-product-read-v1.json",
+    "contracts/sandbox/isolation-probe-v1.schema.json",
+    "docs/07-plugin-sdk.md",
+    "docs/22-plugin-security.md",
+    "docs/28-sandbox-test-mode.md",
+    "internal/platform/connectorsandbox/egress.go",
+    "internal/platform/connectorsandbox/egress_test.go",
+    "internal/platform/connectorsandbox/emulator/emulator.go",
+    "internal/platform/connectorsandbox/linux.go",
+    "internal/platform/connectorsandbox/linux_test.go",
+    "internal/platform/connectorsandbox/model.go",
+    "internal/platform/connectorsandbox/replay_test.go",
+    "internal/platform/connectorsandbox/runtime.go",
+    "internal/platform/connectorsandbox/runtime_test.go",
+    "scripts/check-connector-sandbox-linux.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/010-connector-sdk.md",
+    "tasks/issues/025-plugin-security-boundary.md",
+    "tasks/issues/029-sandbox-dryrun.md",
+    "tasks/issues/064-connector-conformance-harness.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities"
+  ],
+  "adr": "adr/0038-connector-sandbox-dry-run-runtime.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Dry-run/test sessions are host-created per connector/account binding; production credential tiers are forbidden in non-production test mode and no global tenant credential authority is introduced."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Dry-run results store only bounded identifiers, change digests, route templates, usage and isolation evidence; full provider payloads, query strings and secret values are excluded."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Two additive Draft 2020-12 sandbox contracts are introduced; existing Connector SDK and Task-025 contracts are unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 029 adds no EventBus event type and changes no existing event payload."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Task-025 AdmissionPlan grants and limits now have a host-owned executable dry-run/test interpretation while Connector SDK v1 root interfaces remain unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Task 029 adds no persistent table or database migration."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Production credentials fail before broker access, dry-run suppresses all credential/network providers, test egress is exact-grant DNS checked and IP pinned, and Linux namespace/chroot isolation is externally probed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Task 029 deliberately provides no production-credential override; any future exceptional override requires a separate explicit approval design rather than a sandbox flag."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Result records carry connector/version/request/capability identity, resource-change hashes and normalized isolation evidence suitable for later audit attachment without credential content."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "Sandbox preview does not change Inbox/Outbox/reconciliation algorithms; dry-run is side-effect free and test behavior remains connector capability scoped."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Host egress planning re-resolves exact granted DNS destinations, rejects private/special addresses and pins the approved IP plus TLS server name so provider code cannot perform a second DNS lookup."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Signed wall/CPU/RSS/output/concurrency ceilings now produce measured usage and fail-closed limit outcomes in the Linux reference runner."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "No migration exists; rollback removes the sandbox runtime while provider admission remains disabled. Temporary chroot roots are removed after every reference execution."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover credential isolation, side-effect-free dry-run, exact egress, DNS rebinding, special-address rejection and output limits; a Linux external process probe verifies environment/filesystem/network isolation."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "064"
+  ]
+}

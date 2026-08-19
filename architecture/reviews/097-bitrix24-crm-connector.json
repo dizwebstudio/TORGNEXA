@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-097",
+  "task": "097",
+  "change_class": "mixed",
+  "summary": "Introduce the provider-neutral CRM connector family and admit Bitrix24 through current universal CRM item and product-row APIs without changing frozen Connector or Runtime roots.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "README.md",
+    "VALIDATION_REPORT.md",
+    "adr/0089-provider-neutral-crm-and-bitrix24-universal-api.md",
+    "architecture/policy.json",
+    "architecture/reviews/097-bitrix24-crm-connector.json",
+    "connectors/bitrix24/config.go",
+    "connectors/bitrix24/conformance.go",
+    "connectors/bitrix24/connector.go",
+    "connectors/bitrix24/connector_test.go",
+    "connectors/bitrix24/cursor.go",
+    "connectors/bitrix24/manifest.json",
+    "connectors/bitrix24/read.go",
+    "connectors/bitrix24/remote.go",
+    "connectors/bitrix24/write.go",
+    "contracts/connector-capabilities.yaml",
+    "contracts/operations/097-bitrix24-crm-connector-v1.md",
+    "docs/connectors/bitrix24/README.md",
+    "docs/connectors/bitrix24/capability-audit.md",
+    "docs/connectors/bitrix24/conformance-plan.md",
+    "docs/connectors/bitrix24/conformance-report.json",
+    "docs/connectors/bitrix24/spec.md",
+    "internal/platform/architecture/checker.go",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/connectors.go",
+    "internal/platform/connectors/crm.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/097-bitrix24-crm-connector.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0089-provider-neutral-crm-and-bitrix24-universal-api.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0011-privacy-by-design.md",
+    "adr/0016-connector-conformance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Bitrix24 account configuration and entity mappings remain organization/workspace scoped; remote IDs never select a TORGNEXA tenant."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "V1 intentionally excludes contact phone/email multifields and activity/timeline payloads; OAuth access tokens remain callback-scoped secrets."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "No public TORGNEXA REST operation changes; CRM SDK types are additive provider-neutral contracts."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "No canonical event schema changes; Bitrix24 local event/webhook ingestion is deliberately deferred."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Frozen Connector and Runtime roots are unchanged; FamilyCRM and CRM reader/writer interfaces are additive SDK-v1 surfaces."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "No database schema migration is required; existing mapping, sync, inbox and reconciliation persistence remains authoritative."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Portal host is HTTPS-bound and validated; OAuth token material is supplied only through SecretAccessor and Authorization Bearer, never URL/query/body."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Host approval/policy gates remain mandatory before CRM writes; provider capabilities do not bypass workflow governance."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Write receipts preserve stable remote IDs and duplicate/reconciliation outcomes for existing audit and lineage orchestration."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Entity creates reconcile on TORGNEXA originator/origin IDs; ambiguous entity and product-row writes read back desired state before reporting success."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "V1 performs outbound calls only to the configured Bitrix24 portal host; inbound event/webhook support is deferred rather than weakly admitted."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Bitrix24 HTTP/API/rate-limit failures normalize through the existing Connector SDK error and health surfaces."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Admission is additive and can be disabled per account; no database rollback or Core branch removal is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic unit tests plus the Task-064 13-check provider conformance report are required and recorded."
+    }
+  ],
+  "provider": {
+    "id": "bitrix24",
+    "route": "connector_sdk",
+    "manifest": "connectors/bitrix24/manifest.json",
+    "connector_spec": "docs/connectors/bitrix24/spec.md",
+    "capability_audit": "docs/connectors/bitrix24/capability-audit.md",
+    "conformance_plan": "docs/connectors/bitrix24/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

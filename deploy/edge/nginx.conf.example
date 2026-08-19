@@ -1,0 +1,20 @@
+# Example only. Production values/certificates/rate limits must be environment-specific.
+map $http_x_forwarded_for $torgnexa_client_ip {
+    default $remote_addr;
+}
+limit_req_zone $binary_remote_addr zone=torgnexa_api:10m rate=20r/s;
+server {
+    listen 443 ssl http2;
+    server_name _;
+    client_max_body_size 100m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    location /api/ {
+        limit_req zone=torgnexa_api burst=40 nodelay;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        # Only deploy behind trusted topology; application must validate trusted proxies.
+        proxy_pass http://torgnexa-api:8080;
+    }
+}

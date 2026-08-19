@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "package_manager": "npm@10.9.2",
+  "artifacts": [
+    {
+      "name": "n8n-nodes-torgnexa",
+      "path": "integrations/n8n-nodes-torgnexa",
+      "release_enabled": true,
+      "lockfile": "integrations/n8n-nodes-torgnexa/package-lock.json",
+      "install_command": "npm ci --ignore-scripts",
+      "build_command": "npm run build"
+    },
+    {
+      "name": "frontend",
+      "path": "frontend",
+      "release_enabled": false,
+      "lockfile": "frontend/package-lock.json",
+      "blocked_reason": "local Compose build is locked; production publication remains unqualified"
+    },
+    {
+      "name": "typescript-sdk",
+      "path": "sdk/typescript",
+      "release_enabled": false,
+      "lockfile_required": false,
+      "blocked_reason": "source package is consumed locally; it has no external dependencies"
+    }
+  ]
+}

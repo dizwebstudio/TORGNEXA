@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/upload-quarantined-v1.json",
+  "title": "security.upload.quarantined.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "object_id",
+    "reason"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "object_id": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "scanner": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

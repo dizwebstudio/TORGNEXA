@@ -1,0 +1,1 @@
+Read contracts/conformance/connector-conformance.yaml and the connector manifest/spec. Execute the connector conformance skill, fix required failures within scope, and produce a conformance report using templates/connector-conformance-report.md.

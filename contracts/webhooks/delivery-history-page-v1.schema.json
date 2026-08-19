@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/webhooks/delivery-history-page-v1.json",
+  "title": "Webhook delivery history page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array", "maxItems": 100,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["delivery_id", "attempt", "outcome", "duration_ms", "completed_at"],
+        "properties": {
+          "delivery_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "attempt": {"type": "integer", "minimum": 1, "maximum": 32},
+          "outcome": {"type": "string", "enum": ["succeeded", "retry", "dlq"]},
+          "http_status": {"type": "integer", "minimum": 100, "maximum": 599},
+          "duration_ms": {"type": "integer", "minimum": 0, "maximum": 3600000},
+          "error_code": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+          "completed_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+        }
+      }
+    }
+  }
+}

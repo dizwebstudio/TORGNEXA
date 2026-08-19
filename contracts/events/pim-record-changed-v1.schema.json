@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/events/pim-record-changed-v1.json",
+  "title":"commerce.pim.record_changed.v1",
+  "type":"object","additionalProperties":false,
+  "required":["entity_type","entity_id","version","change"],
+  "properties":{
+    "entity_type":{"enum":["brand","category","attribute","product_brand","product_category","product_attribute","field_authority","duplicate_candidate","merge_preview"]},
+    "entity_id":{"type":"string","minLength":1,"maxLength":256},"version":{"type":"integer","minimum":1},"change":{"enum":["created","updated","set","flagged"]}
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-044",
+  "task": "044",
+  "change_class": "new_provider",
+  "summary": "Register Threads API as a Social Core provider with exact user binding, text/image/video publishing, Task-088 media staging and provider-local short/long-lived token rotation without Core or frozen SDK-root changes.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/044-threads-social-connector.json",
+    "connectors/threads/config.go",
+    "connectors/threads/conformance.go",
+    "connectors/threads/connector.go",
+    "connectors/threads/connector_test.go",
+    "connectors/threads/fixtures/container.json",
+    "connectors/threads/fixtures/profile.json",
+    "connectors/threads/fixtures/published.json",
+    "connectors/threads/fixtures/status.json",
+    "connectors/threads/fixtures/token.json",
+    "connectors/threads/manifest.json",
+    "connectors/threads/social.go",
+    "connectors/threads/token.go",
+    "docs/connectors/threads/README.md",
+    "docs/connectors/threads/capability-audit.md",
+    "docs/connectors/threads/conformance-plan.md",
+    "docs/connectors/threads/conformance-report.json",
+    "docs/connectors/threads/reconciliation.md",
+    "docs/connectors/threads/spec.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/044-threads-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md",
+    "adr/0049-canonical-social-core.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "One tenant-bound Account resolves one exact Threads user ID plus a separate app-secret reference; health, publish, status and token rotation cannot override that identity."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Threads user/app-secret and replacement token bytes remain callback/sink scoped; media is Task-088 revalidated and only short-lived staged HTTPS URLs cross to Meta."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 044 adds no public TORGNEXA HTTP/OpenAPI operation."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 044 adds no EventBus schema."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 044 consumes existing SocialPublisher/StatusReader and adds only provider-local TokenSink lifecycle types; frozen Connector/Runtime SDK-v1 roots and Core remain unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No migration is added. Token rotation targets the existing opaque secret reference through a host-owned sink."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Egress authority is fixed to graph.threads.net; user/app secrets use Task-021 boundaries; returned replacement tokens are validated, rotated through TokenSink, zeroed and never returned as result data."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Only text/image/video publication is declared; replies, insights, delete and other remote controls remain outside Task-044 admission."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Task-020 remains canonical publication/audit owner; provider results expose bounded remote IDs/status and token lifecycle timestamps only."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Remote IDs are exact-user bound; ambiguous writes fail closed. Token rotation preserves the opaque secret reference rather than creating provider-local durable credential state."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound API authority is graph.threads.net and host-owned staged media URLs are provider inputs; no webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Auth, permission, rate-limit, media-processing and remote failures are normalized; token bodies, app secret and signed media URLs are excluded from errors/results."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Suspend the Threads connector account and revoke OAuth/app credentials to stop publication/token rotation; no schema rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic tests cover capabilities, exact account binding, Task-088 staging, content limits, token exchange/refresh grants, host secret rotation and write ambiguity; Task-064 passes all thirteen checks."
+    }
+  ],
+  "provider": {
+    "id": "threads",
+    "route": "connector_sdk",
+    "manifest": "connectors/threads/manifest.json",
+    "connector_spec": "docs/connectors/threads/spec.md",
+    "capability_audit": "docs/connectors/threads/capability-audit.md",
+    "conformance_plan": "docs/connectors/threads/conformance-plan.md"
+  },
+  "follow_up_tasks": [
+    "045",
+    "066"
+  ]
+}

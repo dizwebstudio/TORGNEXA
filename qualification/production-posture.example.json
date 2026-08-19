@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "environment": "production",
+  "release_version": "1.0.0",
+  "release_commit": "0000000000000000000000000000000000000000",
+  "repository": "example/torgnexa",
+  "public_base_url": "https://torgnexa.example.com",
+  "secret_management": {
+    "backend": "vault",
+    "plaintext_env_file": false,
+    "rotation_rehearsed": true,
+    "break_glass_documented": true
+  },
+  "network": {
+    "database_encrypted_in_transit": true,
+    "object_storage_encrypted_in_transit": true,
+    "oidc_https_only": true
+  },
+  "data_protection": {
+    "encrypted_backup_store": true,
+    "restore_rehearsed": true,
+    "wal_or_equivalent_recovery": true,
+    "retention_reviewed": true
+  },
+  "operations": {
+    "on_call_owner_defined": true,
+    "rollback_owner_defined": true,
+    "incident_runbook_exercised": true,
+    "monitoring_alerts_verified": true
+  },
+  "approved_at": "2026-08-17T22:00:00Z",
+  "approvers": ["platform-owner", "security-owner"]
+}

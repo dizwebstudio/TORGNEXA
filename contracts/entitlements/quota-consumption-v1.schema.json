@@ -1,0 +1,10 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/quota-consumption-v1.json",
+  "title":"Quota Consumption v1","type":"object","additionalProperties":false,
+  "required":["id","metric","amount","correlation_id","occurred_at"],
+  "properties":{
+    "id":{"type":"string"},"metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"amount":{"type":"integer","minimum":1},
+    "correlation_id":{"type":"string","minLength":1,"maxLength":256},"occurred_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

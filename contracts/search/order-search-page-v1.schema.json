@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/search/order-search-page-v1.json",
+  "title": "Order search page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/hit"}
+    },
+    "next_cursor": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^v1\\.[A-Za-z0-9_-]+$"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "order_number", "status", "currency", "grand_minor_units", "placed_at", "updated_at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "order_number": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+        "status": {"type": "string", "enum": ["pending", "confirmed", "processing", "fulfilled", "cancelled"]},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "grand_minor_units": {"type": "integer", "minimum": 0},
+        "placed_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+        "updated_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+      }
+    }
+  }
+}

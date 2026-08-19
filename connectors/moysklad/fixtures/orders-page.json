@@ -1,0 +1,7 @@
+{
+  "meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/customerorder","type":"customerorder","mediaType":"application/json","size":3,"limit":2,"offset":0,"nextHref":"https://api.moysklad.ru/api/remap/1.2/entity/customerorder?limit=2&offset=2"},
+  "rows":[
+    {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/cccccccc-cccc-cccc-cccc-cccccccccccc","type":"customerorder","mediaType":"application/json"},"id":"cccccccc-cccc-cccc-cccc-cccccccccccc","name":"00001","updated":"2026-08-10 11:00:00.000","moment":"2026-08-10 10:59:00.000","applicable":true,"store":{"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/store/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","type":"store","mediaType":"application/json"}},"state":{"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/dddddddd-dddd-dddd-dddd-dddddddddddd","type":"state","mediaType":"application/json"}},"sum":12345.0},
+    {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","type":"customerorder","mediaType":"application/json"},"id":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","name":"00002","updated":"2026-08-10 11:05:00.000","deleted":"2026-08-10 11:06:00.000","applicable":false}
+  ]
+}

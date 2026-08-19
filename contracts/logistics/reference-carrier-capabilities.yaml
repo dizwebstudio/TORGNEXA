@@ -1,0 +1,16 @@
+version: 1
+family: logistics
+profile: reference_carrier
+required_capabilities:
+  - logistics.rates.read
+  - logistics.shipment.create
+  - logistics.shipment.cancel
+  - logistics.track.read
+  - logistics.webhooks.verify
+  - logistics.return.create
+optional_capabilities:
+  - logistics.label.read
+  - pickup.points.read
+requirements:
+  idempotency_or_deduplication: true
+  remote_status_reconciliation: true

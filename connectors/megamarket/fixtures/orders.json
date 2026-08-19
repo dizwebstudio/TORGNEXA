@@ -1,0 +1,1 @@
+{"success":true,"data":{"total":2,"shipments":[{"shipmentId":"SHP-1001","orderCode":"MM-50001","status":"CONFIRMED","statusDate":"2026-08-10T10:03:00Z","createdAt":"2026-08-10T10:00:00Z","buyer":{"phone":"SHOULD_NOT_BE_PARSED"},"items":[{"itemIndex":1,"goodsId":"900001","offerId":"MM-RED-M","quantity":1},{"itemIndex":2,"goodsId":"900002","offerId":"MM-BLUE-L","quantity":2}]}]}}

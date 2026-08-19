@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-028",
+  "task": "028",
+  "change_class": "pillar_change",
+  "summary": "Add provider-neutral tenant feature entitlements and atomic UTC-window quotas without hard-coded subscription-plan branches or a Cloud Billing runtime dependency.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0046-entitlements-quotas.md",
+    "architecture/policy.json",
+    "contracts/entitlements/evaluate-request-v1.schema.json",
+    "contracts/entitlements/evaluate-response-v1.schema.json",
+    "contracts/entitlements/evaluation-v1.schema.json",
+    "contracts/entitlements/quota-consumption-v1.schema.json",
+    "contracts/entitlements/quota-policy-v1.schema.json",
+    "contracts/entitlements/quota-status-v1.schema.json",
+    "contracts/entitlements/rule-v1.schema.json",
+    "contracts/events/entitlement-quota-policy-changed-v1.schema.json",
+    "contracts/events/entitlement-rule-changed-v1.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "docs/27-tenancy-billing.md",
+    "docs/67-entitlements-quotas.md",
+    "docs/migrations/000018-entitlements.md",
+    "internal/app/api/entitlements.go",
+    "internal/app/api/entitlements_test.go",
+    "internal/platform/entitlementguard/guard.go",
+    "internal/platform/entitlementguard/guard_test.go",
+    "internal/platform/entitlements/entitlements.go",
+    "internal/platform/entitlements/entitlements_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/entitlementrepo/migration_test.go",
+    "internal/platform/postgres/entitlementrepo/repository.go",
+    "migrations/000018_entitlements.sql",
+    "migrations/catalog.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/028-entitlements.md",
+    "tools/migrationcheck/task028_audit_test.go"
+  ],
+  "frozen_pillars": [
+    "workflow-approval-audit-lineage",
+    "developer-surfaces",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "adr": "adr/0046-entitlements-quotas.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0028-cloud-billing-separation.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0042-immutable-data-lineage.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Rules, quota policies, counters and usage are organization/workspace scoped with composite workspace foreign keys, transaction-local tenant settings and forced RLS."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Quota usage stores only metric, amount, correlation and policy identity; feature evaluation and API responses are no-store and contain no customer content or credentials."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "An additive POST /entitlements/evaluate API and Draft 2020-12 schemas are added. Existing billing subscription contracts are unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Two additive governance.entitlement.* v1 events are emitted through the existing outbox; no published event is modified."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK root interfaces and provider admission are unchanged. Future connectors may consume host entitlement guards without SDK plan branches."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000018 adds entitlement rules, quota policies, counters and append-only usage with no destructive rename/drop."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Feature and quota evaluation fail closed. Quota consumption serializes immutable usage IDs and locks counters; RLS prevents cross-tenant policy or usage access."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 028 does not replace Task 017 approvals; a caller may require both entitlement authorization and approval for sensitive operations."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Rule and quota-policy mutations atomically append Task-003 audit, Task-008 outbox and Task-030 lineage evidence with exact version identity."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Quota consumption requires immutable usage IDs; identical retries are idempotent and reuse with changed evidence fails closed. Counter mutation is transactional."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Task 028 adds no network path or webhook delivery behavior."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Evaluation returns stable reason codes and quota status exposes limit/used/remaining/window/policy version. SLO thresholds remain Task 066."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration is expand-only; binary rollback leaves policy and usage evidence intact. Deployment qualification must restore counters and usage consistently."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover deny-by-default, UTC window semantics, quota exceed behavior, no-consume-on-feature-deny, migration guardrails and a static no-plan-branch audit."
+    }
+  ],
+  "follow_up_tasks": [
+    "026",
+    "063",
+    "086",
+    "091"
+  ],
+  "provider": null
+}

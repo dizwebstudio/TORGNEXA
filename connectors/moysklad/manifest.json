@@ -1,0 +1,16 @@
+{
+  "id": "moysklad",
+  "name": "MoySklad",
+  "family": "erp",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["erp.catalog.read", "erp.inventory.read", "erp.orders.read"],
+  "auth": [{"kind": "bearer", "secret_class": "erp.bearer-token", "required": true}],
+  "connection_test": {"url": "https://api.moysklad.ru/api/remap/1.2/entity/assortment?limit=1&offset=0", "method": "GET", "headers": {"Authorization": "Bearer ${secret}", "Accept-Encoding": "gzip"}},
+  "rate_limit": {
+    "max_concurrency": 4,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 20000,
+    "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}
+  }
+}

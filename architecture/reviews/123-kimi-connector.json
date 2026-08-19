@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-123",
+  "task": "123",
+  "change_class": "new_provider",
+  "summary": "Register Kimi (Moonshot AI) as a second ai-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing connectors/openai-compatible (provider packages may not import each other).",
+  "scopes": [
+    "architecture/policy.json",
+    "architecture/reviews/123-kimi-connector.json",
+    "connectors/kimi/capability-audit.md",
+    "connectors/kimi/conformance.go",
+    "connectors/kimi/connector.go",
+    "connectors/kimi/connector_test.go",
+    "connectors/kimi/manifest.json",
+    "docs/connectors/kimi/capability-audit.md",
+    "docs/connectors/kimi/conformance-plan.md",
+    "docs/connectors/kimi/conformance-report.json",
+    "docs/connectors/kimi/spec.md",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "tasks/issues/123-kimi-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "Kimi reuses the Task-122 ai_provider_accounts table and secret binding; it adds no tenant persistence of its own."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "The only tenant text that leaves TORGNEXA through this provider is the caller-assembled analytics prompt at analyze-call time; no response is persisted by this package."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Kimi is reached through the existing Task-122 /settings/ai-providers:analyze operation; no new public operation is added."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is published or consumed."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Adds the kimi provider under the existing ai family/ai.completion.generate capability; dispatch by provider id is confined to internal/platform/builtinruntime."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No schema change; Kimi reuses the ai_provider_accounts table introduced by Task-122."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider code has no direct network authority; all HTTPS calls are host-mediated through builtinruntime's DNS-pinned, public-IP-only transport. Credential bytes are read only inside a host-owned UseSecret callback."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 ai.analyze / settings.ai_providers.* capability gates unchanged."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 audit entries unchanged."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This capability performs no remote-state synchronization."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound calls use a host-injected transport to a fixed default host (api.moonshot.ai) or an account-configured hostname override; no inbound webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Remote non-2xx responses and empty/malformed completions normalize to a bounded error; the manifest's rate_limit/retry policy bounds concurrency and backoff."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disabling the account row immediately stops further Kimi analyze calls; no other component depends on this provider."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Package tests cover the default-Moonshot-host fallback and request shape; the canonical Task-064 conformance suite passes all thirteen checks (docs/connectors/kimi/conformance-report.json), including sandbox_isolation verified under a privileged Linux runner."
+    }
+  ],
+  "provider": {
+    "id": "kimi",
+    "route": "connector_sdk",
+    "manifest": "connectors/kimi/manifest.json",
+    "connector_spec": "docs/connectors/kimi/spec.md",
+    "capability_audit": "docs/connectors/kimi/capability-audit.md",
+    "conformance_plan": "docs/connectors/kimi/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

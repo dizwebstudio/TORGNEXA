@@ -1,0 +1,23 @@
+{
+  "odata.metadata": "https://erp.example.test/demo/odata/standard.odata/$metadata#Catalog_Номенклатура",
+  "value": [
+    {
+      "Ref_Key": "11111111-1111-1111-1111-111111111111",
+      "Code": "000000001",
+      "Артикул": "SKU-001",
+      "Description": "Тестовый товар",
+      "Бренд": "TORGNEXA",
+      "DataVersion": "AAAAAQAAAAE=",
+      "DeletionMark": false
+    },
+    {
+      "Ref_Key": "22222222-2222-2222-2222-222222222222",
+      "Code": "000000002",
+      "Артикул": "SKU-002",
+      "Description": "Архивный товар",
+      "Бренд": "TORGNEXA",
+      "DataVersion": "AAAAAQAAAAI=",
+      "DeletionMark": true
+    }
+  ]
+}

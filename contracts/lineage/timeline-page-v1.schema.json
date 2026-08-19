@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/lineage/timeline-page-v1.json",
+  "title": "TORGNEXA Lineage Timeline Page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {"type":"array","maxItems":200,"items":{"$ref":"record-v1.json"}},
+    "next_cursor": {
+      "type":"object","additionalProperties":false,"required":["occurred_at","id"],
+      "properties":{"occurred_at":{"type":"string","format":"date-time","pattern":"Z$"},"id":{"type":"string","pattern":"^lin\\.[0-9a-f]{64}$"}}
+    }
+  }
+}

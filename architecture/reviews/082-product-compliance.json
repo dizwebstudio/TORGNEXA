@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-082",
+  "task": "082",
+  "change_class": "pillar_change",
+  "summary": "Implement canonical product-compliance evidence, versioned policy evaluation, registry-verification/expiry ports, and a host-side fail-closed publication guard before connector products.write execution.",
+  "scopes": [
+    "GAP_AUDIT.md",
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0045-product-compliance-enforcement.md",
+    "architecture/policy.json",
+    "contracts/compliance/binding-v1.schema.json",
+    "contracts/compliance/document-v2.schema.json",
+    "contracts/compliance/evaluation-request-v1.schema.json",
+    "contracts/compliance/evaluation-result-v1.schema.json",
+    "contracts/compliance/expiry-alert-v1.schema.json",
+    "contracts/compliance/policy-v1.schema.json",
+    "contracts/compliance/verification-result-v1.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/product-compliance-record-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "docs/56-product-compliance.md",
+    "docs/migrations/000017-product-compliance.md",
+    "internal/app/api/compliance.go",
+    "internal/app/api/compliance_test.go",
+    "internal/core/compliance/compliance.go",
+    "internal/core/compliance/compliance_test.go",
+    "internal/core/compliance/service.go",
+    "internal/platform/complianceguard/guard.go",
+    "internal/platform/complianceguard/guard_test.go",
+    "internal/platform/connectorsandbox/model.go",
+    "internal/platform/connectorsandbox/runtime.go",
+    "internal/platform/connectorsandbox/runtime_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/compliancerepo/migration_test.go",
+    "internal/platform/postgres/compliancerepo/repository.go",
+    "migrations/000017_product_compliance.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/082-product-compliance-core.md",
+    "tools/migrationcheck/task082_audit_test.go"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "developer-surfaces",
+    "russia-compliance-generic-ports",
+    "legal-party-product-compliance-fx"
+  ],
+  "adr": "adr/0045-product-compliance-enforcement.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0024-product-compliance-policy.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0041-approval-engine-policy-evidence.md",
+    "adr/0042-immutable-data-lineage.md",
+    "adr/0043-canonical-pim-mdm.md",
+    "adr/0044-canonical-legal-party-counterparty.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Compliance documents, bindings, policies and verification facts are organization/workspace scoped, use composite tenant references, transaction-local scope and forced RLS; subject and holder guards reject cross-tenant canonical references."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Compliance evidence can contain regulated business identifiers. Audit/outbox/lineage store bounded ids/status/version rather than registry payloads; public evaluation is no-store and evidence object content remains outside this task pending upload-security controls."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "An additive POST /compliance/evaluate operation and new Draft 2020-12 v2/evaluation schemas are added. Existing product-compliance v1 and document-status event contracts remain byte-identical."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "New compliance.product.record_changed.v1 is additive and emitted through the existing transactional outbox. Existing compliance event v1 is unchanged."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK root interfaces remain unchanged; Task-029 host sandbox gains an additive OperationGuard and products.write now fails closed unless host compliance authorization succeeds before executor or egress."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000017 adds compliance documents, bindings, policies and verification history with indexes/RLS/guards and no destructive rename/drop of existing schema."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Publication enforcement runs host-side before connector execution/network; missing guard denies products.write. PostgreSQL rejects invalid/cross-tenant product, offer, category, GTIN and SKU bindings and blocks hard deletion of evidence."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Policy outcomes are allow/warn/approval_required/block. approval_required can proceed only through an injected Task-017 authorizer; block and evaluation errors fail closed."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every compliance repository mutation atomically records Task-003 Audit, Task-008 Outbox and Task-030 Lineage evidence with exact tenant/resource/version identity."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Versioned policies, immutable verification facts and deterministic evaluation/expiry fingerprints make retries reproducible; repository writes use optimistic versions and canonical evidence ids."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Task 082 adds no direct provider network path. Official-registry verification is exposed only as a provider-neutral port, while connector products.write egress remains mediated by the Task-029 sandbox after compliance authorization."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Evaluation queries are bounded/indexed, return explainable reason codes and evidence ids, and preserve correlation through audit/outbox/lineage. Runtime SLO thresholds remain Task 066."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration is expand-only. Binary rollback leaves compliance evidence and policy history intact; tenancy and backup/PITR rehearsals are extended to qualify preservation."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover policy outcomes, verification/expiry rules, GTIN/SKU scoping, host no-bypass before executor/egress, migration guards, tenant isolation, contracts and trusted-base architecture admission."
+    }
+  ],
+  "follow_up_tasks": [
+    "011",
+    "012",
+    "015",
+    "016",
+    "022",
+    "028",
+    "068",
+    "072",
+    "083",
+    "088"
+  ],
+  "provider": null
+}

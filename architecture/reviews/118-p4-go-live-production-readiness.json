@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-118",
+  "task": "118",
+  "change_class": "pillar_change",
+  "summary": "Close P4 repository readiness with fail-closed go-live evidence synthesis, hosted GitHub protection verification, independent release-identity and staged-asset verification, live connector qualification, and draft-first publication promotion without weakening existing release-security gates.",
+  "scopes": [
+    ".github/workflows/architecture-required.yml",
+    ".github/workflows/release.yml",
+    "GAP_AUDIT.md",
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0093-p4-go-live-evidence-and-publication.md",
+    "architecture/reviews/118-p4-go-live-production-readiness.json",
+    "docs/45-release-supply-chain-security.md",
+    "qualification/README.md",
+    "qualification/live-connectors.example.json",
+    "qualification/production-posture.example.json",
+    "scripts/check-p4-go-live.sh",
+    "scripts/p4_common.py",
+    "scripts/p4_hosting_rules.py",
+    "scripts/p4_live_connectors.py",
+    "scripts/p4_posture.py",
+    "scripts/p4_qualification_test.py",
+    "scripts/p4_release_stage.py",
+    "scripts/p4_root_evidence.py",
+    "scripts/package-release-evidence.sh",
+    "scripts/promote-github-release.sh",
+    "scripts/stage-github-release.sh",
+    "scripts/verify-release-evidence-external.sh",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/065-release-supply-chain-security.md",
+    "tasks/issues/080-architecture-freeze-and-gap-gate.md",
+    "tasks/issues/118-p4-go-live-production-readiness.md",
+    "templates/release-checklist.md",
+    "tools/contractcheck/internal/checker/supplychain.go",
+    "tools/contractcheck/internal/checker/supplychain_test.go"
+  ],
+  "frozen_pillars": [
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0093-p4-go-live-evidence-and-publication.md",
+  "existing_adrs": [
+    "adr/0017-release-supply-chain-security.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0091-production-qualification-and-warehouse-incident-automation.md",
+    "adr/0092-transactional-fulfillment-failover-execution.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "P4 consumes public tenant-scoped connector APIs and retained release evidence; it introduces no new tenant persistence or cross-tenant access path."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Retained P4 evidence is schema-bounded and rejects secret-shaped fields; bearer/GitHub tokens remain process-only inputs and are never emitted to reports."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "P4 adds no TORGNEXA product endpoints; live qualification uses the existing connector account, health-history and sync APIs."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event schemas, event versions or Kafka topics change in P4."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK/provider contracts and generated product SDKs are unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "P4 introduces no database migration; the migration catalog remains at 000074."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "P4 verifies applied hosted branch rules, independently re-verifies exact-tag Sigstore/SLSA release identity, binds staged GitHub asset SHA-256 digests, requires secret-free worktrees, and permits contents:write checkout only in the protected draft-staging job with persisted credentials disabled."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Production posture requires recent named platform/security approvers; hosted rules must expose Team review protection; public promotion requires a retained P4 PASS artifact."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "p4-go-live.json hashes every subordinate evidence report and binds release version, commit and repository to the staged draft and production posture."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "P4 does not alter reconciliation execution; optional live sync qualification remains behind an explicit write-awareness acknowledgement."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Webhook egress contracts are unchanged; P4 network calls are qualification clients to GitHub and the existing TORGNEXA HTTPS API."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "P4 requires the full P3 topology/load/failure qualification evidence and binds it into the final go-live decision together with live connector and hosted-release evidence."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Publication is draft-first and remains non-public until independent P4 verification; failure before promotion leaves a removable draft, while P3 backup/restore and upgrade rehearsals remain mandatory ancestors."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "P4 adds deterministic Python policy tests, shell/YAML/static checks, exact hosted-rule and staged-asset validators, and retains Go1.26.5/Docker/real-hosted facts as fail-closed external qualification inputs."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

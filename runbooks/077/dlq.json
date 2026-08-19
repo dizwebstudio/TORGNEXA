@@ -1,0 +1,16 @@
+{
+  "id": "rb-dlq",
+  "title": "Dlq incident",
+  "trigger_codes": [
+    "dlq_growth"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Freeze automatic retries for poison messages and inspect bounded redacted metadata.",
+      "validation": "Replay one quarantined item into a sandbox/dry-run path and verify idempotency.",
+      "rollback": "Return the item to DLQ and restore the previous retry policy.",
+      "evidence": "delivery id, event id, replay fingerprint and result"
+    }
+  ]
+}

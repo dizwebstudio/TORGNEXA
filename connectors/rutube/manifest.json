@@ -1,0 +1,12 @@
+{
+  "id": "rutube",
+  "name": "RUTUBE",
+  "family": "social",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["social.post.video"],
+  "auth": [
+    {"kind": "bearer", "secret_class": "social.partner-credential", "required": true}
+  ],
+  "rate_limit": {"max_concurrency": 1, "min_interval_ms": 1000, "request_timeout_ms": 300000, "retry": {"max_attempts": 4, "base_backoff_ms": 2000, "max_backoff_ms": 60000}}
+}

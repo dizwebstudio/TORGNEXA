@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/import-export/mapping-v1.json",
+  "title": "TORGNEXA Import Mapping v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "format", "fields"],
+  "properties": {
+    "id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "version": {"type":"integer","minimum":1},
+    "format": {"enum":["csv","json"]},
+    "fields": {
+      "type":"object",
+      "additionalProperties": false,
+      "required":["product_id","code","title"],
+      "properties": {
+        "product_id":{"type":"string","minLength":1,"maxLength":128},
+        "code":{"type":"string","minLength":1,"maxLength":128},
+        "title":{"type":"string","minLength":1,"maxLength":128},
+        "description":{"type":"string","minLength":1,"maxLength":128}
+      }
+    }
+  }
+}

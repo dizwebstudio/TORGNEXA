@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-064",
+  "task": "064",
+  "change_class": "pillar_change",
+  "summary": "Close the Connector SDK security/runtime boundary with a reusable no-skip conformance harness, machine-readable passing evidence, Linux reference qualification, and future provider-admission enforcement without admitting a provider in the Task-064 completion change.",
+  "scopes": [
+    ".codex/skills/connector-conformance/SKILL.md",
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "architecture/policy.json",
+    "cmd/torgnexa-connector-conformance/main.go",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/plugins/conformance-report-v1.schema.json",
+    "docs/03-module-boundaries.md",
+    "docs/07-plugin-sdk.md",
+    "docs/22-plugin-security.md",
+    "docs/28-sandbox-test-mode.md",
+    "docs/44-connector-conformance.md",
+    "docs/54-architecture-freeze-v1.md",
+    "internal/platform/architecture/checker.go",
+    "internal/platform/architecture/checker_test.go",
+    "internal/platform/connectors/conformance/conformance.go",
+    "internal/platform/connectors/conformance/conformance_test.go",
+    "internal/platform/connectors/conformance/reference.go",
+    "scripts/check-connector-conformance.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/064-connector-conformance-harness.md",
+    "templates/connector-conformance-report.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities"
+  ],
+  "adr": "adr/0039-connector-conformance-admission-gate.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0016-connector-conformance.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The mandatory tenant-isolation check exercises own-tenant success and foreign-tenant denial through a provider conformance adapter; no global tenant authority or database bypass is introduced."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Conformance reports contain only connector identity, ordered outcomes, bounded reason codes, timestamps and hashes; raw provider bodies, credentials, PII and arbitrary error strings are not report fields."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Task 064 adds one Draft 2020-12 conformance-report schema and a new Connector SDK subpackage without changing existing public API, event, webhook, manifest, sandbox or SDK-root contracts."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus event type or event payload is added or modified by the conformance harness."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Providers gain an additive conformance Candidate adapter and report contract under the already approved internal/platform/connectors SDK prefix; Connector, Runtime and SecretAccessor v1 root interfaces remain unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Task 064 adds no PostgreSQL table, column, constraint or migration; provider inventory remains empty."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "The required suite proves production-credential rejection, dry-run side-effect suppression, egress grants, normalized failure reporting, resource-limit failure and Task-029 Linux environment/filesystem/direct-network isolation."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "The harness does not authorize sensitive production writes or bypass Task-017 approval policy; it only certifies connector boundary behavior before provider admission."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "The machine report carries stable connector/version identity, ordered check results and a SHA-256 mutation detector suitable for release evidence while excluding raw provider response content."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "A mandatory repeated-write probe requires one applied effect followed by a duplicate-safe replay with the identical effect fingerprint; reconciliation semantics remain owned by Task 014."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Mandatory webhook replay/deduplication and Task-029 exact egress allow/deny checks are included; Task 063 still owns durable outbound webhook delivery, signing, retries and replay history."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Conformance exposes deterministic normalized check outcomes and verifies bounded retry/resource behavior; it adds no production telemetry backend."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Rollback removes the additive harness/report enforcement with no data migration. Provider admission remains disabled in this change, so rollback cannot strand an admitted provider."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Thirteen mandatory no-skip checks, strict report validation, negative mutation/isolation tests and a real Linux reference qualification are added to repository checks and future provider admission evidence."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "011",
+    "012",
+    "013",
+    "014",
+    "078"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "odnoklassniki",
+  "name": "Odnoklassniki",
+  "family": "social",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["social.analytics.read", "social.post.media", "social.post.text", "social.post.video"],
+  "auth": [
+    {"kind": "oauth2", "secret_class": "social.user-oauth", "required": true, "oauth2": {"grant_type": "authorization_code", "authorization_url": "https://connect.ok.ru/oauth/authorize", "token_url": "https://api.ok.ru/oauth/token.do", "scopes": ["VALUABLE_ACCESS", "PHOTO_CONTENT"], "client_auth_method": "client_secret_post"}},
+    {"kind": "api_key", "secret_class": "social.app-secret", "required": true}
+  ],
+  "connection_test": {"url": "https://api.ok.ru/fb.do?method=users.getCurrentUser&format=json", "method": "GET", "headers": {"Authorization": "Bearer ${access_token}"}},
+  "rate_limit": {"max_concurrency": 1, "min_interval_ms": 500, "request_timeout_ms": 120000, "retry": {"max_attempts": 4, "base_backoff_ms": 1000, "max_backoff_ms": 30000}}
+}

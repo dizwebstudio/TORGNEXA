@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-088B",
+  "task": "088",
+  "stage": "b",
+  "change_class": "implementation",
+  "summary": "Complete the frozen upload-security architecture with bounded MIME/archive/parser validation, full-content fail-closed malware scanning, immutable tenant-scoped security evidence, revocable re-scan semantics and authorized release capabilities consumed by Task 031.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/reviews/088b-upload-security-pipeline.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/upload-released-v1.schema.json",
+    "contracts/events/upload-rescan-requested-v1.schema.json",
+    "contracts/events/upload-security-decision-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/upload/released-object-ref-v1.md",
+    "contracts/upload/security-evidence-v1.schema.json",
+    "contracts/upload/upload-policy.yaml",
+    "docs/33-import-export.md",
+    "docs/62-upload-security-pipeline.md",
+    "docs/migrations/000023-upload-security-pipeline.md",
+    "internal/platform/importexport/importexport.go",
+    "internal/platform/importexport/importexport_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/uploadrepo/migration_test.go",
+    "internal/platform/postgres/uploadrepo/repository.go",
+    "internal/platform/uploads/clamav.go",
+    "internal/platform/uploads/clamav_test.go",
+    "internal/platform/uploads/pipeline.go",
+    "internal/platform/uploads/pipeline_test.go",
+    "internal/platform/uploads/policy_contract_test.go",
+    "internal/platform/uploads/uploads.go",
+    "internal/platform/uploads/uploads_test.go",
+    "migrations/000023_upload_security_pipeline.sql",
+    "migrations/catalog.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/031-import-export.md",
+    "tasks/issues/088-upload-security-pipeline.md",
+    "tasks/issues/088a-upload-quarantine-foundation.md",
+    "tasks/issues/088b-upload-security-pipeline.md",
+    "tools/migrationcheck/task088a_audit_test.go",
+    "tools/migrationcheck/task088b_audit_test.go"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0030-upload-quarantine.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0040-split-stage-architecture-evidence.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Upload state and security evidence remain organization/workspace scoped under forced RLS. Object keys derive from authenticated scope and UploadID; current release references bind tenant-owned record version and evidence and cannot be manufactured by clients."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Immutable evidence contains only bounded machine outcomes, MIME/extension, sizes/hashes and scanner version identifiers. Raw file contents, archive names, parser excerpts, scanner logs and credential-shaped metadata are excluded from evidence/events."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 088b adds no public HTTP operation or generated SDK method. Import/export continues through the internal ReleasedObjectRef capability boundary."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Versioned additive security.upload.decision.v1, security.upload.released.v1 and security.upload.rescan_requested.v1 contracts are registered; existing quarantine event remains unchanged."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Malware scanner and storage ports are host platform capabilities and do not enter Connector SDK v1 or provider-specific contracts."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000023 adds append-only upload_security_evidence, forced RLS, same-tenant evidence linkage and replaces the 088a temporary trigger with the complete security state-transition guard."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Release requires current CLEAN evidence after path/MIME/archive/parser checks and a scanner that consumes the entire immutable object. Scanner errors fail closed; re-scan revokes existing release before new scan work; stale ReleasedObjectRef values fail current-state validation."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Security release is an automated content-safety capability, not a business or legally significant write approval. No manual bypass/override path is introduced; future administrative exceptions would require separate Task-017 risk policy."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every scan decision is immutable evidence linked to the upload and every decision/release/rescan mutation enqueues bounded versioned outbox evidence in the same PostgreSQL transaction."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Pipeline processing is resumable by canonical state. Scanner outage keeps SCANNING for retry by default; terminal evidence attempts are unique per tenant/upload/attempt; re-scan creates a new evidence/version before release can be recreated."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Upload scanning performs no arbitrary webhook egress. The concrete ClamAV adapter connects only to operator-owned configuration and never accepts an upload/client supplied network endpoint."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "The pipeline exposes bounded process and malware_scan observations with outcome, bytes and duration while keeping scanner logs/content out of metric labels. Production scanner/storage latency SLOs remain deployment qualification."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration is expand/high-risk with backup checkpoint. Rollback disables new release/scans rather than deleting evidence. A promotion whose DB release commit fails remains an unreachable private-store orphan because canonical state does not become RELEASED."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Adversarial tests cover traversal, MIME mismatch, archive ratio/depth, parser depth/DTD, synthetic malware, scanner outage/retry, partial scanner reads, stale release revocation and ClamAV INSTREAM framing without using real malware."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "013"
+  ]
+}

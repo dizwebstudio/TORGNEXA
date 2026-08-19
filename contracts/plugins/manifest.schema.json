@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/manifest.json",
+  "title": "TORGNEXA Connector Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "family",
+    "version",
+    "sdk_version",
+    "capabilities"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "family": {
+      "enum": [
+        "marketplace",
+        "storefront",
+        "classified",
+        "social",
+        "erp",
+        "edo",
+        "government",
+        "payment",
+        "logistics",
+        "pickup"
+      ]
+    },
+    "version": {
+      "type": "string"
+    },
+    "sdk_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "auth": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

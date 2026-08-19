@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-081",
+  "task": "081",
+  "change_class": "pillar_change",
+  "summary": "Add canonical provider-neutral legal-party/counterparty masters, typed Russian identifier validation, bounded tenant search/dedup/merge-preview, mapping v4 and atomic audit/outbox/lineage evidence.",
+  "scopes": [
+    "GAP_AUDIT.md",
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0044-canonical-legal-party-counterparty.md",
+    "architecture/policy.json",
+    "contracts/catalog/connector-entity-mapping-v4.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/legal-party-record-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/legalparty/address-v1.schema.json",
+    "contracts/legalparty/authority-reference-v1.schema.json",
+    "contracts/legalparty/bank-account-v1.schema.json",
+    "contracts/legalparty/branch-v1.schema.json",
+    "contracts/legalparty/contract-v1.schema.json",
+    "contracts/legalparty/counterparty-v1.schema.json",
+    "contracts/legalparty/individual-entrepreneur-v1.schema.json",
+    "contracts/legalparty/legal-entity-v1.schema.json",
+    "contracts/legalparty/search-page-v1.schema.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "docs/55-legal-party-counterparty-core.md",
+    "docs/migrations/000016-legal-party-counterparty.md",
+    "internal/app/api/legalparty.go",
+    "internal/app/api/legalparty_test.go",
+    "internal/core/legalparty/legalparty.go",
+    "internal/core/legalparty/legalparty_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/connectormaprepo/repository.go",
+    "internal/platform/postgres/legalpartyrepo/migration_test.go",
+    "internal/platform/postgres/legalpartyrepo/repository.go",
+    "migrations/000016_legal_party_counterparty.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/081-legal-entity-counterparty-core.md",
+    "tools/migrationcheck/task081_audit_test.go"
+  ],
+  "frozen_pillars": [
+    "legal-party-product-compliance-fx"
+  ],
+  "adr": "adr/0044-canonical-legal-party-counterparty.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0042-immutable-data-lineage.md",
+    "adr/0043-canonical-pim-mdm.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "All party, counterparty, subordinate, duplicate and merge records are organization/workspace scoped with forced RLS and same-tenant reference guards."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Individual-entrepreneur names and tax identifiers may be personal data. Audit/outbox/lineage evidence omits names, tax IDs, bank numbers and authority content; search is authenticated/no-store."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "An additive tenant-scoped legal-party search endpoint and Draft 2020-12 schemas are added; existing endpoints/contracts remain unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "New enterprise.legal_party.record_changed.v1 is additive; no existing event payload changes."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Generic connector mapping is additively broadened in v4 to legal-party identity types while SDK v1 root interfaces stay unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000016 creates canonical party/counterparty masters and broadens connector mapping entity-type validation without renaming/dropping existing columns."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Forced RLS, same-tenant polymorphic reference guards, lifecycle/version guards, no hard delete/truncate, bounded search, and provider-neutral Core reduce identity/data leakage risk."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Merge preview is non-executing. Destructive merge and sensitive downstream writes remain subject to Task 017 approval."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every repository mutation atomically writes Task-003 Audit, Task-008 Outbox and Task-030 Lineage evidence; merge previews are fingerprinted."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Stable canonical party IDs and additive connector mappings provide reconciliation identity; optimistic versions and deterministic merge IDs make retries/collisions explicit."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "No webhook or egress behavior is added. Remote identities remain behind the Connector SDK/mapping boundary."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Search and master mutations have bounded queries/indices; no new external dependency is introduced. Runtime SLO definition remains Task 066."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration is expand-only and retains new evidence on binary rollback; backup/restore rehearsals are extended for canonical party tables."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Core identifier/dedup tests, migration guards, API tenant tests, contract fixtures, repository audit, migration and protected architecture checks cover Task 081 acceptance."
+    }
+  ],
+  "follow_up_tasks": [
+    "015",
+    "016",
+    "052",
+    "061",
+    "069",
+    "070",
+    "082",
+    "083",
+    "087"
+  ],
+  "provider": null
+}

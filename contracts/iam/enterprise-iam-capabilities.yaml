@@ -1,0 +1,12 @@
+version: 1
+capabilities:
+  federation.ldap_ad: true
+  federation.saml: true
+  provisioning.scim: true
+  provisioning.jit: true
+  service_accounts.scoped: true
+  group_claim_mapping: true
+requirements:
+  default_deny_unmapped_identity: true
+  offboarding_revokes_sessions_and_keys: true
+  privileged_changes_audited: true

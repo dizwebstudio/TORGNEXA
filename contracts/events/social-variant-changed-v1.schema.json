@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/social-variant-changed-v1.json",
+  "title": "commerce.social.variant_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "variant_id",
+    "content_id",
+    "format",
+    "media_count",
+    "version",
+    "change"
+  ],
+  "properties": {
+    "variant_id": {
+      "$ref": "#/$defs/id"
+    },
+    "content_id": {
+      "$ref": "#/$defs/id"
+    },
+    "format": {
+      "enum": [
+        "text",
+        "image",
+        "gallery",
+        "video",
+        "article"
+      ]
+    },
+    "media_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "version": {
+      "const": 1
+    },
+    "change": {
+      "const": "created"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    }
+  }
+}

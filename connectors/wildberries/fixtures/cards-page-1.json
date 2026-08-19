@@ -1,0 +1,16 @@
+{
+  "cards": [
+    {
+      "nmID": 505548518,
+      "vendorCode": "TSHIRT-001",
+      "title": "Футболка TORGNEXA",
+      "brand": "TORGNEXA",
+      "updatedAt": "2026-08-10T12:00:00Z",
+      "sizes": [
+        {"chrtID": 701710869, "skus": ["4600000000011"]},
+        {"chrtID": 701710870, "skus": ["4600000000012"]}
+      ]
+    }
+  ],
+  "cursor": {"updatedAt": "2026-08-10T12:00:00Z", "nmID": 505548518, "total": 1}
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/fx/conversion-policy-v1.json",
+  "title": "TORGNEXA FX Conversion Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rounding_mode", "rounding_stage", "triangulation_mode"],
+  "properties": {
+    "rounding_mode": {"enum": ["half_even", "half_up", "toward_zero"]},
+    "rounding_stage": {"const": "final_amount_only"},
+    "triangulation_mode": {"enum": ["direct_only", "single_pivot"]},
+    "pivot_currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"triangulation_mode": {"const": "single_pivot"}}, "required": ["triangulation_mode"]},
+      "then": {"required": ["pivot_currency"]},
+      "else": {"not": {"required": ["pivot_currency"]}}
+    }
+  ],
+  "$comment": "Task 089a defines policy only. It permits a direct pair or one explicit pivot and forbids intermediate rounding; cross-currency arithmetic remains disabled until Task 089b."
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-039",
+  "task": "039",
+  "change_class": "new_provider",
+  "summary": "Register CIAN as a classified property provider with fail-closed XML-feed generation and exact feed/import status reconciliation without inventing an API publication-write surface.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/039-cian-vertical-connector.json",
+    "connectors/cian/config.go",
+    "connectors/cian/conformance.go",
+    "connectors/cian/connector.go",
+    "connectors/cian/connector_test.go",
+    "connectors/cian/fixtures/import-report-errors.json",
+    "connectors/cian/fixtures/import-report.json",
+    "connectors/cian/fixtures/import-state.json",
+    "connectors/cian/manifest.json",
+    "connectors/cian/property.go",
+    "connectors/cian/status.go",
+    "docs/connectors/cian/README.md",
+    "docs/connectors/cian/capability-audit.md",
+    "docs/connectors/cian/conformance-plan.md",
+    "docs/connectors/cian/conformance-report.json",
+    "docs/connectors/cian/property-mapping.md",
+    "docs/connectors/cian/reconciliation.md",
+    "docs/connectors/cian/spec.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/039-cian-vertical-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "One tenant-bound connector Account resolves one immutable CIAN FeedURL; remote import evidence must match that URL exactly and caller requests cannot override account identity."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "API keys remain callback-scoped. Generated XML can contain property address, phone and image data supplied by the host, so serving the feed remains subject to Task-060 privacy and host publication policy."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 039 adds no public TORGNEXA HTTP/OpenAPI operation."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 039 adds no EventBus schema."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 039 consumes the existing classified publication-status SDK surface introduced by Task 038 and does not modify frozen Connector/Runtime roots or capability contracts."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No migration is added; feed URL and import identities remain host-owned connector configuration/mapping evidence."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Fixed public-api.cian.ru authority, Task-021 Bearer secret callback, exact FeedURL/order binding, HTTPS-only feed/photo policy, bounded response/XML size and fail-closed category validation constrain provider input and egress."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Runtime status is read-only. XML generation is not misdeclared as a provider API write; the host must run approval/compliance policy before serving or changing the registered CIAN feed."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "The adapter returns bounded import observations and deterministic XML bytes only; host audit, mapping, approval and source lineage remain authoritative."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Status reconciliation binds both FeedURL and remote import/order ID and maps provider counters. There is no connector-side API write/retry ambiguity because CIAN publication remains pull-based XML."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound API authority is fixed to public-api.cian.ru; feed/photo URLs are validated HTTPS inputs and webhook subscription is not admitted."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "API errors and 429/service failures are normalized with bounded retry guidance; malformed or foreign import evidence degrades health instead of being accepted."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Suspend/disable the CIAN connector account and stop serving the configured feed URL to stop integration traffic; no schema rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic tests cover exact feed/order binding, import-status mapping, sale/rent XML rules and invalid payloads; Task-064 provider candidate must pass all thirteen checks before completion."
+    }
+  ],
+  "provider": {
+    "id": "cian",
+    "route": "connector_sdk",
+    "manifest": "connectors/cian/manifest.json",
+    "connector_spec": "docs/connectors/cian/spec.md",
+    "capability_audit": "docs/connectors/cian/capability-audit.md",
+    "conformance_plan": "docs/connectors/cian/conformance-plan.md"
+  },
+  "follow_up_tasks": [
+    "043",
+    "066"
+  ]
+}

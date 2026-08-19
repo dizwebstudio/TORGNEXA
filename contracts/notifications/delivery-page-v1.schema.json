@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/notifications/delivery-page-v1.json",
+  "title": "TORGNEXA Notification Delivery Page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "items"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/delivery"
+      }
+    }
+  },
+  "$defs": {
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notification_id",
+        "channel",
+        "status",
+        "occurrence",
+        "attempt",
+        "attempted_at"
+      ],
+      "properties": {
+        "notification_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+        },
+        "channel": {
+          "enum": [
+            "web_ui",
+            "webhook"
+          ]
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "suppressed",
+            "failed"
+          ]
+        },
+        "error_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "occurrence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "attempted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "error_code"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "error_code"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/stock-changed-v1.json",
+  "title": "commerce.inventory.stock_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "offer_id",
+    "warehouse_id",
+    "old_quantity",
+    "new_quantity"
+  ],
+  "properties": {
+    "offer_id": {
+      "type": "string"
+    },
+    "warehouse_id": {
+      "type": "string"
+    },
+    "old_quantity": {
+      "type": "string"
+    },
+    "new_quantity": {
+      "type": "string"
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

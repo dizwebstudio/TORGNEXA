@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-119",
+  "task": "119",
+  "change_class": "pillar_change",
+  "summary": "Close the operator-facing UI product-experience gap while preserving ADR-0047 host-owned identity, generated-SDK, server-authoritative tenancy/approval and non-persistent browser-state boundaries.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0094-operator-oriented-ui-and-browser-state.md",
+    "architecture/reviews/119-ui-product-experience-closure.json",
+    "docs/69-frontend-shell.md",
+    "frontend/src/app/App.tsx",
+    "frontend/src/app/UiProvider.tsx",
+    "frontend/src/components/ApiState.tsx",
+    "frontend/src/components/CommandPalette.tsx",
+    "frontend/src/components/DataTable.tsx",
+    "frontend/src/components/Dialog.tsx",
+    "frontend/src/components/Drawer.tsx",
+    "frontend/src/components/Icon.tsx",
+    "frontend/src/components/Skeleton.tsx",
+    "frontend/src/components/Toast.tsx",
+    "frontend/src/components/icon-names.ts",
+    "frontend/src/features/catalog/ProductList.tsx",
+    "frontend/src/features/notifications/NotificationList.tsx",
+    "frontend/src/features/orders/OrderList.tsx",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/pages/ApprovalsPage.tsx",
+    "frontend/src/pages/DashboardPage.tsx",
+    "frontend/src/pages/InventoryPage.tsx",
+    "frontend/src/pages/ReportsPage.tsx",
+    "frontend/src/pages/SyncPage.tsx",
+    "frontend/src/shell/AppShell.tsx",
+    "frontend/src/shell/navigation.ts",
+    "frontend/src/styles.css",
+    "frontend/test/ui-experience.test.mjs",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/119-ui-product-experience-closure.md"
+  ],
+  "frozen_pillars": [
+    "developer-surfaces"
+  ],
+  "adr": "adr/0094-operator-oriented-ui-and-browser-state.md",
+  "existing_adrs": [
+    "adr/0035-architecture-change-governance.md",
+    "adr/0047-frontend-shell-runtime.md",
+    "adr/0092-transactional-fulfillment-failover-execution.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The richer dashboard, command search and entity drawers use only existing capability-authorized public APIs; no organization/workspace browser selector or cross-tenant search path is introduced."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Theme/density stay in process memory and table views use display-only URL state; no localStorage, sessionStorage or cookie persistence is introduced for tokens, credentials or tenant business data."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 119 adds no HTTP operation and consumes the existing generated TypeScript SDK including already-published warehouse incident and fulfillment allocation reads."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event envelope, event payload version, topic or producer semantics change."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK/provider contracts remain unchanged; handwritten frontend code consumes the generated non-secret connector catalog rather than importing provider implementations."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Task 119 introduces no persistence schema; the migration catalog remains at 000074."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Host-owned OIDC, in-memory bearer handling, capability route guards, same-origin SDK transport and the static no-browser-persistence/no-provider-branching checks remain intact; global search is capability gated."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Sensitive approval execution receives an extra confirmation dialog, but server approval state and idempotent execution remain authoritative and the dialog is not treated as authorization."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "The UI now exposes existing warehouse incident, fulfillment replacement and reconciliation evidence more clearly; it does not create a browser-side audit store or alter immutable backend lineage."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Drift comparison and operator controls are presentation changes over existing idempotent resolve/run APIs; no reconciliation state transition or write semantics change."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Task 119 adds no webhook sender or browser egress path beyond the existing same-origin API client."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Operational dashboard and activity center expose current bounded API state, while loading skeletons/error/toast feedback improve operator visibility without changing backend SLO claims."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Task 119 is a static frontend change with no data migration; rollback remains deployment of the prior API-compatible frontend bundle."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "The frontend gate expands from 12 to 18 deterministic tests covering operator dashboard, DataTable, incident/fulfillment surfaces, integration drawers, responsive labels, dark mode, focus and reduced motion while retaining the original security policy checks."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://torgnexa.local/schemas/approval/request-v1.json",
+  "title": "TORGNEXA approval request v1",
+  "type":"object","additionalProperties":false,
+  "required":["id","organization_id","workspace_id","policy_id","policy_version","requester_id","source","action","resource_type","resource_id","correlation_id","risk","state","current_stage","expires_at","escalation_count","version","requested_at"],
+  "properties":{
+    "id":{"type":"string","minLength":26,"maxLength":36},"organization_id":{"type":"string","minLength":26,"maxLength":36},"workspace_id":{"type":"string","minLength":26,"maxLength":36},"policy_id":{"type":"string","minLength":26,"maxLength":36},"policy_version":{"type":"integer","minimum":1},
+    "requester_id":{"type":"string","minLength":1,"maxLength":256},"source":{"$ref":"#/$defs/token"},"action":{"$ref":"#/$defs/token"},"resource_type":{"$ref":"#/$defs/token"},"resource_id":{"type":"string","minLength":1,"maxLength":512},"correlation_id":{"type":"string","minLength":1,"maxLength":256},
+    "risk":{"enum":["read","write_safe","write_sensitive","legally_significant"]},"state":{"enum":["pending","approved","rejected","expired","cancelled","executing","completed","failed"]},"current_stage":{"type":"integer","minimum":1,"maximum":16},
+    "expires_at":{"$ref":"#/$defs/utc"},"next_escalation_at":{"anyOf":[{"$ref":"#/$defs/utc"},{"type":"null"}]},"escalation_count":{"type":"integer","minimum":0},"version":{"type":"integer","minimum":1},"requested_at":{"$ref":"#/$defs/utc"},"approved_at":{"anyOf":[{"$ref":"#/$defs/utc"},{"type":"null"}]},"rejected_at":{"anyOf":[{"$ref":"#/$defs/utc"},{"type":"null"}]},"execution_started_at":{"anyOf":[{"$ref":"#/$defs/utc"},{"type":"null"}]},"completed_at":{"anyOf":[{"$ref":"#/$defs/utc"},{"type":"null"}]},"failure_code":{"anyOf":[{"$ref":"#/$defs/token"},{"type":"null"}]}
+  },
+  "$defs":{"token":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"},"utc":{"type":"string","format":"date-time","pattern":"Z$"}}
+}

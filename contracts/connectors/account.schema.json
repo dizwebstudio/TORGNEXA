@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/connectors/account.json",
+  "title": "Connector Account v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "organization_id",
+    "workspace_id",
+    "connector_id",
+    "family",
+    "status",
+    "version",
+    "health",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "organization_id": {
+      "type": "string",
+      "minLength": 26,
+      "maxLength": 36
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 26,
+      "maxLength": 36
+    },
+    "connector_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "family": {
+      "enum": [
+        "marketplace",
+        "storefront",
+        "classified",
+        "social",
+        "erp",
+        "edo",
+        "government",
+        "payment",
+        "logistics",
+        "pickup",
+        "fx",
+        "notification"
+      ]
+    },
+    "status": {
+      "enum": [
+        "disabled",
+        "active",
+        "suspended",
+        "error"
+      ]
+    },
+    "secret_reference": {
+      "type": "string",
+      "pattern": "^sec:v1:[0-9a-f]{32}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unknown",
+            "healthy",
+            "degraded",
+            "unavailable"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "unknown"
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "reason_code"
+                ]
+              },
+              {
+                "required": [
+                  "checked_at"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "healthy"
+            }
+          },
+          "required": [
+            "checked_at"
+          ],
+          "not": {
+            "required": [
+              "reason_code"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "status": {
+              "enum": [
+                "degraded",
+                "unavailable"
+              ]
+            }
+          },
+          "required": [
+            "reason_code",
+            "checked_at"
+          ]
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "description": "Tenant-owned binding to a connector manifest. Credentials are represented only by an opaque Task-021 secret reference."
+}

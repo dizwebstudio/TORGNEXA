@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-095",
+  "task": "095",
+  "change_class": "mixed",
+  "summary": "Admit PrestaShop through its native Webservice API using existing provider-neutral commerce surfaces and fail-closed desired-state reconciliation.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "README.md",
+    "VALIDATION_REPORT.md",
+    "adr/0087-prestashop-native-webservice-storefront-provider.md",
+    "architecture/reviews/095-prestashop-connector.json",
+    "connectors/prestashop/config.go",
+    "connectors/prestashop/conformance.go",
+    "connectors/prestashop/connector.go",
+    "connectors/prestashop/connector_test.go",
+    "connectors/prestashop/cursor.go",
+    "connectors/prestashop/manifest.json",
+    "connectors/prestashop/money.go",
+    "connectors/prestashop/read.go",
+    "connectors/prestashop/remote.go",
+    "connectors/prestashop/write.go",
+    "contracts/operations/095-prestashop-connector-v1.md",
+    "docs/connectors/prestashop/README.md",
+    "docs/connectors/prestashop/capability-audit.md",
+    "docs/connectors/prestashop/conformance-plan.md",
+    "docs/connectors/prestashop/conformance-report.json",
+    "docs/connectors/prestashop/reconciliation.md",
+    "docs/connectors/prestashop/spec.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/095-prestashop-connector.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0087-prestashop-native-webservice-storefront-provider.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0016-connector-conformance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0045-product-compliance-enforcement.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "PrestaShop account configuration and mappings remain organization/workspace scoped; no tenant selector enters provider payloads."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Order projection intentionally excludes PrestaShop billing/shipping/customer identity fields; credentials remain behind SecretAccessor."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "No public TORGNEXA REST operation changes; Connector SDK changes are additive typed interfaces only."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "No canonical event schema changes; PrestaShop webhooks enter existing inbox/sync boundaries after verification."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Frozen Connector/Runtime roots are unchanged; commerce write, return and webhook interfaces are additive SDK-v1 capability surfaces."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "No database schema migration is required; Task-010 mappings and existing inbox/reconciliation persistence remain authoritative."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Store host/base path are constrained, query-string credentials are forbidden, webhook HMAC is constant-time verified and ambiguous writes fail closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Host Task-017/082 policy remains mandatory before invoking commerce writes; provider capability does not bypass approvals/compliance."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Write receipts and reconciliation outcomes preserve remote IDs for existing audit/lineage orchestration without storing raw credentials."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "SKU reconciliation protects creates; exact-state writes use read-before/read-after reconciliation; webhook replay uses signed-material identity."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "PrestaShop inbound webhooks require expected-topic binding and verified HMAC; provider outbound requests use only configured HTTPS store host."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Provider errors/rate-limit health are normalized through existing Connector SDK SLO surfaces."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Connector admission is additive and can be disabled per account; no schema rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic unit tests and the Task-064 13-check provider report are required and recorded."
+    }
+  ],
+  "provider": {
+    "id": "prestashop",
+    "route": "connector_sdk",
+    "manifest": "connectors/prestashop/manifest.json",
+    "connector_spec": "docs/connectors/prestashop/spec.md",
+    "capability_audit": "docs/connectors/prestashop/capability-audit.md",
+    "conformance_plan": "docs/connectors/prestashop/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

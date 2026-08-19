@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-093",
+  "task": "093",
+  "change_class": "pillar_change",
+  "summary": "Community single-host deployment composes TORGNEXA application roles, canonical migrations, Keycloak and S3-compatible storage with generated credentials, loopback-only exposure and fail-closed startup ordering.",
+  "scopes": [
+    ".dockerignore",
+    ".env.example",
+    "Dockerfile",
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "README.md",
+    "VALIDATION_REPORT.md",
+    "adr/0085-community-compose-is-an-explicit-single-host-runtime-contract.md",
+    "architecture/reviews/093-community-docker-deployment.json",
+    "cmd/api/main.go",
+    "cmd/api/main_test.go",
+    "cmd/mcp/main.go",
+    "cmd/mcp/main_test.go",
+    "contracts/operations/093-community-deployment-v1.md",
+    "deploy/garage/render-config.sh",
+    "deploy/keycloak/init-db.sh",
+    "deploy/keycloak/torgnexa-realm.json",
+    "deploy/postgres/catalog.tsv",
+    "deploy/postgres/migrate.sh",
+    "docker-compose.yml",
+    "docs/deployment/093-community-docker-deployment.md",
+    "scripts/check-community-deployment.sh",
+    "scripts/init-community-env.sh",
+    "supply-chain/release-artifacts.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/093-community-docker-deployment.md",
+    "tools/contractcheck/internal/checker/supplychain.go",
+    "tools/contractcheck/internal/checker/supplychain_test.go"
+  ],
+  "frozen_pillars": [
+    "privacy-secrets-security-governance",
+    "developer-surfaces",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "adr": "adr/0085-community-compose-is-an-explicit-single-host-runtime-contract.md",
+  "existing_adrs": [
+    "adr/0034-security-edge-contract.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0083-production-api-security-composition.md",
+    "adr/0084-javascript-release-dependency-locking.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Deployment wiring does not create tenant shortcuts; application tenancy and RLS remain unchanged."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "No default credentials are committed; local credentials are generated into mode-0600 .env and production remains externally secret-managed."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "No public HTTP operation is added or changed; the deployment exposes the existing secure API composition only on loopback."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "No event schema changes; Kafka listener topology only separates container-internal and localhost clients."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK and provider admission are unchanged; connectors receive infrastructure through existing host configuration."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "No schema migration is added; a one-shot runner applies the reviewed 54-file catalog and verifies SHA-256/history before application startup."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Non-root/read-only application images, dropped capabilities, no-new-privileges, generated secrets and loopback-only ports are enforced."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Deployment does not bypass approval or regulated-write policy; existing application policy remains authoritative."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "No audit/lineage data model changes; migration/startup failures are explicit process failures rather than silent state changes."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Migration execution is checksum-aware/idempotent for applied catalog entries and fails on unknown/partial bootstrap state."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Backend network retains required outbound connectivity for provider/webhook egress while no data service is publicly exposed."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Healthchecks and dependency ordering provide local readiness evidence; production SLO qualification remains Task-066 deployment evidence."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Named persistent volumes and separate one-shot migration jobs make stop/restart explicit; destructive volume removal is not part of normal rollback."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Community deployment policy, shell syntax, canonical catalog parity and full repository gates are required."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

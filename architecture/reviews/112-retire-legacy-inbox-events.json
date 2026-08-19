@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-112",
+  "task": "112",
+  "change_class": "implementation",
+  "summary": "Retire the empty pre-Task-009 inbox_events compatibility placeholder through a fail-closed contract migration while retaining inbox_receipts as the sole consumer idempotency store.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/reviews/112-retire-legacy-inbox-events.json",
+    "deploy/postgres/catalog.tsv",
+    "docs/04-event-platform-kafka.md",
+    "docs/05-database.md",
+    "docs/27-tenancy-billing.md",
+    "docs/migrations/000002-tenancy.md",
+    "docs/migrations/000008-inbox-idempotency.md",
+    "docs/migrations/000064-retire-legacy-inbox-events.md",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/inboxrepo/migration_test.go",
+    "migrations/000064_retire_legacy_inbox_events.sql",
+    "migrations/catalog.json",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/009-inbox-idempotency.md",
+    "tasks/issues/112-retire-legacy-inbox-events.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0019-upgrade-compatibility.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {"area": "tenancy", "status": "affected", "evidence": "The tenantless deny-all placeholder is removed; the real inbox_receipts table remains organization/workspace scoped under forced RLS."},
+    {"area": "privacy_data_governance", "status": "not_affected", "evidence": "The retired table is required to be empty; no personal or business data is migrated or deleted."},
+    {"area": "api_compatibility", "status": "not_affected", "evidence": "No REST or OpenAPI surface changes."},
+    {"area": "event_compatibility", "status": "not_affected", "evidence": "Canonical event envelopes and the inbox_receipts deduplication identity remain unchanged."},
+    {"area": "plugin_sdk_compatibility", "status": "not_affected", "evidence": "No connector or plugin SDK surface changes."},
+    {"area": "database_migration", "status": "affected", "evidence": "High-risk contract migration 000064 removes only the qualified empty legacy relation after explicit fleet, traffic and backup gates."},
+    {"area": "security", "status": "affected", "evidence": "Removing an unused tenantless relation reduces schema ambiguity; canonical receipts retain forced RLS and append-only guards."},
+    {"area": "approvals_risk", "status": "not_affected", "evidence": "No business action or approval policy changes."},
+    {"area": "audit_lineage", "status": "not_affected", "evidence": "Immutable inbox_receipts and migration_history evidence are retained."},
+    {"area": "reconciliation_idempotency", "status": "not_affected", "evidence": "Runtime already reads and writes only inbox_receipts; duplicate and collision behavior is unchanged."},
+    {"area": "webhooks_egress", "status": "not_affected", "evidence": "No network destination or delivery behavior changes."},
+    {"area": "slo_observability", "status": "affected", "evidence": "The zero-traffic qualification gate and post-migration relation-absence assertion make retirement observable."},
+    {"area": "operations_rollback", "status": "affected", "evidence": "An unexpected row or lock timeout rolls back atomically; post-commit recovery relies on the required verified backup or a forward repair."},
+    {"area": "testing_conformance", "status": "affected", "evidence": "Static migration tests cover phase, empty-table guard and drop; PostgreSQL tenancy rehearsal asserts fresh-install absence and canonical receipt isolation."}
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

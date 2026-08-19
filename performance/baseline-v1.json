@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "harness": "torgnexa-normalized-slo-v1",
+  "measurement_class": "deterministic_repository_baseline",
+  "results": [
+    {
+      "name": "api_burst",
+      "path": "api",
+      "concurrency": 256,
+      "operations": 100000,
+      "failure_mode": "burst",
+      "thresholds": {
+        "availability_min": 0.999,
+        "p50_max": "100ms",
+        "p95_max": "300ms",
+        "p99_max": "750ms",
+        "throughput_min_ops_per_second": 250,
+        "lag_max": "0s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 1,
+        "p50": "59ms",
+        "p95": "225ms",
+        "p99": "225ms",
+        "throughput_ops_per_second": 312.5,
+        "lag": "0s",
+        "saturation": 0.5845
+      },
+      "passed": true
+    },
+    {
+      "name": "api_steady",
+      "path": "api",
+      "concurrency": 64,
+      "operations": 100000,
+      "failure_mode": "none",
+      "thresholds": {
+        "availability_min": 0.999,
+        "p50_max": "100ms",
+        "p95_max": "300ms",
+        "p99_max": "750ms",
+        "throughput_min_ops_per_second": 250,
+        "lag_max": "0s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 1,
+        "p50": "57.5ms",
+        "p95": "64.5ms",
+        "p99": "65ms",
+        "throughput_ops_per_second": 312.5,
+        "lag": "0s",
+        "saturation": 0.55
+      },
+      "passed": true
+    },
+    {
+      "name": "kafka_throttle",
+      "path": "kafka",
+      "concurrency": 32,
+      "operations": 200000,
+      "failure_mode": "throttle",
+      "thresholds": {
+        "availability_min": 0.9995,
+        "p50_max": "50ms",
+        "p95_max": "250ms",
+        "p99_max": "1s",
+        "throughput_min_ops_per_second": 1000,
+        "lag_max": "30s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 1,
+        "p50": "29.75ms",
+        "p95": "200ms",
+        "p99": "200ms",
+        "throughput_ops_per_second": 1250,
+        "lag": "22.5s",
+        "saturation": 0.592
+      },
+      "passed": true
+    },
+    {
+      "name": "reporting_slow_sink",
+      "path": "reporting",
+      "concurrency": 32,
+      "operations": 50000,
+      "failure_mode": "slow_dependency",
+      "thresholds": {
+        "availability_min": 0.999,
+        "p50_max": "300ms",
+        "p95_max": "2s",
+        "p99_max": "5s",
+        "throughput_min_ops_per_second": 50,
+        "lag_max": "1m0s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 1,
+        "p50": "174ms",
+        "p95": "195ms",
+        "p99": "1.8s",
+        "throughput_ops_per_second": 62.5,
+        "lag": "48s",
+        "saturation": 0.55
+      },
+      "passed": true
+    },
+    {
+      "name": "sync_partial_outage",
+      "path": "sync",
+      "concurrency": 16,
+      "operations": 20000,
+      "failure_mode": "partial_outage",
+      "thresholds": {
+        "availability_min": 0.995,
+        "p50_max": "500ms",
+        "p95_max": "2s",
+        "p99_max": "5s",
+        "throughput_min_ops_per_second": 20,
+        "lag_max": "5m0s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 0.9999,
+        "p50": "287.5ms",
+        "p95": "322.5ms",
+        "p99": "325ms",
+        "throughput_ops_per_second": 25,
+        "lag": "1m15s",
+        "saturation": 0.55
+      },
+      "passed": true
+    },
+    {
+      "name": "webhook_partial_outage",
+      "path": "webhooks",
+      "concurrency": 64,
+      "operations": 50000,
+      "failure_mode": "partial_outage",
+      "thresholds": {
+        "availability_min": 0.999,
+        "p50_max": "250ms",
+        "p95_max": "2s",
+        "p99_max": "10s",
+        "throughput_min_ops_per_second": 50,
+        "lag_max": "1m0s",
+        "saturation_max": 0.8,
+        "error_budget_window": "720h0m0s"
+      },
+      "baseline": {
+        "availability": 0.99996,
+        "p50": "143.75ms",
+        "p95": "161.25ms",
+        "p99": "162.5ms",
+        "throughput_ops_per_second": 62.5,
+        "lag": "15s",
+        "saturation": 0.55
+      },
+      "passed": true
+    }
+  ]
+}

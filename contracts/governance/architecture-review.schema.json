@@ -1,0 +1,453 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/governance/architecture-review.json",
+  "title": "TORGNEXA architecture change review",
+  "description": "Bounded task-linked architecture gap audit and impact evidence. Repository tooling additionally validates exact canonical areas, references, inventory, changed paths, ADR freshness, and provider admission. Split implementation stages may add append-only supplemental reviews using NNN[a|b]-*.json with stage a|b and matching ARCH-NNNA/B ids.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "task",
+    "change_class",
+    "summary",
+    "scopes",
+    "frozen_pillars",
+    "adr",
+    "existing_adrs",
+    "gap_audit",
+    "impacts",
+    "provider",
+    "follow_up_tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^ARCH-[0-9]{3}(?:[AB])?$"
+    },
+    "task": {
+      "type": "string",
+      "pattern": "^[0-9]{3}$"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "a",
+        "b"
+      ]
+    },
+    "change_class": {
+      "type": "string",
+      "enum": [
+        "implementation",
+        "new_domain",
+        "new_provider",
+        "pillar_change",
+        "mixed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 2000
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/repositoryPath"
+      }
+    },
+    "frozen_pillars": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "universal-commerce-content-fulfillment-models",
+          "pim-mdm-financial-stock-ledgers",
+          "connector-plugin-runtime-capabilities",
+          "event-platform-outbox-inbox",
+          "bidirectional-sync-reconciliation",
+          "workflow-approval-audit-lineage",
+          "privacy-secrets-security-governance",
+          "reporting-settlements-growth-supply-planning",
+          "developer-surfaces",
+          "russia-compliance-generic-ports",
+          "legal-party-product-compliance-fx",
+          "enterprise-iam-siem-cloud-upload-edge"
+        ]
+      }
+    },
+    "adr": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/adrPath"
+        }
+      ]
+    },
+    "existing_adrs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/adrPath"
+      }
+    },
+    "gap_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performed",
+        "prompt",
+        "decision"
+      ],
+      "properties": {
+        "performed": {
+          "const": true
+        },
+        "prompt": {
+          "const": "prompts/05-architecture-gap-audit.txt"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "within_frozen_architecture",
+            "extend_existing_capability",
+            "route_to_connector_sdk",
+            "architecture_change"
+          ]
+        }
+      }
+    },
+    "impacts": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/tenancyImpact"
+        },
+        {
+          "$ref": "#/$defs/privacyImpact"
+        },
+        {
+          "$ref": "#/$defs/apiImpact"
+        },
+        {
+          "$ref": "#/$defs/eventImpact"
+        },
+        {
+          "$ref": "#/$defs/pluginImpact"
+        },
+        {
+          "$ref": "#/$defs/migrationImpact"
+        },
+        {
+          "$ref": "#/$defs/securityImpact"
+        },
+        {
+          "$ref": "#/$defs/approvalImpact"
+        },
+        {
+          "$ref": "#/$defs/auditImpact"
+        },
+        {
+          "$ref": "#/$defs/reconciliationImpact"
+        },
+        {
+          "$ref": "#/$defs/webhookImpact"
+        },
+        {
+          "$ref": "#/$defs/sloImpact"
+        },
+        {
+          "$ref": "#/$defs/operationsImpact"
+        },
+        {
+          "$ref": "#/$defs/testingImpact"
+        }
+      ],
+      "items": false
+    },
+    "provider": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/provider"
+        }
+      ]
+    },
+    "follow_up_tasks": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]{3}$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "change_class": {
+            "enum": [
+              "pillar_change",
+              "mixed"
+            ]
+          }
+        },
+        "required": [
+          "change_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "adr": {
+            "$ref": "#/$defs/adrPath"
+          },
+          "frozen_pillars": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "adr": {
+            "type": "null"
+          },
+          "frozen_pillars": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "change_class": {
+            "enum": [
+              "new_provider",
+              "mixed"
+            ]
+          }
+        },
+        "required": [
+          "change_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "$ref": "#/$defs/provider"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "provider": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "adrPath": {
+      "type": "string",
+      "pattern": "^adr/[0-9]{4}-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$"
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "area": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "affected",
+            "not_affected",
+            "not_applicable"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 2000
+        }
+      }
+    },
+    "tenancyImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "tenancy"
+        }
+      }
+    },
+    "privacyImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "privacy_data_governance"
+        }
+      }
+    },
+    "apiImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "api_compatibility"
+        }
+      }
+    },
+    "eventImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "event_compatibility"
+        }
+      }
+    },
+    "pluginImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "plugin_sdk_compatibility"
+        }
+      }
+    },
+    "migrationImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "database_migration"
+        }
+      }
+    },
+    "securityImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "security"
+        }
+      }
+    },
+    "approvalImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "approvals_risk"
+        }
+      }
+    },
+    "auditImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "audit_lineage"
+        }
+      }
+    },
+    "reconciliationImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "reconciliation_idempotency"
+        }
+      }
+    },
+    "webhookImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "webhooks_egress"
+        }
+      }
+    },
+    "sloImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "slo_observability"
+        }
+      }
+    },
+    "operationsImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "operations_rollback"
+        }
+      }
+    },
+    "testingImpact": {
+      "$ref": "#/$defs/impact",
+      "properties": {
+        "area": {
+          "const": "testing_conformance"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "route",
+        "manifest",
+        "connector_spec",
+        "capability_audit",
+        "conformance_plan"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "route": {
+          "const": "connector_sdk"
+        },
+        "manifest": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "connector_spec": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "capability_audit": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "conformance_plan": {
+          "$ref": "#/$defs/repositoryPath"
+        }
+      }
+    }
+  }
+}

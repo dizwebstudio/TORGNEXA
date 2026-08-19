@@ -1,0 +1,3530 @@
+openapi: 3.1.0
+info:
+  title: TORGNEXA API
+  version: 0.16.0
+servers:
+  - url: /api/v1
+paths:
+  /sync/policies:
+    post:
+      operationId: createSyncPolicy
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, connector_account_id, entity_type, direction, source_of_truth]
+              properties:
+                id: {type: string, minLength: 1, maxLength: 128}
+                connector_account_id: {type: string, minLength: 1, maxLength: 128}
+                entity_type: {type: string, enum: [products, offers, inventory, orders]}
+                direction: {type: string, enum: [inbound, outbound, bidirectional]}
+                source_of_truth: {type: string, enum: [local, remote, manual]}
+      responses:
+        '201': {description: Tenant-scoped synchronization policy created}
+        '400': {description: Invalid policy or idempotency key}
+        '403': {description: Administrator permission required}
+        '409': {description: Policy already exists or connector account is unavailable}
+  /sync/policies/{policy_id}:
+    parameters:
+      - name: policy_id
+        in: path
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 128}
+    patch:
+      operationId: updateSyncPolicy
+      parameters:
+        - {name: policy_id, in: path, required: true, schema: {type: string}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SyncPolicyUpdate'}}}}
+      responses: {'200': {description: Policy updated with optimistic concurrency}, '409': {description: Policy version conflict}}
+  /sync/policies/{policy_id}/run:
+    parameters:
+      - name: policy_id
+        in: path
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 128}
+    post:
+      operationId: runSyncPolicy
+      parameters:
+        - {name: policy_id, in: path, required: true, schema: {type: string}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses: {'202': {description: On-demand policy run durably queued}, '422': {description: Policy is disabled}}
+  /sync/drifts/{drift_id}/actions:
+    parameters:
+      - name: drift_id
+        in: path
+        required: true
+        schema: {type: string, minLength: 1, maxLength: 128}
+    post:
+      operationId: resolveSyncDrift
+      parameters:
+        - {name: drift_id, in: path, required: true, schema: {type: string}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SyncDriftAction'}}}}
+      responses: {'200': {description: Open drift resolved with append-only action evidence}, '409': {description: Drift is already resolved or version changed}, '422': {description: Action is unsafe or unavailable}}
+  /sync/status:
+    get:
+      operationId: getSyncStatus
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Tenant-scoped synchronization policies, recent reconciliation runs and bounded drift evidence
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SyncStatus'}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks sync.read}
+  /settings/workspace:
+    get:
+      operationId: getWorkspaceSettings
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Current claim-derived organization and workspace profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkspaceSettings'}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or permission}
+    put:
+      operationId: updateWorkspaceSettings
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WorkspaceSettingsUpdate'}
+      responses:
+        '200':
+          description: Atomically updated organization and workspace profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkspaceSettings'}
+        '400': {description: Invalid profile values or preconditions}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or permission}
+        '409': {description: Optimistic version conflict}
+  /settings/security/configuration:
+    get:
+      operationId: getSettingsSecurityConfiguration
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Runtime OIDC configuration state without claiming provider health, content: {application/json: {schema: {$ref: '#/components/schemas/SettingsSecurityConfiguration'}}}}
+        '403': {description: Caller lacks settings.security.read}
+  /settings/security/sessions:
+    get:
+      operationId: listSettingsSecuritySessions
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 64}}
+      responses:
+        '200': {description: Minimized tenant-scoped OIDC sessions observed by TORGNEXA, content: {application/json: {schema: {$ref: '#/components/schemas/SettingsSecuritySessionPage'}}}}
+        '403': {description: Caller lacks settings.security.read}
+  /settings/security/sessions/{session_ref}:revoke:
+    post:
+      operationId: revokeSettingsSecuritySession
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: session_ref, in: path, required: true, schema: {type: string, pattern: '^[0-9a-f]{64}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200': {description: Session revoked for subsequent TORGNEXA API access, content: {application/json: {schema: {$ref: '#/components/schemas/SettingsSecurityRevocation'}}}}
+        '404': {description: Session is outside the tenant or does not exist}
+  /settings/security/logins:
+    get:
+      operationId: listSettingsSecurityLogins
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 64}}
+      responses:
+        '200': {description: Cursor-paginated TORGNEXA-observed OIDC session history, content: {application/json: {schema: {$ref: '#/components/schemas/SettingsSecurityLoginPage'}}}}
+        '403': {description: Caller lacks settings.security.read}
+  /settings/security/audit:
+    get:
+      operationId: listSettingsSecurityAudit
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 64}}
+      responses:
+        '200': {description: Cursor-paginated settings mutation evidence with actor and correlation, content: {application/json: {schema: {$ref: '#/components/schemas/AuditPage'}}}}
+        '403': {description: Caller lacks settings.security.read}
+  /settings/identity-providers:
+    get:
+      operationId: listSettingsIdentityProviders
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Bounded tenant-scoped current provider configurations, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettingsPage'}}}}
+        '403': {description: Caller lacks settings.identity_providers.read}
+  /settings/identity-providers/{provider_id}:
+    put:
+      operationId: saveSettingsIdentityProviderDraft
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderDraft'}}}}
+      responses:
+        '200': {description: Immutable draft revision stored; active revision is unchanged, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettings'}}}}
+        '409': {description: Optimistic version conflict}
+        '422': {description: Issuer or callback is outside the deployment allowlist or is SSRF-unsafe}
+  /settings/identity-providers/{provider_id}:validate:
+    post:
+      operationId: validateSettingsIdentityProvider
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderAction'}}}}
+      responses:
+        '200': {description: Redirect-free bounded OIDC discovery validation succeeded, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettings'}}}}
+        '422': {description: Discovery failed or returned an unsafe metadata URL}
+  /settings/identity-providers/{provider_id}:activate:
+    post:
+      operationId: activateSettingsIdentityProvider
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderAction'}}}}
+      responses:
+        '200': {description: Validated current revision activated, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettings'}}}}
+        '422': {description: Current revision has no successful validation evidence}
+  /settings/identity-providers/{provider_id}:rollback:
+    post:
+      operationId: rollbackSettingsIdentityProvider
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderRollback'}}}}
+      responses:
+        '200': {description: Previously validated revision copied into a new immutable active revision, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettings'}}}}
+        '422': {description: Target revision is absent or was never validated}
+  /settings/identity-providers/{provider_id}:disable:
+    post:
+      operationId: disableSettingsIdentityProvider
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderAction'}}}}
+      responses:
+        '200': {description: Managed provider disabled without deleting revision or validation evidence, content: {application/json: {schema: {$ref: '#/components/schemas/IdentityProviderSettings'}}}}
+        '409': {description: Optimistic version conflict}
+  /settings/ai-providers:
+    get:
+      operationId: listAIProviderAccounts
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: 'Tenant-scoped configured AI provider accounts; credential material never included', content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountPage'}}}}
+        '403': {description: Caller lacks settings.ai_providers.read}
+    post:
+      operationId: createAIProviderAccount
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountCreate'}}}}
+      responses:
+        '201': {description: AI provider account created; credential stored through the secrets provider, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
+        '400': {description: 'Invalid provider, label, model, base_url, folder_id, or credential'}
+        '403': {description: Caller lacks settings.ai_providers.write}
+  /settings/ai-providers:disable:
+    post:
+      operationId: disableAIProviderAccount
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountDisable'}}}}
+      responses:
+        '200': {description: AI provider account disabled with optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
+        '409': {description: Optimistic version conflict}
+  /settings/ai-providers:analyze:
+    post:
+      operationId: analyzeWithAIProvider
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIAnalyzeRequest'}}}}
+      responses:
+        '200': {description: Provider's completion text for the caller-assembled analytics prompt, content: {application/json: {schema: {$ref: '#/components/schemas/AIAnalyzeResponse'}}}}
+        '404': {description: AI provider account not found}
+        '409': {description: AI provider account is disabled}
+        '502': {description: The external AI provider request failed}
+  /settings/members:
+    get:
+      operationId: listWorkspaceMembers
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128}}
+      responses:
+        '200':
+          description: Cursor-paginated members of the current claim-derived workspace
+          content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMemberPage'}}}
+        '403': {description: Caller lacks settings.members.read}
+    post:
+      operationId: inviteWorkspaceMember
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMemberInvite'}}}}
+      responses:
+        '201': {description: Workspace invitation mapping created, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMember'}}}}
+        '403': {description: Caller lacks settings.members.write}
+        '409': {description: Email or idempotency key conflicts with another invitation}
+  /settings/members/{member_id}:
+    patch:
+      operationId: updateWorkspaceMember
+      parameters:
+        - {name: member_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMemberUpdate'}}}}
+      responses:
+        '200': {description: Role or status changed with append-only audit, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMember'}}}}
+        '403': {description: Caller lacks settings.members.write}
+        '409': {description: Version conflict or last active administrator protection}
+  /health:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: API process is alive and serving requests
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+            X-Content-Type-Options:
+              schema: {type: string, const: nosniff}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthResponse'}
+        '500':
+          description: Safe internal error response
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+  /lineage/timeline:
+    get:
+      operationId: getLineageTimeline
+      parameters:
+        - {name: system, in: query, required: true, schema: {type: string}}
+        - {name: entity_type, in: query, required: true, schema: {type: string}}
+        - {name: entity_id, in: query, required: true, schema: {type: string}}
+        - {name: field, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: before_at, in: query, required: false, schema: {type: string, format: date-time, pattern: 'Z$'}}
+        - {name: before_id, in: query, required: false, schema: {type: string}}
+      responses:
+        '200':
+          description: Immutable provenance timeline for one canonical entity/field
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LineageTimelinePage'}
+        '400': {description: Invalid lineage query}
+        '401': {description: Authenticated tenant scope missing}
+  /inventory/positions/{position_id}:
+    parameters: [{name: position_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: getInventoryPosition
+      responses: {'200': {description: Position card and immutable movement history}, '404': {description: Position not found}}
+  /inventory/positions/{position_id}/adjustments:
+    parameters: [{name: position_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: adjustInventoryPosition
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InventoryAdjustmentWrite'}}}}
+      responses: {'200': {description: Exact on-hand balance corrected and audited}, '409': {description: Version conflict}}
+  /inventory/warehouses:
+    get:
+      operationId: listInventoryWarehouses
+      responses: {'200': {description: Canonical tenant warehouses}}
+    post:
+      operationId: createInventoryWarehouse
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseWrite'}}}}
+      responses: {'201': {description: Warehouse created}, '409': {description: Duplicate code}}
+  /inventory/warehouses/{warehouse_id}:
+    parameters: [{name: warehouse_id, in: path, required: true, schema: {type: string}}]
+    patch:
+      operationId: updateInventoryWarehouse
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseWrite'}}}}
+      responses: {'200': {description: Warehouse status updated}, '409': {description: Version conflict}}
+  /inventory/warehouses/{warehouse_id}/operational-state:
+    parameters: [{name: warehouse_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: getWarehouseOperationalState
+      responses:
+        '200': {description: Persistent warehouse operational state; absent state defaults to active/version 0}
+        '404': {description: Warehouse not found}
+    patch:
+      operationId: updateWarehouseOperationalState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [state, version]
+              properties:
+                state: {type: string, enum: [active, degraded, unavailable, lost]}
+                reason: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+                version: {type: integer, minimum: 0}
+      responses:
+        '200': {description: Operational state updated; UNAVAILABLE/LOST opens durable incident automation}
+        '409': {description: Version conflict}
+  /inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}:
+    parameters:
+      - {name: warehouse_id, in: path, required: true, schema: {type: string}}
+      - {name: destination_warehouse_id, in: path, required: true, schema: {type: string}}
+    put:
+      operationId: putWarehouseFailoverRoute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [priority, enabled, version]
+              properties:
+                priority: {type: integer, minimum: 1, maximum: 10000}
+                enabled: {type: boolean}
+                version: {type: integer, minimum: 0}
+      responses:
+        '200': {description: Explicit failover route created or updated}
+        '409': {description: Version conflict}
+  /inventory/warehouse-incidents:
+    get:
+      operationId: listWarehouseIncidents
+      responses:
+        '200': {description: Durable tenant-scoped warehouse incident automation history}
+  /inventory/warehouse-incidents/{incident_id}:
+    parameters: [{name: incident_id, in: path, required: true, schema: {type: string, pattern: '^whinc_[a-f0-9]{32}$'}}]
+    get:
+      operationId: getWarehouseIncident
+      responses:
+        '200': {description: 'Warehouse incident with routing, rerouted-allocation and execution-attention counters'}
+        '404': {description: Warehouse incident not found}
+  /inventory/fulfillment-allocations:
+    get:
+      operationId: listFulfillmentAllocations
+      responses:
+        '200': {description: Durable order-item reservation allocations and failover lineage}
+    post:
+      operationId: reserveFulfillmentAllocation
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FulfillmentAllocationWrite'}
+      responses:
+        '201': {description: Order item reserved at the requested allocatable warehouse}
+        '400': {description: 'Invalid order item, warehouse, or insufficient ATP'}
+        '409': {description: Idempotency or active-allocation conflict}
+  /inventory/fulfillment-allocations/{allocation_id}:
+    parameters: [{name: allocation_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: getFulfillmentAllocation
+      responses:
+        '200': {description: Durable fulfillment allocation including replacement/incident lineage}
+        '404': {description: Allocation not found}
+  /inventory/import:
+    post:
+      operationId: importInventory
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InventoryImportWrite'}}}}
+      responses: {'200': {description: Inventory rows imported through canonical audited mutations}, '400': {description: Invalid row or unknown SKU/warehouse}}
+  /counterparties/search:
+    get:
+      operationId: searchLegalParties
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 200}}
+        - {name: inn, in: query, required: false, schema: {type: string, pattern: '^[0-9]{10,12}$'}}
+        - {name: registration_id, in: query, required: false, schema: {type: string, maxLength: 32}}
+        - {name: party_type, in: query, required: false, schema: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Tenant-scoped canonical legal-party search results
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegalPartySearchPage'}
+        '400': {description: Invalid legal-party search query}
+        '401': {description: Authenticated tenant scope missing}
+  /connectors:
+    get:
+      operationId: listConnectors
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Connectors in current workspace
+          content:
+            application/json:
+              schema: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorAccountSettings'}}
+        '401': {description: Authenticated tenant scope missing}
+  /connector-accounts:
+    get:
+      operationId: listConnectorAccounts
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Tenant-scoped connector account page without credential values
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountPage'}
+        '400': {description: Invalid cursor or limit}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or permission}
+    post:
+      operationId: createConnectorAccount
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorAccountCreate'}
+      responses:
+        '201':
+          description: Disabled connector account draft created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '200':
+          description: Idempotent replay of the existing identical account
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '400': {description: "Invalid account, manifest, secret reference or idempotency key"}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or write permission}
+        '409': {description: Account id already binds different configuration}
+  /connector-accounts:disable:
+    post:
+      operationId: disableConnectorAccount
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorAccountDisable'}
+      responses:
+        '200':
+          description: Connector account disabled with optimistic version transition
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '400': {description: Invalid request}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or write permission}
+        '409': {description: Concurrent account update}
+  /connector-accounts:credentials:
+    post:
+      operationId: enrollConnectorCredentials
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorCredentialEnrollment'}
+      responses:
+        '200':
+          description: Credential material encrypted and opaque reference bound; account remains disabled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '400': {description: Invalid credential envelope}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or write permission}
+        '409': {description: Concurrent account update}
+        '422': {description: Connector authentication kind is unsupported}
+  /connector-accounts:runtime-config:
+    get:
+      operationId: getConnectorRuntimeConfig
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Non-secret host-owned connector runtime configuration
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorRuntimeConfig'}
+        '400': {description: Invalid request}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or read permission}
+        '404': {description: Connector account or runtime configuration not found}
+    put:
+      operationId: putConnectorRuntimeConfig
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorRuntimeConfigWrite'}
+      responses:
+        '200':
+          description: Versioned non-secret connector runtime configuration stored
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorRuntimeConfig'}
+        '400': {description: Invalid request}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or write permission}
+        '404': {description: Connector account not found}
+        '409': {description: Concurrent runtime configuration update}
+        '422': {description: Runtime configuration is invalid or contains secret-bearing fields}
+  /connector-accounts:oauth-start:
+    post:
+      operationId: startConnectorOAuth
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorOAuthStart'}
+      responses:
+        '200':
+          description: Replay-safe authorization URL with PKCE S256 and bounded one-time state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorOAuthStartResult'}
+        '400': {description: Callback is outside the exact deployment allowlist or request is invalid}
+        '409': {description: Account version or idempotency conflict}
+        '422': {description: Connector does not declare a browser authorization-code flow or client registration is missing}
+  /connector-accounts:oauth-callback:
+    post:
+      operationId: completeConnectorOAuth
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorOAuthCallback'}
+      responses:
+        '200':
+          description: Authorization code exchanged and encrypted token bundle bound; account remains disabled and unvalidated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '400': {description: Callback is outside the exact deployment allowlist or request is invalid}
+        '409': {description: 'State is expired, already consumed, actor-bound to another session or account version changed'}
+        '422': {description: Connector OAuth configuration is invalid}
+        '502': {description: OAuth provider rejected or did not complete the bounded exchange}
+  /connector-accounts:capabilities:
+    put:
+      operationId: replaceConnectorAccountCapabilities
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectorAccountCapabilitiesUpdate'}
+      responses:
+        '200':
+          description: Complete manifest-bound capability snapshot appended and account version advanced
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectorAccountSettings'}
+        '400': {description: Invalid request or idempotency key}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Identity has no reviewed tenant mapping or write permission}
+        '409': {description: Concurrent account update}
+        '422': {description: A selected capability is not declared by the connector manifest}
+  /connector-accounts:check:
+    post:
+      operationId: checkConnectorAccount
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
+      responses: {'200': {description: Manifest-declared remote endpoint called with encrypted credentials and normalized health persisted}, '409': {description: Version conflict}}
+  /connector-accounts:health-history:
+    get:
+      operationId: listConnectorAccountHealthHistory
+      parameters:
+        - {name: account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        '200': {description: Bounded tenant-scoped connector health history, content: {application/json: {schema: {type: object, additionalProperties: false, required: [items], properties: {items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorHealthSnapshot'}}}}}}}
+        '400': {description: Invalid account or limit}
+  /connector-accounts:enable:
+    post:
+      operationId: enableConnectorAccount
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
+      responses: {'200': {description: Healthy connector account enabled}, '422': {description: Successful connection check required}}
+  /connector-accounts:sync:
+    post:
+      operationId: syncConnectorAccount
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
+      responses: {'202': {description: On-demand reconciliation runs durably started for enabled account policies}, '422': {description: Active healthy account and current preview evidence required before remote writes}}
+  /connector-accounts:bootstrap-preview:
+    post:
+      operationId: previewConnectorBootstrap
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapPreviewWrite'}}}}
+      responses:
+        '201': {description: Immutable metadata-only dry-run evidence created without remote IO, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapPreview'}}}}
+        '409': {description: Account version or idempotency evidence conflict}
+        '422': {description: 'Active healthy account, enabled policies and account capabilities are required'}
+  /connector-accounts:bootstrap:
+    get:
+      operationId: getConnectorBootstrapState
+      responses:
+        '200': {description: 'Tenant-scoped previews, durable schedules and bootstrap dispatch progress', content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapState'}}}}
+    post:
+      operationId: startConnectorBootstrap
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapStart'}}}}
+      responses:
+        '202': {description: Resumable initial-import dispatch job durably queued, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncJob'}}}}
+        '409': {description: Idempotency conflict}
+        '422': {description: Current unconsumed preview evidence with at least one inbound policy required}
+  /connector-accounts:schedule:
+    put:
+      operationId: putConnectorSyncSchedule
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncScheduleWrite'}}}}
+      responses:
+        '200': {description: Durable server-side interval schedule created or optimistically updated, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncSchedule'}}}}
+        '409': {description: Account or schedule optimistic version conflict}
+        '422': {description: Active healthy account and current preview evidence required when enabling}
+  /products:
+    post:
+      operationId: createProduct
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductWrite'}}}}
+      responses: {'201': {description: Product created}, '400': {description: Invalid product}, '409': {description: Duplicate code}}
+    get:
+      operationId: listProducts
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 256}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [draft, active, archived]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Tenant-scoped canonical product search/list page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalSearchProductSearchPageV1'}
+        '400': {description: Invalid product search query or cursor}
+        '401': {description: Authenticated tenant scope missing}
+  /products/{product_id}:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: getProduct
+      responses: {'200': {description: 'Product card with offers, prices, categories and images'}, '404': {description: Product not found}}
+    patch:
+      operationId: updateProduct
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductWrite'}}}}
+      responses: {'200': {description: Product updated}, '400': {description: Invalid product}, '409': {description: Version conflict}}
+  /products/{product_id}/offers:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: createProductOffer
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OfferWrite'}}}}
+      responses: {'201': {description: Offer created}, '409': {description: Duplicate SKU}}
+  /products/{product_id}/offers/{offer_id}:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+      - {name: offer_id, in: path, required: true, schema: {type: string}}
+    patch:
+      operationId: updateProductOffer
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OfferWrite'}}}}
+      responses: {'200': {description: Offer updated}, '409': {description: Version conflict}}
+  /products/{product_id}/prices/{offer_or_price_id}:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+      - {name: offer_or_price_id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: createOfferPrice
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriceWrite'}}}}
+      responses: {'201': {description: Price created}, '409': {description: Price already exists}}
+    patch:
+      operationId: updateOfferPrice
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriceWrite'}}}}
+      responses: {'200': {description: Price updated}, '409': {description: Version conflict}}
+  /products/{product_id}/categories/{category_id}:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+      - {name: category_id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: assignProductCategory
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      responses: {'200': {description: Category assigned}, '409': {description: Already assigned}}
+  /products/{product_id}/images:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: createProductImage
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ImageWrite'}}}}
+      responses: {'201': {description: Image reference created}, '400': {description: Only valid HTTPS images are accepted}}
+  /products/{product_id}/images/{image_id}:
+    parameters:
+      - {name: product_id, in: path, required: true, schema: {type: string}}
+      - {name: image_id, in: path, required: true, schema: {type: string}}
+    patch:
+      operationId: updateProductImage
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ImageWrite'}}}}
+      responses: {'200': {description: Image reference updated}, '409': {description: Version conflict}}
+  /catalog/categories:
+    get:
+      operationId: listCatalogCategories
+      responses: {'200': {description: Tenant product categories}}
+    post:
+      operationId: createCatalogCategory
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CategoryWrite'}}}}
+      responses: {'201': {description: Category created}, '409': {description: Duplicate code}}
+  /orders:
+    get:
+      operationId: listOrders
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 256}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [pending, confirmed, processing, fulfilled, cancelled]}}
+        - {name: placed_from, in: query, required: false, schema: {type: string, format: date-time, pattern: 'Z$'}}
+        - {name: placed_to, in: query, required: false, schema: {type: string, format: date-time, pattern: 'Z$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Tenant-scoped canonical order search/list page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalSearchOrderSearchPageV1'}
+        '400': {description: Invalid order search query or cursor}
+        '401': {description: Authenticated tenant scope missing}
+  /orders/demo:
+    post:
+      operationId: createDemoOrders
+      description: Idempotently creates a synthetic tenant-scoped dataset with five orders, product, offer, warehouse, stock position, verified compliance declaration and personal demo notifications for the authenticated actor, then appends audit evidence.
+
+      parameters:
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}
+      responses:
+        '201':
+          description: Demo dataset created, or already present
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created]
+                properties:
+                  created: {type: integer, minimum: 0, maximum: 5}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: User cannot create demo data}
+    delete:
+      operationId: deleteDemoOrders
+      description: Idempotently hides the synthetic demo dataset while retaining immutable canonical order history and appending audit evidence.
+      parameters:
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}
+      responses:
+        '200':
+          description: Demo dataset deleted, or was already absent
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [deleted]
+                properties:
+                  deleted: {type: integer, minimum: 0, maximum: 5}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Administrator permission required}
+  /orders/{order_id}:
+    get:
+      operationId: getOrder
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Tenant-scoped canonical order detail with connector mappings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, order_number, status, currency, subtotal_minor_units, discount_minor_units, tax_minor_units, shipping_minor_units, grand_minor_units, placed_at, updated_at, items, sources]
+                properties:
+                  id: {type: string}
+                  order_number: {type: string}
+                  status: {type: string}
+                  currency: {type: string}
+                  subtotal_minor_units: {type: integer, minimum: 0}
+                  discount_minor_units: {type: integer, minimum: 0}
+                  tax_minor_units: {type: integer, minimum: 0}
+                  shipping_minor_units: {type: integer, minimum: 0}
+                  grand_minor_units: {type: integer, minimum: 0}
+                  placed_at: {type: string, format: date-time}
+                  updated_at: {type: string, format: date-time}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [sku, quantity_coefficient, quantity_scale, unit, unit_price_minor_units, line_total_minor_units]
+                      properties:
+                        sku: {type: string}
+                        quantity_coefficient: {type: integer, minimum: 1}
+                        quantity_scale: {type: integer, minimum: 0, maximum: 9}
+                        unit: {type: string}
+                        unit_price_minor_units: {type: integer, minimum: 0}
+                        line_total_minor_units: {type: integer, minimum: 0}
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [provider, remote_id]
+                      properties:
+                        provider: {type: string}
+                        remote_id: {type: string}
+        '404': {description: Order not found in authenticated workspace}
+  /inventory/positions:
+    get:
+      operationId: listInventoryPositions
+      responses:
+        '200':
+          description: Tenant-scoped canonical inventory positions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      required: [ID, SKU, ProductTitle, WarehouseCode, WarehouseName, OnHand, Reserved, Available, Unit, UpdatedAt]
+                      properties:
+                        ID: {type: string}
+                        SKU: {type: string}
+                        ProductTitle: {type: string}
+                        WarehouseCode: {type: string}
+                        WarehouseName: {type: string}
+                        OnHand: {type: string}
+                        Reserved: {type: string}
+                        Available: {type: string}
+                        Unit: {type: string}
+                        UpdatedAt: {type: string, format: date-time}
+        '401': {description: Authenticated tenant scope missing}
+  /reconciliation/jobs:
+    post:
+      operationId: createReconciliationJob
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReconciliationJobWrite'}
+      responses:
+        '202':
+          description: Retry-safe tenant-scoped reconciliation control-plane run queued
+          content: {application/json: {schema: {$ref: '#/components/schemas/ReconciliationRunStatus'}}}
+        '400': {description: Invalid job request or idempotency key}
+        '409': {description: Idempotency key conflicts with another request}
+  /approvals:
+    get:
+      operationId: listApprovals
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Recent tenant-scoped approval requests
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, requester_id, action, resource_type, resource_id, risk, state, current_stage, expires_at, requested_at, version]
+                      properties:
+                        id: {type: string}
+                        requester_id: {type: string}
+                        action: {type: string}
+                        resource_type: {type: string}
+                        resource_id: {type: string}
+                        risk: {type: string, enum: [read, write_safe, write_sensitive, legally_significant]}
+                        state: {type: string, enum: [pending, approved, rejected, expired, cancelled, executing, completed, failed]}
+                        current_stage: {type: integer, minimum: 1}
+                        expires_at: {type: string, format: date-time}
+                        requested_at: {type: string, format: date-time}
+                        version: {type: integer, minimum: 1}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks approvals.read}
+  /approval-policies:
+    get:
+      operationId: listApprovalPolicies
+      responses: {'200': {description: Current immutable approval policy versions}}
+    post:
+      operationId: createApprovalPolicy
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ApprovalPolicyWrite'}}}}
+      responses: {'201': {description: New active immutable policy version installed}, '409': {description: Version conflict}}
+  /approval-policies/{policy_id}:
+    delete:
+      operationId: retireApprovalPolicy
+      parameters:
+        - {name: policy_id, in: path, required: true, schema: {type: string}}
+        - {name: expected_version, in: query, required: true, schema: {type: integer, minimum: 1}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      responses: {'204': {description: Policy retired without deleting version history}, '409': {description: Version conflict}}
+  /approvals/requests:
+    post:
+      operationId: createApprovalRequest
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ApprovalRequestWrite'}}}}
+      responses: {'201': {description: Real sensitive operation approval request created}, '409': {description: Matching active policy required}}
+  /approvals/demo:
+    post:
+      operationId: createDemoApproval
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}
+      responses:
+        '201': {description: Demonstration approval request created through the canonical policy workflow}
+        '400': {description: Invalid request context}
+        '403': {description: Administrator permission required}
+        '409': {description: Demo policy could not be installed}
+  /approvals/{request_id}/decision:
+    post:
+      operationId: decideApproval
+      parameters:
+        - {name: request_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [vote, expected_version]
+              properties:
+                vote: {type: string, enum: [approve, reject]}
+                expected_version: {type: integer, minimum: 1}
+      responses:
+        '200': {description: Immutable approval decision recorded}
+        '400': {description: Invalid or ineligible decision}
+        '403': {description: Administrator permission required}
+        '409': {description: Request version or state conflict}
+  /approvals/{request_id}/execute:
+    post:
+      operationId: executeApproval
+      parameters:
+        - {name: request_id, in: path, required: true, schema: {type: string}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      responses: {'200': {description: Approved exact operation executed once and request completed}, '409': {description: Approved matching request required}}
+  /settlements:
+    get:
+      operationId: listSettlementEntries
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Tenant-scoped immutable settlement ledger page
+          content: {application/json: {schema: {$ref: '#/components/schemas/SettlementEntryPage'}}}
+        '400': {description: Invalid cursor or limit}
+  /reports:
+    get:
+      operationId: listReports
+      responses:
+        '200':
+          description: Tenant-visible analytical report catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 16
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, title, description, source, availability, freshness_sla_seconds, dimensions, metrics]
+                      properties:
+                        id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}
+                        title: {type: string, minLength: 1, maxLength: 100}
+                        description: {type: string, minLength: 1, maxLength: 300}
+                        source: {type: string, enum: [clickhouse, postgresql]}
+                        availability: {type: string, const: ready}
+                        freshness_sla_seconds: {type: integer, minimum: 1, maximum: 3600}
+                        dimensions: {type: array, minItems: 1, maxItems: 16, uniqueItems: true, items: {type: string}}
+                        metrics: {type: array, minItems: 1, maxItems: 16, uniqueItems: true, items: {type: string}}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks reports.read}
+  /reports/{report_id}:
+    get:
+      operationId: getReportData
+      parameters:
+        - {name: report_id, in: path, required: true, schema: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: status, in: query, required: false, schema: {type: string, maxLength: 32}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200':
+          description: Bounded tenant-scoped ClickHouse analytical report result or generated export
+          headers:
+            Content-Disposition:
+              description: Attachment filename for CSV and PDF exports
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, generated_at, source, columns, rows]
+                properties:
+                  id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}
+                  generated_at: {type: string, format: date-time}
+                  source: {type: string, enum: [clickhouse, postgresql]}
+                  columns:
+                    type: array
+                    minItems: 1
+                    maxItems: 16
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [key, label]
+                      properties:
+                        key: {type: string, minLength: 1, maxLength: 64}
+                        label: {type: string, minLength: 1, maxLength: 100}
+                  rows:
+                    type: array
+                    maxItems: 200
+                    items:
+                      type: array
+                      maxItems: 16
+                      items: {type: string, maxLength: 512}
+            text/csv:
+              schema: {type: string}
+            application/pdf:
+              schema: {type: string, format: binary}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks reports.read}
+        '404': {description: Unknown report}
+        '400': {description: Invalid report filters}
+  /realtime:
+    get:
+      operationId: streamRealtimeInvalidations
+      description: Tenant-scoped Server-Sent Events stream carrying metadata-only cache invalidation and heartbeat signals. Entity data is re-read through normal authorized APIs.
+      responses:
+        '200':
+          description: Streaming text/event-stream response
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Realtime read capability required}
+
+  /audit:
+    get:
+      operationId: listAuditRecords
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Newest-first tenant-scoped append-only audit page
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 200
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, actor_id, source, action, resource_type, resource_id, correlation_id, risk, summary, created_at]
+                      properties:
+                        id: {type: string, minLength: 1, maxLength: 128}
+                        actor_id: {type: string, minLength: 1, maxLength: 256}
+                        source: {type: string, minLength: 1, maxLength: 128}
+                        action: {type: string, minLength: 1, maxLength: 160}
+                        resource_type: {type: string, minLength: 1, maxLength: 128}
+                        resource_id: {type: string, minLength: 1, maxLength: 512}
+                        correlation_id: {type: string, minLength: 1, maxLength: 256}
+                        risk: {type: string, enum: [read, write_safe, write_sensitive, legally_significant, unclassified]}
+                        summary: {type: object, additionalProperties: true}
+                        created_at: {type: string, format: date-time}
+                  next_cursor: {type: string, maxLength: 128}
+        '400': {description: Invalid page limit or cursor}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks audit.read}
+  /webhook-subscriptions:
+    get:
+      operationId: listWebhookSubscriptions
+      responses:
+        '200':
+          description: Tenant-scoped webhook subscriptions; signing secret references are never exposed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalWebhooksSubscriptionListV1'}
+        '401': {description: Authenticated tenant scope missing}
+    post:
+      operationId: createWebhookSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExternalWebhooksCreateSubscriptionV1'}
+      responses:
+        '201':
+          description: Webhook subscription created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalWebhooksSubscriptionV1'}
+        '400': {description: 'Invalid subscription, event allowlist, signing secret or unsafe endpoint'}
+        '401': {description: Authenticated tenant scope missing}
+        '409': {description: Subscription already exists}
+  /webhook-subscriptions/{subscription_id}:
+    delete:
+      operationId: disableWebhookSubscription
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '204': {description: Subscription disabled and signing secret revoked; delivery history is retained}
+        '401': {description: Authenticated tenant scope missing}
+        '404': {description: Subscription not found in tenant scope}
+
+  /webhook-subscriptions/{subscription_id}/rotate-secret:
+    post:
+      operationId: rotateWebhookSigningSecret
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExternalWebhooksRotateSecretV1'}
+      responses:
+        '200':
+          description: New signing secret activated; previous secret remains valid only for the bounded overlap
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalWebhooksSubscriptionV1'}
+        '400': {description: Invalid secret or overlap}
+        '401': {description: Authenticated tenant scope missing}
+        '404': {description: Subscription not found in tenant scope}
+        '409': {description: Rotation already active or concurrent change}
+  /webhook-deliveries/{delivery_id}/replay:
+    post:
+      operationId: replayWebhookDelivery
+      parameters:
+        - {name: delivery_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '202':
+          description: A new durable delivery was queued using the current subscription endpoint and signing secret
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalWebhooksReplayResponseV1'}
+        '401': {description: Authenticated tenant scope missing}
+        '404': {description: Delivery not found in tenant scope}
+  /webhook-deliveries/{delivery_id}/history:
+    get:
+      operationId: getWebhookDeliveryHistory
+      parameters:
+        - {name: delivery_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Immutable bounded attempt history without response bodies or raw remote errors
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalWebhooksDeliveryHistoryPageV1'}
+        '400': {description: Invalid history query}
+        '401': {description: Authenticated tenant scope missing}
+        '404': {description: Delivery not found in tenant scope}
+  /privacy/requests:
+    post:
+      operationId: createPrivacyRequest
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PrivacyRequestWrite'}}}
+      responses:
+        '202':
+          description: Tenant-scoped privacy workflow durably queued
+          content: {application/json: {schema: {$ref: '#/components/schemas/PrivacyRequestAccepted'}}}
+        '400': {description: Invalid privacy request or idempotency key}
+        '409': {description: Idempotency key conflicts with another privacy request}
+  /counterparties:
+    get:
+      operationId: listCounterparties
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Tenant-scoped canonical counterparty role page
+          content: {application/json: {schema: {$ref: '#/components/schemas/CounterpartyPage'}}}
+        '400': {description: Invalid limit}
+  /compliance/documents:
+    get:
+      operationId: listComplianceDocuments
+      responses:
+        '200':
+          description: Product compliance document page
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, document_type, number, jurisdiction, issuer, registry_source, registry_reference, status, issued_at, verification_source, version]
+                      properties:
+                        id: {type: string}
+                        document_type: {type: string}
+                        number: {type: string}
+                        jurisdiction: {type: string}
+                        issuer: {type: string}
+                        registry_source: {type: string}
+                        registry_reference: {type: string}
+                        status: {type: string}
+                        issued_at: {type: string, format: date-time}
+                        expires_at: {type: string, format: date-time}
+                        verification_source: {type: string}
+                        verified_at: {type: string, format: date-time}
+                        version: {type: integer, minimum: 1}
+  /compliance/evaluate:
+    post:
+      operationId: evaluateProductCompliance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExternalComplianceEvaluationRequestV1'}
+      responses:
+        '200':
+          description: Explainable product-compliance decision for an authenticated tenant
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalComplianceEvaluationResultV1'}
+        '400': {description: Invalid compliance evaluation request}
+        '401': {description: Authenticated tenant scope missing}
+  /entitlements/evaluate:
+    post:
+      operationId: evaluateEntitlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExternalEntitlementsEvaluateRequestV1'}
+      responses:
+        '200':
+          description: Tenant feature entitlement and optional current quota status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalEntitlementsEvaluateResponseV1'}
+        '400': {description: Invalid entitlement request}
+        '401': {description: Authenticated tenant scope missing}
+        '404': {description: Requested quota metric has no policy}
+  /fx/rates:
+    get:
+      operationId: listFXRates
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: base, in: query, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: quote, in: query, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: Immutable sourced current/historical FX facts
+          content: {application/json: {schema: {$ref: '#/components/schemas/FXRateFactPage'}}}
+        '400': {description: Invalid currency pair or limit}
+  /cloud/subscription:
+    get:
+      operationId: getCloudSubscription
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Cloud subscription state or explicit Community mode without a billing dependency
+          content: {application/json: {schema: {$ref: '#/components/schemas/CloudSubscriptionState'}}}
+  /uploads:
+    post:
+      operationId: createUpload
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: X-Filename, in: header, required: false, description: Required for application/octet-stream requests, schema: {type: string, minLength: 1, maxLength: 512}}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+          application/json:
+            schema: {$ref: '#/components/schemas/UploadWrite'}
+      responses:
+        '202':
+          description: Upload durably accepted into tenant-derived S3 quarantine and security pipeline
+          content: {application/json: {schema: {$ref: '#/components/schemas/UploadAccepted'}}}
+        '400': {description: 'Invalid metadata, size, media type or idempotency key'}
+        '409': {description: Idempotency key conflicts with different upload metadata}
+        '503': {description: Quarantine object storage is unavailable; content is never released}
+  /plugins:
+    get:
+      operationId: listPlugins
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: Tenant-visible reviewed plugin marketplace listings with explicit trust and requested authority
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalPluginsMarketplacePageV1'}
+        '400': {description: Invalid limit}
+  /notifications:
+    get:
+      operationId: listNotifications
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: Authenticated principal notification inbox
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalNotificationsNotificationPageV1'}
+        '400': {description: Client tenant/recipient override or invalid limit}
+        '401': {description: Authenticated tenant/principal identity missing}
+  /notifications/{notification_id}/read:
+    post:
+      operationId: markNotificationRead
+      parameters:
+        - {name: notification_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Notification marked read idempotently
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalNotificationsNotificationV1'}
+        '401': {description: Authenticated tenant/principal identity missing}
+        '404': {description: Notification not found for authenticated principal}
+  /notifications/{notification_id}/deliveries:
+    get:
+      operationId: listNotificationDeliveries
+      parameters:
+        - {name: notification_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Immutable channel delivery/suppression outcomes
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalNotificationsDeliveryPageV1'}
+        '401': {description: Authenticated tenant/principal identity missing}
+  /notification-preferences/{channel}:
+    get:
+      operationId: getNotificationPreference
+      parameters:
+        - {name: channel, in: path, required: true, schema: {type: string, enum: [web_ui, webhook, email, sms, chat]}}
+      responses:
+        '200':
+          description: Effective per-recipient channel preference including safe defaults
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalNotificationsPreferenceV1'}
+        '401': {description: Authenticated tenant/principal identity missing}
+    put:
+      operationId: putNotificationPreference
+      parameters:
+        - {name: channel, in: path, required: true, schema: {type: string, enum: [web_ui, webhook, email, sms, chat]}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExternalNotificationsPreferenceUpdateV1'}
+      responses:
+        '200':
+          description: Effective per-recipient channel preference
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExternalNotificationsPreferenceV1'}
+        '400': {description: Invalid or unknown preference field}
+        '401': {description: Authenticated tenant/principal identity missing}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+  schemas:
+    WarehouseWrite:
+      type: object
+      properties:
+        code: {type: string, minLength: 1, maxLength: 128}
+        name: {type: string, minLength: 1, maxLength: 300}
+        status: {type: string, enum: [active, disabled]}
+        version: {type: integer, minimum: 1}
+    FulfillmentAllocationWrite:
+      type: object
+      additionalProperties: false
+      required: [order_item_id, warehouse_id]
+      properties:
+        order_item_id: {type: string, pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'}
+        warehouse_id: {type: string, pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'}
+    InventoryAdjustmentWrite:
+      type: object
+      required: [quantity, reason, version]
+      properties:
+        quantity: {type: string, pattern: '^(0|[1-9][0-9]*)([.][0-9]{1,9})?$'}
+        reason: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        version: {type: integer, minimum: 1}
+    InventoryImportWrite:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [sku, warehouse_code, quantity, unit]
+            properties:
+              sku: {type: string, minLength: 1, maxLength: 128}
+              warehouse_code: {type: string, minLength: 1, maxLength: 128}
+              quantity: {type: string, pattern: '^(0|[1-9][0-9]*)([.][0-9]{1,9})?$'}
+              unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+              reason: {type: string, maxLength: 128}
+    ProductWrite:
+      type: object
+      properties:
+        code: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        title: {type: string, minLength: 1, maxLength: 500}
+        description: {type: string, maxLength: 20000}
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [draft, active, archived]}
+        category_id: {type: string}
+    OfferWrite:
+      type: object
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 128}
+        gtin: {type: string, pattern: '^$|^[0-9]{8}$|^[0-9]{12,14}$'}
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [draft, active, archived]}
+    PriceWrite:
+      type: object
+      properties:
+        kind: {type: string, enum: [regular, compare_at, cost]}
+        minor_units: {type: integer, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        version: {type: integer, minimum: 1}
+    CategoryWrite:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string, minLength: 1, maxLength: 128}
+        name: {type: string, minLength: 1, maxLength: 300}
+        parent_id: {type: string}
+    ImageWrite:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string, format: uri, pattern: '^https://'}
+        alt_text: {type: string, maxLength: 300}
+        position: {type: integer, minimum: 0, maximum: 255}
+        version: {type: integer, minimum: 1}
+    SyncStatus:
+      type: object
+      additionalProperties: false
+      required: [summary, policies, runs, drifts]
+      properties:
+        summary:
+          type: object
+          additionalProperties: false
+          required: [enabled_policies, active_runs, open_drifts]
+          properties:
+            enabled_policies: {type: integer, minimum: 0}
+            active_runs: {type: integer, minimum: 0}
+            open_drifts: {type: integer, minimum: 0}
+        policies: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SyncPolicyStatus'}}
+        runs: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/ReconciliationRunStatus'}}
+        drifts: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ReconciliationDriftStatus'}}
+    ApprovalPolicyWrite:
+      type: object
+      additionalProperties: false
+      required: [id, name, action, resource_type, minimum_risk, version, request_ttl_minutes, escalate_after_minutes, separation_of_duties, required_approvals, eligible_scope]
+      properties:
+        id: {type: string, minLength: 36, maxLength: 36}
+        name: {type: string, minLength: 1, maxLength: 160}
+        action: {type: string, enum: [demo.dataset.delete]}
+        resource_type: {type: string, enum: [demo_dataset]}
+        minimum_risk: {type: string, enum: [write_sensitive, legally_significant]}
+        version: {type: integer, minimum: 1}
+        request_ttl_minutes: {type: integer, minimum: 1, maximum: 43200}
+        escalate_after_minutes: {type: integer, minimum: 0, maximum: 43199}
+        separation_of_duties: {type: boolean}
+        required_approvals: {type: integer, minimum: 1, maximum: 32}
+        eligible_scope: {type: string, minLength: 1, maxLength: 160}
+    ApprovalRequestWrite:
+      type: object
+      additionalProperties: false
+      required: [action, resource_type, resource_id, risk]
+      properties:
+        action: {type: string, enum: [demo.dataset.delete]}
+        resource_type: {type: string, enum: [demo_dataset]}
+        resource_id: {type: string, maxLength: 128}
+        risk: {type: string, enum: [write_sensitive]}
+    SyncPolicyStatus:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, entity_type, direction, source_of_truth, enabled, version, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        entity_type: {type: string, minLength: 1, maxLength: 64}
+        direction: {type: string, enum: [inbound, outbound, bidirectional]}
+        source_of_truth: {type: string, enum: [local, remote, manual]}
+        enabled: {type: boolean}
+        version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time}
+    SyncPolicyUpdate:
+      type: object
+      additionalProperties: false
+      required: [direction, source_of_truth, enabled, expected_version]
+      properties:
+        direction: {type: string, enum: [inbound, outbound, bidirectional]}
+        source_of_truth: {type: string, enum: [local, remote, manual]}
+        enabled: {type: boolean}
+        expected_version: {type: integer, minimum: 1}
+    SyncDriftAction:
+      type: object
+      additionalProperties: false
+      required: [action, expected_version]
+      properties:
+        action: {type: string, enum: [ignore]}
+        expected_version: {type: integer, minimum: 1}
+    ReconciliationRunStatus:
+      type: object
+      additionalProperties: false
+      required: [id, policy_id, mode, status, scanned_count, drift_count, started_at, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        policy_id: {type: string, minLength: 1, maxLength: 128}
+        mode: {type: string, enum: [incremental, scheduled_full, on_demand]}
+        status: {type: string, enum: [running, interrupted, completed]}
+        scanned_count: {type: integer, minimum: 0}
+        drift_count: {type: integer, minimum: 0}
+        started_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ReconciliationJobWrite:
+      type: object
+      additionalProperties: false
+      required: [policy_id]
+      properties:
+        policy_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        mode: {type: string, enum: [on_demand], default: on_demand}
+    SettlementEntryPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, source_system, source_account_id, source_entry_ref, order_id, adjusts_entry_id, fee_code, fx_rate_ref, kind, amount, occurred_at, imported_at, disputed]
+            properties:
+              id: {type: string, minLength: 1, maxLength: 128}
+              source_system: {type: string, minLength: 1}
+              source_account_id: {type: string, minLength: 1}
+              source_entry_ref: {type: string, minLength: 1}
+              order_id: {type: string}
+              adjusts_entry_id: {type: string}
+              fee_code: {type: string}
+              fx_rate_ref: {type: string}
+              kind: {type: string, enum: [sale, fee, refund, payout, adjustment]}
+              amount:
+                type: object
+                additionalProperties: false
+                required: [minor_units, currency]
+                properties:
+                  minor_units: {type: integer, format: int64}
+                  currency: {type: string, pattern: '^[A-Z]{3}$'}
+              occurred_at: {type: string, format: date-time, pattern: 'Z$'}
+              imported_at: {type: string, format: date-time, pattern: 'Z$'}
+              disputed: {type: boolean}
+        next_cursor: {type: string, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    PrivacyRequestWrite:
+      type: object
+      additionalProperties: false
+      required: [request_type, subject_kind, subject_opaque_id]
+      properties:
+        request_type: {type: string, enum: [access, export, correction, deletion, restriction]}
+        subject_kind: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'}
+        subject_opaque_id: {type: string, minLength: 1, maxLength: 256}
+        correction_artifact_ref: {type: string, minLength: 1, maxLength: 256}
+    PrivacyRequestAccepted:
+      type: object
+      additionalProperties: false
+      required: [request_id, job_id, status]
+      properties:
+        request_id: {type: string}
+        job_id: {type: string}
+        action: {type: string, enum: [export, correct, delete, restrict]}
+        status: {type: string, enum: [pending]}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+    CounterpartyPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, code, party_type, party_id, role, status, version, created_at, updated_at]
+            properties:
+              id: {type: string}
+              code: {type: string}
+              party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+              party_id: {type: string}
+              role: {type: string, enum: [customer, supplier, partner, other]}
+              status: {type: string, enum: [draft, active, archived]}
+              version: {type: integer, minimum: 1}
+              created_at: {type: string, format: date-time, pattern: 'Z$'}
+              updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    FXRateFactPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [schema_version, id, base_currency, quote_currency, rate, source, rate_type, observed_at, effective_at]
+            properties:
+              schema_version: {type: integer, const: 1}
+              id: {type: string}
+              base_currency: {type: string, pattern: '^[A-Z]{3}$'}
+              quote_currency: {type: string, pattern: '^[A-Z]{3}$'}
+              rate: {type: string, pattern: '^(?:[1-9][0-9]*(?:\.[0-9]{1,9})?|0\.[0-9]{0,8}[1-9])$'}
+              source: {type: string}
+              source_reference: {type: string}
+              rate_type: {type: string, enum: [official, mid, bid, ask, closing, indicative]}
+              observed_at: {type: string, format: date-time, pattern: 'Z$'}
+              effective_at: {type: string, format: date-time, pattern: 'Z$'}
+    CloudSubscriptionState:
+      type: object
+      additionalProperties: false
+      required: [mode, subscription]
+      properties:
+        mode: {type: string, enum: [community, cloud]}
+        subscription:
+          oneOf:
+            - {type: 'null'}
+            - type: object
+              additionalProperties: false
+              required: [id, plan_id, plan_version, state, current_period_start, current_period_end, updated_at, version]
+              properties:
+                id: {type: string}
+                plan_id: {type: string}
+                plan_version: {type: integer, minimum: 1}
+                state: {type: string, enum: [trial, active, past_due, grace, suspended, cancelled]}
+                current_period_start: {type: string, format: date-time, pattern: 'Z$'}
+                current_period_end: {type: string, format: date-time, pattern: 'Z$'}
+                updated_at: {type: string, format: date-time, pattern: 'Z$'}
+                version: {type: integer, minimum: 1}
+    UploadAccepted:
+      type: object
+      additionalProperties: false
+      required: [id, state, content_size_bytes, content_sha256, received_at, quarantined_at, version]
+      properties:
+        id: {type: string, pattern: '^upl_[0-9a-f]{32}$'}
+        state: {type: string, const: quarantined}
+        content_size_bytes: {type: integer, format: int64, minimum: 0}
+        content_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        received_at: {type: string, format: date-time, pattern: 'Z$'}
+        quarantined_at: {type: string, format: date-time, pattern: 'Z$'}
+        version: {type: integer, minimum: 2}
+    UploadWrite:
+      type: object
+      additionalProperties: false
+      required: [filename, content_base64]
+      properties:
+        filename: {type: string, minLength: 1, maxLength: 512}
+        declared_media_type: {type: string, maxLength: 255}
+        content_base64: {type: string, contentEncoding: base64}
+    ReconciliationDriftStatus:
+      type: object
+      additionalProperties: false
+      required: [id, run_id, policy_id, kind, local_entity_id, remote_id, local_status, remote_status, status, recommended_action, version, detected_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        run_id: {type: string, minLength: 1, maxLength: 128}
+        policy_id: {type: string, minLength: 1, maxLength: 128}
+        kind: {type: string, enum: [content_drift, missing_mapping, orphan_mapping, duplicate_mapping, status_mismatch, stale_connector]}
+        local_entity_id: {type: string, maxLength: 128}
+        remote_id: {type: string, maxLength: 512}
+        local_status: {type: string, maxLength: 64}
+        remote_status: {type: string, maxLength: 64}
+        status: {type: string, enum: [open, auto_fixed, notified, approval_pending, ignored]}
+        recommended_action: {type: string, enum: [none, auto_fix, notify, approval, ignore]}
+        version: {type: integer, minimum: 1}
+        detected_at: {type: string, format: date-time}
+    IdentityProviderSettings:
+      type: object
+      additionalProperties: false
+      required: [provider_id, protocol, display_name, issuer_url, client_id, callback_url, secret_configured, revision, version, enabled, validation_status, validation_reason, updated_at]
+      properties:
+        provider_id: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'}
+        protocol: {type: string, const: oidc}
+        display_name: {type: string, minLength: 1, maxLength: 160}
+        issuer_url: {type: string, format: uri, maxLength: 2048}
+        client_id: {type: string, minLength: 1, maxLength: 256}
+        callback_url: {type: string, format: uri, maxLength: 2048}
+        secret_configured: {type: boolean}
+        revision: {type: integer, minimum: 1}
+        version: {type: integer, minimum: 1}
+        active_revision: {type: integer, minimum: 1}
+        enabled: {type: boolean}
+        validation_status: {type: string, enum: [not_validated, valid, invalid]}
+        validation_reason: {type: string, pattern: '^[a-z][a-z0-9._-]{0,63}$'}
+        validated_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    IdentityProviderSettingsPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/IdentityProviderSettings'}}
+    IdentityProviderDraft:
+      type: object
+      additionalProperties: false
+      required: [protocol, display_name, issuer_url, client_id, callback_url, expected_version]
+      properties:
+        protocol: {type: string, const: oidc}
+        display_name: {type: string, minLength: 1, maxLength: 160}
+        issuer_url: {type: string, format: uri, maxLength: 2048}
+        client_id: {type: string, minLength: 1, maxLength: 256}
+        callback_url: {type: string, format: uri, maxLength: 2048}
+        client_secret: {type: string, format: password, maxLength: 65536, writeOnly: true}
+        expected_version: {type: integer, minimum: 0}
+    IdentityProviderAction:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      properties:
+        expected_version: {type: integer, minimum: 1}
+    IdentityProviderRollback:
+      type: object
+      additionalProperties: false
+      required: [expected_version, target_revision]
+      properties:
+        expected_version: {type: integer, minimum: 1}
+        target_revision: {type: integer, minimum: 1}
+    AIProviderAccount:
+      type: object
+      additionalProperties: false
+      required: [id, provider, label, model, enabled, version, created_at, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi]}
+        label: {type: string, minLength: 1, maxLength: 120}
+        model: {type: string, minLength: 1, maxLength: 120}
+        base_url: {type: string, format: uri, maxLength: 2039}
+        folder_id: {type: string, maxLength: 120}
+        enabled: {type: boolean}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    AIProviderAccountPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/AIProviderAccount'}}
+    AIProviderAccountCreate:
+      type: object
+      additionalProperties: false
+      required: [provider, label, model, credential]
+      properties:
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi]}
+        label: {type: string, minLength: 1, maxLength: 120}
+        model: {type: string, minLength: 1, maxLength: 120}
+        base_url: {type: string, format: uri, maxLength: 2039}
+        folder_id: {type: string, maxLength: 120}
+        credential: {type: string, format: password, minLength: 1, maxLength: 65536, writeOnly: true}
+    AIProviderAccountDisable:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        expected_version: {type: integer, minimum: 1}
+    AIAnalyzeRequest:
+      type: object
+      additionalProperties: false
+      required: [account_id, prompt]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        system_prompt: {type: string, maxLength: 32000}
+        prompt: {type: string, minLength: 1, maxLength: 32000}
+    AIAnalyzeResponse:
+      type: object
+      additionalProperties: false
+      required: [text, provider, model]
+      properties:
+        text: {type: string}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi]}
+        model: {type: string}
+    WorkspaceMember:
+      type: object
+      additionalProperties: false
+      required: [id, email, display_name, role, status, version, invited_at, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        email: {type: string, format: email, maxLength: 254}
+        display_name: {type: string, maxLength: 160}
+        oidc_subject: {type: string, minLength: 1, maxLength: 255}
+        role: {type: string, enum: [admin, manager, operator, viewer]}
+        status: {type: string, enum: [invited, active, disabled]}
+        version: {type: integer, minimum: 1}
+        invited_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    WorkspaceMemberPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WorkspaceMember'}}
+        next_cursor: {type: string, maxLength: 128}
+    WorkspaceMemberInvite:
+      type: object
+      additionalProperties: false
+      required: [email, display_name, role]
+      properties:
+        email: {type: string, format: email, maxLength: 254}
+        display_name: {type: string, maxLength: 160}
+        role: {type: string, enum: [admin, manager, operator, viewer]}
+    WorkspaceMemberUpdate:
+      type: object
+      additionalProperties: false
+      required: [role, status, expected_version]
+      properties:
+        role: {type: string, enum: [admin, manager, operator, viewer]}
+        status: {type: string, enum: [invited, active, disabled]}
+        expected_version: {type: integer, minimum: 1}
+    WorkspaceSettings:
+      type: object
+      additionalProperties: false
+      required: [organization_name, workspace_name, organization_status, workspace_status, organization_version, workspace_version, updated_at]
+      properties:
+        organization_name: {type: string, minLength: 1, maxLength: 200}
+        workspace_name: {type: string, minLength: 1, maxLength: 200}
+        organization_status: {type: string, enum: [active, suspended, archived]}
+        workspace_status: {type: string, enum: [active, suspended, archived]}
+        organization_version: {type: integer, minimum: 1}
+        workspace_version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time}
+    WorkspaceSettingsUpdate:
+      type: object
+      additionalProperties: false
+      required: [organization_name, workspace_name, organization_version, workspace_version]
+      properties:
+        organization_name: {type: string, minLength: 1, maxLength: 200}
+        workspace_name: {type: string, minLength: 1, maxLength: 200}
+        organization_version: {type: integer, minimum: 1}
+        workspace_version: {type: integer, minimum: 1}
+    SettingsSecurityConfiguration:
+      type: object
+      additionalProperties: false
+      required: [provider, issuer, client_id, configuration_status, configuration_source, provider_health]
+      properties:
+        provider: {type: string, const: oidc}
+        issuer: {type: string, format: uri}
+        client_id: {type: string, minLength: 1, maxLength: 256}
+        configuration_status: {type: string, enum: [configured]}
+        configuration_source: {type: string, enum: [runtime]}
+        provider_health: {type: string, enum: [not_verified]}
+    SettingsSecuritySession:
+      type: object
+      additionalProperties: false
+      required: [session_ref, user_ref, status, client_kind, authenticated_at, first_seen_at, last_seen_at, expires_at, current]
+      properties:
+        session_ref: {type: string, pattern: '^[0-9a-f]{64}$'}
+        user_ref: {type: string, pattern: '^[0-9a-f]{12}$'}
+        status: {type: string, enum: [active, revoked]}
+        client_kind: {type: string, enum: [browser, mobile, api, unknown]}
+        authenticated_at: {type: string, format: date-time}
+        first_seen_at: {type: string, format: date-time}
+        last_seen_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        revoked_at: {type: string, format: date-time}
+        current: {type: boolean}
+    SettingsSecuritySessionPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SettingsSecuritySession'}}
+        next_cursor: {type: string, maxLength: 64}
+    SettingsSecurityRevocation:
+      type: object
+      additionalProperties: false
+      required: [session_ref, status, revoked_at, current]
+      properties:
+        session_ref: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, const: revoked}
+        revoked_at: {type: string, format: date-time}
+        current: {type: boolean}
+    SettingsSecurityLogin:
+      type: object
+      additionalProperties: false
+      required: [id, session_ref, event_type, client_kind, occurred_at]
+      properties:
+        id: {type: string, format: uuid}
+        session_ref: {type: string, pattern: '^[0-9a-f]{64}$'}
+        event_type: {type: string, enum: [session_observed, session_revoked]}
+        client_kind: {type: string, enum: [browser, mobile, api, unknown]}
+        occurred_at: {type: string, format: date-time}
+    SettingsSecurityLoginPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor, evidence_scope]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SettingsSecurityLogin'}}
+        next_cursor: {type: string, maxLength: 64}
+        evidence_scope: {type: string, const: torgnexa_observed_oidc_sessions}
+    AuditRecord:
+      type: object
+      additionalProperties: false
+      required: [id, actor_id, source, action, resource_type, resource_id, correlation_id, risk, summary, created_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        actor_id: {type: string, minLength: 1, maxLength: 255}
+        source: {type: string, minLength: 1, maxLength: 64}
+        action: {type: string, minLength: 1, maxLength: 160}
+        resource_type: {type: string, minLength: 1, maxLength: 128}
+        resource_id: {type: string, minLength: 1, maxLength: 512}
+        correlation_id: {type: string, minLength: 1, maxLength: 128}
+        risk: {type: string, enum: [read, write_safe, write_sensitive, legally_significant]}
+        summary: {type: object, additionalProperties: true}
+        created_at: {type: string, format: date-time}
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/AuditRecord'}}
+        next_cursor: {type: string, maxLength: 64}
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer, minimum: 400, maximum: 599}
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status: {type: string, const: ok}
+        service: {type: string, const: api}
+    LineageTimelinePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items: {$ref: '#/components/schemas/LineageRecord'}
+        next_cursor:
+          type: object
+          required: [occurred_at, id]
+          properties:
+            occurred_at: {type: string, format: date-time, pattern: 'Z$'}
+            id: {type: string}
+    LineageRecord:
+      type: object
+      required: [id, source, operation, output, inputs, transformation, correlation_id, audit_id, event_id, result, occurred_at]
+      properties:
+        id: {type: string}
+        source: {type: string}
+        actor_id: {type: string}
+        operation: {type: string}
+        output: {type: object}
+        inputs: {type: array, items: {type: object}}
+        transformation: {type: object}
+        correlation_id: {type: string}
+        causation_id: {type: string}
+        audit_id: {type: string}
+        event_id: {type: string}
+        result: {type: string, enum: [applied, observed, rejected]}
+        occurred_at: {type: string, format: date-time, pattern: 'Z$'}
+    LegalPartySearchPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [party_type, party_id, code, display_name, status]
+            properties:
+              party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+              party_id: {type: string}
+              code: {type: string}
+              display_name: {type: string}
+              inn: {type: string}
+              registration_id: {type: string}
+              status: {type: string, enum: [draft, active, archived]}
+    ConnectorAccount:
+      type: object
+      required: [id, family, provider, status]
+      properties:
+        id: {type: string}
+        family: {type: string}
+        provider: {type: string}
+        status: {type: string}
+        capabilities: {type: array, items: {type: string}}
+    ConnectorAccountSettings:
+      type: object
+      additionalProperties: false
+      required: [id, connector_id, family, status, version, health_status, created_at, updated_at, capabilities]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        connector_id: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}$'}
+        family: {type: string, enum: [marketplace, storefront, classified, social, erp, edo, government, payment, logistics, pickup, fx, notification, crm]}
+        status: {type: string, enum: [disabled, active, suspended, error]}
+        secret_reference: {type: string, pattern: '^sec:v1:[0-9a-f]{32}$'}
+        version: {type: integer, minimum: 1}
+        health_status: {type: string, enum: [unknown, healthy, degraded, unavailable]}
+        health_reason_code: {type: string, maxLength: 64, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        health_checked_at: {type: string, format: date-time, pattern: 'Z$'}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+        capabilities:
+          type: array
+          maxItems: 100
+          description: Latest complete account capability snapshot. Empty means default deny.
+          items: {$ref: '#/components/schemas/ConnectorAccountCapabilitySetting'}
+    ConnectorHealthSnapshot:
+      type: object
+      additionalProperties: false
+      required: [account_id, status, category, checked_at]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        status: {type: string, enum: [healthy, degraded, unavailable]}
+        category: {type: string, enum: [healthy, configuration_error, authentication_error, rate_limited, remote_unavailable, degraded]}
+        reason_code: {type: string, maxLength: 64, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        rate_limit_remaining: {type: integer, minimum: 0}
+        rate_limit_reset_at: {type: string, format: date-time, pattern: 'Z$'}
+        checked_at: {type: string, format: date-time, pattern: 'Z$'}
+    ConnectorAccountCapabilitySetting:
+      type: object
+      additionalProperties: false
+      required: [capability, direction, risk, approval_required, enabled]
+      properties:
+        capability: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        direction: {type: string, enum: [read, write]}
+        risk: {type: string, enum: [read, write_sensitive]}
+        approval_required: {type: boolean}
+        enabled: {type: boolean}
+    ConnectorAccountCapabilitiesUpdate:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version, enabled]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 1}
+        enabled:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          description: Exact enabled subset of the account connector manifest; omitted manifest capabilities are denied.
+          items: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+    ConnectorAccountPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorAccountSettings'}}
+        next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    ConnectorAccountCreate:
+      type: object
+      additionalProperties: false
+      required: [account_id, connector_id]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        connector_id: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}$'}
+        secret_reference: {type: string, pattern: '^sec:v1:[0-9a-f]{32}$'}
+    ConnectorAccountDisable:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 1}
+    ConnectorAccountAction:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        expected_version: {type: integer, minimum: 1}
+    ConnectorBootstrapPreviewWrite:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 1}
+    ConnectorBootstrapPreview:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, account_version, policy_count, read_count, write_count, created_at, expires_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        account_version: {type: integer, minimum: 1}
+        policy_count: {type: integer, minimum: 1, maximum: 200}
+        read_count: {type: integer, minimum: 0, maximum: 200}
+        write_count: {type: integer, minimum: 0, maximum: 200}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+        consumed_at: {type: string, format: date-time, pattern: 'Z$'}
+    ConnectorBootstrapStart:
+      type: object
+      additionalProperties: false
+      required: [preview_id]
+      properties:
+        preview_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+    ConnectorSyncScheduleWrite:
+      type: object
+      additionalProperties: false
+      required: [account_id, account_version, mode, interval_minutes, enabled, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        account_version: {type: integer, minimum: 1}
+        mode: {type: string, enum: [incremental, scheduled_full]}
+        interval_minutes: {type: integer, minimum: 15, maximum: 10080}
+        enabled: {type: boolean}
+        expected_version: {type: integer, minimum: 0}
+    ConnectorSyncSchedule:
+      type: object
+      additionalProperties: false
+      required: [account_id, mode, interval_minutes, enabled, version, updated_at]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        mode: {type: string, enum: [incremental, scheduled_full]}
+        interval_minutes: {type: integer, minimum: 15, maximum: 10080}
+        enabled: {type: boolean}
+        next_run_at: {type: string, format: date-time, pattern: 'Z$'}
+        last_enqueued_at: {type: string, format: date-time, pattern: 'Z$'}
+        last_job_id: {type: string, minLength: 1, maxLength: 128}
+        version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    ConnectorSyncJob:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, kind, mode, status, started_runs, attempt_count, created_at, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        kind: {type: string, enum: [initial_import, scheduled_sync]}
+        mode: {type: string, enum: [incremental, scheduled_full]}
+        status: {type: string, enum: [pending, running, retry_wait, completed, failed]}
+        checkpoint_policy_id: {type: string, minLength: 1, maxLength: 128}
+        started_runs: {type: integer, minimum: 0, maximum: 200}
+        attempt_count: {type: integer, minimum: 0, maximum: 5}
+        last_error_code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,63}$'}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    ConnectorBootstrapState:
+      type: object
+      additionalProperties: false
+      required: [previews, schedules, jobs]
+      properties:
+        previews: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorBootstrapPreview'}}
+        schedules: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorSyncSchedule'}}
+        jobs: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorSyncJob'}}
+    ConnectorCredentialEnrollment:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version, material_base64]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 1}
+        material_base64: {type: string, minLength: 4, maxLength: 90000, description: Transient base64 transport envelope; never returned or logged}
+    ConnectorRuntimeConfigWrite:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version, config]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 0}
+        config:
+          type: object
+          minProperties: 1
+          maxProperties: 100
+          description: Host-owned non-secret provider configuration. Credential, token, password, private-key and authorization fields are rejected.
+          additionalProperties: true
+    ConnectorRuntimeConfig:
+      type: object
+      additionalProperties: false
+      required: [account_id, version, config]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        version: {type: integer, minimum: 1}
+        config:
+          type: object
+          minProperties: 1
+          maxProperties: 100
+          additionalProperties: true
+    ConnectorOAuthStart:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version, callback_url]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        expected_version: {type: integer, minimum: 1}
+        callback_url: {type: string, format: uri, maxLength: 2048, description: Must exactly match an allowed deployment origin plus /oauth/connectors/callback}
+    ConnectorOAuthStartResult:
+      type: object
+      additionalProperties: false
+      required: [authorization_url, expires_at]
+      properties:
+        authorization_url: {type: string, format: uri, maxLength: 8192, pattern: '^https://'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+    ConnectorOAuthCallback:
+      type: object
+      additionalProperties: false
+      required: [code, state, callback_url]
+      properties:
+        code: {type: string, minLength: 1, maxLength: 8192}
+        state: {type: string, minLength: 32, maxLength: 256, pattern: '^[A-Za-z0-9_-]+$'}
+        callback_url: {type: string, format: uri, maxLength: 2048, description: Must be identical to the URL bound when authorization started}
+    ExternalComplianceEvaluationRequestV1:
+      additionalProperties: false
+      title: Compliance Evaluation Request v1
+      type: object
+      required:
+      - operation
+      - jurisdiction
+      - product_id
+      - at
+      properties:
+        operation:
+          enum:
+          - publication
+          - sale
+          - advertising
+          - shipping
+        jurisdiction:
+          type: string
+          pattern: ^[A-Z]{2}$
+        product_id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        offer_id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        category_id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        gtin:
+          type: string
+          pattern: ^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$
+        sku:
+          type: string
+          maxLength: 128
+        seller_party_id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        seller_role:
+          type: string
+          maxLength: 128
+        connector_id:
+          type: string
+          maxLength: 128
+        connector_family:
+          type: string
+          maxLength: 128
+        at:
+          type: string
+          format: date-time
+          pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$
+    ExternalComplianceEvaluationResultV1:
+      additionalProperties: false
+      title: Compliance Evaluation Result v1
+      type: object
+      required:
+      - outcome
+      - reasons
+      - evaluated_at
+      - fingerprint_sha256
+      properties:
+        outcome:
+          enum:
+          - allow
+          - warn
+          - approval_required
+          - block
+        reasons:
+          type: array
+          maxItems: 512
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - code
+            - policy_id
+            - policy_version
+            - document_type
+            properties:
+              code:
+                enum:
+                - missing_evidence
+                - expired_evidence
+                - unverified_evidence
+                - invalid_evidence
+              policy_id:
+                type: string
+                pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+              policy_version:
+                type: integer
+                minimum: 1
+              document_type:
+                enum:
+                - declaration
+                - certificate
+                - eac_evidence
+                - state_registration
+                - veterinary
+                - sanitary
+                - refusal_letter
+                - information_letter
+                - other
+              evidence_ids:
+                type: array
+                maxItems: 256
+                items:
+                  type: string
+                  pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        evaluated_at:
+          type: string
+          format: date-time
+          pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$
+        fingerprint_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+    ExternalEntitlementsEvaluateRequestV1:
+      title: Entitlement Evaluate Request v1
+      type: object
+      additionalProperties: false
+      required:
+      - feature
+      properties:
+        feature:
+          type: string
+          pattern: ^[a-z][a-z0-9._:/-]{0,127}$
+        metric:
+          type: string
+          pattern: ^[a-z][a-z0-9._:/-]{0,127}$
+    ExternalEntitlementsEvaluateResponseV1:
+      title: Entitlement Evaluate Response v1
+      type: object
+      additionalProperties: false
+      required:
+      - evaluation
+      properties:
+        evaluation:
+          type: object
+          additionalProperties: false
+          required:
+          - feature
+          - allowed
+          - reason_code
+          - evaluated_at
+          properties:
+            feature:
+              type: string
+              pattern: ^[a-z][a-z0-9._:/-]{0,127}$
+            allowed:
+              type: boolean
+            reason_code:
+              enum:
+              - no_entitlement
+              - entitlement_enabled
+              - entitlement_disabled
+            rule_id:
+              type: string
+            rule_version:
+              type: integer
+              minimum: 1
+            evaluated_at:
+              type: string
+              format: date-time
+              pattern: Z$
+          allOf:
+          - if:
+              required:
+              - rule_id
+            then:
+              required:
+              - rule_version
+        quota:
+          type: object
+          additionalProperties: false
+          required:
+          - metric
+          - limit
+          - used
+          - remaining
+          - window_start
+          - window_end
+          - policy_id
+          - policy_version
+          properties:
+            metric:
+              type: string
+              pattern: ^[a-z][a-z0-9._:/-]{0,127}$
+            limit:
+              type: integer
+              minimum: 0
+            used:
+              type: integer
+              minimum: 0
+            remaining:
+              type: integer
+              minimum: 0
+            window_start:
+              type: string
+              format: date-time
+              pattern: Z$
+            window_end:
+              type: string
+              format: date-time
+              pattern: Z$
+            policy_id:
+              type: string
+            policy_version:
+              type: integer
+              minimum: 1
+    ExternalNotificationsDeliveryPageV1:
+      title: TORGNEXA Notification Delivery Page v1
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalNotificationsDeliveryPageV1/$defs/delivery'
+      $defs:
+        delivery:
+          type: object
+          additionalProperties: false
+          required:
+          - notification_id
+          - channel
+          - status
+          - occurrence
+          - attempt
+          - attempted_at
+          properties:
+            notification_id:
+              type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+            channel:
+              enum:
+              - web_ui
+              - webhook
+            status:
+              enum:
+              - succeeded
+              - suppressed
+              - failed
+            error_code:
+              type: string
+              pattern: ^[a-z][a-z0-9_]{0,63}$
+            occurrence:
+              type: integer
+              minimum: 1
+            attempt:
+              type: integer
+              minimum: 1
+              maximum: 64
+            attempted_at:
+              type: string
+              format: date-time
+              pattern: Z$
+          allOf:
+          - if:
+              properties:
+                status:
+                  const: failed
+              required:
+              - status
+            then:
+              required:
+              - error_code
+            else:
+              not:
+                required:
+                - error_code
+    ExternalNotificationsNotificationPageV1:
+      title: TORGNEXA Notification Page v1
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ExternalNotificationsNotificationV1'
+    ExternalNotificationsNotificationV1:
+      title: TORGNEXA Notification v1
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - recipient_id
+      - dedupe_key
+      - severity
+      - title
+      - body
+      - occurrence_count
+      - first_occurred_at
+      - last_occurred_at
+      - created_at
+      - updated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/id'
+        recipient_id:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/id'
+        dedupe_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+        severity:
+          enum:
+          - info
+          - warning
+          - critical
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 4000
+        entity_type:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/id'
+        entity_id:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/id'
+        source_event_id:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/id'
+        source_event_type:
+          type: string
+          pattern: ^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.v[1-9][0-9]{0,2}$
+        occurrence_count:
+          type: integer
+          minimum: 1
+        first_occurred_at:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/utc'
+        last_occurred_at:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/utc'
+        read_at:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/utc'
+        created_at:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/utc'
+        updated_at:
+          $ref: '#/components/schemas/ExternalNotificationsNotificationV1/$defs/utc'
+      $defs:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+        utc:
+          type: string
+          format: date-time
+          pattern: Z$
+      dependentRequired:
+        entity_type:
+        - entity_id
+        entity_id:
+        - entity_type
+        source_event_id:
+        - source_event_type
+        source_event_type:
+        - source_event_id
+    ExternalNotificationsPreferenceUpdateV1:
+      title: TORGNEXA Notification Preference Update v1
+      type: object
+      additionalProperties: false
+      required:
+      - enabled
+      - min_severity
+      properties:
+        enabled:
+          type: boolean
+        min_severity:
+          enum:
+          - info
+          - warning
+          - critical
+        categories: {$ref: '#/components/schemas/NotificationCategories'}
+        quiet_enabled: {type: boolean}
+        quiet_start: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        quiet_end: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        timezone: {type: string, minLength: 1, maxLength: 64, default: Europe/Moscow}
+        expected_version: {type: integer, minimum: 1}
+    ExternalNotificationsPreferenceV1:
+      title: TORGNEXA Notification Preference v1
+      type: object
+      additionalProperties: false
+      required:
+      - recipient_id
+      - channel
+      - enabled
+      - min_severity
+      - categories
+      - quiet_enabled
+      - quiet_start
+      - quiet_end
+      - timezone
+      - version
+      - updated_at
+      properties:
+        recipient_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+        channel:
+          enum:
+          - web_ui
+          - webhook
+          - email
+          - sms
+        enabled:
+          type: boolean
+        min_severity:
+          enum:
+          - info
+          - warning
+          - critical
+        categories: {$ref: '#/components/schemas/NotificationCategories'}
+        quiet_enabled: {type: boolean}
+        quiet_start: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        quiet_end: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        timezone: {type: string, minLength: 1, maxLength: 64}
+        version:
+          type: integer
+          minimum: 1
+        updated_at:
+          type: string
+          format: date-time
+          pattern: Z$
+    NotificationCategories:
+      type: array
+      minItems: 1
+      maxItems: 6
+      uniqueItems: true
+      items: {type: string, enum: [commerce, inventory, integrations, compliance, security, system]}
+    ExternalPluginsManifestV2:
+      title: TORGNEXA Connector Manifest v2 / SDK v1
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - family
+      - version
+      - sdk_version
+      - capabilities
+      - auth
+      - rate_limit
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        family:
+          enum:
+          - marketplace
+          - classified
+          - social
+          - erp
+          - edo
+          - government
+          - payment
+          - logistics
+          - pickup
+          - fx
+          - notification
+        version:
+          type: string
+          pattern: ^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$
+        sdk_version:
+          const: 1
+        capabilities:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            enum:
+            - products.read
+            - products.write
+            - prices.read
+            - prices.write
+            - inventory.read
+            - inventory.write
+            - orders.read
+            - notifications.receive
+            - orders.status.write
+            - returns.read
+            - reviews.read
+            - reviews.reply
+            - messages.read
+            - messages.reply
+            - ads.read
+            - ads.manage
+            - promotions.read
+            - promotions.manage
+            - finance.settlements.read
+            - social.post.text
+            - social.post.media
+            - social.post.video
+            - social.post.edit
+            - social.post.delete
+            - social.comments.read
+            - social.comments.reply
+            - social.analytics.read
+            - erp.catalog.read
+            - erp.catalog.write
+            - erp.inventory.read
+            - erp.orders.read
+            - erp.orders.write
+            - edo.documents.read
+            - edo.documents.send
+            - edo.documents.sign_request
+            - marking.status.read
+            - marking.documents.write
+            - fiscal.receipts.write
+            - vetis.documents.read
+            - vetis.documents.write
+            - payments.create
+            - payments.refund
+            - payments.reconcile
+            - logistics.rates.read
+            - logistics.shipment.create
+            - logistics.track.read
+            - logistics.return.create
+            - pickup.points.read
+            - pickup.capacity.read
+            - pickup.orders.write
+            - compliance.documents.read
+            - compliance.documents.write
+            - compliance.evaluate
+            - government.identity.read
+            - government.documents.read
+            - government.documents.write
+            - government.inventory.read
+            - government.references.read
+            - government.reconciliation.run
+            - payments.status.read
+            - payments.webhooks
+            - logistics.shipment.cancel
+            - logistics.label.read
+            - fx.rates.read
+            - notifications.sms.send
+            - notifications.sms.status.read
+        auth:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - kind
+            - required
+            properties:
+              kind:
+                enum:
+                - none
+                - api_key
+                - bearer
+                - basic
+                - oauth2
+                - certificate
+              secret_class:
+                type: string
+                pattern: ^[a-z][a-z0-9._-]{0,63}$
+              required:
+                type: boolean
+            allOf:
+            - if:
+                properties:
+                  kind:
+                    const: none
+              then:
+                properties:
+                  required:
+                    const: false
+                not:
+                  required:
+                  - secret_class
+            - if:
+                properties:
+                  required:
+                    const: true
+              then:
+                if:
+                  properties:
+                    kind:
+                      not:
+                        const: none
+                then:
+                  required:
+                  - secret_class
+        rate_limit:
+          type: object
+          additionalProperties: false
+          required:
+          - max_concurrency
+          - min_interval_ms
+          - request_timeout_ms
+          - retry
+          properties:
+            max_concurrency:
+              type: integer
+              minimum: 1
+              maximum: 1024
+            min_interval_ms:
+              type: integer
+              minimum: 0
+              maximum: 60000
+            request_timeout_ms:
+              type: integer
+              minimum: 100
+              maximum: 300000
+            retry:
+              type: object
+              additionalProperties: false
+              required:
+              - max_attempts
+              - base_backoff_ms
+              - max_backoff_ms
+              properties:
+                max_attempts:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                base_backoff_ms:
+                  type: integer
+                  minimum: 1
+                  maximum: 300000
+                max_backoff_ms:
+                  type: integer
+                  minimum: 1
+                  maximum: 300000
+      description: Additive manifest contract for Connector SDK v1. Family/capability compatibility is additionally enforced by
+        the executable SDK registry.
+    ExternalPluginsMarketplaceListingV1:
+      title: TORGNEXA plugin marketplace listing v1
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - family
+      - version
+      - sdk_version
+      - artifact_sha256
+      - publisher_id
+      - publisher_key_id
+      - trust
+      - license_expression
+      - security_contact
+      - requested_permissions
+      - isolation_limits
+      - published_at
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        family:
+          enum:
+          - marketplace
+          - classified
+          - social
+          - erp
+          - edo
+          - government
+          - payment
+          - logistics
+          - pickup
+          - fx
+          - notification
+        version:
+          type: string
+          pattern: ^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$
+        sdk_version:
+          const: 1
+        artifact_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        publisher_id:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+        publisher_key_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9._:-]{0,127}$
+        trust:
+          enum:
+          - official
+          - verified
+          - community
+          - private
+        license_expression:
+          type: string
+          minLength: 1
+          maxLength: 256
+          pattern: ^[^\r\n\x00]+$
+        security_contact:
+          type: string
+          minLength: 3
+          maxLength: 320
+          pattern: ^[^\r\n\x00]+$
+        requested_permissions:
+          $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/permissions'
+        isolation_limits:
+          $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/limits'
+        published_at:
+          type: string
+          format: date-time
+          pattern: Z$
+      description: Safe marketplace projection shown before activation. Trust level and requested capabilities/secrets/network
+        authority are explicit; credentials and private signing material are never returned.
+    ExternalPluginsMarketplacePageV1:
+      title: TORGNEXA plugin marketplace page v1
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ExternalPluginsMarketplaceListingV1'
+    ExternalPluginsSecurityDescriptorV1:
+      title: TORGNEXA isolated plugin security descriptor v1
+      type: object
+      additionalProperties: false
+      required:
+      - boundary_version
+      - execution_mode
+      - trust
+      - manifest
+      - artifact
+      - requested_permissions
+      - isolation_limits
+      properties:
+        boundary_version:
+          const: 1
+        execution_mode:
+          const: isolated_process_v1
+        trust:
+          enum:
+          - official
+          - verified
+          - community
+          - private
+        manifest:
+          $ref: '#/components/schemas/ExternalPluginsManifestV2'
+        artifact:
+          type: object
+          additionalProperties: false
+          required:
+          - sha256
+          - size_bytes
+          - publisher_id
+          - key_id
+          - key_fingerprint_sha256
+          - signature_base64
+          properties:
+            sha256:
+              type: string
+              pattern: ^[0-9a-f]{64}$
+            size_bytes:
+              type: integer
+              minimum: 1
+              maximum: 268435456
+            publisher_id:
+              type: string
+              pattern: ^[a-z][a-z0-9-]{1,62}$
+            key_id:
+              type: string
+              pattern: ^[a-z0-9][a-z0-9._:-]{0,127}$
+            key_fingerprint_sha256:
+              type: string
+              pattern: ^[0-9a-f]{64}$
+            signature_base64:
+              type: string
+              pattern: ^[A-Za-z0-9+/]{86}==$
+        requested_permissions:
+          $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/permissions'
+        isolation_limits:
+          $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/limits'
+      $defs:
+        capability:
+          type: string
+          pattern: ^[a-z][a-z0-9._-]{1,95}$
+        secretClass:
+          type: string
+          pattern: ^[a-z][a-z0-9._-]{0,63}$
+        networkDestination:
+          type: object
+          additionalProperties: false
+          required:
+          - host
+          - port
+          properties:
+            host:
+              type: string
+              minLength: 3
+              maxLength: 253
+              pattern: ^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$
+            port:
+              type: integer
+              minimum: 1
+              maximum: 65535
+        permissions:
+          type: object
+          additionalProperties: false
+          required:
+          - capabilities
+          properties:
+            capabilities:
+              type: array
+              minItems: 1
+              maxItems: 64
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/capability'
+            secret_classes:
+              type: array
+              maxItems: 8
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/secretClass'
+            network:
+              type: array
+              maxItems: 32
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/ExternalPluginsSecurityDescriptorV1/$defs/networkDestination'
+        limits:
+          type: object
+          additionalProperties: false
+          required:
+          - memory_mib
+          - cpu_time_ms
+          - wall_time_ms
+          - max_output_bytes
+          - max_concurrent_calls
+          properties:
+            memory_mib:
+              type: integer
+              minimum: 16
+              maximum: 4096
+            cpu_time_ms:
+              type: integer
+              minimum: 100
+              maximum: 300000
+            wall_time_ms:
+              type: integer
+              minimum: 100
+              maximum: 300000
+            max_output_bytes:
+              type: integer
+              minimum: 1024
+              maximum: 16777216
+            max_concurrent_calls:
+              type: integer
+              minimum: 1
+              maximum: 64
+      description: Signed, non-executing Task-025 security descriptor for a future isolated Connector SDK plugin. Runtime enforcement
+        is owned by Task 029.
+    ExternalSearchOrderSearchPageV1:
+      title: Order search page v1
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ExternalSearchOrderSearchPageV1/$defs/hit'
+        next_cursor:
+          type: string
+          maxLength: 2048
+          pattern: ^v1\.[A-Za-z0-9_-]+$
+      $defs:
+        id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        hit:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - order_number
+          - status
+          - currency
+          - grand_minor_units
+          - placed_at
+          - updated_at
+          properties:
+            id:
+              $ref: '#/components/schemas/ExternalSearchOrderSearchPageV1/$defs/id'
+            order_number:
+              type: string
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$
+            status:
+              type: string
+              enum:
+              - pending
+              - confirmed
+              - processing
+              - fulfilled
+              - cancelled
+            currency:
+              type: string
+              pattern: ^[A-Z]{3}$
+            grand_minor_units:
+              type: integer
+              minimum: 0
+            placed_at:
+              type: string
+              format: date-time
+              pattern: Z$
+            updated_at:
+              type: string
+              format: date-time
+              pattern: Z$
+    ExternalSearchProductSearchPageV1:
+      title: Product search page v1
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ExternalSearchProductSearchPageV1/$defs/hit'
+        next_cursor:
+          type: string
+          maxLength: 2048
+          pattern: ^v1\.[A-Za-z0-9_-]+$
+      $defs:
+        id:
+          type: string
+          pattern: ^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$
+        hit:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - code
+          - title
+          - status
+          - updated_at
+          properties:
+            id:
+              $ref: '#/components/schemas/ExternalSearchProductSearchPageV1/$defs/id'
+            code:
+              type: string
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$
+            title:
+              type: string
+              minLength: 1
+              maxLength: 300
+            status:
+              type: string
+              enum:
+              - draft
+              - active
+              - archived
+            updated_at:
+              type: string
+              format: date-time
+              pattern: Z$
+    ExternalWebhooksCreateSubscriptionV1:
+      title: Create webhook subscription
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - endpoint
+      - event_types
+      - signing_secret
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^https://[^?#]+$
+        event_types:
+          type: array
+          minItems: 1
+          maxItems: 128
+          uniqueItems: true
+          items:
+            type: string
+        signing_secret:
+          type: string
+          minLength: 32
+          maxLength: 64
+    ExternalWebhooksDeliveryHistoryPageV1:
+      title: Webhook delivery history page
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - delivery_id
+            - attempt
+            - outcome
+            - duration_ms
+            - completed_at
+            properties:
+              delivery_id:
+                type: string
+                minLength: 1
+                maxLength: 128
+              attempt:
+                type: integer
+                minimum: 1
+                maximum: 32
+              outcome:
+                type: string
+                enum:
+                - succeeded
+                - retry
+                - dlq
+              http_status:
+                type: integer
+                minimum: 100
+                maximum: 599
+              duration_ms:
+                type: integer
+                minimum: 0
+                maximum: 3600000
+              error_code:
+                type: string
+                pattern: ^[a-z][a-z0-9_]{0,63}$
+              completed_at:
+                type: string
+                format: date-time
+                pattern: Z$
+    ExternalWebhooksReplayResponseV1:
+      title: Webhook replay response
+      type: object
+      additionalProperties: false
+      required:
+      - delivery_id
+      - replay_of
+      - status
+      properties:
+        delivery_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        replay_of:
+          type: string
+          minLength: 1
+          maxLength: 128
+        status:
+          const: pending
+    ExternalWebhooksRotateSecretV1:
+      title: Rotate webhook signing secret
+      type: object
+      additionalProperties: false
+      required:
+      - signing_secret
+      - overlap_seconds
+      properties:
+        signing_secret:
+          type: string
+          minLength: 32
+          maxLength: 64
+        overlap_seconds:
+          type: integer
+          minimum: 300
+          maximum: 86400
+    ExternalWebhooksSubscriptionListV1:
+      title: Webhook subscription list
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalWebhooksSubscriptionV1'
+    ExternalWebhooksSubscriptionV1:
+      title: Webhook subscription
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - endpoint
+      - event_types
+      - status
+      - consecutive_failures
+      - version
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]*$
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^https://[^?#]+$
+        event_types:
+          type: array
+          minItems: 1
+          maxItems: 128
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^[a-z][a-z0-9]*(_[a-z0-9]+)*\.[a-z][a-z0-9]*(_[a-z0-9]+)*\.[a-z][a-z0-9]*(_[a-z0-9]+)*\.v[1-9][0-9]{0,2}$
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        consecutive_failures:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+          pattern: Z$
+        updated_at:
+          type: string
+          format: date-time
+          pattern: Z$

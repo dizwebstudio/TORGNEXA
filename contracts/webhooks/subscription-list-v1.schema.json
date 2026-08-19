@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/webhooks/subscription-list-v1.json",
+  "title": "Webhook subscription list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {"items": {"type": "array", "items": {"$ref": "https://torgnexa.local/schemas/webhooks/subscription-v1.json"}}}
+}

@@ -1,0 +1,10 @@
+BEGIN;
+CREATE TABLE organizations (id text PRIMARY KEY, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE workspaces (id text PRIMARY KEY, organization_id text NOT NULL REFERENCES organizations(id), name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE connector_accounts (id text PRIMARY KEY, organization_id text NOT NULL REFERENCES organizations(id), workspace_id text NOT NULL REFERENCES workspaces(id), family text NOT NULL, provider text NOT NULL, status text NOT NULL DEFAULT 'disabled', created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE outbox_events (id text PRIMARY KEY, organization_id text NOT NULL, workspace_id text NOT NULL, event_type text NOT NULL, aggregate_type text NOT NULL, aggregate_id text NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), published_at timestamptz, attempts integer NOT NULL DEFAULT 0, last_error text);
+CREATE INDEX outbox_events_unpublished_idx ON outbox_events (created_at) WHERE published_at IS NULL;
+CREATE TABLE inbox_events (consumer text NOT NULL, event_id text NOT NULL, processed_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (consumer,event_id));
+CREATE TABLE audit_records (id text PRIMARY KEY, organization_id text NOT NULL, workspace_id text NOT NULL, actor_id text, source text NOT NULL, action text NOT NULL, resource_type text NOT NULL, resource_id text NOT NULL, correlation_id text, summary jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX audit_records_resource_idx ON audit_records (organization_id, workspace_id, resource_type, resource_id, created_at DESC);
+COMMIT;

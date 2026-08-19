@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/marketplace-page-v1.json",
+  "title": "TORGNEXA plugin marketplace page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {"type": "array", "maxItems": 200, "items": {"$ref": "https://torgnexa.local/schemas/plugins/marketplace-listing-v1.json"}}
+  }
+}

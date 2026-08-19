@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sandbox/dry-run-result-v1.json",
+  "title": "Connector sandbox operation result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "mode", "status", "request_id", "connector_id", "connector_version", "capability", "usage", "isolation", "completed_at"],
+  "properties": {
+    "version": {"const": 1},
+    "mode": {"enum": ["dry_run", "test"]},
+    "status": {"enum": ["planned", "succeeded", "rejected", "limit_exceeded"]},
+    "request_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"},
+    "connector_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"},
+    "connector_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "capability": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+    "changes": {
+      "type": "array", "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["resource_type", "resource_id", "kind"],
+        "properties": {
+          "resource_type": {"type": "string", "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"},
+          "resource_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"},
+          "kind": {"enum": ["create", "update", "delete"]},
+          "before_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "after_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "external_actions": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["method", "destination", "route_template"],
+        "properties": {
+          "method": {"enum": ["DELETE", "GET", "HEAD", "PATCH", "POST", "PUT"]},
+          "destination": {
+            "type": "object", "additionalProperties": false,
+            "required": ["host", "port"],
+            "properties": {
+              "host": {"type": "string", "pattern": "^[a-z0-9.-]{3,253}$"},
+              "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+            }
+          },
+          "route_template": {"type": "string", "pattern": "^/[^?#\\r\\n]{0,255}$"}
+        }
+      }
+    },
+    "reason_code": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+    "usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wall_time_ms", "cpu_time_ms", "peak_rss_bytes", "output_bytes"],
+      "properties": {
+        "wall_time_ms": {"type": "integer", "minimum": 0},
+        "cpu_time_ms": {"type": "integer", "minimum": 0},
+        "peak_rss_bytes": {"type": "integer", "minimum": 0},
+        "output_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "isolation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["production_credentials_blocked", "environment_isolated", "filesystem_isolated", "direct_network_blocked", "egress_mediated", "resource_limits_enforced"],
+      "properties": {
+        "production_credentials_blocked": {"type": "boolean"},
+        "environment_isolated": {"type": "boolean"},
+        "filesystem_isolated": {"type": "boolean"},
+        "direct_network_blocked": {"type": "boolean"},
+        "egress_mediated": {"type": "boolean"},
+        "resource_limits_enforced": {"type": "boolean"}
+      }
+    },
+    "completed_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

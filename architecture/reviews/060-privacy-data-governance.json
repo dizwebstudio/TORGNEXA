@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-060",
+  "task": "060",
+  "change_class": "new_domain",
+  "summary": "Implement the frozen privacy/data-governance capability with canonical data classes, tenant-scoped purpose/legal-basis and retention registries, PII redaction for operational metadata, and PostgreSQL RLS enforcement without introducing a new architecture pillar.",
+  "scopes": [
+    "architecture/policy.json",
+    "internal/platform/audit/audit.go",
+    "internal/platform/audit/audit_test.go",
+    "internal/platform/logging/logging.go",
+    "internal/platform/logging/logging_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/privacyrepo/migration_test.go",
+    "internal/platform/postgres/privacyrepo/repository.go",
+    "internal/platform/postgres/privacyrepo/repository_test.go",
+    "internal/platform/privacy/privacy.go",
+    "internal/platform/privacy/privacy_test.go",
+    "internal/platform/privacy/redaction.go",
+    "migrations/000006_privacy_foundation.sql",
+    "migrations/catalog.json"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0006-approval-security.md",
+    "adr/0011-privacy-by-design.md",
+    "adr/0019-upgrade-compatibility.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "extend_existing_capability"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Purpose and retention registries carry organization/workspace scope, use composite workspace foreign keys, transaction-local tenant GUCs, and forced RLS with cross-tenant smoke coverage."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Task 060 implements canonical classifications, handling metadata, purpose/legal-basis/notice/consent metadata, retention metadata, lifecycle rules, and a shared default PII redaction boundary."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No REST route or OpenAPI operation is added; the new JSON Schemas describe internal governance metadata that future public APIs may consume."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event payload or envelope changes are introduced; classification metadata instead establishes the minimization rules Task 007 and later event producers must obey."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "No Connector SDK surface is changed; future connectors must consume the already frozen privacy capability rather than defining provider-local policy models."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Atomic migration 000006 adds privacy purpose/retention tables, forced RLS, monotonic lifecycle guards, purpose-class retention validation, and migration-history registration."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "PII/secret classification and redaction are fail-closed on operational surfaces; database policy rows contain no subject payload, hard-delete is blocked, and tenant isolation is enforced at repository and RLS boundaries."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 060 defines governance metadata and legal basis but does not add approval policy; sensitive-operation approval remains owned by Task 017."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Append-only audit summary sanitization now consumes the privacy classifier in addition to secret redaction, preventing common PII fields/email/IP values from being persisted verbatim."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "Optimistic policy versions prevent lost governance updates but do not change commerce inbox, reconciliation, or external-delivery idempotency semantics."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook payload/delivery behavior changes; the classification contract records that secrets are forbidden and PII must be minimized on egress surfaces."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Structured logging now redacts common PII field/value shapes using the shared privacy boundary while preserving safe scalar operational fields."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration 000006 is expand-only but high-risk and requires a backup checkpoint; backup/restore rehearsals now verify registry data and RLS preservation."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover class metadata, purpose/retention lifecycle and no-PII leakage; static/runtime migration checks cover RLS, cross-tenant isolation, policy-class enforcement and immutable retire-only lifecycle."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "007",
+    "061",
+    "076"
+  ]
+}

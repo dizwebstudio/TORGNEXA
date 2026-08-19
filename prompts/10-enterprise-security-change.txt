@@ -1,0 +1,1 @@
+Read AGENTS.md, relevant security/IAM/SIEM/edge docs and target task. Identify trust boundaries, tenant/PII/secrets, failure mode, audit/SIEM evidence and rollback. Implement only generic ports/policies; run security and contract checks.

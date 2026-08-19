@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/domain/money.json",
+  "title": "TORGNEXA Money",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["minor_units", "currency"],
+  "properties": {
+    "minor_units": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+  },
+  "$comment": "Money is exact integer minor units. Major-unit JSON numbers/floats are forbidden. Currency syntax is validated here; authoritative active-currency registries belong to adapters/policy."
+}

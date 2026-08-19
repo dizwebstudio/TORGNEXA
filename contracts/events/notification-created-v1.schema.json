@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/notification-created-v1.json",
+  "title": "platform.notifications.notification_created.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "notification_id",
+    "recipient_id",
+    "severity",
+    "title",
+    "body",
+    "occurrence_count"
+  ],
+  "properties": {
+    "notification_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "recipient_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "entity_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "occurrence_count": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "dependentRequired": {
+    "entity_type": [
+      "entity_id"
+    ],
+    "entity_id": [
+      "entity_type"
+    ]
+  }
+}

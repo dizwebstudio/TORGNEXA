@@ -1,0 +1,35 @@
+-- Copy to migrations/NNNNNN_safe_name.sql and register it in catalog.json.
+-- The migration controller sets every torgnexa.migration_* session value from
+-- the already validated catalog/release context. None of these values is a
+-- credential. Missing or malformed settings make the transaction fail.
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
+-- Add one reviewed expand/migrate/contract change here. Long row processing
+-- belongs in the resumable backfill runner, not this transaction.
+
+INSERT INTO migration_history (
+  version,
+  name,
+  file_name,
+  phase,
+  risk,
+  checksum_sha256,
+  application_version,
+  execution_id,
+  duration_ms
+) VALUES (
+  current_setting('torgnexa.migration_version')::integer,
+  current_setting('torgnexa.migration_name'),
+  current_setting('torgnexa.migration_file'),
+  current_setting('torgnexa.migration_phase'),
+  current_setting('torgnexa.migration_risk'),
+  current_setting('torgnexa.migration_checksum'),
+  current_setting('torgnexa.application_version'),
+  current_setting('torgnexa.migration_execution_id'),
+  current_setting('torgnexa.migration_duration_ms')::bigint
+);
+
+COMMIT;

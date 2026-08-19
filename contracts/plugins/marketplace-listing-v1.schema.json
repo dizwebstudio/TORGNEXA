@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/marketplace-listing-v1.json",
+  "title": "TORGNEXA plugin marketplace listing v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "family", "version", "sdk_version", "artifact_sha256", "publisher_id", "publisher_key_id", "trust", "license_expression", "security_contact", "requested_permissions", "isolation_limits", "published_at"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "family": {"enum": ["marketplace", "storefront", "classified", "social", "erp", "edo", "government", "payment", "logistics", "pickup", "fx", "notification"]},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+    "sdk_version": {"const": 1},
+    "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "publisher_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+    "publisher_key_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"},
+    "trust": {"enum": ["official", "verified", "community", "private"]},
+    "license_expression": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\r\\n\\x00]+$"},
+    "security_contact": {"type": "string", "minLength": 3, "maxLength": 320, "pattern": "^[^\\r\\n\\x00]+$"},
+    "requested_permissions": {"$ref": "https://torgnexa.local/schemas/plugins/security-descriptor-v1.json#/$defs/permissions"},
+    "isolation_limits": {"$ref": "https://torgnexa.local/schemas/plugins/security-descriptor-v1.json#/$defs/limits"},
+    "published_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "description": "Safe marketplace projection shown before activation. Trust level and requested capabilities/secrets/network authority are explicit; credentials and private signing material are never returned."
+}

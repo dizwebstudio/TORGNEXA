@@ -1,0 +1,1 @@
+{"items":[{"offer_id":"OZ-RED-M","sku":120001,"stocks":[{"warehouse_id":70001,"present":10,"reserved":3},{"warehouse_id":70002,"present":5,"reserved":1}]},{"offer_id":"OZ-BLUE-L","sku":120002,"stocks":[{"warehouse_id":70001,"present":4,"reserved":1}]}],"cursor":""}

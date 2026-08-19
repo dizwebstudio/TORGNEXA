@@ -1,0 +1,42 @@
+version: 1
+foundation:
+  upload_id_format: upl_<128-bit-lowercase-hex>
+  client_supplied_object_keys: false
+  tenant_scoped_object_keys: true
+  quarantine_prefix: quarantine
+  released_prefix: released
+  consumer_access_state: released
+  release_authority: upload_security_pipeline_v1
+  foundation_transitions:
+    - received_to_quarantined
+  security_pipeline_complete: true
+security:
+  policy_version: upload-security-v1
+  max_file_bytes: 104857600
+  max_archive_entries: 10000
+  max_archive_depth: 5
+  max_archive_expanded_bytes: 536870912
+  max_archive_entry_bytes: 134217728
+  max_nested_archive_bytes: 33554432
+  max_expansion_ratio: 100
+  max_parser_depth: 64
+  max_parser_tokens: 1000000
+  max_csv_rows: 100000
+  max_csv_columns: 512
+  max_field_bytes: 1048576
+  quarantine_before_scan: true
+  scanner_failure_mode: retry_fail_closed
+  immutable_security_evidence: true
+  rescan_revokes_existing_release_before_scan: true
+  consumer_must_revalidate_released_reference_before_read: true
+checks:
+  - content_integrity
+  - content_type_sniff
+  - extension_mismatch
+  - declared_mime_match
+  - path_normalization
+  - archive_limits
+  - parser_limits
+  - malware_scan
+scan_decision_states: [clean, rejected]
+consumer_access_state: released

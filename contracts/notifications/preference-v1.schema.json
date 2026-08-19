@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/notifications/preference-v1.json",
+  "title":"TORGNEXA Notification Preference v1",
+  "type":"object","additionalProperties":false,
+  "required":["recipient_id","channel","enabled","min_severity","version","updated_at"],
+  "properties":{
+    "recipient_id":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]*$"},
+    "channel":{"enum":["web_ui","webhook"]},
+    "enabled":{"type":"boolean"},
+    "min_severity":{"enum":["info","warning","critical"]},
+    "version":{"type":"integer","minimum":1},
+    "updated_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

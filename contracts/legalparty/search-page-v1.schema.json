@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/legalparty/search-page-v1.json",
+  "title": "TORGNEXA Legal Party Search Page v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "items"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "party_type",
+          "party_id",
+          "code",
+          "display_name",
+          "status"
+        ],
+        "properties": {
+          "party_type": {
+            "enum": [
+              "legal_entity",
+              "individual_entrepreneur",
+              "branch"
+            ]
+          },
+          "party_id": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+          },
+          "code": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "inn": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "registration_id": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

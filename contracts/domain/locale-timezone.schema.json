@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/domain/locale-timezone.json",
+  "title": "TORGNEXA Locale and Timezone Edge Context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["locale", "timezone"],
+  "properties": {
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-(?:[A-Z]{2}|[0-9]{3}))?$",
+      "description": "Canonical language[-Script][-REGION] BCP47 subset."
+    },
+    "timezone": {
+      "type": "string",
+      "pattern": "^(UTC|[A-Za-z0-9._+-]+/[A-Za-z0-9._+-]+(?:/[A-Za-z0-9._+-]+)*)$",
+      "description": "UTC or named IANA area/location timezone; fixed offsets and machine-local zones are not persisted as timezone identity."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+version: 1
+required:
+  - manifest_valid
+  - capabilities_match_implementation
+  - tenant_isolation
+  - secrets_not_logged
+  - health_check
+  - timeout_behavior
+  - normalized_errors
+  - rate_limit_handling
+  - pagination
+  - idempotent_retry_semantics
+conditional:
+  webhooks: [signature_verification, deduplication, replay_protection]
+  writes: [risk_class, audit, dry_run_or_documented_limitation]
+  reconciliation: [remote_id_mapping, drift_fixture]

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/fx/rate.json",
+  "title": "FXRate",
+  "type": "object",
+  "required": [
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "source",
+    "observed_at",
+    "effective_at"
+  ],
+  "properties": {
+    "base_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "quote_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "rate": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$"
+    },
+    "source": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rate_type": {
+      "type": "string"
+    },
+    "source_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,6 @@
+{
+  "result": [
+    {"barcode": 4601234567890, "product_id": 1001, "seller_sku_id": "MAG-RED-M", "sku_id": 2001, "title": "Футболка красная M", "is_active": true, "is_archive": false, "is_blocked": false, "is_no_stock": false},
+    {"barcode": 4601234567891, "product_id": 1002, "seller_sku_id": "MAG-BLUE-L", "sku_id": 2002, "title": "Футболка синяя L", "is_active": true, "is_archive": false, "is_blocked": false, "is_no_stock": false}
+  ]
+}

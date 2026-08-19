@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/webhooks/webhook-envelope.json",
+  "title": "TORGNEXA Webhook Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["delivery_id", "event_id", "event_type", "occurred_at", "organization_id", "workspace_id", "data"],
+  "properties": {
+    "delivery_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"},
+    "event_type": {"type": "string", "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.v[1-9][0-9]{0,2}$"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "organization_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "workspace_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "data": {"type": "object"}
+  }
+}

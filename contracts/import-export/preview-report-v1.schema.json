@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/import-export/preview-report-v1.json",
+  "title":"TORGNEXA Import Preview Report v1",
+  "type":"object","additionalProperties":false,
+  "required":["source_sha256","mapping_fingerprint","total_rows","valid_rows","invalid_rows","errors_truncated","errors","sample"],
+  "properties":{
+    "source_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "mapping_fingerprint":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "total_rows":{"type":"integer","minimum":1,"maximum":100000},
+    "valid_rows":{"type":"integer","minimum":0,"maximum":100000},
+    "invalid_rows":{"type":"integer","minimum":0,"maximum":100000},
+    "errors_truncated":{"type":"boolean"},
+    "errors":{"type":"array","maxItems":10000,"items":{"$ref":"#/$defs/error"}},
+    "sample":{"type":"array","maxItems":10,"items":{"$ref":"#/$defs/product"}}
+  },
+  "$defs":{
+    "error":{"type":"object","additionalProperties":false,"required":["row","code"],"properties":{"row":{"type":"integer","minimum":1},"field":{"type":"string","maxLength":128},"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}},
+    "product":{"type":"object","additionalProperties":false,"required":["row","product_id","code","title"],"properties":{"row":{"type":"integer","minimum":1},"product_id":{"type":"string","minLength":1,"maxLength":36},"code":{"type":"string","maxLength":128},"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":20000}}}
+  }
+}

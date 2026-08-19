@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/transport/outbox-publication.json",
+  "title": "TORGNEXA Outbox Publication Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "attempt",
+    "available_at",
+    "lease_owner",
+    "lease_token",
+    "lease_expires_at",
+    "published_at",
+    "last_error_code"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "available_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "lease_owner": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "lease_token": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "lease_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "published_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "last_error_code": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"lease_token": {"type": "string"}}},
+      "then": {
+        "properties": {
+          "lease_owner": {"type": "string"},
+          "lease_expires_at": {"type": "string"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"published_at": {"type": "string"}}},
+      "then": {
+        "properties": {
+          "lease_owner": {"type": "null"},
+          "lease_token": {"type": "null"},
+          "lease_expires_at": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "description": "Operational publication metadata only. The immutable event body uses the canonical EventBus envelope and is not copied into retry/error metadata."
+}

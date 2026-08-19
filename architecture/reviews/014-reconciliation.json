@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-014",
+  "task": "014",
+  "change_class": "implementation",
+  "summary": "Implement the frozen provider-neutral reconciliation control plane on Task-013 sync primitives with resumable scan modes, bounded durable drift evidence and fail-closed safe remediation actions.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/014-reconciliation.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/reconciliation/README.md",
+    "contracts/reconciliation/action-v1.schema.json",
+    "contracts/reconciliation/drift-v1.schema.json",
+    "contracts/reconciliation/run-v1.schema.json",
+    "docs/08-sync-reconciliation.md",
+    "docs/migrations/000025-reconciliation.md",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/reconciliationrepo/migration_test.go",
+    "internal/platform/postgres/reconciliationrepo/repository.go",
+    "internal/platform/reconciliation/reconciliation.go",
+    "internal/platform/reconciliation/reconciliation_test.go",
+    "migrations/000025_reconciliation.sql",
+    "migrations/catalog.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/014-reconciliation.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0002-kafka-event-platform.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Runs, drift records and action receipts are explicit organization/workspace scoped in PostgreSQL and protected by forced RLS."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Reconciliation persists bounded identifiers, fingerprints, status/revision metadata and machine error codes only; no remote payload bodies, credentials or raw errors."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 014 adds no public HTTP endpoint; scheduled and on-demand callers use an internal platform capability."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No new EventBus schema is introduced. Remediation adapters retain ownership of their existing domain events."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK v1 interfaces are unchanged; scanning and remediation are host-side ports."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000025 adds resumable runs, immutable drift evidence and append-only action receipts with forced RLS."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Auto-fix is permitted only for unambiguous mapping creation or source-of-truth/direction-authorized content/status repair. Ambiguous mapping and health drift fail closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Approval is an explicit remediation action; external approval integration is called with deterministic idempotency evidence rather than bypassed."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Immutable drift and action receipts preserve machine-readable reconciliation evidence without replacing Audit/Data Lineage."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Deterministic drift IDs suppress page replay duplicates, persisted cursor enables resume, and deterministic action keys protect external remediation retries."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Notification/remediation delivery occurs through a host action executor and does not bypass Task-063 webhook infrastructure."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Runs expose scanned/drift counts and detect stale remote observation timestamps; Task 066 later defines production thresholds and load profiles."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disable reconciliation scheduling to stop new work. Expand-only evidence is retained; completed runs and action history are immutable."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover drift classes, safe/unsafe remediation, stale health, interrupted-run resume and machine-code-only action failures."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "011",
+    "012",
+    "015",
+    "016",
+    "033",
+    "059",
+    "066"
+  ]
+}

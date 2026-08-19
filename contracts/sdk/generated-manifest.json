@@ -1,0 +1,597 @@
+{
+  "schema_version": 1,
+  "generator": "torgnexa-sdkgen/v1",
+  "openapi": {
+    "path": "contracts/openapi/torgnexa-v1.yaml",
+    "sha256": "28a3456f8045536742ba829482a7a14008839b1c4f994bfcb9f70a984d81bc94",
+    "openapi_version": "3.1.0",
+    "api_version": "0.16.0",
+    "server_path": "/api/v1"
+  },
+  "operations": [
+    {
+      "operation_id": "activateSettingsIdentityProvider",
+      "method": "POST",
+      "path": "/settings/identity-providers/{provider_id}:activate"
+    },
+    {
+      "operation_id": "adjustInventoryPosition",
+      "method": "POST",
+      "path": "/inventory/positions/{position_id}/adjustments"
+    },
+    {
+      "operation_id": "analyzeWithAIProvider",
+      "method": "POST",
+      "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "assignProductCategory",
+      "method": "POST",
+      "path": "/products/{product_id}/categories/{category_id}"
+    },
+    {
+      "operation_id": "checkConnectorAccount",
+      "method": "POST",
+      "path": "/connector-accounts:check"
+    },
+    {
+      "operation_id": "completeConnectorOAuth",
+      "method": "POST",
+      "path": "/connector-accounts:oauth-callback"
+    },
+    {
+      "operation_id": "createAIProviderAccount",
+      "method": "POST",
+      "path": "/settings/ai-providers"
+    },
+    {
+      "operation_id": "createApprovalPolicy",
+      "method": "POST",
+      "path": "/approval-policies"
+    },
+    {
+      "operation_id": "createApprovalRequest",
+      "method": "POST",
+      "path": "/approvals/requests"
+    },
+    {
+      "operation_id": "createCatalogCategory",
+      "method": "POST",
+      "path": "/catalog/categories"
+    },
+    {
+      "operation_id": "createConnectorAccount",
+      "method": "POST",
+      "path": "/connector-accounts"
+    },
+    {
+      "operation_id": "createDemoApproval",
+      "method": "POST",
+      "path": "/approvals/demo"
+    },
+    {
+      "operation_id": "createDemoOrders",
+      "method": "POST",
+      "path": "/orders/demo"
+    },
+    {
+      "operation_id": "createInventoryWarehouse",
+      "method": "POST",
+      "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "createOfferPrice",
+      "method": "POST",
+      "path": "/products/{product_id}/prices/{offer_or_price_id}"
+    },
+    {
+      "operation_id": "createPrivacyRequest",
+      "method": "POST",
+      "path": "/privacy/requests"
+    },
+    {
+      "operation_id": "createProduct",
+      "method": "POST",
+      "path": "/products"
+    },
+    {
+      "operation_id": "createProductImage",
+      "method": "POST",
+      "path": "/products/{product_id}/images"
+    },
+    {
+      "operation_id": "createProductOffer",
+      "method": "POST",
+      "path": "/products/{product_id}/offers"
+    },
+    {
+      "operation_id": "createReconciliationJob",
+      "method": "POST",
+      "path": "/reconciliation/jobs"
+    },
+    {
+      "operation_id": "createSyncPolicy",
+      "method": "POST",
+      "path": "/sync/policies"
+    },
+    {
+      "operation_id": "createUpload",
+      "method": "POST",
+      "path": "/uploads"
+    },
+    {
+      "operation_id": "createWebhookSubscription",
+      "method": "POST",
+      "path": "/webhook-subscriptions"
+    },
+    {
+      "operation_id": "decideApproval",
+      "method": "POST",
+      "path": "/approvals/{request_id}/decision"
+    },
+    {
+      "operation_id": "deleteDemoOrders",
+      "method": "DELETE",
+      "path": "/orders/demo"
+    },
+    {
+      "operation_id": "disableAIProviderAccount",
+      "method": "POST",
+      "path": "/settings/ai-providers:disable"
+    },
+    {
+      "operation_id": "disableConnectorAccount",
+      "method": "POST",
+      "path": "/connector-accounts:disable"
+    },
+    {
+      "operation_id": "disableSettingsIdentityProvider",
+      "method": "POST",
+      "path": "/settings/identity-providers/{provider_id}:disable"
+    },
+    {
+      "operation_id": "disableWebhookSubscription",
+      "method": "DELETE",
+      "path": "/webhook-subscriptions/{subscription_id}"
+    },
+    {
+      "operation_id": "enableConnectorAccount",
+      "method": "POST",
+      "path": "/connector-accounts:enable"
+    },
+    {
+      "operation_id": "enrollConnectorCredentials",
+      "method": "POST",
+      "path": "/connector-accounts:credentials"
+    },
+    {
+      "operation_id": "evaluateEntitlement",
+      "method": "POST",
+      "path": "/entitlements/evaluate"
+    },
+    {
+      "operation_id": "evaluateProductCompliance",
+      "method": "POST",
+      "path": "/compliance/evaluate"
+    },
+    {
+      "operation_id": "executeApproval",
+      "method": "POST",
+      "path": "/approvals/{request_id}/execute"
+    },
+    {
+      "operation_id": "getCloudSubscription",
+      "method": "GET",
+      "path": "/cloud/subscription"
+    },
+    {
+      "operation_id": "getConnectorBootstrapState",
+      "method": "GET",
+      "path": "/connector-accounts:bootstrap"
+    },
+    {
+      "operation_id": "getConnectorRuntimeConfig",
+      "method": "GET",
+      "path": "/connector-accounts:runtime-config"
+    },
+    {
+      "operation_id": "getFulfillmentAllocation",
+      "method": "GET",
+      "path": "/inventory/fulfillment-allocations/{allocation_id}"
+    },
+    {
+      "operation_id": "getHealth",
+      "method": "GET",
+      "path": "/health"
+    },
+    {
+      "operation_id": "getInventoryPosition",
+      "method": "GET",
+      "path": "/inventory/positions/{position_id}"
+    },
+    {
+      "operation_id": "getLineageTimeline",
+      "method": "GET",
+      "path": "/lineage/timeline"
+    },
+    {
+      "operation_id": "getNotificationPreference",
+      "method": "GET",
+      "path": "/notification-preferences/{channel}"
+    },
+    {
+      "operation_id": "getOrder",
+      "method": "GET",
+      "path": "/orders/{order_id}"
+    },
+    {
+      "operation_id": "getProduct",
+      "method": "GET",
+      "path": "/products/{product_id}"
+    },
+    {
+      "operation_id": "getReportData",
+      "method": "GET",
+      "path": "/reports/{report_id}"
+    },
+    {
+      "operation_id": "getSettingsSecurityConfiguration",
+      "method": "GET",
+      "path": "/settings/security/configuration"
+    },
+    {
+      "operation_id": "getSyncStatus",
+      "method": "GET",
+      "path": "/sync/status"
+    },
+    {
+      "operation_id": "getWarehouseIncident",
+      "method": "GET",
+      "path": "/inventory/warehouse-incidents/{incident_id}"
+    },
+    {
+      "operation_id": "getWarehouseOperationalState",
+      "method": "GET",
+      "path": "/inventory/warehouses/{warehouse_id}/operational-state"
+    },
+    {
+      "operation_id": "getWebhookDeliveryHistory",
+      "method": "GET",
+      "path": "/webhook-deliveries/{delivery_id}/history"
+    },
+    {
+      "operation_id": "getWorkspaceSettings",
+      "method": "GET",
+      "path": "/settings/workspace"
+    },
+    {
+      "operation_id": "importInventory",
+      "method": "POST",
+      "path": "/inventory/import"
+    },
+    {
+      "operation_id": "inviteWorkspaceMember",
+      "method": "POST",
+      "path": "/settings/members"
+    },
+    {
+      "operation_id": "listAIProviderAccounts",
+      "method": "GET",
+      "path": "/settings/ai-providers"
+    },
+    {
+      "operation_id": "listApprovalPolicies",
+      "method": "GET",
+      "path": "/approval-policies"
+    },
+    {
+      "operation_id": "listApprovals",
+      "method": "GET",
+      "path": "/approvals"
+    },
+    {
+      "operation_id": "listAuditRecords",
+      "method": "GET",
+      "path": "/audit"
+    },
+    {
+      "operation_id": "listCatalogCategories",
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "operation_id": "listComplianceDocuments",
+      "method": "GET",
+      "path": "/compliance/documents"
+    },
+    {
+      "operation_id": "listConnectorAccountHealthHistory",
+      "method": "GET",
+      "path": "/connector-accounts:health-history"
+    },
+    {
+      "operation_id": "listConnectorAccounts",
+      "method": "GET",
+      "path": "/connector-accounts"
+    },
+    {
+      "operation_id": "listConnectors",
+      "method": "GET",
+      "path": "/connectors"
+    },
+    {
+      "operation_id": "listCounterparties",
+      "method": "GET",
+      "path": "/counterparties"
+    },
+    {
+      "operation_id": "listFXRates",
+      "method": "GET",
+      "path": "/fx/rates"
+    },
+    {
+      "operation_id": "listFulfillmentAllocations",
+      "method": "GET",
+      "path": "/inventory/fulfillment-allocations"
+    },
+    {
+      "operation_id": "listInventoryPositions",
+      "method": "GET",
+      "path": "/inventory/positions"
+    },
+    {
+      "operation_id": "listInventoryWarehouses",
+      "method": "GET",
+      "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "listNotificationDeliveries",
+      "method": "GET",
+      "path": "/notifications/{notification_id}/deliveries"
+    },
+    {
+      "operation_id": "listNotifications",
+      "method": "GET",
+      "path": "/notifications"
+    },
+    {
+      "operation_id": "listOrders",
+      "method": "GET",
+      "path": "/orders"
+    },
+    {
+      "operation_id": "listPlugins",
+      "method": "GET",
+      "path": "/plugins"
+    },
+    {
+      "operation_id": "listProducts",
+      "method": "GET",
+      "path": "/products"
+    },
+    {
+      "operation_id": "listReports",
+      "method": "GET",
+      "path": "/reports"
+    },
+    {
+      "operation_id": "listSettingsIdentityProviders",
+      "method": "GET",
+      "path": "/settings/identity-providers"
+    },
+    {
+      "operation_id": "listSettingsSecurityAudit",
+      "method": "GET",
+      "path": "/settings/security/audit"
+    },
+    {
+      "operation_id": "listSettingsSecurityLogins",
+      "method": "GET",
+      "path": "/settings/security/logins"
+    },
+    {
+      "operation_id": "listSettingsSecuritySessions",
+      "method": "GET",
+      "path": "/settings/security/sessions"
+    },
+    {
+      "operation_id": "listSettlementEntries",
+      "method": "GET",
+      "path": "/settlements"
+    },
+    {
+      "operation_id": "listWarehouseIncidents",
+      "method": "GET",
+      "path": "/inventory/warehouse-incidents"
+    },
+    {
+      "operation_id": "listWebhookSubscriptions",
+      "method": "GET",
+      "path": "/webhook-subscriptions"
+    },
+    {
+      "operation_id": "listWorkspaceMembers",
+      "method": "GET",
+      "path": "/settings/members"
+    },
+    {
+      "operation_id": "markNotificationRead",
+      "method": "POST",
+      "path": "/notifications/{notification_id}/read"
+    },
+    {
+      "operation_id": "previewConnectorBootstrap",
+      "method": "POST",
+      "path": "/connector-accounts:bootstrap-preview"
+    },
+    {
+      "operation_id": "putConnectorRuntimeConfig",
+      "method": "PUT",
+      "path": "/connector-accounts:runtime-config"
+    },
+    {
+      "operation_id": "putConnectorSyncSchedule",
+      "method": "PUT",
+      "path": "/connector-accounts:schedule"
+    },
+    {
+      "operation_id": "putNotificationPreference",
+      "method": "PUT",
+      "path": "/notification-preferences/{channel}"
+    },
+    {
+      "operation_id": "putWarehouseFailoverRoute",
+      "method": "PUT",
+      "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
+    },
+    {
+      "operation_id": "replaceConnectorAccountCapabilities",
+      "method": "PUT",
+      "path": "/connector-accounts:capabilities"
+    },
+    {
+      "operation_id": "replayWebhookDelivery",
+      "method": "POST",
+      "path": "/webhook-deliveries/{delivery_id}/replay"
+    },
+    {
+      "operation_id": "reserveFulfillmentAllocation",
+      "method": "POST",
+      "path": "/inventory/fulfillment-allocations"
+    },
+    {
+      "operation_id": "resolveSyncDrift",
+      "method": "POST",
+      "path": "/sync/drifts/{drift_id}/actions"
+    },
+    {
+      "operation_id": "retireApprovalPolicy",
+      "method": "DELETE",
+      "path": "/approval-policies/{policy_id}"
+    },
+    {
+      "operation_id": "revokeSettingsSecuritySession",
+      "method": "POST",
+      "path": "/settings/security/sessions/{session_ref}:revoke"
+    },
+    {
+      "operation_id": "rollbackSettingsIdentityProvider",
+      "method": "POST",
+      "path": "/settings/identity-providers/{provider_id}:rollback"
+    },
+    {
+      "operation_id": "rotateWebhookSigningSecret",
+      "method": "POST",
+      "path": "/webhook-subscriptions/{subscription_id}/rotate-secret"
+    },
+    {
+      "operation_id": "runSyncPolicy",
+      "method": "POST",
+      "path": "/sync/policies/{policy_id}/run"
+    },
+    {
+      "operation_id": "saveSettingsIdentityProviderDraft",
+      "method": "PUT",
+      "path": "/settings/identity-providers/{provider_id}"
+    },
+    {
+      "operation_id": "searchLegalParties",
+      "method": "GET",
+      "path": "/counterparties/search"
+    },
+    {
+      "operation_id": "startConnectorBootstrap",
+      "method": "POST",
+      "path": "/connector-accounts:bootstrap"
+    },
+    {
+      "operation_id": "startConnectorOAuth",
+      "method": "POST",
+      "path": "/connector-accounts:oauth-start"
+    },
+    {
+      "operation_id": "streamRealtimeInvalidations",
+      "method": "GET",
+      "path": "/realtime"
+    },
+    {
+      "operation_id": "syncConnectorAccount",
+      "method": "POST",
+      "path": "/connector-accounts:sync"
+    },
+    {
+      "operation_id": "updateInventoryWarehouse",
+      "method": "PATCH",
+      "path": "/inventory/warehouses/{warehouse_id}"
+    },
+    {
+      "operation_id": "updateOfferPrice",
+      "method": "PATCH",
+      "path": "/products/{product_id}/prices/{offer_or_price_id}"
+    },
+    {
+      "operation_id": "updateProduct",
+      "method": "PATCH",
+      "path": "/products/{product_id}"
+    },
+    {
+      "operation_id": "updateProductImage",
+      "method": "PATCH",
+      "path": "/products/{product_id}/images/{image_id}"
+    },
+    {
+      "operation_id": "updateProductOffer",
+      "method": "PATCH",
+      "path": "/products/{product_id}/offers/{offer_id}"
+    },
+    {
+      "operation_id": "updateSyncPolicy",
+      "method": "PATCH",
+      "path": "/sync/policies/{policy_id}"
+    },
+    {
+      "operation_id": "updateWarehouseOperationalState",
+      "method": "PATCH",
+      "path": "/inventory/warehouses/{warehouse_id}/operational-state"
+    },
+    {
+      "operation_id": "updateWorkspaceMember",
+      "method": "PATCH",
+      "path": "/settings/members/{member_id}"
+    },
+    {
+      "operation_id": "updateWorkspaceSettings",
+      "method": "PUT",
+      "path": "/settings/workspace"
+    },
+    {
+      "operation_id": "validateSettingsIdentityProvider",
+      "method": "POST",
+      "path": "/settings/identity-providers/{provider_id}:validate"
+    }
+  ],
+  "sdks": [
+    {
+      "language": "go",
+      "minimum_runtime": "go1.23",
+      "paths": [
+        "sdk/go/torgnexa/client.gen.go"
+      ]
+    },
+    {
+      "language": "typescript",
+      "minimum_runtime": "ES2022 + Fetch",
+      "paths": [
+        "sdk/typescript/src/client.gen.mjs",
+        "sdk/typescript/src/client.gen.d.mts"
+      ]
+    },
+    {
+      "language": "python",
+      "minimum_runtime": "python3.11",
+      "paths": [
+        "sdk/python/torgnexa_sdk/client_gen.py"
+      ]
+    }
+  ]
+}

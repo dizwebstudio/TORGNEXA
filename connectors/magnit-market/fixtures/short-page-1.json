@@ -1,0 +1,8 @@
+{
+  "result": [
+    {"barcode": 4601234567890, "product_id": 1001, "seller_sku_id": "MAG-RED-M", "sku_id": 2001},
+    {"barcode": 4601234567891, "product_id": 1002, "seller_sku_id": "MAG-BLUE-L", "sku_id": 2002}
+  ],
+  "result_count": 2,
+  "shop_id": 42
+}

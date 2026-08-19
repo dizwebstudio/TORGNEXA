@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/operations/migration-catalog.json",
+  "title": "TORGNEXA database migration catalog",
+  "description": "Immutable migration metadata and expand/migrate/contract compatibility declarations. Repository tooling additionally verifies ordering, dependencies, inventory, SQL safety, and file checksums.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "migrations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "migrations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 999999,
+      "items": {
+        "$ref": "#/$defs/migration"
+      }
+    }
+  },
+  "$defs": {
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "old_readers",
+        "old_writers",
+        "new_binary_on_old_schema",
+        "contract_preconditions"
+      ],
+      "properties": {
+        "old_readers": {
+          "type": "boolean"
+        },
+        "old_writers": {
+          "type": "boolean"
+        },
+        "new_binary_on_old_schema": {
+          "type": "boolean"
+        },
+        "contract_preconditions": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]{2,127}$"
+          }
+        }
+      }
+    },
+    "backfill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_key",
+        "tenant_scoped",
+        "cursor",
+        "batch_size",
+        "idempotency"
+      ],
+      "properties": {
+        "job_key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{2,127}$"
+        },
+        "tenant_scoped": {
+          "type": "boolean"
+        },
+        "cursor": {
+          "type": "string",
+          "enum": [
+            "lexicographic",
+            "monotonic_id"
+          ]
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "idempotency": {
+          "const": "required"
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "name",
+        "file",
+        "phase",
+        "risk",
+        "transaction",
+        "policy",
+        "history_mode",
+        "requires_backup",
+        "dependencies",
+        "compatibility",
+        "backfill",
+        "sha256"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,62}$"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^[0-9]{6}_[a-z][a-z0-9_]{1,62}\\.sql$"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "expand",
+            "migrate",
+            "contract"
+          ]
+        },
+        "risk": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "transaction": {
+          "const": "embedded"
+        },
+        "policy": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "v1"
+          ]
+        },
+        "history_mode": {
+          "type": "string",
+          "enum": [
+            "bootstrap",
+            "atomic"
+          ]
+        },
+        "requires_backup": {
+          "type": "boolean"
+        },
+        "dependencies": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999999
+          }
+        },
+        "compatibility": {
+          "$ref": "#/$defs/compatibility"
+        },
+        "backfill": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/backfill"
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "expand"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compatibility": {
+                "properties": {
+                  "old_readers": {
+                    "const": true
+                  },
+                  "old_writers": {
+                    "const": true
+                  },
+                  "new_binary_on_old_schema": {
+                    "const": true
+                  },
+                  "contract_preconditions": {
+                    "maxItems": 0
+                  }
+                }
+              },
+              "backfill": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "migrate"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compatibility": {
+                "properties": {
+                  "old_readers": {
+                    "const": true
+                  },
+                  "old_writers": {
+                    "const": true
+                  }
+                }
+              },
+              "backfill": {
+                "$ref": "#/$defs/backfill"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "contract"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requires_backup": {
+                "const": true
+              },
+              "compatibility": {
+                "properties": {
+                  "old_readers": {
+                    "const": false
+                  },
+                  "old_writers": {
+                    "const": false
+                  },
+                  "new_binary_on_old_schema": {
+                    "const": false
+                  },
+                  "contract_preconditions": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "backfill": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "risk": {
+                "enum": [
+                  "high",
+                  "critical"
+                ]
+              }
+            },
+            "required": [
+              "risk"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requires_backup": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

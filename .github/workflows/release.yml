@@ -1,0 +1,514 @@
+name: release-candidate
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Canonical SemVer without the v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Install the approved Node toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.16.0"
+      - name: Verify and build the locked JavaScript release graph
+        run: |
+          ./scripts/check-js-supply-chain.sh release
+          npm --prefix integrations/n8n-nodes-torgnexa ci --ignore-scripts --no-audit --no-fund
+          npm --prefix integrations/n8n-nodes-torgnexa run build
+          npm --prefix integrations/n8n-nodes-torgnexa run test:offline
+          npm --prefix integrations/n8n-nodes-torgnexa run verify:package
+      - name: Run tests and race detector
+        run: |
+          go test -race ./...
+          go -C tools/contractcheck test -race ./...
+      - name: Validate the frozen architecture tree
+        run: ./scripts/check-architecture.sh
+      - name: Verify PostgreSQL tenancy migration and RLS
+        run: ./scripts/check-tenancy-postgres.sh
+      - name: Verify PostgreSQL logical restore and physical PITR
+        run: ./scripts/check-postgres-backup-restore.sh
+      - name: Rehearse PostgreSQL upgrade and resumable backfill
+        run: ./scripts/check-postgres-upgrade.sh
+
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Validate API, event, schema, and protobuf contracts
+        run: ./scripts/check-contracts.sh
+
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Verify deterministic JavaScript dependency policy
+        run: ./scripts/check-js-supply-chain.sh release
+      - name: Validate immutable inputs and release policy
+        run: ./scripts/check-supply-chain.sh
+      - name: Resolve registered Action tags against their committed SHAs
+        run: ./scripts/verify-action-pins.sh
+
+  runtime-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-runtime-qualification
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Qualify deployed worker, Kafka, PostgreSQL, and warehouse execution
+        run: |
+          mkdir -m 0700 -- "$EVIDENCE_DIR"
+          TORGNEXA_QUALIFICATION_EVIDENCE_DIR="$EVIDENCE_DIR" ./scripts/check-production-qualification.sh
+      - name: Retain runtime qualification evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runtime-qualification-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-runtime-qualification
+          if-no-files-found: error
+          retention-days: 90
+
+  build:
+    needs: [tests, contracts, policy, runtime-qualification]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.context.outputs.mode }}
+      version: ${{ steps.context.outputs.version }}
+      revision: ${{ steps.context.outputs.revision }}
+      source_epoch: ${{ steps.context.outputs.source_epoch }}
+      release_ref: ${{ steps.context.outputs.release_ref }}
+      event_name: ${{ steps.context.outputs.event_name }}
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      INPUT_VERSION: ${{ inputs.version }}
+      REF_NAME: ${{ github.ref_name }}
+      FULL_REF: ${{ github.ref }}
+      SOURCE_REVISION: ${{ github.sha }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Derive and validate immutable release context
+        id: context
+        run: |
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            version=${REF_NAME#v}
+          else
+            version=$INPUT_VERSION
+          fi
+          ./scripts/check-semver.sh "$version"
+          if [[ "$FULL_REF" != "refs/tags/v$version" ]]; then
+            echo "release workflow must run from the exact tag refs/tags/v$version; select that tag for workflow_dispatch" >&2
+            exit 1
+          fi
+          release_ref=$FULL_REF
+          [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          source_epoch=$(git show -s --format=%ct "$SOURCE_REVISION")
+          mode=dry-run
+          if jq -e '.public_release_ready == true' supply-chain/release-artifacts.json >/dev/null && [[ "$EVENT_NAME" == "push" ]]; then
+            mode=public
+          fi
+          printf 'mode=%s\nversion=%s\nrevision=%s\nsource_epoch=%s\nrelease_ref=%s\nevent_name=%s\n' \
+            "$mode" "$version" "$SOURCE_REVISION" "$source_epoch" "$release_ref" "$EVENT_NAME" >>"$GITHUB_OUTPUT"
+      - name: Build reproducible release bytes once
+        env:
+          BUILD_MODE: ${{ steps.context.outputs.mode }}
+          BUILD_VERSION: ${{ steps.context.outputs.version }}
+          BUILD_REVISION: ${{ steps.context.outputs.revision }}
+          BUILD_SOURCE_EPOCH: ${{ steps.context.outputs.source_epoch }}
+        run: |
+          mkdir -m 0700 -- "$ARTIFACT_DIR"
+          ./scripts/build-release.sh \
+            --mode "$BUILD_MODE" \
+            --version "$BUILD_VERSION" \
+            --source-revision "$BUILD_REVISION" \
+            --source-date-epoch "$BUILD_SOURCE_EPOCH" \
+            --default-branch "$DEFAULT_BRANCH" \
+            --output-dir "$ARTIFACT_DIR"
+      - name: Retain exact build bytes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+  sbom:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-artifacts
+      - name: Install checksum-verified SBOM tooling
+        run: |
+          mkdir -m 0700 -- "$TOOLS_DIR"
+          ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
+      - name: Generate SPDX 2.3 SBOMs for the exact binaries
+        run: ./scripts/generate-release-sboms.sh --artifact-dir "$ARTIFACT_DIR" --version "$VERSION" --syft "$TOOLS_DIR/syft"
+      - name: Retain binaries and their SBOMs without rebuilding
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-sbom-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+  security:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      MODE: ${{ needs.build.outputs.mode }}
+      SOURCE_REVISION: ${{ needs.build.outputs.revision }}
+      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+      REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
+      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Install checksum-verified security tools
+        run: |
+          mkdir -m 0700 -- "$TOOLS_DIR" "$REPORT_DIR"
+          ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
+      - name: Run all source and runtime-image gates
+        run: |
+          ./scripts/scan-supply-chain.sh \
+            --mode "$MODE" \
+            --scope all \
+            --source-revision "$SOURCE_REVISION" \
+            --tool-dir "$TOOLS_DIR" \
+            --output-dir "$REPORT_DIR"
+      - name: Retain sanitized reports even on failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-security-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-reports
+          if-no-files-found: error
+          retention-days: 30
+
+  attest:
+    needs: [build, sbom, security]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release-signing
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+      REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
+      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
+      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+      VERSION: ${{ needs.build.outputs.version }}
+      MODE: ${{ needs.build.outputs.mode }}
+      SOURCE_REVISION: ${{ needs.build.outputs.revision }}
+      RELEASE_REF: ${{ needs.build.outputs.release_ref }}
+      EVENT_NAME: ${{ needs.build.outputs.event_name }}
+      REPOSITORY: ${{ github.repository }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
+      COSIGN_YES: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-sbom-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-artifacts
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-security-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-reports
+      - name: Install checksum-verified signing tools
+        run: |
+          mkdir -m 0700 -- "$TOOLS_DIR" "$EVIDENCE_DIR"
+          ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
+      - name: Keylessly sign every first-party binary digest
+        run: |
+          for binary in api mcp scheduler worker; do
+            subject="$ARTIFACT_DIR/${binary}_${VERSION}_linux_amd64"
+            "$TOOLS_DIR/cosign" sign-blob --yes --bundle "${subject}.sigstore.json" "$subject"
+          done
+      - name: Generate GitHub-hosted SLSA provenance for all exact binaries
+        id: github_attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ runner.temp }}/torgnexa-release-artifacts/*_linux_amd64
+      - name: Verify both keyless signature paths before evidence assembly
+        env:
+          GITHUB_ATTESTATION: ${{ steps.github_attest.outputs.bundle-path }}
+        run: |
+          issuer=https://token.actions.githubusercontent.com
+          identity="https://github.com/$REPOSITORY/.github/workflows/release.yml@$RELEASE_REF"
+          attestation_sha=$(sha256sum -- "$GITHUB_ATTESTATION")
+          attestation_sha=${attestation_sha%% *}
+          verified_subjects=$(mktemp "$ARTIFACT_DIR/.verified-subjects.XXXXXX")
+          : >"$verified_subjects"
+          for binary in api mcp scheduler worker; do
+            subject="$ARTIFACT_DIR/${binary}_${VERSION}_linux_amd64"
+            signature_bundle="${subject}.sigstore.json"
+            "$TOOLS_DIR/cosign" verify-blob \
+              --bundle "$signature_bundle" \
+              --certificate-identity "$identity" \
+              --certificate-oidc-issuer "$issuer" \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              --certificate-github-workflow-ref "$RELEASE_REF" \
+              --certificate-github-workflow-sha "$SOURCE_REVISION" \
+              --certificate-github-workflow-trigger "$EVENT_NAME" \
+              "$subject"
+            "$TOOLS_DIR/cosign" verify-blob-attestation \
+              --bundle "$GITHUB_ATTESTATION" \
+              --type slsaprovenance1 \
+              --certificate-identity "$identity" \
+              --certificate-oidc-issuer "$issuer" \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              --certificate-github-workflow-ref "$RELEASE_REF" \
+              --certificate-github-workflow-sha "$SOURCE_REVISION" \
+              --certificate-github-workflow-trigger "$EVENT_NAME" \
+              "$subject"
+            subject_sha=$(sha256sum -- "$subject")
+            subject_sha=${subject_sha%% *}
+            signature_sha=$(sha256sum -- "$signature_bundle")
+            signature_sha=${signature_sha%% *}
+            jq -cn --arg name "$binary" --arg sha "$subject_sha" --arg signature_sha "$signature_sha" \
+              '{name: $name, sha256: $sha, signature_bundle_sha256: $signature_sha, signature_verified: true, github_attestation_verified: true}' \
+              >>"$verified_subjects"
+          done
+          jq -s \
+            --arg repository "$REPOSITORY" --arg revision "$SOURCE_REVISION" --arg ref "$RELEASE_REF" \
+            --arg workflow .github/workflows/release.yml --arg event_name "$EVENT_NAME" \
+            --arg issuer "$issuer" --arg identity "$identity" --arg attestation_sha "$attestation_sha" \
+            '{version: 1, status: "pass", repository: $repository, source_revision: $revision, ref: $ref, workflow: $workflow, event_name: $event_name, issuer: $issuer, certificate_identity: $identity, github_attestation_sha256: $attestation_sha, subjects: .}' \
+            "$verified_subjects" >"$ARTIFACT_DIR/external-verification.json"
+          rm -f -- "$verified_subjects"
+      - name: Assemble and structurally validate the self-contained evidence
+        env:
+          GITHUB_ATTESTATION: ${{ steps.github_attest.outputs.bundle-path }}
+          EXTERNAL_VERIFICATION: ${{ runner.temp }}/torgnexa-release-artifacts/external-verification.json
+        run: |
+          ./scripts/generate-release-evidence.sh \
+            --mode "$MODE" \
+            --version "$VERSION" \
+            --source-revision "$SOURCE_REVISION" \
+            --repository "$REPOSITORY" \
+            --ref "$RELEASE_REF" \
+            --workflow .github/workflows/release.yml \
+            --workflow-run-id "$WORKFLOW_RUN_ID" \
+            --workflow-run-url "$WORKFLOW_RUN_URL" \
+            --artifact-dir "$ARTIFACT_DIR" \
+            --report-dir "$REPORT_DIR" \
+            --evidence-dir "$EVIDENCE_DIR" \
+            --github-attestation "$GITHUB_ATTESTATION" \
+            --external-verification "$EXTERNAL_VERIFICATION"
+      - name: Retain signatures, provenance, and complete evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+  verify:
+    needs: [attest, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      public_ready: ${{ steps.ready.outputs.public_ready }}
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
+      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+      MODE: ${{ needs.build.outputs.mode }}
+      VERSION: ${{ needs.build.outputs.version }}
+      EXPECTED_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}
+      EXPECTED_ISSUER: https://token.actions.githubusercontent.com
+      EVENT_NAME: ${{ needs.build.outputs.event_name }}
+      REPOSITORY: ${{ github.repository }}
+      RELEASE_REF: ${{ needs.build.outputs.release_ref }}
+      SOURCE_REVISION: ${{ needs.build.outputs.revision }}
+      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-evidence
+      - name: Install checksum-verified verification tools
+        run: |
+          mkdir -m 0700 -- "$TOOLS_DIR"
+          ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
+      - name: Verify evidence structure and exact OIDC identity
+        run: |
+          go -C tools/contractcheck run ./cmd/releasecheck -root "$EVIDENCE_DIR" -manifest evidence.json -mode "$MODE"
+          for binary in api mcp scheduler worker; do
+            subject="$EVIDENCE_DIR/artifacts/${binary}_${VERSION}_linux_amd64"
+            "$TOOLS_DIR/cosign" verify-blob \
+              --bundle "$EVIDENCE_DIR/signatures/${binary}.sigstore.json" \
+              --certificate-identity "$EXPECTED_IDENTITY" \
+              --certificate-oidc-issuer "$EXPECTED_ISSUER" \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              --certificate-github-workflow-ref "$RELEASE_REF" \
+              --certificate-github-workflow-sha "$SOURCE_REVISION" \
+              --certificate-github-workflow-trigger "$EVENT_NAME" \
+              "$subject"
+            "$TOOLS_DIR/cosign" verify-blob-attestation \
+              --bundle "$EVIDENCE_DIR/attestations/github-attestation.json" \
+              --type slsaprovenance1 \
+              --certificate-identity "$EXPECTED_IDENTITY" \
+              --certificate-oidc-issuer "$EXPECTED_ISSUER" \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              --certificate-github-workflow-ref "$RELEASE_REF" \
+              --certificate-github-workflow-sha "$SOURCE_REVISION" \
+              --certificate-github-workflow-trigger "$EVENT_NAME" \
+              "$subject"
+          done
+      - name: Expose fail-closed publication state
+        id: ready
+        run: |
+          public_ready=$(jq -r '.release.public_ready' "$EVIDENCE_DIR/evidence.json")
+          [[ "$public_ready" == true || "$public_ready" == false ]]
+          printf 'public_ready=%s\n' "$public_ready" >>"$GITHUB_OUTPUT"
+
+  publish:
+    if: needs.verify.outputs.public_ready == 'true' && github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release-publication
+    permissions:
+      contents: write
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-release-evidence
+      - name: Stage verified bytes as a non-public GitHub Release draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/stage-github-release.sh

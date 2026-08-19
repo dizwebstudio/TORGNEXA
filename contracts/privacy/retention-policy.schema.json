@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/privacy/retention-policy.json",
+  "title": "TORGNEXA Privacy Retention Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "organization_id",
+    "workspace_id",
+    "purpose_key",
+    "data_class",
+    "retention_days",
+    "disposition",
+    "legal_hold_permitted",
+    "status",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "organization_id": { "$ref": "#/$defs/sortable_id" },
+    "workspace_id": { "$ref": "#/$defs/sortable_id" },
+    "purpose_key": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,62}$" },
+    "data_class": { "$ref": "#/$defs/data_class" },
+    "retention_days": { "type": "integer", "minimum": 1, "maximum": 36500 },
+    "disposition": { "type": "string", "enum": ["delete", "anonymize", "archive_then_delete", "manual_review"] },
+    "legal_hold_permitted": { "type": "boolean" },
+    "status": { "type": "string", "enum": ["active", "retired"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "data_class": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "personal", "sensitive_operational", "secret"]
+    },
+    "sortable_id": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        { "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" }
+      ]
+    }
+  }
+}

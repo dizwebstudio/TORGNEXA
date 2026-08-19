@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fx-rate-published-v1.json",
+  "title": "finance.fx_rate.published.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "source"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "quote_currency": {
+      "type": "string"
+    },
+    "rate": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

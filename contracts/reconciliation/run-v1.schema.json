@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/reconciliation/run-v1.json",
+  "title": "ReconciliationRunV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id","policy_id","mode","status","cursor","scanned_count","drift_count","version","started_at","updated_at"],
+  "properties": {
+    "id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "policy_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "mode": {"enum":["incremental","scheduled_full","on_demand"]},
+    "trigger_ref": {"type":"string","minLength":1,"maxLength":128},
+    "status": {"enum":["running","interrupted","completed"]},
+    "cursor": {"type":"string","maxLength":1024},
+    "scanned_count": {"type":"integer","minimum":0},
+    "drift_count": {"type":"integer","minimum":0},
+    "version": {"type":"integer","minimum":1},
+    "started_at": {"type":"string","format":"date-time"},
+    "updated_at": {"type":"string","format":"date-time"},
+    "completed_at": {"type":"string","format":"date-time"}
+  }
+}

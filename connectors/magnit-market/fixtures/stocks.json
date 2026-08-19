@@ -1,0 +1,6 @@
+{
+  "result": [
+    {"seller_sku_id": "MAG-RED-M", "sku_id": 2001, "stock_info_details": [{"reserved": 2, "stock": 10, "type": "FBS"}, {"reserved": 1, "stock": 20, "type": "FBO"}]},
+    {"seller_sku_id": "MAG-BLUE-L", "sku_id": 2002, "stock_info_details": [{"reserved": 1, "stock": 4, "type": "FBS"}, {"reserved": 0, "stock": 8, "type": "FBO"}]}
+  ]
+}

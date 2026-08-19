@@ -1,0 +1,5 @@
+{
+  "result": [
+    {"commission_amount": 100.00, "commission_currency_code": "RUB", "commission_percent": 12, "currency_code": "RUB", "old_price": 1099, "price": 899, "seller_sku_id": "MAG-GREEN-S", "sku_id": 2003, "timestamp": "2026-08-10T18:02:00Z"}
+  ]
+}

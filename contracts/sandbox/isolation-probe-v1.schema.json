@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sandbox/isolation-probe-v1.json",
+  "title": "Connector sandbox isolation probe v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["environment_visible", "filesystem_visible", "direct_network_reachable"],
+  "properties": {
+    "environment_visible": {"const": false},
+    "filesystem_visible": {"const": false},
+    "direct_network_reachable": {"const": false}
+  }
+}

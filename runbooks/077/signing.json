@@ -1,0 +1,16 @@
+{
+  "id": "rb-signing",
+  "title": "Signing incident",
+  "trigger_codes": [
+    "signing_failure"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Disable regulated writes that require signing and verify HSM/CSP availability through the isolated signing service.",
+      "validation": "Verify certificate chain, authority and a non-production signing probe.",
+      "rollback": "Restore the previous signing route only after certificate and authority validation.",
+      "evidence": "certificate fingerprint, authority ref and signing audit ids"
+    }
+  ]
+}

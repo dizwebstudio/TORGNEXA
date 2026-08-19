@@ -1,0 +1,8 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/notifications/preference-update-v1.json",
+  "title":"TORGNEXA Notification Preference Update v1",
+  "type":"object","additionalProperties":false,
+  "required":["enabled","min_severity"],
+  "properties":{"enabled":{"type":"boolean"},"min_severity":{"enum":["info","warning","critical"]}}
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/claim-created-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "commerce.claim.created.v1",
+  "required": [
+    "claim_id",
+    "claim_type",
+    "status"
+  ],
+  "properties": {
+    "claim_id": {
+      "type": "string"
+    },
+    "claim_type": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Read docs/46-sre-performance-slo.md and the changed module. Define/update its SLO and load profile, run deterministic performance/failure tests, identify bottlenecks/regressions and report evidence.

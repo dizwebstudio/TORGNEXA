@@ -1,0 +1,902 @@
+{
+  "schema_version": 1,
+  "module_path": "github.com/torgnexa/torgnexa",
+  "frozen_pillars": [
+    "universal-commerce-content-fulfillment-models",
+    "pim-mdm-financial-stock-ledgers",
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning",
+    "developer-surfaces",
+    "russia-compliance-generic-ports",
+    "legal-party-product-compliance-fx",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "impact_areas": [
+    "tenancy",
+    "privacy_data_governance",
+    "api_compatibility",
+    "event_compatibility",
+    "plugin_sdk_compatibility",
+    "database_migration",
+    "security",
+    "approvals_risk",
+    "audit_lineage",
+    "reconciliation_idempotency",
+    "webhooks_egress",
+    "slo_observability",
+    "operations_rollback",
+    "testing_conformance"
+  ],
+  "provider_implementation_roots": [
+    "connectors",
+    "plugins"
+  ],
+  "provider_admission": {
+    "enabled": true,
+    "required_tasks": [
+      "010",
+      "025",
+      "029",
+      "064"
+    ]
+  },
+  "provider_composition_module": "internal/platform/builtinruntime",
+  "core_external_imports": [],
+  "provider_allowed_internal_imports": [
+    "internal/platform/connectors"
+  ],
+  "sensitive_paths": [
+    "architecture/policy.json",
+    "cmd/",
+    "docs/01-architecture.md",
+    "docs/03-module-boundaries.md",
+    "docs/54-architecture-freeze-v1.md",
+    "internal/core/",
+    "internal/platform/"
+  ],
+  "modules": [
+    {
+      "path": "internal/app/api",
+      "kind": "application"
+    },
+    {
+      "path": "internal/app/mcp",
+      "kind": "application"
+    },
+    {
+      "path": "internal/app/worker",
+      "kind": "application"
+    },
+    {
+      "path": "internal/core/catalog",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/compliance",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/inventory",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/legalparty",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/orders",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/pim",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/pricing",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/social",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/tenancy",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/platform/advertising",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/agentgovernance",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/aiadvisory",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/approval",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/architecture",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/audit",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/background",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/backupdr",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/bootstrap",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/builtinruntime",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/claims",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/cloudbilling",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/complianceguard",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/config",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/connectorauth",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/connectorruntime",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/connectors",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/connectors/conformance",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/connectorsandbox",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/connectorsandbox/emulator",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/customerinbox",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/domain",
+      "kind": "shared_types"
+    },
+    {
+      "path": "internal/platform/edo",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/enterpriseiam",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/entitlementguard",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/entitlements",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/eventbus",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/fiscalization",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/fx",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/importexport",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/inbox",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/incidents",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/kafkaeventbus",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/kafkatransport",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/lineage",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/logging",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/logistics",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/marking",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/migration",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/notifications",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/outbox",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/paymentreconciliation",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/payments",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/pluginmarketplace",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/pluginsecurity",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/postgres/agentgovernancerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/aiadvisoryrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/approvalrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/auditrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/backfillrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/catalogimagerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/catalogrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/cloudbillingrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/compliancerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/connectorconfigrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/connectormaprepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/connectorrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/database",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/entitlementrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/fxrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/inboxrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/inventoryrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/legalpartyrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/lineagerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/notificationrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/ordersrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/outboxrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/pimrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/pluginmarketplacerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/pricingrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/privacyrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/reconciliationrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/reportrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/retentionrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/searchrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/secretrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/securitysettingsrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/settlementrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/socialrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/syncrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/tenancyrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/uploadrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/webhookrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/workerrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/privacy",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/procurement",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/promotions",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/pudo",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/reconciliation",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/replenishment",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/reporting",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/retention",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/search",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/secrets",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/securityedge",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/securitysettings",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/settlements",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/siem",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/signing",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/slo",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/sms",
+      "kind": "sdk_port"
+    },
+    {
+      "path": "internal/platform/syncengine",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/uploads",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/vetis",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/webhooks",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/wmsexecution",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/wmsledger",
+      "kind": "platform_capability"
+    }
+  ],
+  "providers": [
+    {
+      "id": "aliexpress-ru",
+      "family": "marketplace",
+      "implementation": "connectors/aliexpress-ru",
+      "manifest": "connectors/aliexpress-ru/manifest.json",
+      "connector_spec": "docs/connectors/aliexpress-ru/spec.md",
+      "capability_audit": "docs/connectors/aliexpress-ru/capability-audit.md",
+      "conformance_plan": "docs/connectors/aliexpress-ru/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "auto-ru",
+      "family": "classified",
+      "implementation": "connectors/auto-ru",
+      "manifest": "connectors/auto-ru/manifest.json",
+      "connector_spec": "docs/connectors/auto-ru/spec.md",
+      "capability_audit": "docs/connectors/auto-ru/capability-audit.md",
+      "conformance_plan": "docs/connectors/auto-ru/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "avito",
+      "family": "classified",
+      "implementation": "connectors/avito",
+      "manifest": "connectors/avito/manifest.json",
+      "connector_spec": "docs/connectors/avito/spec.md",
+      "capability_audit": "docs/connectors/avito/capability-audit.md",
+      "conformance_plan": "docs/connectors/avito/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "bitrix24",
+      "family": "crm",
+      "implementation": "connectors/bitrix24",
+      "manifest": "connectors/bitrix24/manifest.json",
+      "connector_spec": "docs/connectors/bitrix24/spec.md",
+      "capability_audit": "docs/connectors/bitrix24/capability-audit.md",
+      "conformance_plan": "docs/connectors/bitrix24/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "cbr-fx",
+      "family": "fx",
+      "implementation": "connectors/cbr-fx",
+      "manifest": "connectors/cbr-fx/manifest.json",
+      "connector_spec": "docs/connectors/cbr-fx/spec.md",
+      "capability_audit": "docs/connectors/cbr-fx/capability-audit.md",
+      "conformance_plan": "docs/connectors/cbr-fx/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "cdek",
+      "family": "logistics",
+      "implementation": "connectors/cdek",
+      "manifest": "connectors/cdek/manifest.json",
+      "connector_spec": "docs/connectors/cdek/spec.md",
+      "capability_audit": "docs/connectors/cdek/capability-audit.md",
+      "conformance_plan": "docs/connectors/cdek/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "chestny-znak",
+      "family": "government",
+      "implementation": "connectors/chestny-znak",
+      "manifest": "connectors/chestny-znak/manifest.json",
+      "connector_spec": "docs/connectors/chestny-znak/spec.md",
+      "capability_audit": "docs/connectors/chestny-znak/capability-audit.md",
+      "conformance_plan": "docs/connectors/chestny-znak/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "cian",
+      "family": "classified",
+      "implementation": "connectors/cian",
+      "manifest": "connectors/cian/manifest.json",
+      "connector_spec": "docs/connectors/cian/spec.md",
+      "capability_audit": "docs/connectors/cian/capability-audit.md",
+      "conformance_plan": "docs/connectors/cian/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "diadoc",
+      "family": "edo",
+      "implementation": "connectors/diadoc",
+      "manifest": "connectors/diadoc/manifest.json",
+      "connector_spec": "docs/connectors/diadoc/spec.md",
+      "capability_audit": "docs/connectors/diadoc/capability-audit.md",
+      "conformance_plan": "docs/connectors/diadoc/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "egais",
+      "family": "government",
+      "implementation": "connectors/egais",
+      "manifest": "connectors/egais/manifest.json",
+      "connector_spec": "docs/connectors/egais/spec.md",
+      "capability_audit": "docs/connectors/egais/capability-audit.md",
+      "conformance_plan": "docs/connectors/egais/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "gigachat",
+      "family": "ai",
+      "implementation": "connectors/gigachat",
+      "manifest": "connectors/gigachat/manifest.json",
+      "connector_spec": "docs/connectors/gigachat/spec.md",
+      "capability_audit": "docs/connectors/gigachat/capability-audit.md",
+      "conformance_plan": "docs/connectors/gigachat/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "instagram",
+      "family": "social",
+      "implementation": "connectors/instagram",
+      "manifest": "connectors/instagram/manifest.json",
+      "connector_spec": "docs/connectors/instagram/spec.md",
+      "capability_audit": "docs/connectors/instagram/capability-audit.md",
+      "conformance_plan": "docs/connectors/instagram/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "kimi",
+      "family": "ai",
+      "implementation": "connectors/kimi",
+      "manifest": "connectors/kimi/manifest.json",
+      "connector_spec": "docs/connectors/kimi/spec.md",
+      "capability_audit": "docs/connectors/kimi/capability-audit.md",
+      "conformance_plan": "docs/connectors/kimi/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "magnit-market",
+      "family": "marketplace",
+      "implementation": "connectors/magnit-market",
+      "manifest": "connectors/magnit-market/manifest.json",
+      "connector_spec": "docs/connectors/magnit-market/spec.md",
+      "capability_audit": "docs/connectors/magnit-market/capability-audit.md",
+      "conformance_plan": "docs/connectors/magnit-market/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "max-messenger",
+      "family": "social",
+      "implementation": "connectors/max-messenger",
+      "manifest": "connectors/max-messenger/manifest.json",
+      "connector_spec": "docs/connectors/max-messenger/spec.md",
+      "capability_audit": "docs/connectors/max-messenger/capability-audit.md",
+      "conformance_plan": "docs/connectors/max-messenger/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "megamarket",
+      "family": "marketplace",
+      "implementation": "connectors/megamarket",
+      "manifest": "connectors/megamarket/manifest.json",
+      "connector_spec": "docs/connectors/megamarket/spec.md",
+      "capability_audit": "docs/connectors/megamarket/capability-audit.md",
+      "conformance_plan": "docs/connectors/megamarket/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "moysklad",
+      "family": "erp",
+      "implementation": "connectors/moysklad",
+      "manifest": "connectors/moysklad/manifest.json",
+      "connector_spec": "docs/connectors/moysklad/spec.md",
+      "capability_audit": "docs/connectors/moysklad/capability-audit.md",
+      "conformance_plan": "docs/connectors/moysklad/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "odnoklassniki",
+      "family": "social",
+      "implementation": "connectors/odnoklassniki",
+      "manifest": "connectors/odnoklassniki/manifest.json",
+      "connector_spec": "docs/connectors/odnoklassniki/spec.md",
+      "capability_audit": "docs/connectors/odnoklassniki/capability-audit.md",
+      "conformance_plan": "docs/connectors/odnoklassniki/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "onec",
+      "family": "erp",
+      "implementation": "connectors/onec",
+      "manifest": "connectors/onec/manifest.json",
+      "connector_spec": "docs/connectors/onec/spec.md",
+      "capability_audit": "docs/connectors/onec/capability-audit.md",
+      "conformance_plan": "docs/connectors/onec/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "openai-compatible",
+      "family": "ai",
+      "implementation": "connectors/openai-compatible",
+      "manifest": "connectors/openai-compatible/manifest.json",
+      "connector_spec": "docs/connectors/openai-compatible/spec.md",
+      "capability_audit": "docs/connectors/openai-compatible/capability-audit.md",
+      "conformance_plan": "docs/connectors/openai-compatible/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "opencart",
+      "family": "storefront",
+      "implementation": "connectors/opencart",
+      "manifest": "connectors/opencart/manifest.json",
+      "connector_spec": "docs/connectors/opencart/spec.md",
+      "capability_audit": "docs/connectors/opencart/capability-audit.md",
+      "conformance_plan": "docs/connectors/opencart/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "ozon",
+      "family": "marketplace",
+      "implementation": "connectors/ozon",
+      "manifest": "connectors/ozon/manifest.json",
+      "connector_spec": "docs/connectors/ozon/spec.md",
+      "capability_audit": "docs/connectors/ozon/capability-audit.md",
+      "conformance_plan": "docs/connectors/ozon/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "prestashop",
+      "family": "storefront",
+      "implementation": "connectors/prestashop",
+      "manifest": "connectors/prestashop/manifest.json",
+      "connector_spec": "docs/connectors/prestashop/spec.md",
+      "capability_audit": "docs/connectors/prestashop/capability-audit.md",
+      "conformance_plan": "docs/connectors/prestashop/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "rutube",
+      "family": "social",
+      "implementation": "connectors/rutube",
+      "manifest": "connectors/rutube/manifest.json",
+      "connector_spec": "docs/connectors/rutube/spec.md",
+      "capability_audit": "docs/connectors/rutube/capability-audit.md",
+      "conformance_plan": "docs/connectors/rutube/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "saby-edo",
+      "family": "edo",
+      "implementation": "connectors/saby-edo",
+      "manifest": "connectors/saby-edo/manifest.json",
+      "connector_spec": "docs/connectors/saby-edo/spec.md",
+      "capability_audit": "docs/connectors/saby-edo/capability-audit.md",
+      "conformance_plan": "docs/connectors/saby-edo/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "sbp",
+      "family": "payment",
+      "implementation": "connectors/sbp",
+      "manifest": "connectors/sbp/manifest.json",
+      "connector_spec": "docs/connectors/sbp/spec.md",
+      "capability_audit": "docs/connectors/sbp/capability-audit.md",
+      "conformance_plan": "docs/connectors/sbp/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "telegram",
+      "family": "social",
+      "implementation": "connectors/telegram",
+      "manifest": "connectors/telegram/manifest.json",
+      "connector_spec": "docs/connectors/telegram/spec.md",
+      "capability_audit": "docs/connectors/telegram/capability-audit.md",
+      "conformance_plan": "docs/connectors/telegram/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "threads",
+      "family": "social",
+      "implementation": "connectors/threads",
+      "manifest": "connectors/threads/manifest.json",
+      "connector_spec": "docs/connectors/threads/spec.md",
+      "capability_audit": "docs/connectors/threads/capability-audit.md",
+      "conformance_plan": "docs/connectors/threads/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "vetis-mercury",
+      "family": "government",
+      "implementation": "connectors/vetis-mercury",
+      "manifest": "connectors/vetis-mercury/manifest.json",
+      "connector_spec": "docs/connectors/vetis-mercury/spec.md",
+      "capability_audit": "docs/connectors/vetis-mercury/capability-audit.md",
+      "conformance_plan": "docs/connectors/vetis-mercury/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "vk",
+      "family": "social",
+      "implementation": "connectors/vk",
+      "manifest": "connectors/vk/manifest.json",
+      "connector_spec": "docs/connectors/vk/spec.md",
+      "capability_audit": "docs/connectors/vk/capability-audit.md",
+      "conformance_plan": "docs/connectors/vk/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "wildberries",
+      "family": "marketplace",
+      "implementation": "connectors/wildberries",
+      "manifest": "connectors/wildberries/manifest.json",
+      "connector_spec": "docs/connectors/wildberries/spec.md",
+      "capability_audit": "docs/connectors/wildberries/capability-audit.md",
+      "conformance_plan": "docs/connectors/wildberries/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "woocommerce",
+      "family": "storefront",
+      "implementation": "connectors/woocommerce",
+      "manifest": "connectors/woocommerce/manifest.json",
+      "connector_spec": "docs/connectors/woocommerce/spec.md",
+      "capability_audit": "docs/connectors/woocommerce/capability-audit.md",
+      "conformance_plan": "docs/connectors/woocommerce/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "yandex-market",
+      "family": "marketplace",
+      "implementation": "connectors/yandex-market",
+      "manifest": "connectors/yandex-market/manifest.json",
+      "connector_spec": "docs/connectors/yandex-market/spec.md",
+      "capability_audit": "docs/connectors/yandex-market/capability-audit.md",
+      "conformance_plan": "docs/connectors/yandex-market/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "yandexgpt",
+      "family": "ai",
+      "implementation": "connectors/yandexgpt",
+      "manifest": "connectors/yandexgpt/manifest.json",
+      "connector_spec": "docs/connectors/yandexgpt/spec.md",
+      "capability_audit": "docs/connectors/yandexgpt/capability-audit.md",
+      "conformance_plan": "docs/connectors/yandexgpt/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "yookassa",
+      "family": "payment",
+      "implementation": "connectors/yookassa",
+      "manifest": "connectors/yookassa/manifest.json",
+      "connector_spec": "docs/connectors/yookassa/spec.md",
+      "capability_audit": "docs/connectors/yookassa/capability-audit.md",
+      "conformance_plan": "docs/connectors/yookassa/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "youtube",
+      "family": "social",
+      "implementation": "connectors/youtube",
+      "manifest": "connectors/youtube/manifest.json",
+      "connector_spec": "docs/connectors/youtube/spec.md",
+      "capability_audit": "docs/connectors/youtube/capability-audit.md",
+      "conformance_plan": "docs/connectors/youtube/conformance-plan.md",
+      "allowed_external_imports": []
+    }
+  ],
+  "retired_providers": []
+}

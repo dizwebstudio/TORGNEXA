@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/ai/agent-provenance-v1.json",
+  "title": "TORGNEXA AI agent tool provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "model_id", "run_id", "integration_id", "correlation_id", "tool", "action", "policy_id", "policy_version", "risk", "context_trust", "output_kind", "ai_generated"],
+  "properties": {
+    "agent_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "model_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "integration_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "correlation_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "tool": {"type": "string", "minLength": 1, "maxLength": 160},
+    "action": {"type": "string", "minLength": 1, "maxLength": 200},
+    "policy_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "policy_version": {"type": "integer", "minimum": 1},
+    "risk": {"type": "string", "enum": ["read", "safe_write", "sensitive_write", "prohibited"]},
+    "context_trust": {"type": "string", "enum": ["trusted_system", "user_input", "untrusted_external", "model_generated"]},
+    "output_kind": {"type": "string", "enum": ["source_facts", "governance_workflow", "ai_recommendation"]},
+    "ai_generated": {"type": "boolean"}
+  }
+}

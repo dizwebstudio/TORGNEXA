@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/reconciliation/drift-v1.json",
+  "title": "ReconciliationDriftV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id","run_id","policy_id","kind","mapping_local_count","mapping_remote_count","detected_at","status","recommended_action","version"],
+  "properties": {
+    "id": {"type":"string","pattern":"^rcd_[0-9a-f]{32}$"},
+    "run_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "policy_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "kind": {"enum":["content_drift","missing_mapping","orphan_mapping","duplicate_mapping","status_mismatch","stale_connector"]},
+    "local_entity_id": {"type":"string","minLength":1,"maxLength":128},
+    "remote_id": {"type":"string","minLength":1,"maxLength":512},
+    "local_fingerprint": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "remote_fingerprint": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "local_status": {"type":"string","minLength":1,"maxLength":64},
+    "remote_status": {"type":"string","minLength":1,"maxLength":64},
+    "local_version": {"type":"integer","minimum":0},
+    "remote_revision": {"type":"string","minLength":1,"maxLength":256},
+    "mapping_local_count": {"type":"integer","minimum":0,"maximum":1000},
+    "mapping_remote_count": {"type":"integer","minimum":0,"maximum":1000},
+    "detected_at": {"type":"string","format":"date-time"},
+    "status": {"enum":["open","auto_fixed","notified","approval_pending","ignored"]},
+    "recommended_action": {"enum":["none","auto_fix","notify","approval","ignore"]},
+    "version": {"type":"integer","minimum":1},
+    "resolved_at": {"type":"string","format":"date-time"}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/counterparty-updated-v1.json",
+  "title": "party.counterparty.updated.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "counterparty_id",
+    "changed_fields"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "counterparty_id": {
+      "type": "string"
+    },
+    "changed_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

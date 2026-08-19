@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/catalog/connector-entity-mapping-v3.json",
+  "title":"TORGNEXA Connector Entity Mapping v3",
+  "type":"object","additionalProperties":false,
+  "required":["organization_id","workspace_id","connector_account_id","entity_type","local_entity_id","remote_id","version","created_at","updated_at"],
+  "properties":{
+    "organization_id":{"type":"string","minLength":1,"maxLength":36},"workspace_id":{"type":"string","minLength":1,"maxLength":36},"connector_account_id":{"type":"string","minLength":1,"maxLength":128},
+    "entity_type":{"enum":["product","offer","order","brand","category","attribute"]},"local_entity_id":{"type":"string","minLength":1,"maxLength":36},"remote_id":{"type":"string","minLength":1,"maxLength":512},"version":{"type":"integer","minimum":1},
+    "created_at":{"type":"string","format":"date-time","pattern":"Z$"},"updated_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  },
+  "description":"Additive v3 mapping contract adds canonical Brand, Category and Attribute identities without provider-specific fields in Core."
+}

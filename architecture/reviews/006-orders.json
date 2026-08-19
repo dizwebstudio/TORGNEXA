@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-006",
+  "task": "006",
+  "change_class": "new_domain",
+  "summary": "Implement provider-neutral immutable Order/OrderItem snapshots, normalized lifecycle, exact money/quantity/tax facts, generic external order mapping, optimistic concurrency, and atomic audit + transactional-outbox intent without provider statuses in Core.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "contracts/catalog/connector-entity-mapping-v2.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/order-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/orders/order-item.schema.json",
+    "contracts/orders/order.schema.json",
+    "docs/02-domain-model.md",
+    "docs/05-database.md",
+    "docs/migrations/000011-orders.md",
+    "internal/core/orders/orders.go",
+    "internal/core/orders/orders_test.go",
+    "internal/platform/connectors/mapping.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/connectormaprepo/repository.go",
+    "internal/platform/postgres/ordersrepo/migration_test.go",
+    "internal/platform/postgres/ordersrepo/repository.go",
+    "internal/platform/postgres/ordersrepo/repository_test.go",
+    "migrations/000011_orders.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/006-orders.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0022-i18n-money-tax.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "extend_existing_capability"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Orders and OrderItems carry organization/workspace ownership, composite tenant foreign keys, forced RLS, and tenant-scoped repository transactions."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Task 006 deliberately stores no customer PII/address in the baseline aggregate; audit/events contain commerce identifiers and totals only."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "New Draft 2020-12 Order/OrderItem contracts establish provider-neutral v1 shapes; the legacy order_created.v1 contract is left untouched."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "New commerce.orders.order_changed.v1 is additive and emitted through Task-008 Transactional Outbox; existing order_created.v1 is retained unchanged."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Provider status translation and remote order IDs remain connector concerns; generic connector_entity_mappings is broadened only to entity_type=order."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Atomic expand migration 000011 adds immutable order snapshots/RLS/totals guards and broadens the mapping type constraint without rewriting earlier migration files."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Immutable commercial snapshots, exact non-negative money, positive exact quantities, tax bounds, lifecycle triggers, tenant FKs and hard-delete blockers fail closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 006 records canonical order state; provider-facing writes remain behind later connector approval/dry-run boundaries."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Create/status transitions append immutable Task-003 audit records in the same SQL transaction as order state and outbox intent."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Stable order IDs, optimistic versions, immutable item snapshots and generic remote mappings provide deterministic inputs for Tasks 013/014; Inbox remains consumer duplicate protection."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook surface is introduced."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Versioned order_changed events and bounded audit summaries expose lifecycle mutation signals without provider payloads or PII."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration 000011 is additive; rollback disables new order writers while retaining immutable order/audit/outbox history."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit/migration/contract/rehearsal tests cover lifecycle, exact totals, tax inclusion, provider neutrality, mapping expansion, RLS and restore paths."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "011",
+    "012",
+    "013",
+    "014",
+    "056",
+    "076"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-092B",
+  "task": "092",
+  "stage": "b",
+  "change_class": "pillar_change",
+  "summary": "Closes the production API composition HIGH finding by forcing all non-health routes through edge validation, authentication, canonical tenant resolution and authorization with no public-route bypass flag.",
+  "scopes": [
+    ".env.example",
+    "SECURITY_HIGH_BLOCKERS_CLOSURE.md",
+    "adr/0083-production-api-security-composition.md",
+    "architecture/reviews/092b-production-api-security-composition.json",
+    "docs/security/production-api-security-composition.md",
+    "internal/app/api",
+    "internal/platform/config/config.go",
+    "internal/platform/config/config_test.go"
+  ],
+  "frozen_pillars": [
+    "privacy-secrets-security-governance",
+    "developer-surfaces",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "adr": "adr/0083-production-api-security-composition.md",
+  "existing_adrs": [
+    "adr/0034-security-edge-contract.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0076-final-enterprise-iam-federation-with-explicit-authorization-mapping.md",
+    "adr/0082-final-vendor-neutral-security-edge-contract.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Private handlers receive a validated organization/workspace scope only after the authenticated principal is resolved through TenantResolver and authorized."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Raw bearer credentials and unbounded IdP claims are not copied to request context; only a minimized principal and canonical scope are propagated."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "The existing public health operation is unchanged; unmounted feature handlers remain unavailable rather than being exposed without security composition."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Trusted-proxy validation, bounded rate limiting, origin/CSRF policy and headers wrap routing; private route startup requires Authenticator, TenantResolver and Authorizer and there is no custom-public flag."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Admin-only route descriptors add validated client-IP allowlisting on top of application authorization."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "The composition preserves minimized identity/scope/client-IP context for downstream audit without propagating bearer tokens."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "This hardening supplement does not alter this contract area."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Health remains public and edge-protected; auth failures remain bounded HTTP outcomes suitable for operational metrics without secret logging."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "No database or external contract migration is required; routes can remain unmounted while security adapters are qualified."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit and race tests cover missing dependency startup failure, authn/tenant/authz fail-closed stages, spoofed forwarding, origins, body bounds and exported-handler drift."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

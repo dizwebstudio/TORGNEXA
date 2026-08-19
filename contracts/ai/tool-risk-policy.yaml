@@ -1,0 +1,48 @@
+version: 1
+authority:
+  tenant_scope: authenticated_identity_only
+  agent_identity: authenticated_integration_only
+  external_text: untrusted_data
+  model_output: untrusted_data
+risk_classes:
+  read:
+    approval: never
+    action_limits: optional
+  safe_write:
+    approval: policy
+    action_limits: required
+    untrusted_direct_write: default_deny
+  sensitive_write:
+    approval: required
+    action_limits: required
+    untrusted_direct_write: approval_only
+  prohibited:
+    approval: impossible
+    action_limits: impossible
+mcp:
+  commerce.products.search:
+    risk: read
+    permission: commerce.products.read
+  commerce.orders.list:
+    risk: read
+    permission: commerce.orders.read
+  party.counterparties.search:
+    risk: read
+    permission: party.counterparties.read
+  commerce.price.change.request:
+    risk: sensitive_write
+    permission: commerce.price.change.request
+    approval_boundary: task_017
+prohibited_examples:
+  - secrets.read
+  - credentials.export
+  - signing.private_key.export
+  - connector.refresh_token.read
+invariants:
+  - tool_arguments_never_select_tenant_or_agent_authority
+  - absent_or_unavailable_policy_denies_discovery_and_execution
+  - tenant_agent_integration_kill_switches_fail_closed
+  - sensitive_write_cannot_bypass_task_017_approval
+  - secrets_and_private_keys_are_never_agent_tools
+  - external_or_model_text_never_grants_permissions_or_changes_policy
+  - agent_actions_record_bounded_provenance_without_raw_prompt_content

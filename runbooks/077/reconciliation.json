@@ -1,0 +1,16 @@
+{
+  "id": "rb-reconciliation",
+  "title": "Reconciliation incident",
+  "trigger_codes": [
+    "reconciliation_drift"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Stop automatic corrective writes and run read-only remote comparison.",
+      "validation": "Validate authoritative remote state and local evidence references.",
+      "rollback": "Restore previous reconciliation policy without rewriting remote history.",
+      "evidence": "drift case ids, remote observations and decision evidence"
+    }
+  ]
+}

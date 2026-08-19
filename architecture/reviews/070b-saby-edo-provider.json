@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-070B",
+  "task": "070",
+  "change_class": "mixed",
+  "summary": "Adds the second baseline EDO provider, Saby EDO, against the same provider-neutral signed-document/status contract and Task-064 admission boundary.",
+  "scopes": [
+    "architecture/policy.json",
+    "architecture/reviews/070b-saby-edo-provider.json",
+    "connectors/saby-edo",
+    "docs/connectors/saby-edo",
+    "tasks/issues/070-edo-connector-sdk-providers.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "workflow-approval-audit-lineage",
+    "russia-compliance-generic-ports"
+  ],
+  "adr": "adr/0068-provider-neutral-edo.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "All durable operational data is organization/workspace scoped and new PostgreSQL tables use forced RLS; global provider manifests contain no tenant payload."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Sensitive credentials remain behind SecretAccessor/isolated ports; marking codes/card data/private keys are not persisted in generic evidence."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No existing public HTTP/OpenAPI operation is removed or changed; the task is internal/additive connector/domain capability work."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No existing EventBus schema is removed or changed; new evidence/state is persisted through additive domain contracts."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK root Connector/Runtime remain frozen; only additive capability-specific interfaces/types are introduced where required."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand-only migration migrations/000043_edo_connector_sdk_providers.sql adds tenant-scoped state/evidence without destructive changes."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider code has no direct Core/SQL authority, production networking is host-injected, credentials stay opaque and regulated writes fail closed where applicable."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Regulated signing/VetIS/EDO workflows require explicit approval or signed artifact evidence; non-applicable read-only paths cannot escalate into writes."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Append-only status/signing/fiscal/payment/tracking/event evidence preserves remote references, timestamps and correlation without uncontrolled payload copies."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Idempotency keys, remote authoritative status and replay-safe evidence prevent duplicate side effects and local state from overriding provider state."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "No arbitrary egress is granted; payment callbacks require verification and replay evidence, while other adapters use typed host transports."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Normalized remote errors/status and bounded timestamps provide measurable availability/lag without logging credentials or sensitive payloads."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Additive migrations/tables can remain during binary rollback; providers can be disabled without rewriting immutable evidence."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover task invariants; admitted providers include deterministic Task-064 13-check reports and final repository gates are required."
+    }
+  ],
+  "provider": {
+    "id": "saby-edo",
+    "route": "connector_sdk",
+    "manifest": "connectors/saby-edo/manifest.json",
+    "connector_spec": "docs/connectors/saby-edo/spec.md",
+    "capability_audit": "docs/connectors/saby-edo/capability-audit.md",
+    "conformance_plan": "docs/connectors/saby-edo/conformance-plan.md"
+  },
+  "follow_up_tasks": [
+    "083"
+  ],
+  "stage": "b"
+}

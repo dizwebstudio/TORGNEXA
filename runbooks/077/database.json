@@ -1,0 +1,16 @@
+{
+  "id": "rb-database",
+  "title": "Database incident",
+  "trigger_codes": [
+    "db_unavailable"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Validate primary/replica health and fail over only to a reviewed healthy replica.",
+      "validation": "Check connection, write probe and replication position.",
+      "rollback": "Restore previous routing after health validation.",
+      "evidence": "timeline, topology snapshot and probe results"
+    }
+  ]
+}

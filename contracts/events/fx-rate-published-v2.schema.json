@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fx-rate-published-v2.json",
+  "title": "finance.fx_rate.published.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "rate_fact_id",
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "source",
+    "rate_type",
+    "observed_at",
+    "effective_at"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "rate_fact_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "base_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "quote_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "rate": {"type": "string", "pattern": "^(?:[1-9][0-9]*(?:\\.[0-9]{1,9})?|0\\.[0-9]{0,8}[1-9])$"},
+    "source": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+    "source_reference": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"},
+    "rate_type": {"enum": ["official", "mid", "bid", "ask", "closing", "indicative"]},
+    "observed_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "effective_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "$comment": "Additive v2 event contract. Existing finance.fx_rate.published.v1 remains immutable; Task 089b may publish v2 only after immutable storage is implemented."
+}

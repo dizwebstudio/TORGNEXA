@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/audit/audit-record.json",
+  "title": "TORGNEXA Audit Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "organization_id",
+    "workspace_id",
+    "actor_id",
+    "source",
+    "action",
+    "resource_type",
+    "resource_id",
+    "correlation_id",
+    "risk",
+    "summary",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "$ref": "#/$defs/sortable_id" },
+    "organization_id": { "$ref": "#/$defs/sortable_id" },
+    "workspace_id": { "$ref": "#/$defs/sortable_id" },
+    "actor_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "source": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$" },
+    "action": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$" },
+    "resource_type": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$" },
+    "resource_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "correlation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "risk": {
+      "type": "string",
+      "enum": ["read", "write_safe", "write_sensitive", "legally_significant"]
+    },
+    "summary": {
+      "type": "object",
+      "description": "Bounded redacted before/after or decision metadata. Raw Authorization headers, credentials, secrets, private keys, and full request/response payloads are forbidden.",
+      "maxProperties": 256
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sortable_id": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        { "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" }
+      ]
+    }
+  }
+}

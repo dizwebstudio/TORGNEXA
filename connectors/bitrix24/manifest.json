@@ -1,0 +1,11 @@
+{
+  "id": "bitrix24",
+  "name": "Bitrix24 CRM",
+  "family": "crm",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["crm.entities.read", "crm.entities.write", "crm.productrows.read", "crm.productrows.write"],
+  "auth": [{"kind": "oauth2", "secret_class": "crm.oauth-token", "required": true, "oauth2": {"grant_type": "authorization_code", "authorization_url": "https://oauth.bitrix.info/oauth/authorize/", "token_url": "https://oauth.bitrix.info/oauth/token/", "scopes": ["crm"], "client_auth_method": "client_secret_post"}}],
+  "connection_test": {"url": "https://oauth.bitrix.info/rest/app.info.json", "method": "GET", "headers": {"Authorization": "Bearer ${access_token}"}},
+  "rate_limit": {"max_concurrency": 2, "min_interval_ms": 250, "request_timeout_ms": 30000, "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}}
+}

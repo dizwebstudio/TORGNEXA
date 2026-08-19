@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-094",
+  "task": "094",
+  "change_class": "mixed",
+  "summary": "Admit WooCommerce as a bidirectional storefront provider and add reusable typed commerce write/return/webhook SDK-v1 surfaces without changing frozen Connector/Runtime roots.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "README.md",
+    "VALIDATION_REPORT.md",
+    "adr/0086-woocommerce-storefront-as-bidirectional-commerce-provider.md",
+    "architecture/policy.json",
+    "architecture/reviews/094-woocommerce-connector.json",
+    "connectors/woocommerce/config.go",
+    "connectors/woocommerce/conformance.go",
+    "connectors/woocommerce/connector.go",
+    "connectors/woocommerce/connector_test.go",
+    "connectors/woocommerce/cursor.go",
+    "connectors/woocommerce/inventory.go",
+    "connectors/woocommerce/manifest.json",
+    "connectors/woocommerce/numbers.go",
+    "connectors/woocommerce/orders.go",
+    "connectors/woocommerce/prices.go",
+    "connectors/woocommerce/products.go",
+    "connectors/woocommerce/remote.go",
+    "connectors/woocommerce/returns.go",
+    "connectors/woocommerce/target.go",
+    "connectors/woocommerce/webhook.go",
+    "connectors/woocommerce/write.go",
+    "contracts/operations/094-woocommerce-connector-v1.md",
+    "docs/connectors/woocommerce/README.md",
+    "docs/connectors/woocommerce/capability-audit.md",
+    "docs/connectors/woocommerce/conformance-plan.md",
+    "docs/connectors/woocommerce/conformance-report.json",
+    "docs/connectors/woocommerce/reconciliation.md",
+    "docs/connectors/woocommerce/spec.md",
+    "internal/platform/connectors/commerce.go",
+    "internal/platform/connectors/commerce_returns.go",
+    "internal/platform/connectors/commerce_webhook.go",
+    "internal/platform/connectors/commerce_write.go",
+    "internal/platform/connectors/commerce_write_test.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/094-woocommerce-connector.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0086-woocommerce-storefront-as-bidirectional-commerce-provider.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0016-connector-conformance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0045-product-compliance-enforcement.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "WooCommerce account configuration and mappings remain organization/workspace scoped; no tenant selector enters provider payloads."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Order projection intentionally excludes Woo billing/shipping/customer identity fields; credentials remain behind SecretAccessor."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "No public TORGNEXA REST operation changes; Connector SDK changes are additive typed interfaces only."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "No canonical event schema changes; Woo webhooks enter existing inbox/sync boundaries after verification."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Frozen Connector/Runtime roots are unchanged; commerce write, return and webhook interfaces are additive SDK-v1 capability surfaces."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "No database schema migration is required; Task-010 mappings and existing inbox/reconciliation persistence remain authoritative."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Store host/base path are constrained, query-string credentials are forbidden, webhook HMAC is constant-time verified and ambiguous writes fail closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Host Task-017/082 policy remains mandatory before invoking commerce writes; provider capability does not bypass approvals/compliance."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Write receipts and reconciliation outcomes preserve remote IDs for existing audit/lineage orchestration without storing raw credentials."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "SKU reconciliation protects creates; exact-state writes use read-before/read-after reconciliation; webhook replay uses signed-material identity."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Woo inbound webhooks require expected-topic binding and verified HMAC; provider outbound requests use only configured HTTPS store host."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Provider errors/rate-limit health are normalized through existing Connector SDK SLO surfaces."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Connector admission is additive and can be disabled per account; no schema rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic unit tests and the Task-064 13-check provider report are required and recorded."
+    }
+  ],
+  "provider": {
+    "id": "woocommerce",
+    "route": "connector_sdk",
+    "manifest": "connectors/woocommerce/manifest.json",
+    "connector_spec": "docs/connectors/woocommerce/spec.md",
+    "capability_audit": "docs/connectors/woocommerce/capability-audit.md",
+    "conformance_plan": "docs/connectors/woocommerce/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

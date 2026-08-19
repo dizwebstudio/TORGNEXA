@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-088A",
+  "task": "088",
+  "stage": "a",
+  "change_class": "implementation",
+  "summary": "Implement the first protected stage of the frozen upload-security architecture: opaque UploadID identity, tenant-scoped quarantine metadata and storage ports, transactional quarantine evidence, and a fail-closed released-object access gate that deliberately cannot release content before Task 088b.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/088a-upload-quarantine-foundation.json",
+    "contracts/upload/released-object-ref-v1.md",
+    "contracts/upload/upload-policy.yaml",
+    "docs/62-upload-security-pipeline.md",
+    "docs/migrations/000022-upload-quarantine-foundation.md",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/uploadrepo/migration_test.go",
+    "internal/platform/postgres/uploadrepo/repository.go",
+    "internal/platform/uploads/policy_contract_test.go",
+    "internal/platform/uploads/uploads.go",
+    "internal/platform/uploads/uploads_test.go",
+    "migrations/000022_upload_quarantine_foundation.sql",
+    "migrations/catalog.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/088-upload-security-pipeline.md",
+    "tasks/issues/088a-upload-quarantine-foundation.md",
+    "tools/migrationcheck/task088a_audit_test.go"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0030-upload-quarantine.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0040-split-stage-architecture-evidence.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Upload metadata is keyed by organization/workspace under forced RLS. Quarantine and released object locators are derived from authenticated scope plus UploadID, and AccessGate returns the same not-released boundary for missing and cross-tenant records."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Original filename is treated as bounded untrusted metadata only; raw file bytes stay in object storage and do not enter audit/event payloads. The canonical record retains only storage locator, size, SHA-256 and future evidence identity."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 088a adds no public HTTP operation or generated SDK surface. Task 031 will consume the internal ReleasedObjectRef boundary after this foundation."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "The pre-existing security.upload.quarantined.v1 event is now emitted transactionally when canonical state reaches quarantined; its versioned contract is not renamed or removed."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK/provider admission contracts are unchanged; upload storage ports remain host platform capability and no provider-specific object-store type enters Core or SDK."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000022 adds the forced-RLS uploads table, exact tenant path/lifecycle constraints and a temporary foundation trigger that permits only RECEIVED to QUARANTINED. Task 088b must replace that trigger when security evidence exists."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Client filenames and object keys cannot control storage location; both Go and SQL forbid release before 088b. ReleasedObjectRef has private fields, AccessGate requires RELEASED plus security evidence, and malformed/cross-tenant records fail closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 088a creates no sensitive business write or release approval operation. Future release/security override behavior remains part of Task 088b and Task 017 policy where applicable."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Quarantine transition writes its canonical versioned event intent through the transactional outbox without file contents or credentials. Full scan decision evidence/audit remains explicitly deferred to 088b."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "The canonical state update is conditional on state=received and conflicts on repeats; transactional outbox shares the same SQL commit. Object-store/DB are not falsely claimed atomic: a post-store metadata failure may leave only an inaccessible quarantine orphan."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Task 088a does not implement webhook or arbitrary network egress. Any eventual external notification of security decisions continues through existing EventBus/Webhook boundaries."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Foundation failures use bounded machine error classes and retain canonical state, but scan metrics and pipeline SLOs are intentionally deferred to Task 088b. No production latency or throughput claim is made."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration is expand-only and high risk with a backup checkpoint. Rollback disables admission while retaining upload rows/quarantine objects; object-store reconciliation is required before any later exposure."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover tenant-derived keys, storage escape/size mismatch, fail-closed consumer resolution and future released-reference validation; migration/audit tests prove forced RLS, transactional outbox and absence of a release mutation."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "031",
+    "088"
+  ]
+}

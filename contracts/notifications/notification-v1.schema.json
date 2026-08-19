@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/notifications/notification-v1.json",
+  "title": "TORGNEXA Notification v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "recipient_id",
+    "dedupe_key",
+    "severity",
+    "title",
+    "body",
+    "occurrence_count",
+    "first_occurred_at",
+    "last_occurred_at",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "recipient_id": {
+      "$ref": "#/$defs/id"
+    },
+    "dedupe_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "entity_type": {
+      "$ref": "#/$defs/id"
+    },
+    "entity_id": {
+      "$ref": "#/$defs/id"
+    },
+    "source_event_id": {
+      "$ref": "#/$defs/id"
+    },
+    "source_event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.v[1-9][0-9]{0,2}$"
+    },
+    "occurrence_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "first_occurred_at": {
+      "$ref": "#/$defs/utc"
+    },
+    "last_occurred_at": {
+      "$ref": "#/$defs/utc"
+    },
+    "read_at": {
+      "$ref": "#/$defs/utc"
+    },
+    "created_at": {
+      "$ref": "#/$defs/utc"
+    },
+    "updated_at": {
+      "$ref": "#/$defs/utc"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "dependentRequired": {
+    "entity_type": [
+      "entity_id"
+    ],
+    "entity_id": [
+      "entity_type"
+    ],
+    "source_event_id": [
+      "source_event_type"
+    ],
+    "source_event_type": [
+      "source_event_id"
+    ]
+  }
+}

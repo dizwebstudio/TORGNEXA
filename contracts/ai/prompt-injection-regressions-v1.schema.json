@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/ai/prompt-injection-regressions-v1.json",
+  "title": "TORGNEXA prompt-injection regression corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "external_text",
+          "requested_tool",
+          "permission",
+          "risk",
+          "approval_boundary",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+          },
+          "external_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "requested_tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "permission": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "read",
+              "safe_write",
+              "sensitive_write",
+              "prohibited"
+            ]
+          },
+          "approval_boundary": {
+            "type": "boolean"
+          },
+          "money": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "minor_units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              "minor_units": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "expected": {
+            "type": "string",
+            "enum": [
+              "allowed_read",
+              "allowed_approval_only",
+              "denied"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

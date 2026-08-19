@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/reconciliation/action-v1.json",
+  "title": "ReconciliationActionV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id","drift_id","action","idempotency_key","result","created_at"],
+  "properties": {
+    "id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "drift_id": {"type":"string","pattern":"^rcd_[0-9a-f]{32}$"},
+    "action": {"enum":["auto_fix","notify","approval","ignore"]},
+    "idempotency_key": {"type":"string","pattern":"^reconcile:[0-9a-f]{32}$"},
+    "result": {"enum":["succeeded","failed"]},
+    "error_code": {"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},
+    "created_at": {"type":"string","format":"date-time"}
+  }
+}

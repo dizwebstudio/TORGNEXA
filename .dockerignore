@@ -1,0 +1,13 @@
+.git
+.github
+.codex
+.env
+**/.DS_Store
+**/__pycache__
+frontend/node_modules
+integrations/n8n-nodes-torgnexa/node_modules
+*.zip
+
+qualification/evidence/
+
+migrations_legacy_pre_v1

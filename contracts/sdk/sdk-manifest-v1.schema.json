@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sdk/sdk-manifest-v1.json",
+  "title": "TORGNEXA generated SDK manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator",
+    "openapi",
+    "operations",
+    "sdks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "generator": {
+      "type": "string",
+      "const": "torgnexa-sdkgen/v1"
+    },
+    "openapi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "openapi_version",
+        "api_version",
+        "server_path"
+      ],
+      "properties": {
+        "path": {
+          "const": "contracts/openapi/torgnexa-v1.yaml"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "openapi_version": {
+          "type": "string",
+          "const": "3.1.0"
+        },
+        "api_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "server_path": {
+          "type": "string",
+          "pattern": "^/api/v[0-9]+$"
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id",
+          "method",
+          "path"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/"
+          }
+        }
+      }
+    },
+    "sdks": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "language",
+          "minimum_runtime",
+          "paths"
+        ],
+        "properties": {
+          "language": {
+            "enum": [
+              "go",
+              "typescript",
+              "python"
+            ]
+          },
+          "minimum_runtime": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^sdk/"
+            }
+          }
+        }
+      }
+    }
+  }
+}

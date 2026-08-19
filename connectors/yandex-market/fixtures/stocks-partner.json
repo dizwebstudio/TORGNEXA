@@ -1,0 +1,1 @@
+{"status":"OK","result":{"partnerWarehouseId":70001,"offers":[{"offerId":"YM-RED-M","stocks":[{"type":"AVAILABLE","count":7},{"type":"FREEZE","count":1}],"updatedAt":"2026-08-10T12:20:00Z"},{"offerId":"YM-BLUE-L","stocks":[{"type":"AVAILABLE","count":3}],"updatedAt":"2026-08-10T12:20:00Z"}],"paging":{}}}

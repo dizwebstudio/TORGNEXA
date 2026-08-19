@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "$id": "https://torgnexa.local/schemas/compliance/policy-v1.json",
+  "title": "Product Compliance Policy v1",
+  "type": "object",
+  "required": [
+    "id",
+    "organization_id",
+    "workspace_id",
+    "code",
+    "jurisdiction",
+    "operation",
+    "requirements",
+    "effective_from",
+    "active",
+    "version",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "organization_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"
+    },
+    "jurisdiction": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "operation": {
+      "enum": [
+        "publication",
+        "sale",
+        "advertising",
+        "shipping"
+      ]
+    },
+    "connector_family": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "seller_role": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "category_id": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_type",
+          "failure_outcome",
+          "verification_required",
+          "min_validity_hours"
+        ],
+        "properties": {
+          "document_type": {
+            "enum": [
+              "declaration",
+              "certificate",
+              "eac_evidence",
+              "state_registration",
+              "veterinary",
+              "sanitary",
+              "refusal_letter",
+              "information_letter",
+              "other"
+            ]
+          },
+          "failure_outcome": {
+            "enum": [
+              "warn",
+              "approval_required",
+              "block"
+            ]
+          },
+          "verification_required": {
+            "type": "boolean"
+          },
+          "min_validity_hours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 87600
+          }
+        }
+      }
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "effective_until": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    }
+  }
+}

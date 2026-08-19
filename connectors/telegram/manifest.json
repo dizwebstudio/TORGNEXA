@@ -1,0 +1,10 @@
+{
+  "id": "telegram",
+  "name": "Telegram",
+  "family": "social",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"],
+  "auth": [{"kind": "bearer", "secret_class": "social.bot-token", "required": true}],
+  "rate_limit": {"max_concurrency": 1, "min_interval_ms": 40, "request_timeout_ms": 30000, "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 60000}}
+}

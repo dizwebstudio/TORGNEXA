@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/evaluation-v1.json",
+  "title":"Entitlement Evaluation v1","type":"object","additionalProperties":false,
+  "required":["feature","allowed","reason_code","evaluated_at"],
+  "properties":{
+    "feature":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"allowed":{"type":"boolean"},
+    "reason_code":{"enum":["no_entitlement","entitlement_enabled","entitlement_disabled"]},
+    "rule_id":{"type":"string"},"rule_version":{"type":"integer","minimum":1},
+    "evaluated_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  },
+  "allOf":[{"if":{"required":["rule_id"]},"then":{"required":["rule_version"]}}]
+}

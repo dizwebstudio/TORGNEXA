@@ -1,0 +1,28 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/evaluate-response-v1.json",
+  "title":"Entitlement Evaluate Response v1","type":"object","additionalProperties":false,
+  "required":["evaluation"],
+  "properties":{
+    "evaluation":{
+      "type":"object","additionalProperties":false,
+      "required":["feature","allowed","reason_code","evaluated_at"],
+      "properties":{
+        "feature":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"allowed":{"type":"boolean"},
+        "reason_code":{"enum":["no_entitlement","entitlement_enabled","entitlement_disabled"]},
+        "rule_id":{"type":"string"},"rule_version":{"type":"integer","minimum":1},
+        "evaluated_at":{"type":"string","format":"date-time","pattern":"Z$"}
+      },
+      "allOf":[{"if":{"required":["rule_id"]},"then":{"required":["rule_version"]}}]
+    },
+    "quota":{
+      "type":"object","additionalProperties":false,
+      "required":["metric","limit","used","remaining","window_start","window_end","policy_id","policy_version"],
+      "properties":{
+        "metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"limit":{"type":"integer","minimum":0},"used":{"type":"integer","minimum":0},"remaining":{"type":"integer","minimum":0},
+        "window_start":{"type":"string","format":"date-time","pattern":"Z$"},"window_end":{"type":"string","format":"date-time","pattern":"Z$"},
+        "policy_id":{"type":"string"},"policy_version":{"type":"integer","minimum":1}
+      }
+    }
+  }
+}

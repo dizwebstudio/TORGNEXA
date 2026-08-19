@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/transport/event-delivery-metadata.json",
+  "title": "TORGNEXA Event Delivery Metadata",
+  "description": "Broker-neutral retry/dead-letter metadata. Failure fields contain bounded machine codes only and must never contain raw handler errors, credentials, or PII.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "attempt",
+    "first_observed_at",
+    "original_topic",
+    "state"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.v[1-9][0-9]{0,2}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "first_observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "original_topic": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,248}$"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["retry", "dead_letter"]
+    },
+    "not_before": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "failure_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "terminal_reason": {
+      "type": "string",
+      "enum": [
+        "permanent",
+        "retry_exhausted",
+        "invalid_event",
+        "topic_event_mismatch",
+        "envelope_header_mismatch",
+        "invalid_transport_metadata"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "retry"}}, "required": ["state"]},
+      "then": {"required": ["not_before", "failure_code"], "not": {"required": ["terminal_reason"]}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "dead_letter"}}, "required": ["state"]},
+      "then": {"required": ["failure_code", "terminal_reason"], "not": {"required": ["not_before"]}}
+    }
+  ]
+}

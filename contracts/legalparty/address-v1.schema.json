@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/legalparty/address-v1.json",
+  "title": "TORGNEXA Legal Party Address v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "organization_id",
+    "workspace_id",
+    "party_type",
+    "party_id",
+    "kind",
+    "country_code",
+    "line1",
+    "version",
+    "active",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "organization_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "active",
+        "archived"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "party_type": {
+      "enum": [
+        "legal_entity",
+        "individual_entrepreneur",
+        "branch"
+      ]
+    },
+    "party_id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    },
+    "kind": {
+      "enum": [
+        "legal",
+        "actual",
+        "postal"
+      ]
+    },
+    "country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "postal_code": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "region": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "city": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "line1": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "line2": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "is_primary": {
+      "type": "boolean"
+    },
+    "active": {
+      "type": "boolean"
+    }
+  }
+}

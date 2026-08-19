@@ -1,0 +1,5 @@
+# Yandex Market Conformance Plan
+
+Task-064 suite v1 is mandatory before provider admission. The candidate uses only synthetic API keys and the Task-029 Linux sandbox fixture. Required machine evidence is committed as `docs/connectors/yandex-market/conformance-report.json`.
+
+Provider-specific tests cover manifest read-only boundaries, strict configuration/API-key parsing, current product/price/order pagination, exact decimal price preservation, explicit two-mode warehouse semantics, partial/duplicate stock rejection, buyer-PII exclusion, duplicate-notification dedupe, configured tenant-account scope, malformed/oversized cursors and responses, HTTP 420/429 normalization and raw transport/remote-body non-disclosure.

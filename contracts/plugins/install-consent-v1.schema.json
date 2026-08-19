@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/install-consent-v1.json",
+  "title": "TORGNEXA plugin installation consent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "grant", "actor_id", "granted_at"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\r\\n\\x00]+$"},
+    "grant": {"$ref": "https://torgnexa.local/schemas/plugins/permission-grant-v1.json"},
+    "actor_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\r\\n\\x00]+$"},
+    "granted_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "description": "Explicit tenant consent bound to an exact plugin version and artifact digest. A new artifact always requires a new consent record."
+}

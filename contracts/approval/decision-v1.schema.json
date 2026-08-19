@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://torgnexa.local/schemas/approval/decision-v1.json",
+  "title": "TORGNEXA approval decision v1",
+  "type":"object","additionalProperties":false,
+  "required":["id","request_id","stage","actor_id","actor_scopes","decision","comment","decided_at"],
+  "properties":{"id":{"type":"string","minLength":26,"maxLength":36},"request_id":{"type":"string","minLength":26,"maxLength":36},"stage":{"type":"integer","minimum":1,"maximum":16},"actor_id":{"type":"string","minLength":1,"maxLength":256},"actor_scopes":{"type":"array","minItems":1,"maxItems":128,"uniqueItems":true,"items":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"}},"decision":{"enum":["approve","reject"]},"comment":{"type":"string","maxLength":1024},"decided_at":{"type":"string","format":"date-time","pattern":"Z$"}}
+}

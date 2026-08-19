@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/lineage/record-v1.json",
+  "title": "TORGNEXA Lineage Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id","organization_id","workspace_id","source","operation","output","inputs","transformation","correlation_id","audit_id","event_id","result","occurred_at"],
+  "properties": {
+    "id": {"type":"string","pattern":"^lin\\.[0-9a-f]{64}$"},
+    "organization_id": {"$ref":"#/$defs/tenantId"},
+    "workspace_id": {"$ref":"#/$defs/tenantId"},
+    "source": {"$ref":"#/$defs/token"},
+    "actor_id": {"type":"string","minLength":1,"maxLength":256},
+    "operation": {"$ref":"#/$defs/token"},
+    "output": {"$ref":"#/$defs/ref"},
+    "inputs": {"type":"array","maxItems":32,"items":{"$ref":"#/$defs/input"}},
+    "transformation": {"$ref":"#/$defs/transformation"},
+    "correlation_id": {"type":"string","minLength":1,"maxLength":256},
+    "causation_id": {"type":"string","minLength":1,"maxLength":256},
+    "audit_id": {"type":"string","minLength":1,"maxLength":160},
+    "event_id": {"type":"string","minLength":1,"maxLength":160},
+    "result": {"enum":["applied","observed","rejected"]},
+    "occurred_at": {"type":"string","format":"date-time","pattern":"Z$"}
+  },
+  "$defs": {
+    "tenantId": {"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "token": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"},
+    "ref": {
+      "type":"object","additionalProperties":false,
+      "required":["system","entity_type","entity_id"],
+      "properties":{
+        "system":{"$ref":"#/$defs/token"},"entity_type":{"$ref":"#/$defs/token"},"entity_id":{"type":"string","minLength":1,"maxLength":512},
+        "version":{"type":"string","minLength":1,"maxLength":128},"field":{"$ref":"#/$defs/token"},"observed_at":{"type":"string","format":"date-time","pattern":"Z$"}
+      }
+    },
+    "input": {"type":"object","additionalProperties":false,"required":["role","ref"],"properties":{"role":{"$ref":"#/$defs/token"},"ref":{"$ref":"#/$defs/ref"}}},
+    "transformation": {
+      "type":"object","additionalProperties":false,"required":["kind","id","version"],
+      "properties":{"kind":{"$ref":"#/$defs/token"},"id":{"type":"string","minLength":1,"maxLength":256},"version":{"type":"string","minLength":1,"maxLength":128},"mapping_id":{"type":"string","minLength":1,"maxLength":256},"rule_id":{"type":"string","minLength":1,"maxLength":256}}
+    }
+  }
+}

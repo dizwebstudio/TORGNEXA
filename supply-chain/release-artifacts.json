@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "public_release_ready": true,
+  "binaries": [
+    {
+      "name": "api",
+      "package": "./cmd/api",
+      "platforms": [
+        "linux/amd64"
+      ]
+    },
+    {
+      "name": "mcp",
+      "package": "./cmd/mcp",
+      "platforms": [
+        "linux/amd64"
+      ]
+    },
+    {
+      "name": "scheduler",
+      "package": "./cmd/scheduler",
+      "platforms": [
+        "linux/amd64"
+      ]
+    },
+    {
+      "name": "worker",
+      "package": "./cmd/worker",
+      "platforms": [
+        "linux/amd64"
+      ]
+    }
+  ],
+  "development_runtime": [
+    {
+      "name": "clickhouse",
+      "image": "clickhouse/clickhouse-server:26.6@sha256:a63a90ffdcb574683ebfe96e4c53e2dbe401864add7bb06dc244eb935d828e7f",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "garage",
+      "image": "dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "garage-config",
+      "image": "postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "kafka",
+      "image": "apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "keycloak",
+      "image": "quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "keycloak-db-init",
+      "image": "postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "migrate",
+      "image": "postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "postgres",
+      "image": "postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "valkey",
+      "image": "valkey/valkey:9.1.1-alpine@sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    }
+  ]
+}

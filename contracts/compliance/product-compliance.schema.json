@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/compliance/product-compliance.json",
+  "title": "ProductComplianceDocument",
+  "type": "object",
+  "required": [
+    "id",
+    "document_type",
+    "number",
+    "status",
+    "jurisdiction",
+    "scope"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string"
+    },
+    "number": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "valid",
+        "expired",
+        "revoked",
+        "suspended",
+        "verification_failed"
+      ]
+    },
+    "jurisdiction": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "product_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gtins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence_object_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "holder_party_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

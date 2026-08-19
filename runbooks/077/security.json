@@ -1,0 +1,16 @@
+{
+  "id": "rb-security",
+  "title": "Security incident",
+  "trigger_codes": [
+    "security_critical"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Block the affected edge/account path, preserve evidence and revoke compromised sessions or keys.",
+      "validation": "Verify containment, SIEM delivery and clean authentication/edge probes.",
+      "rollback": "Remove temporary block only after review and evidence sign-off.",
+      "evidence": "security event ids, SIEM delivery ids and containment timeline"
+    }
+  ]
+}

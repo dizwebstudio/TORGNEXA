@@ -1,0 +1,6 @@
+[project]
+name = "torgnexa-sdk"
+version = "0.6.0"
+requires-python = ">=3.11"
+description = "Generated TORGNEXA public API client"
+license = "Apache-2.0"

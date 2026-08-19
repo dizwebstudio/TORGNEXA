@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/fx/conversion-snapshot-v1.json",
+  "title": "TORGNEXA FX Derivation Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_amount",
+    "target_amount",
+    "rate_facts",
+    "rounding_mode",
+    "rounding_stage",
+    "triangulation_mode",
+    "target_minor_unit_scale",
+    "derived_at"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_amount": {"$ref": "#/$defs/money"},
+    "target_amount": {"$ref": "#/$defs/money"},
+    "rate_facts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/rateFact"}
+    },
+    "rounding_mode": {"enum": ["half_even", "half_up", "toward_zero"]},
+    "rounding_stage": {"const": "final_amount_only"},
+    "triangulation_mode": {"enum": ["direct_only", "single_pivot"]},
+    "pivot_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "target_minor_unit_scale": {"type": "integer", "minimum": 0, "maximum": 9},
+    "derived_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"triangulation_mode": {"const": "single_pivot"}}, "required": ["triangulation_mode"]},
+      "then": {"required": ["pivot_currency"]},
+      "else": {"not": {"required": ["pivot_currency"]}}
+    }
+  ],
+  "$defs": {
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minor_units", "currency"],
+      "properties": {
+        "minor_units": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+      }
+    },
+    "rateFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "id", "base_currency", "quote_currency", "rate", "source", "rate_type", "observed_at", "effective_at"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+        "base_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "quote_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "rate": {"type": "string", "pattern": "^(?:[1-9][0-9]*(?:\\.[0-9]{1,9})?|0\\.[0-9]{0,8}[1-9])$"},
+        "source": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+        "source_reference": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"},
+        "rate_type": {"enum": ["official", "mid", "bid", "ask", "closing", "indicative"]},
+        "observed_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+        "effective_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+      }
+    }
+  },
+  "$comment": "The snapshot is the mandatory future derivation evidence. The Task-089a runtime validates the ordered currency route and that no future rate fact is used; Task 089b will additionally verify the arithmetic and persist immutable source facts."
+}

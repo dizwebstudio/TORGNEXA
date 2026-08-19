@@ -1,0 +1,71 @@
+name: architecture-required
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GOTELEMETRY: "off"
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - name: Check out the exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          clean: true
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install the approved Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.26.5"
+          cache: false
+      - name: Build the trusted base verifier and validate the pull-request diff
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha }}
+          HEAD_REVISION: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$BASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RUNNER_TEMP" == /* && "$GITHUB_WORKSPACE" == /* ]]
+          [[ "$(git -C "$GITHUB_WORKSPACE" rev-parse --verify HEAD)" == "$HEAD_REVISION" ]]
+          trusted_base="$RUNNER_TEMP/torgnexa-architecture-base"
+          trusted_checker="$RUNNER_TEMP/torgnexa-architecturecheck"
+          trusted_cache="$RUNNER_TEMP/torgnexa-architecture-gocache"
+          trusted_home="$RUNNER_TEMP/torgnexa-architecture-home"
+          [[ ! -e "$trusted_base" && ! -e "$trusted_checker" && ! -e "$trusted_cache" && ! -e "$trusted_home" ]]
+          mkdir -m 0700 -- "$trusted_cache" "$trusted_home"
+          git -C "$GITHUB_WORKSPACE" cat-file -e "$BASE_REVISION^{commit}"
+          git -C "$GITHUB_WORKSPACE" -c core.hooksPath=/dev/null worktree add --detach "$trusted_base" "$BASE_REVISION"
+          [[ "$(git -C "$trusted_base" rev-parse --verify HEAD)" == "$BASE_REVISION" ]]
+          (
+            cd -- "$trusted_base"
+            env -i \
+              CGO_ENABLED=0 \
+              GOCACHE="$trusted_cache" \
+              GOENV=off \
+              GOTELEMETRY=off \
+              GOTOOLCHAIN=local \
+              GOWORK=off \
+              GOPROXY=off \
+              GOSUMDB=off \
+              HOME="$trusted_home" \
+              LC_ALL=C \
+              PATH="$PATH" \
+              TMPDIR="$RUNNER_TEMP" \
+              TZ=UTC \
+              go build -buildvcs=false -mod=readonly -trimpath -o "$trusted_checker" ./tools/architecturecheck
+          )
+          [[ -f "$trusted_checker" && ! -L "$trusted_checker" ]]
+          env -i HOME="$trusted_home" LC_ALL=C PATH=/usr/bin:/bin TZ=UTC \
+            "$trusted_checker" --root "$GITHUB_WORKSPACE" --base "$BASE_REVISION" --head "$HEAD_REVISION"

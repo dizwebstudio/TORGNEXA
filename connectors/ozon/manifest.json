@@ -1,0 +1,16 @@
+{
+  "id": "ozon",
+  "name": "Ozon",
+  "family": "marketplace",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["inventory.read", "products.read"],
+  "auth": [{"kind": "api_key", "secret_class": "marketplace.api-credentials", "required": true}],
+  "connection_test": {"url": "https://api-seller.ozon.ru/v3/product/list", "method": "POST", "headers": {"Client-Id": "${line1}", "Api-Key": "${line2}", "Content-Type": "application/json"}, "body": "{\"filter\":{},\"limit\":1}"},
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 15000,
+    "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}
+  }
+}

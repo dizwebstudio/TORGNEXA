@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/upload-rescan-requested-v1.json",
+  "title": "security.upload.rescan_requested.v1",
+  "type": "object",
+  "required": ["event_id", "object_id", "reason_code", "prior_evidence_id"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "object_id": {"type": "string", "pattern": "^upl_[0-9a-f]{32}$"},
+    "reason_code": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,95}$"},
+    "prior_evidence_id": {"type": "string", "pattern": "^uev_[0-9a-f]{32}$"}
+  },
+  "additionalProperties": false
+}

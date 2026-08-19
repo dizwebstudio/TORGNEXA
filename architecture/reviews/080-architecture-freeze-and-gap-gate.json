@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-080",
+  "task": "080",
+  "change_class": "pillar_change",
+  "summary": "Introduce fail-closed architecture inventory, impact evidence, dependency checks, and pull-request diff enforcement.",
+  "scopes": [
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    "Makefile",
+    "architecture/policy.json",
+    "contracts/governance/architecture-review.schema.json",
+    "docs/03-module-boundaries.md",
+    "docs/54-architecture-freeze-v1.md",
+    "internal/platform/architecture/checker.go",
+    "internal/platform/architecture/checker_test.go",
+    "internal/platform/architecture/diff.go",
+    "internal/platform/architecture/diff_test.go",
+    "internal/platform/architecture/go_tree.go",
+    "internal/platform/architecture/json.go",
+    "internal/platform/architecture/types.go",
+    "prompts/05-architecture-gap-audit.txt",
+    "scripts/check-architecture.sh",
+    "templates/adr.md",
+    "templates/architecture-gap-audit.md",
+    "tools/architecturecheck/main.go",
+    "tools/contractcheck/internal/checker/supplychain.go",
+    "tools/contractcheck/internal/checker/supplychain_test.go"
+  ],
+  "frozen_pillars": [
+    "universal-commerce-content-fulfillment-models",
+    "pim-mdm-financial-stock-ledgers",
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning",
+    "developer-surfaces",
+    "russia-compliance-generic-ports",
+    "legal-party-product-compliance-fx",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "adr": "adr/0035-architecture-change-governance.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0016-connector-conformance.md",
+    "adr/0017-release-supply-chain-security.md",
+    "adr/0019-upgrade-compatibility.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "The gate adds no request or persistence path and preserves the Task 002 tenant-scope boundary."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Every protected change must classify privacy and data-governance impact with bounded non-sensitive rationale."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No REST or OpenAPI shape changes; Task 024 remains the semantic public-contract gate."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event schema or envelope changes; version and compatibility checks remain owned by Task 024."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Provider admission stays disabled until Tasks 010, 025, 029, and 064 establish the SDK and conformance boundary."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No SQL changes are introduced; Task 067 continues to enforce migration metadata and rehearsal."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Strict bounded parsing, path and symlink checks, dependency rules, and self-protection reduce architecture bypasses."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Machine evidence supports an architecture reviewer but cannot replace protected hosting approval rules."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Append-only task-linked review records preserve decision and changed-path lineage in repository history."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "The build-time gate performs no business effects and does not change reconciliation or retry semantics."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_applicable",
+      "evidence": "The checker is offline build tooling and creates no webhook, network, or runtime egress path."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "CI reports deterministic bounded diagnostics and a concise inventory count for required-check observability."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "A policy regression blocks merge; correction uses a new reviewed change and accepted ADRs are superseded, not rewritten."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Static, diff, import-direction, malformed-input, and provider-admission negative tests become mandatory CI checks."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

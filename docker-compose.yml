@@ -1,0 +1,361 @@
+name: torgnexa
+
+x-app-env: &app-env
+  TORGNEXA_ENV: development
+  TORGNEXA_LOG_LEVEL: ${TORGNEXA_LOG_LEVEL:-info}
+  TORGNEXA_LOG_FORMAT: json
+  TORGNEXA_LOG_ADD_SOURCE: "false"
+  TORGNEXA_SHUTDOWN_TIMEOUT: 15s
+  DATABASE_URL: postgres://torgnexa:${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}@postgres:5432/torgnexa?sslmode=disable
+  TORGNEXA_DB_MAX_OPEN_CONNS: ${TORGNEXA_DB_MAX_OPEN_CONNS:-20}
+  TORGNEXA_DB_MAX_IDLE_CONNS: ${TORGNEXA_DB_MAX_IDLE_CONNS:-10}
+  TORGNEXA_DB_CONN_MAX_LIFETIME: ${TORGNEXA_DB_CONN_MAX_LIFETIME:-30m}
+  TORGNEXA_DB_CONN_MAX_IDLE_TIME: ${TORGNEXA_DB_CONN_MAX_IDLE_TIME:-5m}
+  TORGNEXA_DB_CONNECT_TIMEOUT: ${TORGNEXA_DB_CONNECT_TIMEOUT:-5s}
+  TORGNEXA_KAFKA_BROKERS: kafka:29092
+  VALKEY_ADDR: valkey:6379
+  CLICKHOUSE_DSN: http://clickhouse:8123
+  CLICKHOUSE_USERNAME: ${CLICKHOUSE_USERNAME:-torgnexa}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run scripts/init-community-env.sh}
+  TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT: ${TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT:-5s}
+  TORGNEXA_OIDC_ISSUER: http://127.0.0.1:8081/realms/torgnexa
+  TORGNEXA_OIDC_USERINFO_URL: http://keycloak:8080/realms/torgnexa/protocol/openid-connect/userinfo
+  TORGNEXA_OIDC_CLIENT_ID: torgnexa-web
+  TORGNEXA_OIDC_DEVELOPMENT_ORGANIZATION_ID: 0198b8d0-0000-7000-8000-000000000001
+  TORGNEXA_OIDC_DEVELOPMENT_WORKSPACE_ID: 0198b8d0-0000-7000-8000-000000000002
+  TORGNEXA_OIDC_REQUEST_TIMEOUT: 3s
+  TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS: ${TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS:-}
+  TORGNEXA_SECRETS_KEY_ID: community-v1
+  TORGNEXA_SECRETS_MASTER_KEY: ${TORGNEXA_SECRETS_MASTER_KEY:?run scripts/ensure-community-secrets-key.sh}
+  S3_ENDPOINT: http://garage:3900
+  S3_BUCKET: ${S3_BUCKET:-torgnexa}
+  S3_REGION: garage
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?run scripts/init-community-env.sh}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?run scripts/init-community-env.sh}
+  TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS: 127.0.0.1/32,::1/128
+  TORGNEXA_SECURITY_ADMIN_CIDRS: 127.0.0.1/32,::1/128
+  TORGNEXA_SECURITY_ALLOWED_ORIGINS: http://127.0.0.1:5173,http://localhost:5173
+  TORGNEXA_SECURITY_MAX_REQUEST_BYTES: "33554432"
+  TORGNEXA_SECURITY_MAX_UPLOAD_BYTES: "16777216"
+  TORGNEXA_SECURITY_RATE_PER_MINUTE: "600"
+  TORGNEXA_SECURITY_HSTS_SECONDS: "31536000"
+
+x-app-common: &app-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      VERSION: ${TORGNEXA_VERSION:-0.1.0-dev}
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  networks: [backend]
+  environment: *app-env
+
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: torgnexa
+      POSTGRES_USER: torgnexa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U torgnexa -d torgnexa']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+
+  keycloak-db-init:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: torgnexa
+      PGPASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?run scripts/init-community-env.sh}
+    volumes:
+      - ./deploy/keycloak/init-db.sh:/init-db.sh:ro
+    entrypoint: [/bin/sh, /init-db.sh]
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  migrate:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: torgnexa
+      PGUSER: torgnexa
+      PGPASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}
+      TORGNEXA_VERSION: ${TORGNEXA_VERSION:-0.1.0-dev}
+    volumes:
+      - ./migrations:/migrations:ro
+      - ./deploy/postgres:/deploy/postgres:ro
+    entrypoint: [/bin/sh, /deploy/postgres/migrate.sh]
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  kafka:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${KAFKA_PORT:-9092}:9092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1']
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+
+  valkey:
+    image: valkey/valkey:9.1.1-alpine@sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328
+    restart: unless-stopped
+    user: "999:1000"
+    command: [valkey-server, --save, "60", "1", --appendonly, "yes"]
+    ports:
+      - 127.0.0.1:${VALKEY_PORT:-6379}:6379
+    volumes:
+      - valkey-data:/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.6@sha256:a63a90ffdcb574683ebfe96e4c53e2dbe401864add7bb06dc244eb935d828e7f
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-torgnexa}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run scripts/init-community-env.sh}
+    ports:
+      - 127.0.0.1:${CLICKHOUSE_HTTP_PORT:-8123}:8123
+      - 127.0.0.1:${CLICKHOUSE_NATIVE_PORT:-9000}:9000
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./deploy/clickhouse:/docker-entrypoint-initdb.d:ro
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query "SELECT 1" >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+
+  garage-config:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?run scripts/init-community-env.sh}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?run scripts/init-community-env.sh}
+      GARAGE_METRICS_TOKEN: ${GARAGE_METRICS_TOKEN:?run scripts/init-community-env.sh}
+    volumes:
+      - garage-config:/config
+      - ./deploy/garage/render-config.sh:/render-config.sh:ro
+    entrypoint: [/bin/sh, /render-config.sh]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  garage:
+    image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
+    restart: unless-stopped
+    depends_on:
+      garage-config:
+        condition: service_completed_successfully
+    command: [/garage, server, --single-node, --default-bucket]
+    environment:
+      GARAGE_CONFIG_FILE: /etc/garage/garage.toml
+      GARAGE_DEFAULT_ACCESS_KEY: ${S3_ACCESS_KEY:?run scripts/init-community-env.sh}
+      GARAGE_DEFAULT_SECRET_KEY: ${S3_SECRET_KEY:?run scripts/init-community-env.sh}
+      GARAGE_DEFAULT_BUCKET: ${S3_BUCKET:-torgnexa}
+      RUST_LOG: garage=info
+    ports:
+      - 127.0.0.1:${S3_PORT:-9002}:3900
+    volumes:
+      - garage-config:/etc/garage:ro
+      - garage-data:/var/lib/garage
+    networks: [backend]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, /garage, -c, /etc/garage/garage.toml, status]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    restart: unless-stopped
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    command: [start-dev, --import-realm]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?run scripts/init-community-env.sh}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?run scripts/init-community-env.sh}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - 127.0.0.1:${KEYCLOAK_PORT:-8081}:8080
+    volumes:
+      - ./deploy/keycloak/torgnexa-realm.json:/opt/keycloak/data/import/torgnexa-realm.json:ro
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep -q 'HTTP/1.0 200'; } 0<>/dev/tcp/127.0.0.1/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    <<: *app-common
+    entrypoint: [/app/torgnexa-api]
+    environment:
+      <<: *app-env
+      TORGNEXA_HTTP_ADDR: 0.0.0.0:8080
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${TORGNEXA_API_PORT:-8080}:8080
+    healthcheck:
+      test: [CMD, /app/torgnexa-api, healthcheck]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    <<: *app-common
+    entrypoint: [/app/torgnexa-worker]
+    environment:
+      <<: *app-env
+      TORGNEXA_WORKER_RECONCILIATION_ENABLED: ${TORGNEXA_WORKER_RECONCILIATION_ENABLED:-true}
+      TORGNEXA_WORKER_UPLOADS_ENABLED: ${TORGNEXA_WORKER_UPLOADS_ENABLED:-false}
+      TORGNEXA_KAFKA_CONSUMER_GROUP: ${TORGNEXA_KAFKA_CONSUMER_GROUP:-torgnexa.webhooks.v1}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  scheduler:
+    <<: *app-common
+    entrypoint: [/app/torgnexa-scheduler]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  mcp:
+    <<: *app-common
+    entrypoint: [/app/torgnexa-mcp]
+    environment:
+      <<: *app-env
+      TORGNEXA_HTTP_ADDR: 0.0.0.0:8090
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${TORGNEXA_MCP_PORT:-8090}:8090
+    healthcheck:
+      test: [CMD, /app/torgnexa-mcp, healthcheck]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /workspace/frontend/node_modules/.vite-temp:rw,noexec,nosuid,size=8m,uid=1000,gid=1000
+    networks: [backend]
+    environment:
+      TORGNEXA_API_PROXY_TARGET: http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${TORGNEXA_FRONTEND_PORT:-5173}:5173
+    healthcheck:
+      test: [CMD, wget, --quiet, --tries=1, --spider, http://127.0.0.1:5173/]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  valkey-data:
+  clickhouse-data:
+  garage-config:
+  garage-data:

@@ -1,0 +1,5 @@
+# Capability audit
+
+Only capabilities demonstrated by the current official interface and Connector SDK v1 are admitted. POST operations are bound to a caller-supplied Idempotence-Key (max 64 characters). HTTP 500 is treated as outcome-unknown and must be reconciled with the same key or GET. Full and partial refunds remain exact minor-unit operations. No browser-cookie automation, private editor endpoints, raw card credentials, or provider-specific Core branches are permitted.
+
+Official documentation: https://yookassa.ru/developers/api

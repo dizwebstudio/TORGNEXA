@@ -1,0 +1,2 @@
+export function Skeleton({lines=4}:{lines?:number}) { return <div className="panel skeleton-card" aria-hidden="true"><div className="skeleton skeleton-title"/>{Array.from({length:lines},(_,i)=><div className="skeleton" style={{width:`${92-i*7}%`}} key={i}/>)}</div>; }
+export function TableSkeleton(){return <div className="panel skeleton-table" aria-hidden="true">{Array.from({length:6},(_,i)=><div className="skeleton-row" key={i}>{Array.from({length:5},(_,j)=><span className="skeleton" key={j}/>)}</div>)}</div>}

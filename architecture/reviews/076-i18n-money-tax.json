@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-076",
+  "task": "076",
+  "change_class": "implementation",
+  "summary": "Implement Task 076a inside the frozen shared-types architecture: exact Money and Decimal/Quantity values, UTC and explicit DST-edge resolution, canonical locale/address boundaries, and provider-neutral currency/tax formatting ports without creating a new domain pillar.",
+  "scopes": [
+    "HANDOFF.md",
+    "contracts/domain/address.schema.json",
+    "contracts/domain/locale-timezone.schema.json",
+    "contracts/domain/money.schema.json",
+    "contracts/domain/quantity.schema.json",
+    "contracts/domain/tax-treatment.schema.json",
+    "contracts/domain/utc-instant.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "docs/49-internationalization-money-tax.md",
+    "internal/platform/domain/primitives.go",
+    "internal/platform/domain/primitives_test.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/076-internationalization-money-tax-hardening.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0022-i18n-money-tax.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "The primitive types contain no tenant state, repository, or RLS behavior; tenant scoping remains owned by domain records and storage adapters."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Address is explicitly modeled as structured domain data and kept separate from localized display text; Task 060 classification/redaction still governs any personal address payload."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Six canonical Draft 2020-12 schemas define future Money, Quantity, UTC, locale/timezone, Address, and TaxTreatment wire shapes before commerce APIs are implemented."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Future event payloads must reuse exact decimal strings, integer minor-unit Money, and canonical UTC Z timestamps rather than provider-local numeric/time representations."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Provider adapters will map local currency/unit/address/tax representations to shared primitives; no provider-specific identifier or rule is added to the shared package."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Stage 076a introduces no persistence schema. Task 076b will audit Tasks 004-006 migrations for exact numeric/minor-unit and UTC storage."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Strict decoding/validation rejects float money, non-canonical currencies/locales, machine-local timezone identities, invalid address shapes, and implicit tax representations at shared boundaries."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "No approval or transaction-risk policy changes; Task 017 continues to govern sensitive action authorization."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Exact currency, quantity, UTC, and explicit tax values provide deterministic facts that later audit/lineage records can reference without float or timezone ambiguity."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Canonical exact representations eliminate float drift and local-time ambiguity that could otherwise create false reconciliation differences or unstable idempotency material."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Future webhook schemas must emit the canonical domain wire forms, especially decimal strings and UTC Z instants, rather than localized values."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "No metrics/logging implementation changes are introduced; presentation formatting remains outside observability fields."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "not_affected",
+      "evidence": "There is no data migration or runtime service state in stage 076a, so rollback is source/contract rollback only subject to normal compatibility policy."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover exact arithmetic, overflow, canonical JSON, Amsterdam DST gap/fold behavior, locale/address validation and explicit tax constraints; schema fixtures include negative float and non-UTC cases."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "004",
+    "005",
+    "006",
+    "007",
+    "076"
+  ]
+}

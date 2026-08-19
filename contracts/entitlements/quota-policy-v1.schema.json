@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/quota-policy-v1.json",
+  "title":"Tenant Quota Policy v1","type":"object","additionalProperties":false,
+  "required":["id","organization_id","workspace_id","metric","limit","window","source","version","effective_from","created_at"],
+  "properties":{
+    "id":{"type":"string"},"organization_id":{"type":"string"},"workspace_id":{"type":"string"},
+    "metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"limit":{"type":"integer","minimum":0},
+    "window":{"enum":["lifetime","calendar_day_utc","calendar_month_utc"]},
+    "source":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"version":{"type":"integer","minimum":1},
+    "effective_from":{"type":"string","format":"date-time","pattern":"Z$"},"effective_until":{"type":["string","null"],"format":"date-time"},
+    "created_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

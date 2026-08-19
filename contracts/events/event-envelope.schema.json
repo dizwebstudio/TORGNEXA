@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/event-envelope.json",
+  "title": "TORGNEXA Event Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "organization_id",
+    "workspace_id",
+    "correlation_id",
+    "causation_id",
+    "entity_type",
+    "entity_id",
+    "source",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.[a-z][a-z0-9]*(_[a-z0-9]+)*\\.v[1-9][0-9]{0,2}$"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event occurrence instant. TORGNEXA producers canonicalize this value to UTC with a Z suffix."
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "workspace_id": {
+      "type": "string"
+    },
+    "entity_type": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "causation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "actor_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "trace_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "description": "Canonical broker-neutral application event envelope. Producers emit occurred_at in UTC Z form; the published schema keeps RFC 3339 date-time compatibility while runtime EventBus validation is stricter."
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-058",
+  "task": "058",
+  "change_class": "pillar_change",
+  "summary": "Marketplace settlements are immutable append-oriented facts keyed by provider references. Corrections are new adjustment entries and original currency is preserved until sourced FX exists.",
+  "scopes": [
+    "adr/0061-marketplace-settlement-ledger.md",
+    "architecture/policy.json",
+    "architecture/reviews/058-marketplace-settlement-ledger.json",
+    "contracts/operations/058-marketplace-settlement-ledger-v1.md",
+    "docs/operations/058-marketplace-settlement-ledger.md",
+    "internal/platform/settlements/settlements.go",
+    "internal/platform/settlements/settlements_test.go",
+    "migrations/000037_marketplace_settlement_ledger.sql",
+    "tasks/issues/058-marketplace-settlement-ledger.md"
+  ],
+  "frozen_pillars": [
+    "reporting-settlements-growth-supply-planning"
+  ],
+  "adr": "adr/0061-marketplace-settlement-ledger.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Every command/store boundary requires canonical organization/workspace scope and PostgreSQL tables carry tenant keys."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "not_affected",
+      "evidence": "Sensitive evidence/messages are minimized and tenant-scoped; otherwise this task adds no new PII authority."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No existing public HTTP/OpenAPI operation is changed; v1 host-side contracts are additive."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No existing canonical event payload is changed; workflow evidence remains additive."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK/provider roots remain unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand-only migration 000037_marketplace_settlement_ledger.sql adds tenant-scoped durable state and preserves rolling compatibility."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Writes fail closed on invalid scope/policy and no provider credential is introduced into the domain model."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Sensitive or mass-write workflows preserve explicit approval/dry-run or advisory-only semantics where applicable."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Canonical IDs, versions, provider references, snapshots or append-only evidence preserve traceability."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Idempotency keys, immutable snapshots, append-only entries, atomic reservations or classified differences make retries deterministic."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook transport or egress surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "State/deadline/status data provides bounded operational signals for later Task 066/077 SLOs."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Schema is expand-only; rollback disables new writers while preserving historical rows for forward recovery."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Task 058 includes deterministic tests for its acceptance-critical safety invariant."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

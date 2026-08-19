@@ -1,0 +1,1 @@
+{"status":"OK","result":{"warehouses":[{"warehouseId":80001,"offers":[{"offerId":"YM-RED-M","stocks":[{"type":"AVAILABLE","count":5},{"type":"FIT","count":6}],"updatedAt":"2026-08-10T12:20:00Z"},{"offerId":"YM-BLUE-L","stocks":[{"type":"FIT","count":2},{"type":"FREEZE","count":2}],"updatedAt":"2026-08-10T12:20:00Z"}]}],"paging":{}}}

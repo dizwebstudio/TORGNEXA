@@ -1,0 +1,6 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://torgnexa.local/schemas/events/entitlement-quota-policy-changed-v1.json",
+  "title": "governance.entitlement.quota_policy_changed.v1",
+  "type":"object","additionalProperties":false,"required":["policy_id","metric","limit","window","source","version"],
+  "properties":{"policy_id":{"type":"string"},"metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"limit":{"type":"integer","minimum":0},"window":{"enum":["lifetime","calendar_day_utc","calendar_month_utc"]},"source":{"type":"string"},"version":{"type":"integer","minimum":1}}
+}

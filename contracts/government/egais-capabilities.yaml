@@ -1,0 +1,13 @@
+version: 1
+family: government
+provider: egais
+capabilities:
+  government.identity.read: required
+  government.documents.read: optional
+  government.documents.write: optional_approval_required
+  government.inventory.read: optional
+  government.references.read: optional
+  government.reconciliation.run: required
+security:
+  regulated_write: true
+  private_keys_in_connector: false

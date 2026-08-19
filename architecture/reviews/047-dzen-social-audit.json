@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-047",
+  "task": "047",
+  "change_class": "implementation",
+  "summary": "Close the Dzen channel audit with a deterministic post/article/video content transformer and explicit fail-closed live-publication gate because Task 047 did not establish a qualified official public publishing contract; no provider is admitted.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/reviews/047-dzen-social-audit.json",
+    "docs/connectors/dzen/README.md",
+    "docs/connectors/dzen/capability-audit.md",
+    "docs/connectors/dzen/fixtures/article.json",
+    "docs/connectors/dzen/fixtures/post.json",
+    "docs/connectors/dzen/fixtures/video.json",
+    "docs/connectors/dzen/spec.md",
+    "scripts/dzen-content-transformer-test.py",
+    "scripts/dzen-content-transformer.py",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/047-dzen-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md",
+    "adr/0049-canonical-social-core.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "Task 047 creates no remote account/provider binding; the transformer only preserves already tenant-authorized Task-020 publication/media references."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "not_affected",
+      "evidence": "No Dzen credentials, cookies, remote requests or new persisted personal data are introduced; media remains represented by canonical UploadID references."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 047 adds no public TORGNEXA HTTP/OpenAPI operation."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 047 adds no EventBus schema."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "The transformer consumes existing SocialPublishRequest/SocialMediaRef types without modifying frozen Connector/Runtime SDK-v1 roots or capability registry."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No persistence or migration is added."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "The admission decision explicitly forbids private Studio/editor endpoints, browser cookies, DOM/headless automation and undocumented RPCs; live Publish fails closed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "No remote Dzen write capability is declared, so Task-017/Task-020 publication cannot accidentally route through an unqualified provider surface."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "The content package preserves canonical PublicationID and UploadID references and creates no remote lineage claim."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "There is no remote side effect or remote identity to reconcile in Task 047; Publish deterministically returns the unavailable gate."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No Dzen egress or webhook authority is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "The unavailable live-publishing state is explicit and deterministic rather than surfacing opaque browser/private-endpoint failures."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "not_affected",
+      "evidence": "There is no deployed Dzen provider state or schema to roll back; removing the transformer has no external side effect."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Fixture tests cover post/article/video transformation, article-video rejection and deterministic fail-closed live publication; provider conformance is intentionally inapplicable because no provider is admitted."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "048",
+    "066"
+  ]
+}

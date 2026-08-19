@@ -1,0 +1,13 @@
+{
+  "id": "youtube",
+  "name": "YouTube",
+  "family": "social",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["social.post.video", "social.comments.read"],
+  "auth": [
+    {"kind": "oauth2", "secret_class": "social.user-oauth", "required": true, "oauth2": {"grant_type": "authorization_code", "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth", "token_url": "https://oauth2.googleapis.com/token", "scopes": ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"], "client_auth_method": "client_secret_post"}}
+  ],
+  "connection_test": {"url": "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true&maxResults=1", "method": "GET", "headers": {"Authorization": "Bearer ${access_token}"}},
+  "rate_limit": {"max_concurrency": 1, "min_interval_ms": 250, "request_timeout_ms": 300000, "retry": {"max_attempts": 5, "base_backoff_ms": 1000, "max_backoff_ms": 60000}}
+}

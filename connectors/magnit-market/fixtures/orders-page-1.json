@@ -1,0 +1,19 @@
+{
+  "next_page_token": "magnit-orders-next-1",
+  "orders": [
+    {
+      "created_at": "2026-08-09T12:00:00Z",
+      "customer_id": "SHOULD_NOT_BE_EXPOSED",
+      "customer_order_number": "M12345678-00001",
+      "cutoff_time": "2026-08-10T12:00:00Z",
+      "delivery_region": "SHOULD_NOT_BE_EXPOSED",
+      "items": [
+        {"canceled_quantity": 0, "quantity": 2, "sku_id": 2001, "financial_data": {"old_price": 999.9, "price": 999.9, "payment_price": 999.9}},
+        {"canceled_quantity": 1, "quantity": 1, "sku_id": 2002, "financial_data": {"old_price": 1199, "price": 1199, "payment_price": 1199}}
+      ],
+      "order_id": "123e4567-e89b-12d3-a456-426614174111",
+      "status": "NEW",
+      "warehouse_id": "123e4567-e89b-12d3-a456-426614174000"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/rule-v1.json",
+  "title":"Tenant Entitlement Rule v1","type":"object","additionalProperties":false,
+  "required":["id","organization_id","workspace_id","feature","enabled","source","version","effective_from","created_at"],
+  "properties":{
+    "id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "organization_id":{"type":"string"},"workspace_id":{"type":"string"},
+    "feature":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"enabled":{"type":"boolean"},
+    "source":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"version":{"type":"integer","minimum":1},
+    "effective_from":{"type":"string","format":"date-time","pattern":"Z$"},"effective_until":{"type":["string","null"],"format":"date-time"},
+    "created_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

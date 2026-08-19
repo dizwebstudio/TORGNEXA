@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-122",
+  "task": "122",
+  "change_class": "mixed",
+  "summary": "Add a tenant-scoped AI provider account capability (settings CRUD, bounded analytics completion) plus the openai-compatible connector as its first registered ai-family provider, keeping Core and the settings API free of any provider-name branching.",
+  "scopes": [
+    "HANDOFF.md",
+    "architecture/policy.json",
+    "architecture/reviews/122-openai-compatible-connector.json",
+    "connectors/openai-compatible/capability-audit.md",
+    "connectors/openai-compatible/conformance.go",
+    "connectors/openai-compatible/connector.go",
+    "connectors/openai-compatible/connector_test.go",
+    "connectors/openai-compatible/manifest.json",
+    "contracts/connector-capabilities.yaml",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "docs/connectors/openai-compatible/capability-audit.md",
+    "docs/connectors/openai-compatible/conformance-plan.md",
+    "docs/connectors/openai-compatible/conformance-report.json",
+    "docs/connectors/openai-compatible/spec.md",
+    "internal/app/api/ai_advisory.go",
+    "internal/app/api/oidc_security.go",
+    "internal/app/api/production_routes.go",
+    "internal/platform/aiadvisory/aiadvisory.go",
+    "internal/platform/architecture/checker.go",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/connectors.go",
+    "internal/platform/postgres/aiadvisoryrepo/repository.go",
+    "internal/platform/secrets/secrets.go",
+    "migrations/000012_ai_advisory.sql",
+    "migrations/000013_ai_provider_credential_class.sql",
+    "migrations/catalog.json",
+    "migrations_legacy_pre_v1/000057_catalog_product_images.sql",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/122-ai-advisory-openai-compatible-connector.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0097-ai-provider-settings-and-openai-compatible-admission.md",
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0011-privacy-by-design.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "ai_provider_accounts is a new tenant-scoped table (organization_id/workspace_id, RLS forced) storing only label/model/base_url/folder_id/enabled/version plus a secrets.Reference; credential bytes never live in Postgres."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "The only tenant text sent off-platform is the caller-assembled analytics prompt at analyze-call time; the audit trail intentionally records only account id/provider/outcome, never the prompt or the model's response."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Four additive OpenAPI 0.16.0 operations under /settings/ai-providers(:disable|:analyze); no existing operation changed."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is published or consumed by this capability."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Frozen Connector/Runtime roots are unchanged. Adds an additive ai family, ai.completion.generate capability, and the openai-compatible provider; dispatch by provider id is confined to internal/platform/builtinruntime, the sole registered provider composition module."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Migration 000012_ai_advisory.sql adds ai_provider_accounts as a normal post-baseline expand migration; 000013_ai_provider_credential_class.sql additively widens the pre-existing secret_references.class CHECK constraint (the same pattern 000011 used) to admit ai_provider_credential. The immutable 000001-000011 pre-v1 squash is unchanged and re-verified byte-identical."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider code has no direct network/database/filesystem/process/Core/App authority; all HTTPS calls are host-mediated through builtinruntime's DNS-pinned, public-IP-only transport. Credential bytes are read only inside a host-owned UseSecret callback and are zeroed after use at the API layer."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Account create/disable/analyze are audited as write_sensitive; analyze is capability-gated separately (ai.analyze, manager/operator/admin) from account management. settings.ai_providers.write (create/disable) is admin only; settings.ai_providers.read (list, never returns credential material) extends to manager/operator/viewer for account selection, matching the existing read-broad/write-admin-only pattern used by connectors.accounts.*."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every create/disable/analyze call is captured with actor, correlation id and a bounded summary (provider, label, ok) that excludes prompt/response text."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This capability performs no remote-state synchronization; there is nothing to reconcile."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound calls use a host-injected transport to a fixed default host (api.openai.com) or an account-configured OpenAI-wire-compatible hostname; no inbound webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Remote non-2xx responses and empty/malformed completions normalize to a bounded 502 at the API layer; the connector's manifest rate_limit/retry policy bounds concurrency and backoff."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disabling or deleting an ai_provider_accounts row (soft-disable; DELETE is revoked at the schema level, matching catalog_product_images) immediately stops further analyze calls for that account; no other component depends on this table."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Package tests cover request/response marshaling and manifest/account mismatch rejection; the canonical Task-064 conformance suite passes all thirteen checks (docs/connectors/openai-compatible/conformance-report.json), including sandbox_isolation verified under a privileged Linux runner."
+    }
+  ],
+  "provider": {
+    "id": "openai-compatible",
+    "route": "connector_sdk",
+    "manifest": "connectors/openai-compatible/manifest.json",
+    "connector_spec": "docs/connectors/openai-compatible/spec.md",
+    "capability_audit": "docs/connectors/openai-compatible/capability-audit.md",
+    "conformance_plan": "docs/connectors/openai-compatible/conformance-plan.md"
+  },
+  "follow_up_tasks": ["123", "124", "125"]
+}

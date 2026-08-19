@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/evaluate-request-v1.json",
+  "title":"Entitlement Evaluate Request v1","type":"object","additionalProperties":false,
+  "required":["feature"],
+  "properties":{"feature":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"}}
+}

@@ -1,0 +1,15 @@
+{
+  "orders": [
+    {
+      "created_at": "2026-08-09T13:00:00Z",
+      "customer_id": "ANOTHER_PRIVATE_CUSTOMER",
+      "customer_order_number": "M12345678-00002",
+      "cutoff_time": "2026-08-10T13:00:00Z",
+      "delivery_region": "PRIVATE_REGION",
+      "items": [{"canceled_quantity": 0, "quantity": 1, "sku_id": 2003, "financial_data": {"old_price": 899, "price": 899, "payment_price": 899}}],
+      "order_id": "123e4567-e89b-12d3-a456-426614174112",
+      "status": "IN_ASSEMBLY",
+      "warehouse_id": "123e4567-e89b-12d3-a456-426614174000"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/product-changed-v1.json",
+  "title": "commerce.catalog.product_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_id","version","status","change"],
+  "properties": {
+    "product_id": {"type":"string","minLength":1,"maxLength":36},
+    "version": {"type":"integer","minimum":1},
+    "status": {"enum":["draft","active","archived"]},
+    "change": {"enum":["created","updated","status_changed"]}
+  }
+}

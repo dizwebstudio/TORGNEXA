@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sync/propagation-result-v1.json",
+  "title": "TORGNEXA Sync Propagation Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome","policy_id","local_version"],
+  "properties": {
+    "outcome": {"enum":["applied","duplicate","loop_suppressed","stale_suppressed","conflict_local_wins"]},
+    "policy_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "local_entity_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "remote_id": {"type":"string","minLength":1,"maxLength":512},
+    "local_version": {"type":"integer","minimum":0},
+    "remote_revision": {"type":"string","minLength":1,"maxLength":256},
+    "correlation_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "causation_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"}
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/tenancy/hierarchy.json",
+  "title": "TORGNEXA tenant hierarchy",
+  "description": "Stable organization, workspace, and store shapes. Parent-ID equality is enforced by composite PostgreSQL constraints and tenant-scoped repositories.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "organization",
+    "workspace",
+    "store"
+  ],
+  "properties": {
+    "organization": {
+      "$ref": "#/$defs/organization"
+    },
+    "workspace": {
+      "$ref": "#/$defs/workspace"
+    },
+    "store": {
+      "$ref": "#/$defs/store"
+    }
+  },
+  "$defs": {
+    "sortable_id": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        {
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        }
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^(?:\\S|\\S.*\\S)$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "archived"
+      ]
+    },
+    "organization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "organization_id",
+        "name",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "organization_id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "organization_id",
+        "workspace_id",
+        "code",
+        "name",
+        "kind",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "organization_id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "workspace_id": {
+          "$ref": "#/$defs/sortable_id"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "store",
+            "business_unit"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

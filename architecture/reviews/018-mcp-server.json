@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-018",
+  "task": "018",
+  "change_class": "pillar_change",
+  "summary": "Implement the stateless provider-neutral MCP application boundary with identity-derived tenancy, permission-filtered discovery, re-authorization, fail-closed audit and a Task-017 approval-only sensitive price-change request tool.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0008-mcp-openclaw.md",
+    "architecture/policy.json",
+    "architecture/reviews/018-mcp-server.json",
+    "cmd/mcp/main.go",
+    "contracts/mcp-tools.md",
+    "docs/70-mcp-server.md",
+    "internal/app/mcp/price_request.go",
+    "internal/app/mcp/price_request_test.go",
+    "internal/app/mcp/server.go",
+    "internal/app/mcp/server_test.go",
+    "internal/app/mcp/tools.go",
+    "internal/platform/config/config.go",
+    "internal/platform/config/config_test.go",
+    "internal/platform/postgres/approvalrepo/repository.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/018-mcp-server.md"
+  ],
+  "frozen_pillars": [
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance",
+    "developer-surfaces"
+  ],
+  "adr": "adr/0008-mcp-openclaw.md",
+  "existing_adrs": [
+    "adr/0006-approval-security.md",
+    "adr/0021-ai-agent-guardrails.md",
+    "adr/0026-enterprise-iam-federation.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "MCP identity contains a canonical tenancy.Scope derived by a trusted resolver. Tool schemas do not accept organization/workspace selectors and all canonical read/approval ports receive only identity scope."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Tool boundary-audit summaries retain only bounded tool/authorized-phase/argument digest metadata. Secret-shaped price-change reasons are rejected and raw tool/provider payloads are not copied into audit evidence."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "A new additive MCP developer surface is introduced at POST /mcp. Existing REST/OpenAPI routes and schemas are unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "MCP introduces no new event type. Sensitive requests reuse Task-017 governance.approval.requested.v1 transactional outbox evidence."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK v1 and provider interfaces are unchanged. MCP calls provider-neutral search/legal-party/approval ports and never imports connector implementations."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Task 018 adds no storage schema. Audit and approval persistence reuse Tasks 003 and 017."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Origin/protocol/header validation happens before tool execution; discovery is authorization-filtered; direct calls are re-authorized; runtime composition denies identity by default; no secrets/raw DB are exposed."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "commerce.price.change.request is write_sensitive and can only create a Task-017 approval request for pricing.price.updated; it never calls the pricing update repository directly and fails closed without matching policy."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every authorized MCP call must append Task-003 audit evidence with identity tenant/actor, canonical risk and SHA-256 argument digest. Audit failure prevents tool execution; approval creation additionally records Task-017 atomic outcome audit/outbox evidence."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "The price request uses a caller-generated canonical UUIDv7/ULID as the durable approval request id, replays the same request across retries/policy changes, rejects key reuse for a different intent, and SHA-256-binds exact price/version/currency/minor-units/reason. Direct downstream execution remains outside Task 018 and keeps its normal optimistic/idempotency boundary."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "MCP performs no webhook or arbitrary network egress. Canonical providers own any later external operations."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "The MCP process exposes stable structured startup/diagnostic events and normalized protocol/tool error classes without logging untrusted request details."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The change is migration-free and can be rolled back by removing/disabling the MCP process. Fail-closed default identity wiring prevents accidental anonymous service exposure during rollout."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover current protocol discovery, tenant isolation, permission-filtered discovery, direct-call denial, Origin/header mismatch, audit failure, Task-017 approval-only mutation request, intent binding and secret-shaped reason rejection."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "079",
+    "084"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/connectors/health.json",
+  "title": "Connector Health v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "unknown",
+        "healthy",
+        "degraded",
+        "unavailable"
+      ]
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "checked_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "status": {
+          "const": "unknown"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "reason_code"
+            ]
+          },
+          {
+            "required": [
+              "checked_at"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "properties": {
+        "status": {
+          "const": "healthy"
+        }
+      },
+      "required": [
+        "checked_at"
+      ],
+      "not": {
+        "required": [
+          "reason_code"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "status": {
+          "enum": [
+            "degraded",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "reason_code",
+        "checked_at"
+      ]
+    }
+  ]
+}

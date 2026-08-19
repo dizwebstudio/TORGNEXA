@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/domain/tax-treatment.json",
+  "title": "TORGNEXA Tax Treatment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "jurisdiction",
+    "category",
+    "price_includes_tax"
+  ],
+  "properties": {
+    "jurisdiction": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}(?:-[A-Z0-9]{1,8})*$"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "reduced",
+        "zero",
+        "exempt",
+        "out_of_scope",
+        "reverse_charge"
+      ]
+    },
+    "rate_fraction": {
+      "type": "string",
+      "pattern": "^(0|0\\.[0-9]{1,9}|1)$",
+      "description": "Explicit decimal fraction in [0,1], where 0.2 means 20 percent. Producers MUST emit normalized decimal form."
+    },
+    "price_includes_tax": {
+      "type": "boolean"
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,62}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "enum": [
+              "standard",
+              "reduced",
+              "zero"
+            ]
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "required": [
+          "rate_fraction"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "enum": [
+              "exempt",
+              "out_of_scope",
+              "reverse_charge"
+            ]
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "rate_fraction"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "const": "zero"
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rate_fraction": {
+            "const": "0"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Tax/VAT metadata is explicit. Country-specific rule engines and compliance semantics remain behind TaxProvider adapters."
+}

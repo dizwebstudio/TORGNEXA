@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/operations/postgresql-restore-evidence.json",
+  "title": "TORGNEXA PostgreSQL restore drill evidence",
+  "description": "Sanitized evidence for the combined logical restore and physical point-in-time recovery drill. It contains integrity metadata, never credentials or storage URLs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "drill_id",
+    "environment",
+    "started_at",
+    "completed_at",
+    "postgres",
+    "artifacts",
+    "recovery_target",
+    "wal_archive",
+    "checks",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "drill_id": {
+      "type": "string",
+      "pattern": "^postgres-restore-[0-9]{8}T[0-9]{6}Z-[0-9]+$"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "synthetic_ci",
+        "development",
+        "staging",
+        "production"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "server_version",
+        "source_timeline"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^postgres:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$"
+        },
+        "server_version": {
+          "type": "string",
+          "pattern": "^[0-9]+(?:\\.[0-9]+){1,2}$"
+        },
+        "source_timeline": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "name": {
+                "const": "logical.dump"
+              },
+              "kind": {
+                "const": "postgres_custom_dump"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "name": {
+                "const": "backup_manifest"
+              },
+              "kind": {
+                "const": "postgres_base_backup_manifest"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "sha256",
+          "size_bytes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "logical.dump",
+              "backup_manifest"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "postgres_custom_dump",
+              "postgres_base_backup_manifest"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "recovery_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "inclusive"
+      ],
+      "properties": {
+        "kind": {
+          "const": "lsn"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9A-F]+/[0-9A-F]+$"
+        },
+        "inclusive": {
+          "const": true
+        }
+      }
+    },
+    "wal_archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeline",
+        "last_required_segment",
+        "durability"
+      ],
+      "properties": {
+        "timeline": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_required_segment": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{24}$"
+        },
+        "durability": {
+          "type": "string",
+          "enum": [
+            "ephemeral_test",
+            "encrypted_immutable"
+          ]
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logical_restore",
+        "base_backup_manifest",
+        "physical_restore",
+        "pitr_target_included",
+        "pitr_post_target_excluded",
+        "row_level_security",
+        "corruption_detection"
+      ],
+      "properties": {
+        "logical_restore": {
+          "const": "passed"
+        },
+        "base_backup_manifest": {
+          "const": "passed"
+        },
+        "physical_restore": {
+          "const": "passed"
+        },
+        "pitr_target_included": {
+          "const": "passed"
+        },
+        "pitr_post_target_excluded": {
+          "const": "passed"
+        },
+        "row_level_security": {
+          "const": "passed"
+        },
+        "corruption_detection": {
+          "const": "passed"
+        }
+      }
+    },
+    "result": {
+      "const": "passed"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "environment"
+        ],
+        "properties": {
+          "environment": {
+            "const": "synthetic_ci"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "wal_archive": {
+            "properties": {
+              "durability": {
+                "const": "ephemeral_test"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "environment"
+        ],
+        "properties": {
+          "environment": {
+            "enum": [
+              "staging",
+              "production"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "wal_archive": {
+            "properties": {
+              "durability": {
+                "const": "encrypted_immutable"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

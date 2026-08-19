@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/events/order-changed-v1.json",
+  "title":"commerce.orders.order_changed.v1",
+  "type":"object","additionalProperties":false,
+  "required":["order_id","number","status","total","item_count","items","version","change"],
+  "properties":{
+    "order_id":{"$ref":"#/$defs/id"},"number":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},"status":{"enum":["pending","confirmed","processing","fulfilled","cancelled"]},"old_status":{"enum":["pending","confirmed","processing"]},"total":{"$ref":"#/$defs/money"},"item_count":{"type":"integer","minimum":1,"maximum":1000},"items":{"type":"array","minItems":1,"maxItems":1000,"items":{"$ref":"#/$defs/item"}},"version":{"type":"integer","minimum":1},"change":{"enum":["created","status_changed"]}
+  },
+  "allOf":[{"if":{"properties":{"change":{"const":"created"}}},"then":{"not":{"required":["old_status"]}}},{"if":{"properties":{"change":{"const":"status_changed"}}},"then":{"required":["old_status"]}}],
+  "$defs":{
+    "id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "money":{"type":"object","additionalProperties":false,"required":["minor_units","currency"],"properties":{"minor_units":{"type":"integer","minimum":0},"currency":{"type":"string","pattern":"^[A-Z]{3}$"}}},
+    "quantity":{"type":"object","additionalProperties":false,"required":["value","unit"],"properties":{"value":{"type":"string","pattern":"^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?$"},"unit":{"type":"string","pattern":"^[A-Z][A-Z0-9._-]{0,15}$"}}},
+    "tax":{"type":"object","additionalProperties":false,"required":["jurisdiction","category","rate_fraction","price_includes_tax"],"properties":{"jurisdiction":{"type":"string"},"category":{"enum":["standard","reduced","zero"]},"rate_fraction":{"type":"string"},"price_includes_tax":{"type":"boolean"}}},
+    "item":{"type":"object","additionalProperties":false,"required":["item_id","offer_id","sku","quantity","unit_price","line_total","tax"],"properties":{"item_id":{"$ref":"#/$defs/id"},"offer_id":{"$ref":"#/$defs/id"},"sku":{"type":"string"},"quantity":{"$ref":"#/$defs/quantity"},"unit_price":{"$ref":"#/$defs/money"},"line_total":{"$ref":"#/$defs/money"},"tax":{"$ref":"#/$defs/tax"}}}
+  }
+}

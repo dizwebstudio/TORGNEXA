@@ -1,0 +1,1 @@
+Read AGENTS.md, CODEX.md, docs/00-product-scope.md, docs/01-architecture.md and tasks/milestones/M0-foundation.md. Audit scaffold against M0, plan by dependency, then execute only the first incomplete task. Run all required checks.

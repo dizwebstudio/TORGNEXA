@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-103",
+  "task": "103",
+  "change_class": "implementation",
+  "summary": "Add minimized tenant-scoped OIDC session observation, application-level revocation, login evidence and a settings-specific audit view within the existing PostgreSQL, OIDC and asynchronous SIEM boundaries.",
+  "scopes": [
+    "architecture/policy.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "docs/73-settings-security.md",
+    "frontend/src/features/settings/SecuritySettings.tsx",
+    "internal/app/api/settings_security.go",
+    "internal/platform/postgres/securitysettingsrepo",
+    "internal/platform/securitysettings",
+    "migrations/000061_settings_security.sql"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0035-architecture-change-governance.md",
+    "adr/0076-final-enterprise-iam-federation-with-explicit-authorization-mapping.md"
+  ],
+  "gap_audit": {"performed": true, "prompt": "prompts/05-architecture-gap-audit.txt", "decision": "within_frozen_architecture"},
+  "impacts": [
+    {"area":"tenancy","status":"affected","evidence":"Session state and evidence are scoped by authenticated organization/workspace claims and forced PostgreSQL RLS."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"Only SHA-256 sid/sub references and a bounded client class are stored; raw identifiers, tokens, IP and User-Agent are prohibited; security evidence has a documented 180-day minimum retention."},
+    {"area":"api_compatibility","status":"affected","evidence":"OpenAPI 0.10.0 adds five settings-security operations and regenerated SDK methods without changing existing operations."},
+    {"area":"event_compatibility","status":"not_affected","evidence":"No domain event or canonical envelope changes."},
+    {"area":"plugin_sdk_compatibility","status":"not_affected","evidence":"Connector and plugin contracts are unchanged."},
+    {"area":"database_migration","status":"affected","evidence":"Expand migration 000061 creates monotonic session state and append-only login evidence under forced RLS."},
+    {"area":"security","status":"affected","evidence":"Revocation is enforced during authentication and blocks subsequent API access; provider-wide SSO ownership remains with Keycloak."},
+    {"area":"approvals_risk","status":"affected","evidence":"Session revocation is classified write_sensitive and limited to settings.security.write administrators."},
+    {"area":"audit_lineage","status":"affected","evidence":"Revocation and audit evidence commit atomically with actor and correlation identifiers; settings audit remains append-only."},
+    {"area":"reconciliation_idempotency","status":"not_affected","evidence":"No synchronization or reconciliation behavior changes; repeated revocation is a monotonic no-op."},
+    {"area":"webhooks_egress","status":"not_affected","evidence":"No new outbound destination or synchronous SIEM dependency is introduced."},
+    {"area":"slo_observability","status":"affected","evidence":"UI distinguishes configured runtime state from not-verified provider health and observed sessions from provider login history."},
+    {"area":"operations_rollback","status":"affected","evidence":"Deployment requires migration 000061 first; evidence tables are retained through rollback and retention policy."},
+    {"area":"testing_conformance","status":"affected","evidence":"API privacy/revocation tests, migration invariants, route parity, SDK generation and frontend type checks cover the change."}
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

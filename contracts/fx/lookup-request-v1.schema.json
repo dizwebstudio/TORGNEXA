@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/fx/lookup-request-v1.json",
+  "title": "TORGNEXA FX Provider Lookup Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["base_currency", "quote_currency", "as_of", "rate_type"],
+  "properties": {
+    "base_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "quote_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "as_of": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "rate_type": {"enum": ["official", "mid", "bid", "ask", "closing", "indicative"]}
+  },
+  "$comment": "Every lookup carries an explicit UTC as_of instant. A caller requesting a current rate intentionally supplies its current UTC instant; providers do not expose an unversioned naked current-number operation."
+}

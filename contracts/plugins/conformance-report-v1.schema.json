@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/plugins/conformance-report-v1.json",
+  "title": "TORGNEXA Connector Conformance Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_version",
+    "connector_id",
+    "connector_version",
+    "sdk_version",
+    "passed",
+    "checks",
+    "completed_at",
+    "report_sha256"
+  ],
+  "properties": {
+    "suite_version": { "const": 1 },
+    "connector_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "connector_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sdk_version": { "const": 1 },
+    "passed": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "minItems": 13,
+      "maxItems": 13,
+      "prefixItems": [
+        { "$ref": "#/$defs/manifestCheck" },
+        { "$ref": "#/$defs/authCheck" },
+        { "$ref": "#/$defs/healthCheck" },
+        { "$ref": "#/$defs/errorsCheck" },
+        { "$ref": "#/$defs/rateLimitCheck" },
+        { "$ref": "#/$defs/idempotencyCheck" },
+        { "$ref": "#/$defs/webhookCheck" },
+        { "$ref": "#/$defs/tenantCheck" },
+        { "$ref": "#/$defs/dryRunCheck" },
+        { "$ref": "#/$defs/credentialCheck" },
+        { "$ref": "#/$defs/egressCheck" },
+        { "$ref": "#/$defs/resourceCheck" },
+        { "$ref": "#/$defs/isolationCheck" }
+      ],
+      "items": false
+    },
+    "completed_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$",
+      "format": "date-time"
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "enum": ["pass", "fail"] },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "pass" } }, "required": ["status"] },
+          "then": { "not": { "required": ["reason_code"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "fail" } }, "required": ["status"] },
+          "then": { "required": ["reason_code"] }
+        }
+      ]
+    },
+    "manifestCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "manifest_sdk" } } }] },
+    "authCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "auth_boundary" } } }] },
+    "healthCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "health_normalization" } } }] },
+    "errorsCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "normalized_errors" } } }] },
+    "rateLimitCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "rate_limit_retry" } } }] },
+    "idempotencyCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "idempotency" } } }] },
+    "webhookCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "webhook_replay" } } }] },
+    "tenantCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "tenant_isolation" } } }] },
+    "dryRunCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "dry_run_side_effect_suppression" } } }] },
+    "credentialCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "production_credential_rejection" } } }] },
+    "egressCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "egress_grant_enforcement" } } }] },
+    "resourceCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "resource_limit_failure" } } }] },
+    "isolationCheck": { "allOf": [{ "$ref": "#/$defs/check" }, { "properties": { "id": { "const": "sandbox_isolation" } } }] }
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-032",
+  "task": "032",
+  "change_class": "pillar_change",
+  "summary": "Implement the frozen React/TypeScript/Vite frontend shell and finalize the developer-surface runtime decision for server state, host-owned OIDC authentication, capability-aware routing and generated SDK consumption.",
+  "scopes": [
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "README.md",
+    "VALIDATION_REPORT.md",
+    "adr/0047-frontend-shell-runtime.md",
+    "architecture/reviews/032-frontend-shell.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/frontend/auth-adapter-v1.md",
+    "contracts/frontend/ui-session-v1.schema.json",
+    "docs/34-frontend.md",
+    "docs/69-frontend-shell.md",
+    "frontend/.gitignore",
+    "frontend/index.html",
+    "frontend/package.json",
+    "frontend/repository-shims.d.ts",
+    "frontend/src/api/ApiProvider.tsx",
+    "frontend/src/api/client.ts",
+    "frontend/src/api/decoders.ts",
+    "frontend/src/app/App.tsx",
+    "frontend/src/auth/AuthBoundary.tsx",
+    "frontend/src/auth/AuthProvider.tsx",
+    "frontend/src/auth/auth-adapter.ts",
+    "frontend/src/auth/session-model.ts",
+    "frontend/src/components/ApiState.tsx",
+    "frontend/src/components/EmptyState.tsx",
+    "frontend/src/components/StatusBadge.tsx",
+    "frontend/src/features/catalog/ProductList.tsx",
+    "frontend/src/features/notifications/NotificationList.tsx",
+    "frontend/src/features/orders/OrderList.tsx",
+    "frontend/src/main.tsx",
+    "frontend/src/pages/CatalogPage.tsx",
+    "frontend/src/pages/DashboardPage.tsx",
+    "frontend/src/pages/NotificationsPage.tsx",
+    "frontend/src/pages/OrdersPage.tsx",
+    "frontend/src/pages/Page.tsx",
+    "frontend/src/pages/PlaceholderPage.tsx",
+    "frontend/src/shell/AppShell.tsx",
+    "frontend/src/shell/navigation.ts",
+    "frontend/src/shell/useLocationPath.ts",
+    "frontend/src/styles.css",
+    "frontend/test/decoders.test.mjs",
+    "frontend/test/navigation.test.mjs",
+    "frontend/test/session.test.mjs",
+    "frontend/tsconfig.json",
+    "frontend/tsconfig.logic.json",
+    "frontend/tsconfig.repository.json",
+    "frontend/vite.config.ts",
+    "scripts/check-frontend-shell.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/032-frontend-shell.md"
+  ],
+  "frozen_pillars": [
+    "developer-surfaces"
+  ],
+  "adr": "adr/0047-frontend-shell-runtime.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The shell never accepts or synthesizes organization/workspace selectors; API tenant/workspace scope remains derived from authenticated server context."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Browser state contains bounded public projections only. Access-token material stays in memory and is excluded from the public UI-session schema and persistence APIs."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "The frontend consumes only the generated Task-062 TypeScript SDK and current public OpenAPI operations; no hand-written endpoint contract or copied generated client is introduced."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 032 does not publish or mutate event envelopes or event payload contracts."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK and provider runtime contracts are unchanged; the shell does not import connector implementations."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No database schema or migration is introduced; browser state is non-authoritative."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Host-owned OIDC adapter, memory-only access tokens, exact capability route guards, same-origin SDK transport, redirect rejection, and static checks prevent browser persistence, tenant-selector injection and provider-specific branching."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Navigation metadata preserves risk class for sensitive areas, but approval authorization remains server-side Task-017 policy and no sensitive write is implemented by the shell."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "Audit and lineage remain server-owned API/domain capabilities; the shell does not duplicate evidence stores."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "Task 032 adds no sync/reconciliation mutation semantics and does not alter request idempotency contracts."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "The browser does not send durable webhooks or duplicate Task-063 egress; Notifications reads use the public API only."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Frontend loading/error states are deterministic, but production browser telemetry/SLO instrumentation remains later operational work and no SLO claim is made."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The shell is a static artifact behind same-origin hosting; rollback is deployment of the prior bundle/API-compatible commit. No data rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "frontend-check adds capability/session/decoder tests, TSX repository validation and static security checks; a real Vite bundle is additionally required when npm dependencies are installed in CI/staging."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "031",
+    "088"
+  ]
+}

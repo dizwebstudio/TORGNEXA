@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-017",
+  "task": "017",
+  "change_class": "pillar_change",
+  "summary": "Implement the provider-neutral fail-closed approval engine with immutable versioned policies, staged quorum/four-eyes/scope evidence, expiry/escalation, execution lifecycle, forced-RLS persistence and atomic audit/outbox evidence.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0041-approval-engine-policy-evidence.md",
+    "architecture/policy.json",
+    "contracts/approval/decision-v1.schema.json",
+    "contracts/approval/policy-v1.schema.json",
+    "contracts/approval/request-v1.schema.json",
+    "contracts/events/approval-decided-v1.schema.json",
+    "contracts/events/approval-escalated-v1.schema.json",
+    "contracts/events/approval-policy-changed-v1.schema.json",
+    "contracts/events/approval-requested-v1.schema.json",
+    "contracts/events/approval-state-changed-v1.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "docs/24-workflow-approval.md",
+    "docs/migrations/000013-approval-engine.md",
+    "internal/platform/approval/approval.go",
+    "internal/platform/approval/approval_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/approvalrepo/migration_test.go",
+    "internal/platform/postgres/approvalrepo/repository.go",
+    "migrations/000013_approval_engine.sql",
+    "migrations/catalog.json",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/017-approval-engine.md",
+    "tools/migrationcheck/task017_audit_test.go"
+  ],
+  "frozen_pillars": [
+    "workflow-approval-audit-lineage"
+  ],
+  "adr": "adr/0041-approval-engine-policy-evidence.md",
+  "existing_adrs": [
+    "adr/0006-approval-security.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy","status":"affected","evidence":"Policies, requests, decisions and escalation evidence are organization/workspace owned with composite foreign keys, transaction-local tenant scope and forced RLS. Cross-tenant policy/request evidence cannot be selected or mutated by the application role."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"Approval evidence stores bounded identifiers, scopes, state and sanitized comments only. Raw provider payloads and credentials are excluded; secret-shaped comments are replaced with the canonical redaction marker."},
+    {"area":"api_compatibility","status":"affected","evidence":"Three additive Draft 2020-12 approval contracts are introduced. Existing OpenAPI approval listing remains compatible and no published request/response field is removed or renamed."},
+    {"area":"event_compatibility","status":"affected","evidence":"Five additive governance.approval.*.v1 event payloads are registered. Existing event types and payload schemas are unchanged, and all new events are emitted through the canonical Transactional Outbox envelope."},
+    {"area":"plugin_sdk_compatibility","status":"not_affected","evidence":"Connector SDK v1 root interfaces, plugin security, sandbox and conformance contracts are unchanged. Connectors remain ordinary callers of host approval policy and cannot implement provider-specific bypasses."},
+    {"area":"database_migration","status":"affected","evidence":"Expand migration 000013 adds four new approval tables, indexes, forced RLS and defensive triggers without renaming/dropping existing columns or tables. Historical policy/decision/escalation evidence is append-oriented."},
+    {"area":"security","status":"affected","evidence":"Sensitive and legally-significant writes deny without matching active policy. Four-eyes, eligible scopes, stage quorum, exact policy version, expiry and allowed state transitions are enforced in Go and PostgreSQL; direct SQL cannot forge final approval without decision evidence."},
+    {"area":"approvals_risk","status":"affected","evidence":"Task 017 becomes the canonical risk-to-approval boundary: read/write-safe may allow, sensitive/legal writes fail closed without policy and otherwise require versioned multi-stage approval before execution."},
+    {"area":"audit_lineage","status":"affected","evidence":"Policy install, request, decision, escalation and execution transitions append safe audit records in the same transaction as state and outbox intent. Task 030 will add cross-domain lineage/timeline reads using these stable request/policy identifiers."},
+    {"area":"reconciliation_idempotency","status":"affected","evidence":"Optimistic request versions, unique actor vote per stage and caller-supplied immutable audit/event IDs make retries fail closed rather than double-apply approval state. Downstream sensitive execution still uses its normal Inbox/Outbox/idempotency boundary."},
+    {"area":"webhooks_egress","status":"not_affected","evidence":"Task 017 adds no webhook transport or direct external egress. Approval events remain internal EventBus facts; Task 063 owns durable outbound webhooks."},
+    {"area":"slo_observability","status":"affected","evidence":"Stable states, escalation count, UTC deadlines and normalized failure codes provide bounded metrics for pending age, expiry, approval latency and execution outcomes without persisting arbitrary remote error text."},
+    {"area":"operations_rollback","status":"affected","evidence":"The migration is additive. Rollback of binaries leaves immutable approval evidence intact; policy/request tables must not be dropped as an emergency rollback because historical authorization evidence is auditable state."},
+    {"area":"testing_conformance","status":"affected","evidence":"Tests cover fail-closed risk gating, four-eyes, scope eligibility, staged quorum, duplicate votes, rejection, expiry, escalation, execution binding and secret-comment redaction; migration audits assert forced RLS, append-only evidence and DB quorum guards."}
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "030",
+    "051",
+    "068",
+    "069",
+    "079",
+    "082",
+    "084"
+  ]
+}

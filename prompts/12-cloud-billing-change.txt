@@ -1,0 +1,1 @@
+Read entitlements, settlements, payments and Cloud Billing docs. Keep subscription/invoice/metering state separate from commerce payments and Community runtime. Model idempotent state transitions/adjustments and test grace/suspension/reactivation/reconciliation.

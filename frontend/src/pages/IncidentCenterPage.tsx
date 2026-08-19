@@ -1,0 +1,39 @@
+import {useMemo} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {useApi} from "../api/ApiProvider";
+import {useAuth} from "../auth/AuthProvider";
+import {Page} from "./Page";
+import {DataTable} from "../components/DataTable";
+import {Drawer} from "../components/Drawer";
+import {StatusBadge} from "../components/StatusBadge";
+import {ErrorBlock,LoadingBlock} from "../components/ApiState";
+import {navigate,useLocationPath} from "../shell/useLocationPath";
+import {Icon} from "../components/Icon";
+
+type Incident={id:string;kind:"warehouse"|"drift"|"connector"|"approval";title:string;entity:string;status:string;severity:string;opened:string;detail:any};
+const items=(v:any)=>Array.isArray(v?.items)?v.items:[];
+const severity=(status:string)=>/lost|unavailable|failed|error|critical/i.test(status)?"critical":/degraded|open|pending|rate|warning/i.test(status)?"warning":"info";
+
+export function IncidentCenterPage(){
+ const api=useApi() as any,{session}=useAuth(),path=useLocationPath(),caps=session?.capabilities??[];
+ const warehouses=useQuery({queryKey:["incident-center","warehouses"],enabled:caps.includes("stock.read"),queryFn:async()=>items((await api.listWarehouseIncidents()).body)});
+ const sync=useQuery({queryKey:["incident-center","sync"],enabled:caps.includes("sync.read"),queryFn:async()=>(await api.getSyncStatus()).body as any});
+ const connectors=useQuery({queryKey:["incident-center","connectors"],enabled:caps.includes("connectors.read"),queryFn:async()=>items((await api.listConnectorAccounts({limit:100})).body)});
+ const approvals=useQuery({queryKey:["incident-center","approvals"],enabled:caps.includes("approvals.read"),queryFn:async()=>items((await api.listApprovals()).body)});
+ const rows=useMemo<Incident[]>(()=>[
+  ...(warehouses.data??[]).filter((v:any)=>!["completed","closed","resolved"].includes(String(v.Status??v.status??"").toLowerCase())).map((v:any)=>({id:String(v.ID),kind:"warehouse" as const,title:`Склад ${v.WarehouseID}`,entity:String(v.WarehouseID),status:String(v.Status),severity:severity(`${v.OperationalState} ${v.Status}`),opened:String(v.OpenedAt),detail:v})),
+  ...((sync.data?.drifts??[]) as any[]).filter(v=>String(v.status)==="open").map(v=>({id:String(v.id),kind:"drift" as const,title:`Расхождение ${v.kind}`,entity:String(v.local_entity_id||v.remote_id||"—"),status:String(v.status),severity:"warning",opened:String(v.detected_at),detail:v})),
+  ...(connectors.data??[]).filter((v:any)=>String(v.status)==="active"&&!["healthy","unknown"].includes(String(v.health_status))).map((v:any)=>({id:String(v.id),kind:"connector" as const,title:`${v.connector_id}: ${v.health_status}`,entity:String(v.id),status:String(v.health_status),severity:severity(String(v.health_status)),opened:String(v.health_checked_at??v.updated_at??new Date().toISOString()),detail:v})),
+  ...(approvals.data??[]).filter((v:any)=>String(v.state)==="pending").map((v:any)=>({id:String(v.id),kind:"approval" as const,title:"Требуется согласование",entity:String(v.action??v.resource_id??v.id),status:"pending",severity:"warning",opened:String(v.created_at??new Date().toISOString()),detail:v}))
+ ].sort((a,b)=>Date.parse(b.opened)-Date.parse(a.opened)),[warehouses.data,sync.data,connectors.data,approvals.data]);
+ const parts=path.split("/").filter(Boolean),selected=parts[0]==="incidents"&&parts.length>=3?rows.find(v=>v.kind===parts[1]&&v.id===decodeURIComponent(parts.slice(2).join("/"))):undefined;
+ const loading=[warehouses,sync,connectors,approvals].some(v=>v.isFetching&&!v.data),failed=[warehouses,sync,connectors,approvals].some(v=>v.isError);
+ const columns=[{key:"severity",label:"Приоритет",value:(v:Incident)=>v.severity,render:(v:Incident)=><StatusBadge value={v.severity}/>},{key:"kind",label:"Источник",value:(v:Incident)=>v.kind,render:(v:Incident)=><span className="incident-kind"><Icon name={v.kind==="warehouse"?"warehouse":v.kind==="drift"?"sync":v.kind==="connector"?"connectors":"approvals"}/>{v.kind}</span>},{key:"title",label:"Проблема",value:(v:Incident)=>`${v.title} ${v.entity}`,render:(v:Incident)=><span><strong>{v.title}</strong><small className="table-subline mono">{v.entity}</small></span>},{key:"status",label:"Статус",value:(v:Incident)=>v.status,render:(v:Incident)=><StatusBadge value={v.status}/>},{key:"opened",label:"Обнаружено",value:(v:Incident)=>v.opened,render:(v:Incident)=><time>{new Date(v.opened).toLocaleString("ru-RU")}</time>}];
+ return <Page eyebrow="Operations" title="Incident Center" description="Единая очередь складских отказов, reconciliation drift, проблем интеграций и действий, требующих человека.">
+  <div className="hero-grid"><article className="metric-card primary-metric"><span>Открыто</span><strong>{rows.length}</strong><small>операционных проблем</small></article><article className="metric-card"><span>Критические</span><strong>{rows.filter(v=>v.severity==="critical").length}</strong><small>требуют немедленного внимания</small></article><article className="metric-card"><span>Автоматизация</span><strong>{rows.filter(v=>v.kind==="warehouse"||v.kind==="drift").length}</strong><small>оркестрация уже работает</small></article></div>
+  {loading?<LoadingBlock/>:failed?<ErrorBlock>Часть источников Incident Center недоступна. Доступные данные всё равно показаны.</ErrorBlock>:null}
+  <DataTable rows={rows} columns={columns} rowKey={v=>`${v.kind}:${v.id}`} searchPlaceholder="Склад, drift, кабинет, согласование…" onOpen={v=>navigate(`/incidents/${v.kind}/${encodeURIComponent(v.id)}`)}/>
+  <Drawer open={!!selected} title={selected?.title??"Инцидент"} subtitle={selected?`${selected.kind} · ${selected.id}`:undefined} onClose={()=>navigate("/incidents")}><>{selected?<IncidentDetail incident={selected}/>:null}</></Drawer>
+ </Page>
+}
+function IncidentDetail({incident}:{incident:Incident}){const v=incident.detail;return <div className="catalog-stack"><div className="drawer-kpis"><div><small>Приоритет</small><StatusBadge value={incident.severity}/></div><div><small>Статус</small><StatusBadge value={incident.status}/></div><div><small>Источник</small><strong>{incident.kind}</strong></div></div><section className="drawer-section"><h3>Impact</h3><dl className="detail-list"><div><dt>Сущность</dt><dd className="mono">{incident.entity}</dd></div><div><dt>Обнаружено</dt><dd>{new Date(incident.opened).toLocaleString("ru-RU")}</dd></div>{incident.kind==="warehouse"?<><div><dt>Operational state</dt><dd>{v.OperationalState}</dd></div><div><dt>Rerouted allocations</dt><dd>{v.ReroutedAllocationCount??0}</dd></div><div><dt>Требует человека</dt><dd>{v.ExecutionAttentionCount??0}</dd></div></>:null}{incident.kind==="drift"?<><div><dt>Local</dt><dd className="mono">{v.local_entity_id||"—"} · {v.local_status||"—"}</dd></div><div><dt>Remote</dt><dd className="mono">{v.remote_id||"—"} · {v.remote_status||"—"}</dd></div><div><dt>Рекомендация</dt><dd>{v.recommended_action||"review"}</dd></div></>:null}{incident.kind==="connector"?<><div><dt>Connector</dt><dd>{v.connector_id}</dd></div><div><dt>Health</dt><dd>{v.health_status}</dd></div></>:null}</dl></section><section className="drawer-section"><h3>Следующее действие</h3><p className="drawer-help">{incident.kind==="warehouse"?"Проверьте автоматическое переназначение fulfillment allocations и остаточную очередь needs_attention.":incident.kind==="drift"?"Сравните local/remote state и разрешите drift в разделе синхронизации.":incident.kind==="connector"?"Запустите health check, проверьте rate limit и авторизацию кабинета.":"Откройте согласование и примите решение с учётом impact."}</p><button className="button primary" onClick={()=>navigate(incident.kind==="warehouse"?"/inventory":incident.kind==="drift"?"/sync":incident.kind==="connector"?"/integrations":"/approvals")}>Перейти к операции</button></section></div>}

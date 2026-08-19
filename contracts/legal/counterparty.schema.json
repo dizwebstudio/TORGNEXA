@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/legal/counterparty.json",
+  "title": "Counterparty",
+  "type": "object",
+  "required": [
+    "id",
+    "party_type",
+    "display_name",
+    "jurisdiction",
+    "identifiers",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "party_type": {
+      "enum": [
+        "legal_entity",
+        "individual_entrepreneur",
+        "person",
+        "branch"
+      ]
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jurisdiction": {
+      "type": "string",
+      "minLength": 2
+    },
+    "identifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "active",
+        "inactive",
+        "blocked",
+        "archived"
+      ]
+    },
+    "parent_party_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

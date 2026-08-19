@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-042",
+  "task": "042",
+  "change_class": "new_provider",
+  "summary": "Register MAX Bot API as a Social Core provider adapter with exact-channel bot authorization, released text/image/gallery/video publishing, HTTPS URL buttons, bounded status reads, production webhook secret verification and host-owned durable deduplication.",
+  "scopes": [
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/042-max-social-connector.json",
+    "connectors/max-messenger/config.go",
+    "connectors/max-messenger/conformance.go",
+    "connectors/max-messenger/connector.go",
+    "connectors/max-messenger/connector_test.go",
+    "connectors/max-messenger/fixtures/get-channel.json",
+    "connectors/max-messenger/fixtures/get-me.json",
+    "connectors/max-messenger/fixtures/get-membership.json",
+    "connectors/max-messenger/fixtures/send-message.json",
+    "connectors/max-messenger/fixtures/upload-image.json",
+    "connectors/max-messenger/fixtures/upload-init-image.json",
+    "connectors/max-messenger/fixtures/webhook-message-created.json",
+    "connectors/max-messenger/manifest.json",
+    "connectors/max-messenger/social.go",
+    "connectors/max-messenger/webhook.go",
+    "contracts/connector-capabilities.yaml",
+    "docs/71-social-core.md",
+    "docs/connectors/max-messenger/README.md",
+    "docs/connectors/max-messenger/capability-audit.md",
+    "docs/connectors/max-messenger/conformance-plan.md",
+    "docs/connectors/max-messenger/conformance-report.json",
+    "docs/connectors/max-messenger/reconciliation.md",
+    "docs/connectors/max-messenger/spec.md",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/social_webhook.go",
+    "internal/platform/connectors/social_webhook_test.go",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/042-max-social-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md",
+    "adr/0049-canonical-social-core.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The adapter receives only a validated tenant-bound Account and one configured numeric ChatID. Publish receipts, status reads and webhook events must match that ChatID; no caller tenant/channel override exists."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Only bounded MAX chat/message identifiers and canonicalized admitted webhook payloads cross the provider boundary. Bot token and webhook verification secret remain callback-scoped behind SecretAccessor and are excluded from normalized errors/results."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 042 adds no public TORGNEXA HTTP/OpenAPI operation."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 042 adds no EventBus schema. The SocialWebhookReceiver result is an internal Connector SDK projection; host Task-009/EventBus wiring remains separately versioned."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Connector SDK v1 gains additive social.webhooks capability plus SocialWebhookRequest/Result/Receiver/Deduplicator types. Frozen Connector and Runtime roots are unchanged and existing providers need no implementation changes."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No migration is added. Durable webhook dedup is host-owned and must reuse tenant-scoped Task-009 Inbox/idempotency persistence rather than provider-local tables."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "API authority is fixed, bot/channel identity is exact, secrets remain behind SecretAccessor, released media is re-opened through Task-088, dynamic media upload URLs use an exact HTTPS host allowlist, and webhook secret comparison is constant-time."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 042 admits publish/status/webhook surfaces only. Remote edit/delete and other destructive MAX operations remain undeclared; host Social Core authorization remains authoritative for publication dispatch."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Task-020 remains Content/Variant/Publication/audit/outbox authority. Provider results are bounded receipts and webhook projections; the adapter cannot mutate Core/audit/lineage stores directly."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Audited MAX send requests expose no caller idempotency token, so ambiguous writes fail closed as non-retryable write_outcome_unknown. Webhook retries are content-addressed from canonical JSON and claimed by host-owned durable dedup before processing."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound API authority is platform-api2.max.ru; media upload egress is restricted to qualified official hosts. Production webhook subscription requires HTTPS implicit port 443, fixed update types and a separate verification secret; foreign/malformed events are rejected before dedup."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Manifest pacing is conservative against current provider guidance. Auth/permission/rate/service/write-unknown failures are normalized to bounded categories without raw provider messages or secret-bearing URLs."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Suspend the MAX connector account and delete its webhook subscription to stop new traffic. Existing canonical publication/audit/inbox evidence remains intact and no migration rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Deterministic tests cover manifest/config/secrets, exact-channel health, text/buttons, Task-088 media upload and SSRF controls, channel-bound receipts/status, ambiguous-write behavior, subscription lifecycle, secret verification, foreign-channel/timestamp rejection before dedup and duplicate replay; provider report covers all thirteen Task-064 checks."
+    }
+  ],
+  "provider": {
+    "id": "max-messenger",
+    "route": "connector_sdk",
+    "manifest": "connectors/max-messenger/manifest.json",
+    "connector_spec": "docs/connectors/max-messenger/spec.md",
+    "capability_audit": "docs/connectors/max-messenger/capability-audit.md",
+    "conformance_plan": "docs/connectors/max-messenger/conformance-plan.md"
+  },
+  "follow_up_tasks": [
+    "043",
+    "066"
+  ]
+}

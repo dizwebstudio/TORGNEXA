@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "$id": "https://torgnexa.local/schemas/events/product-compliance-record-changed-v1.json",
+  "title": "compliance.product.record_changed.v1",
+  "type": "object",
+  "required": [
+    "entity_type",
+    "entity_id",
+    "version",
+    "change"
+  ],
+  "properties": {
+    "entity_type": {
+      "enum": [
+        "document",
+        "binding",
+        "policy"
+      ]
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "enum": [
+        "created",
+        "updated",
+        "verified"
+      ]
+    }
+  }
+}

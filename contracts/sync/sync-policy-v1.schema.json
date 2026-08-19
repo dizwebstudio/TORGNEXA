@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/sync/sync-policy-v1.json",
+  "title": "TORGNEXA Sync Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id","organization_id","workspace_id","connector_account_id","entity_type","direction","source_of_truth","enabled","version","created_at","updated_at"],
+  "properties": {
+    "id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "organization_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "workspace_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "connector_account_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "entity_type": {"type":"string","pattern":"^[a-z][a-z0-9._-]{0,63}$"},
+    "direction": {"enum":["inbound","outbound","bidirectional"]},
+    "source_of_truth": {"enum":["local","remote","manual"]},
+    "enabled": {"type":"boolean"},
+    "version": {"type":"integer","minimum":1},
+    "created_at": {"type":"string","format":"date-time","pattern":"Z$"},
+    "updated_at": {"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/order-created-v1.json",
+  "title": "commerce.orders.order_created.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "order_id",
+    "channel",
+    "external_order_id"
+  ],
+  "properties": {
+    "order_id": {
+      "type": "string"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "external_order_id": {
+      "type": "string"
+    },
+    "total_minor": {
+      "type": "integer"
+    },
+    "currency": {
+      "type": "string"
+    }
+  }
+}

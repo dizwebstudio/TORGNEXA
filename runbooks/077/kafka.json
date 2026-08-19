@@ -1,0 +1,16 @@
+{
+  "id": "rb-kafka",
+  "title": "Kafka incident",
+  "trigger_codes": [
+    "kafka_lag_critical"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Pause non-critical producers or rebalance reviewed partitions without deleting offsets.",
+      "validation": "Verify ISR, consumer lag and end-to-end event flow.",
+      "rollback": "Restore previous producer/consumer concurrency.",
+      "evidence": "broker health, lag snapshot and correlation ids"
+    }
+  ]
+}

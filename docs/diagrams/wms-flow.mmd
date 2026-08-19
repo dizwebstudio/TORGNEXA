@@ -1,0 +1,12 @@
+flowchart LR
+  PO[Purchase Order] --> IN[Inbound Shipment]
+  IN --> REC[Receiving]
+  REC --> PUT[Put-away]
+  PUT --> LED[Inventory Ledger]
+  LED --> RES[Reservation]
+  RES --> PICK[Pick]
+  PICK --> PACK[Pack]
+  PACK --> SHIP[Shipment]
+  SHIP --> PUDO[PUDO / Customer]
+  PUDO --> RET[Return]
+  RET --> REC

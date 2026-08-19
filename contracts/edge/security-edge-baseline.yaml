@@ -1,0 +1,13 @@
+version: 1
+production:
+  tls_required: true
+  hsts_required: true
+  trust_forwarded_headers_only_from_known_proxies: true
+  request_limits_required: true
+  rate_limiting_required: true
+  cors_allowlist_required: true
+  csrf_for_cookie_auth_required: true
+  waf_or_equivalent_required: true
+  ddos_mitigation_strategy_required: true
+  edge_security_event_export_required: true
+  application_authz_still_required: true

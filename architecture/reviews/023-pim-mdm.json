@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-023",
+  "task": "023",
+  "change_class": "pillar_change",
+  "summary": "Implement canonical provider-neutral PIM/MDM masters, typed Product master-data assignments, field-level source authority, explainable duplicate candidates, deterministic non-executing merge previews, additive external mapping v3, and atomic audit/outbox/lineage evidence.",
+  "scopes": [
+    "GAP_AUDIT.md",
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0043-canonical-pim-mdm.md",
+    "architecture/policy.json",
+    "contracts/catalog/connector-entity-mapping-v3.schema.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/pim-record-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/pim/attribute-v1.schema.json",
+    "contracts/pim/brand-v1.schema.json",
+    "contracts/pim/category-v1.schema.json",
+    "contracts/pim/duplicate-candidate-v1.schema.json",
+    "contracts/pim/field-authority-v1.schema.json",
+    "contracts/pim/merge-preview-v1.schema.json",
+    "docs/19-pim-mdm.md",
+    "docs/migrations/000015-pim-mdm.md",
+    "internal/core/pim/pim.go",
+    "internal/core/pim/pim_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/pimrepo/migration_test.go",
+    "internal/platform/postgres/pimrepo/repository.go",
+    "migrations/000015_pim_mdm.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/023-pim-mdm.md",
+    "tools/migrationcheck/task023_audit_test.go"
+  ],
+  "frozen_pillars": [
+    "pim-mdm-financial-stock-ledgers"
+  ],
+  "adr": "adr/0043-canonical-pim-mdm.md",
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0042-immutable-data-lineage.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "All PIM masters, assignments, authority rules and review evidence are organization/workspace scoped with composite tenant foreign keys, transaction-local scope and forced RLS."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "PIM stores bounded business master data and review explanations; it does not copy credentials or customer PII. Decimal attribute values use exact string representation and review evidence is bounded."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "New additive Draft 2020-12 PIM contracts and connector-mapping v3 are introduced. Existing Product/Offer and connector mapping v1/v2 shapes remain unchanged."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "A new commerce.pim.record_changed.v1 event is registered. Existing catalog/order/pricing/inventory event payloads are not modified."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "The generic connector identity bridge is additively broadened to brand/category/attribute. No provider name or taxonomy field is added to Core and Connector SDK v1 root interfaces remain unchanged."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000015 creates canonical PIM/MDM tables and broadens the connector mapping type constraint/guard without dropping or renaming existing data columns."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Forced RLS, same-tenant foreign keys, immutable identities/types, no hard delete/truncate and exact typed-attribute validation fail closed against cross-tenant/provider-specific contamination."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Task 023 creates merge previews only and does not execute destructive merges. Sensitive merge/publication actions remain gated by Task 017 approval."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "PIM mutations append Task-003 Audit, Task-008 Outbox and Task-030 Lineage evidence atomically; merge/duplicate provenance references source IDs and versions instead of copying provider payloads."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Optimistic versions, generic external mappings, deterministic preview fingerprints and immutable duplicate evidence create the canonical identity/decision inputs for Tasks 013/014."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "Task 023 performs no outbound webhook/network delivery. Task 063 remains responsible for durable webhook egress."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Versioned PIM events, duplicate scores/signals and merge conflict counts provide bounded operational metrics and explainable support evidence."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The migration is additive; binary rollback retains PIM masters and review evidence. Backup/restore rehearsal must preserve the new tables and RLS boundaries."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover typed master validation, deterministic authority-based merge preview, explainable duplicates, migration/RLS/provider-neutral guards, and executable Task-023 static audits."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "013",
+    "014",
+    "031",
+    "054",
+    "081",
+    "082"
+  ]
+}

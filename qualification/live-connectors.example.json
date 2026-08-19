@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "accounts": [
+    {
+      "account_id": "replace-with-wildberries-account",
+      "connector_id": "wildberries",
+      "run_sync": false
+    },
+    {
+      "account_id": "replace-with-ozon-account",
+      "connector_id": "ozon",
+      "run_sync": false
+    },
+    {
+      "account_id": "replace-with-yandex-market-account",
+      "connector_id": "yandex-market",
+      "run_sync": false
+    }
+  ]
+}

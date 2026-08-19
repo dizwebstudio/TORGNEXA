@@ -1,0 +1,5 @@
+{
+  "result": [
+    {"barcode": 4601234567892, "product_id": 1003, "seller_sku_id": "MAG-GREEN-S", "sku_id": 2003, "title": "Футболка зеленая S", "is_active": true, "is_archive": false, "is_blocked": false, "is_no_stock": false}
+  ]
+}

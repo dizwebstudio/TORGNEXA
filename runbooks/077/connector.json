@@ -1,0 +1,16 @@
+{
+  "id": "rb-connector",
+  "title": "Connector incident",
+  "trigger_codes": [
+    "connector_failure"
+  ],
+  "steps": [
+    {
+      "id": "contain",
+      "safe_action": "Disable the affected connector account and stop outbound writes while retaining reconciliation reads where safe.",
+      "validation": "Run connector health and conformance-safe read probe.",
+      "rollback": "Re-enable the account after remote health and credential validation.",
+      "evidence": "account health, remote error codes and reconciliation ids"
+    }
+  ]
+}

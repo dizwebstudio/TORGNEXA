@@ -1,0 +1,12 @@
+{
+  "meta": {"href":"https://api.moysklad.ru/api/remap/1.2/report/stock/bystore","type":"stockbystore","mediaType":"application/json","size":2,"limit":2,"offset":0},
+  "rows": [
+    {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/product/11111111-1111-1111-1111-111111111111","type":"product","mediaType":"application/json"},"stockByStore":[
+      {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/store/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","type":"store","mediaType":"application/json"},"name":"Основной склад","stock":12.500,"reserve":1,"inTransit":0},
+      {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/store/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","type":"store","mediaType":"application/json"},"name":"Резервный склад","stock":3.25,"reserve":0,"inTransit":2}
+    ]},
+    {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/product/22222222-2222-2222-2222-222222222222","type":"product","mediaType":"application/json"},"stockByStore":[
+      {"meta":{"href":"https://api.moysklad.ru/api/remap/1.2/entity/store/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","type":"store","mediaType":"application/json"},"name":"Основной склад","stock":5,"reserve":0,"inTransit":0}
+    ]}
+  ]
+}

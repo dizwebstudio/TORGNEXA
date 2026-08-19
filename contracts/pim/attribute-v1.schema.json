@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/pim/attribute-v1.json",
+  "title":"TORGNEXA Canonical Attribute v1",
+  "type":"object","additionalProperties":false,
+  "required":["id","organization_id","workspace_id","code","name","value_type","multi_value","status","version","created_at","updated_at"],
+  "properties":{
+    "id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "organization_id":{"type":"string","minLength":1,"maxLength":36},"workspace_id":{"type":"string","minLength":1,"maxLength":36},
+    "code":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},"name":{"type":"string","minLength":1,"maxLength":300},
+    "value_type":{"enum":["text","integer","decimal","boolean","date","datetime","reference"]},"multi_value":{"type":"boolean"},
+    "status":{"enum":["draft","active","archived"]},"version":{"type":"integer","minimum":1},
+    "created_at":{"type":"string","format":"date-time","pattern":"Z$"},"updated_at":{"type":"string","format":"date-time","pattern":"Z$"}
+  }
+}

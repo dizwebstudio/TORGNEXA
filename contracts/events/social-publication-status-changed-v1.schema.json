@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/social-publication-status-changed-v1.json",
+  "title": "commerce.social.publication_status_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "publication_id",
+    "variant_id",
+    "channel_account_id",
+    "schedule_mode",
+    "scheduled_at",
+    "status",
+    "attempt",
+    "version"
+  ],
+  "properties": {
+    "publication_id": {
+      "$ref": "#/$defs/id"
+    },
+    "variant_id": {
+      "$ref": "#/$defs/id"
+    },
+    "channel_account_id": {
+      "$ref": "#/$defs/id"
+    },
+    "schedule_mode": {
+      "enum": [
+        "immediate",
+        "at"
+      ]
+    },
+    "scheduled_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "scheduled",
+        "ready",
+        "publishing",
+        "published",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schedule_mode": {
+            "const": "immediate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scheduled_at": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schedule_mode": {
+            "const": "at"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason_code"
+        ]
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "status": {
+              "const": "failed"
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "reason_code"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"
+    }
+  }
+}

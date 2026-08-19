@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-066",
+  "task": "066",
+  "change_class": "pillar_change",
+  "summary": "Makes API, event processing, sync, webhook and reporting SLOs executable with deterministic load/failure profiles and fail-closed percentile, throughput, lag, saturation and error-budget evaluation.",
+  "scopes": [
+    "HANDOFF.md",
+    "Makefile",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0064-executable-slo-performance-qualification.md",
+    "architecture/policy.json",
+    "architecture/reviews/066-slo-performance-test-suite.json",
+    "cmd/torgnexa-slo-report",
+    "contracts/operations/slo-v1.md",
+    "docs/46-sre-performance-slo.md",
+    "docs/operations/066-slo-performance-test-suite.md",
+    "internal/platform/slo",
+    "performance",
+    "scripts/check-performance-slo.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/066-slo-and-performance-test-suite.md"
+  ],
+  "frozen_pillars": [
+    "event-platform-outbox-inbox",
+    "bidirectional-sync-reconciliation",
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning"
+  ],
+  "adr": "adr/0064-executable-slo-performance-qualification.md",
+  "existing_adrs": [
+    "adr/0018-slo-performance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0052-clickhouse-reporting-projections.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "Task 066 evaluates aggregate operational observations and introduces no tenant data store or authorization path."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "SLO observations contain only numeric timing/count/capacity signals; payloads, identifiers, headers and credentials are outside the contract."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No public HTTP/OpenAPI operation changes; API objectives are host-side operational contracts."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event schema changes; Kafka/event-processing lag and throughput are measured around existing envelopes."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK/provider contracts remain unchanged and external provider availability is explicitly excluded from host availability SLOs."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No PostgreSQL or ClickHouse schema change is required by the evaluator/baseline harness."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Metric observations are bounded numeric structures; deterministic CI qualification avoids arbitrary payload capture or remote endpoints."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Threshold changes become reviewed repository changes and performance release gates fail closed on a breach rather than silently widening budgets."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Committed baseline and deployment evidence requirements bind measurements to commit/image, topology, dataset and duration."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Sync/reconciliation lag is a first-class objective; deterministic profiles include partial-outage recovery without changing domain idempotency contracts."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Durable webhook delivery receives explicit latency, throughput, lag and availability objectives while external endpoint downtime remains dependency state."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Task 066 defines executable objectives, p50/p95/p99 summarization, throughput, lag, saturation, 30-day error budgets and six deterministic load/failure profiles."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "A release is blocked by objective breach; Task 077 owns paging/runbooks and recovery actions while Task 066 supplies the measurable trigger."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "make performance regenerates a deterministic baseline and diffs it; tests prove every threshold fails closed and default failure profiles remain inside declared budgets."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "077",
+    "084",
+    "085",
+    "092"
+  ]
+}

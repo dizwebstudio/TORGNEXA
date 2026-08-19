@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/privacy/purpose.json",
+  "title": "TORGNEXA Privacy Processing Purpose",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "organization_id",
+    "workspace_id",
+    "purpose_key",
+    "description",
+    "legal_basis",
+    "notice_reference",
+    "consent_reference",
+    "allowed_classes",
+    "status",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "organization_id": { "$ref": "#/$defs/sortable_id" },
+    "workspace_id": { "$ref": "#/$defs/sortable_id" },
+    "purpose_key": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,62}$" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "legal_basis": {
+      "type": "string",
+      "enum": ["consent", "contract", "legal_obligation", "legitimate_interest", "vital_interest", "public_task", "other_documented_basis"]
+    },
+    "notice_reference": { "type": "string", "maxLength": 512 },
+    "consent_reference": { "type": "string", "maxLength": 512 },
+    "allowed_classes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/data_class" }
+    },
+    "status": { "type": "string", "enum": ["active", "retired"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "legal_basis": { "const": "consent" } }, "required": ["legal_basis"] },
+      "then": { "properties": { "consent_reference": { "minLength": 1 } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "allowed_classes": { "contains": { "enum": ["personal", "sensitive_operational"] } }
+        },
+        "required": ["allowed_classes"]
+      },
+      "then": { "properties": { "notice_reference": { "minLength": 1 } } }
+    }
+  ],
+  "$defs": {
+    "data_class": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "personal", "sensitive_operational", "secret"]
+    },
+    "sortable_id": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        { "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" }
+      ]
+    }
+  }
+}

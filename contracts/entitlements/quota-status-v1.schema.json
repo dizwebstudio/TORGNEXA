@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/entitlements/quota-status-v1.json",
+  "title":"Quota Status v1","type":"object","additionalProperties":false,
+  "required":["metric","limit","used","remaining","window_start","window_end","policy_id","policy_version"],
+  "properties":{
+    "metric":{"type":"string","pattern":"^[a-z][a-z0-9._:/-]{0,127}$"},"limit":{"type":"integer","minimum":0},"used":{"type":"integer","minimum":0},"remaining":{"type":"integer","minimum":0},
+    "window_start":{"type":"string","format":"date-time","pattern":"Z$"},"window_end":{"type":"string","format":"date-time","pattern":"Z$"},
+    "policy_id":{"type":"string"},"policy_version":{"type":"integer","minimum":1}
+  }
+}

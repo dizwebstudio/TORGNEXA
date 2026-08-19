@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-003",
+  "task": "003",
+  "change_class": "new_domain",
+  "summary": "Extend the existing audit capability with its registered PostgreSQL infrastructure adapter and production-grade append-only persistence controls.",
+  "scopes": [
+    "architecture/policy.json",
+    "internal/platform/audit/audit.go",
+    "internal/platform/audit/audit_test.go",
+    "internal/platform/migration/catalog.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/auditrepo/migration_test.go",
+    "internal/platform/postgres/auditrepo/repository.go",
+    "internal/platform/postgres/auditrepo/repository_test.go"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0006-approval-security.md",
+    "adr/0011-privacy-by-design.md",
+    "adr/0019-upgrade-compatibility.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "extend_existing_capability"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The PostgreSQL adapter binds transaction-local organization and workspace scope, while split audit RLS policies independently enforce tenant reads and inserts."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Audit summaries are bounded and recursively sanitized before persistence so credentials and raw authorization material do not become durable audit data."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "Task 003 adds no public REST endpoint or OpenAPI operation and therefore does not change the existing external API compatibility surface."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "The implementation persists application audit records directly and introduces no Kafka event family, envelope change, or public event-version transition."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "The audit service and PostgreSQL adapter remain internal platform capabilities and do not modify connector or plugin SDK contracts or provider admission."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Immutable migration 000004 adds the audit risk column, bounded summary constraints, split RLS policies, append-only triggers, and atomic migration-history recording."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Application and database layers both reject unsafe audit content, while database triggers block update, delete, and truncate attempts even outside normal RLS paths."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Every new application audit event carries one canonical operation risk class, preserving an explicit risk signal for later approval and governance capabilities."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "The task establishes immutable actor, source, action, resource, correlation, risk, summary, tenant, identifier, and timestamp lineage for application effects."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "Audit capture adds a persistence side effect but does not define reconciliation state, inbox deduplication, retry ownership, or idempotency semantics for business operations."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_applicable",
+      "evidence": "The audit foundation has no webhook delivery or external network egress behavior; it writes only through the internal PostgreSQL persistence boundary."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "Task 003 adds no SLO thresholds, metrics contract, tracing backend, or alert-routing change; observability policy remains owned by its existing platform work."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The expand migration preserves legacy nullable actor/correlation fields and a legacy risk default while upgrade and backup rehearsal scripts now apply atomic migrations correctly."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "New unit, static migration, schema fixture, RLS smoke, append-only mutation, migration catalog, race, and repeated package tests cover the audit boundary."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "021",
+    "060"
+  ]
+}

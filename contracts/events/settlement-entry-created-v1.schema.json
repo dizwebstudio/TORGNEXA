@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/settlement-entry-created-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "finance.settlement_entry.created.v1",
+  "required": [
+    "amount_minor",
+    "currency",
+    "entry_id",
+    "entry_type",
+    "provider"
+  ],
+  "properties": {
+    "entry_id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "entry_type": {
+      "type": "string"
+    },
+    "amount_minor": {
+      "type": "integer"
+    },
+    "currency": {
+      "type": "string"
+    }
+  }
+}

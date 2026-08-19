@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@torgnexa/sdk": ["../sdk/typescript/src/client.gen.d.mts"]
+    },
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": ["repository-shims.d.ts", "src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+}

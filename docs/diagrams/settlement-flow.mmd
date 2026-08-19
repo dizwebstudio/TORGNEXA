@@ -1,0 +1,10 @@
+flowchart LR
+  ORD[Orders/Returns] --> EXP[Expected Economics]
+  MKT[Marketplace Statements] --> LED[Settlement Ledger]
+  BANK[Bank/Acquirer Receipts] --> REC[Settlement Reconciliation]
+  EXP --> REC
+  LED --> REC
+  REC --> OK[Matched / Timing / Known Fee]
+  REC --> BAD[Unmatched / Duplicate / Disputed]
+  BAD --> CLAIM[Claim / Investigation]
+  LED --> CH[(ClickHouse Reporting)]

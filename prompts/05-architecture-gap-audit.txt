@@ -1,0 +1,20 @@
+Read AGENTS.md, docs/03-module-boundaries.md,
+docs/54-architecture-freeze-v1.md, architecture/policy.json, the target task,
+and relevant ADRs/contracts. Classify the change as an implementation of an
+existing capability, a new domain, a new provider, a frozen-pillar change, or
+mixed provider/Core work.
+
+Audit every area: tenancy; privacy/data governance; API compatibility; event
+compatibility; plugin/Connector SDK compatibility; database migration/backfill;
+security; approvals/risk; audit/lineage; reconciliation/idempotency;
+webhooks/egress; SLO/observability; operations/rollback; tests/conformance.
+Record meaningful evidence even when an area is not affected. Do not use N/A,
+TODO, TBD, or a stale ADR as proof.
+
+For a new provider require a registered connector/plugin root, manifest,
+Connector Spec, capability audit, conformance plan, and route through the SDK;
+do not implement while provider admission is disabled. For a frozen-pillar,
+gate, or mixed change add a new/superseding ADR with compatibility,
+migration/data, security/privacy, and operational impacts. Identify required
+follow-up tasks/contracts before implementation, then add an exact
+architecture/reviews/NNN-*.json record for the protected paths.

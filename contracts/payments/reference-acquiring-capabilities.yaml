@@ -1,0 +1,14 @@
+version: 1
+family: payment
+profile: reference_acquirer
+required_capabilities:
+  - payments.create
+  - payments.status.read
+  - payments.refund
+  - payments.webhooks
+  - payments.reconcile
+requirements:
+  raw_card_credentials_stored: false
+  idempotency: true
+  webhook_deduplication: true
+  sandbox_fixture_support: preferred

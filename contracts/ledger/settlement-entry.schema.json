@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/ledger/settlement-entry.json",
+  "title": "SettlementEntry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entry_id",
+    "organization_id",
+    "workspace_id",
+    "provider",
+    "entry_type",
+    "amount_minor",
+    "currency",
+    "occurred_at"
+  ],
+  "properties": {
+    "entry_id": {
+      "type": "string"
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "workspace_id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "entry_type": {
+      "enum": [
+        "sale",
+        "commission",
+        "logistics",
+        "storage",
+        "advertising",
+        "penalty",
+        "refund",
+        "compensation",
+        "withholding",
+        "payout",
+        "adjustment"
+      ]
+    },
+    "amount_minor": {
+      "type": "integer"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "remote_reference": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

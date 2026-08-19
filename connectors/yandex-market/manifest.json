@@ -1,0 +1,39 @@
+{
+  "id": "yandex-market",
+  "name": "Yandex Market",
+  "family": "marketplace",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": [
+    "inventory.read",
+    "notifications.receive",
+    "orders.read",
+    "prices.read",
+    "prices.write",
+    "products.read"
+  ],
+  "auth": [
+    {
+      "kind": "api_key",
+      "secret_class": "marketplace.api-key",
+      "required": true
+    }
+  ],
+  "connection_test": {
+    "url": "https://api.partner.market.yandex.ru/ping",
+    "method": "GET",
+    "headers": {
+      "Api-Key": "${secret}"
+    }
+  },
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 15000,
+    "retry": {
+      "max_attempts": 5,
+      "base_backoff_ms": 500,
+      "max_backoff_ms": 30000
+    }
+  }
+}

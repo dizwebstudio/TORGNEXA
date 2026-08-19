@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-005",
+  "task": "005",
+  "change_class": "new_domain",
+  "summary": "Implement provider-neutral, money-safe Price and exact InventoryPosition domains with minimal Warehouse identity, optimistic concurrency, transactional audit + outbox intents, exact Decimal persistence, and tenant/RLS safeguards without leaking provider-specific price/stock fields into Core.",
+  "scopes": [
+    "HANDOFF.md",
+    "architecture/policy.json",
+    "contracts/events/event-catalog.json",
+    "contracts/events/inventory-position-changed-v1.schema.json",
+    "contracts/events/price-changed-v1.schema.json",
+    "contracts/events/warehouse-changed-v1.schema.json",
+    "contracts/fixtures/schema-fixtures.json",
+    "contracts/inventory/inventory-position.schema.json",
+    "contracts/inventory/warehouse.schema.json",
+    "contracts/pricing/price.schema.json",
+    "docs/02-domain-model.md",
+    "docs/05-database.md",
+    "docs/migrations/000010-price-inventory.md",
+    "internal/core/inventory/inventory.go",
+    "internal/core/inventory/inventory_test.go",
+    "internal/core/pricing/pricing.go",
+    "internal/core/pricing/pricing_test.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/auditrepo/transaction.go",
+    "internal/platform/postgres/inventoryrepo/migration_test.go",
+    "internal/platform/postgres/inventoryrepo/repository.go",
+    "internal/platform/postgres/inventoryrepo/repository_test.go",
+    "internal/platform/postgres/pricingrepo/migration_test.go",
+    "internal/platform/postgres/pricingrepo/repository.go",
+    "internal/platform/postgres/pricingrepo/repository_test.go",
+    "migrations/000010_price_inventory.sql",
+    "migrations/catalog.json",
+    "scripts/check-postgres-backup-restore.sh",
+    "scripts/check-tenancy-postgres.sh",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/005-price-inventory.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0001-modular-monolith.md",
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0022-i18n-money-tax.md",
+    "adr/0035-architecture-change-governance.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "extend_existing_capability"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Price, Warehouse, and InventoryPosition carry organization/workspace ownership, composite tenant foreign keys, forced RLS, and tenant-scoped repository transactions."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Price/inventory events and audit summaries contain business-operational values only and avoid customer PII, credentials, provider payloads, and full catalog descriptions."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "Draft 2020-12 canonical Price, Warehouse, and InventoryPosition schemas establish exact Money/Quantity wire shapes before Task 006/API expansion; adapters map self-contained Core value objects into the shared Task-076a transport primitives."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "affected",
+      "evidence": "Versioned price, warehouse, and inventory-position events are registered; every mutation persists event intent through Task-008 Transactional Outbox in the same SQL transaction."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Core Price/Inventory references canonical Offer/Warehouse only. No provider price/stock IDs or provider-specific branching is introduced."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Atomic high-risk expand migration 000010 creates exact price/inventory storage, tenant FKs, lifecycle guards, forced RLS, and immutable/versioned state without rewriting earlier tables."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Non-negative money/quantities, reserved<=on-hand, immutable identities, parent lifecycle checks, bounded identifiers, forced RLS, and hard-delete blockers fail closed against malformed or cross-tenant state."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Task 005 records canonical operational state but does not authorize sensitive external publication; Task 017 remains the external-write approval boundary."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every mutation requires a distinct AuditID and appends a Task-003 immutable audit record in the same transaction as the state change and outbox event."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Optimistic versions prevent lost updates; exact values and stable Offer/Warehouse identity provide deterministic price/stock reconciliation inputs for Tasks 013/014."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "not_affected",
+      "evidence": "No webhook surface is introduced; downstream egress consumes versioned canonical events."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Versioned price/inventory events plus bounded audit summaries expose deterministic mutation and contention/error signals without logging secrets."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Migration 000010 is additive. Rollback disables Task-005 writers while retaining price/inventory, audit, and outbox history; backup/restore rehearsal is extended."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover exact Money/Quantity invariants and adapter conversion to Task-076a wire primitives; migration/repository tests verify exact storage, RLS, atomic audit/outbox intent, contracts, tenancy isolation and restore rehearsal paths."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "006",
+    "013",
+    "014",
+    "030",
+    "051",
+    "054",
+    "076"
+  ]
+}
