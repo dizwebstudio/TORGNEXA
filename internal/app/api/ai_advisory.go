@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -231,7 +232,12 @@ func (api *aiAdvisoryAPI) analyze(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	text, model, err := api.registry.AICompletion(r.Context(), sdkAccount, runtime, account.BaseURL, account.FolderID, account.Model, input.SystemPrompt, input.Prompt)
+	host, err := hostFromBaseURL(account.BaseURL)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	text, model, err := api.registry.AICompletion(r.Context(), sdkAccount, runtime, host, account.FolderID, account.Model, input.SystemPrompt, input.Prompt)
 	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
 		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.analyze", ResourceType: "ai_provider_account",
 		ResourceID: account.ID, CorrelationID: newApprovalID(), Risk: audit.RiskWriteSensitive,
@@ -242,6 +248,24 @@ func (api *aiAdvisoryAPI) analyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, aiAnalyzeResponse{Text: text, Provider: string(account.Provider), Model: model})
+}
+
+// hostFromBaseURL extracts the bare hostname builtinruntime.AICompletion's
+// host override expects. aiadvisory.ValidateCreate already guarantees a
+// stored BaseURL is either empty or an "https://" URL; the connector
+// transport (internal/platform/builtinruntime) rejects anything but a bare
+// hostname, so the scheme/path/port must be stripped at this provider-neutral
+// boundary rather than forwarded as-is.
+func hostFromBaseURL(baseURL string) (string, error) {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+		return "", errors.New("ai advisory: invalid base_url")
+	}
+	return parsed.Hostname(), nil
 }
 
 func zero(material []byte) {

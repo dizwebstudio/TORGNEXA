@@ -39,20 +39,32 @@ type ClickHouseQueryPort struct {
 	client   *http.Client
 }
 
-// NewClickHouseQueryPort creates a bounded analytical query adapter.
-func NewClickHouseQueryPort(cfg ClickHouseConfig) (*ClickHouseQueryPort, error) {
+// newClickHouseCore validates cfg and builds the endpoint/client fields
+// shared verbatim by NewClickHouseQueryPort and NewClickHouseSink, so the two
+// adapters can never silently drift apart on which endpoints/timeouts they
+// accept.
+func newClickHouseCore(cfg ClickHouseConfig) (endpoint string, client *http.Client, err error) {
 	parsed, err := url.Parse(cfg.Endpoint)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-		return nil, errors.New("reporting clickhouse: invalid endpoint")
+		return "", nil, errors.New("reporting clickhouse: invalid endpoint")
 	}
 	if cfg.Timeout <= 0 || cfg.Timeout > 30*time.Second {
-		return nil, errors.New("reporting clickhouse: invalid timeout")
+		return "", nil, errors.New("reporting clickhouse: invalid timeout")
 	}
-	client := cfg.Client
+	client = cfg.Client
 	if client == nil {
 		client = &http.Client{Timeout: cfg.Timeout}
 	}
-	return &ClickHouseQueryPort{endpoint: strings.TrimRight(cfg.Endpoint, "/"), username: cfg.Username, password: cfg.Password, timeout: cfg.Timeout, client: client}, nil
+	return strings.TrimRight(cfg.Endpoint, "/"), client, nil
+}
+
+// NewClickHouseQueryPort creates a bounded analytical query adapter.
+func NewClickHouseQueryPort(cfg ClickHouseConfig) (*ClickHouseQueryPort, error) {
+	endpoint, client, err := newClickHouseCore(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &ClickHouseQueryPort{endpoint: endpoint, username: cfg.Username, password: cfg.Password, timeout: cfg.Timeout, client: client}, nil
 }
 
 const insertEventFactStatement = "INSERT INTO torgnexa_reporting.event_fact_v1 FORMAT JSONEachRow"
@@ -73,18 +85,11 @@ type ClickHouseSink struct {
 // NewClickHouseSink creates a bounded analytical append adapter using the
 // same host-owned HTTP endpoint/credentials as ClickHouseQueryPort.
 func NewClickHouseSink(cfg ClickHouseConfig) (*ClickHouseSink, error) {
-	parsed, err := url.Parse(cfg.Endpoint)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-		return nil, errors.New("reporting clickhouse: invalid endpoint")
+	endpoint, client, err := newClickHouseCore(cfg)
+	if err != nil {
+		return nil, err
 	}
-	if cfg.Timeout <= 0 || cfg.Timeout > 30*time.Second {
-		return nil, errors.New("reporting clickhouse: invalid timeout")
-	}
-	client := cfg.Client
-	if client == nil {
-		client = &http.Client{Timeout: cfg.Timeout}
-	}
-	return &ClickHouseSink{endpoint: strings.TrimRight(cfg.Endpoint, "/"), username: cfg.Username, password: cfg.Password, timeout: cfg.Timeout, client: client}, nil
+	return &ClickHouseSink{endpoint: endpoint, username: cfg.Username, password: cfg.Password, timeout: cfg.Timeout, client: client}, nil
 }
 
 type clickHouseEventFactWire struct {
@@ -197,7 +202,11 @@ func (p *ClickHouseQueryPort) Sales(ctx context.Context, scope tenancy.Scope, qu
 		if err != nil {
 			return nil, fmt.Errorf("reporting clickhouse: invalid sales row")
 		}
-		rows = append(rows, SalesBucket{Day: day.UTC(), Currency: value.Currency, Orders: value.Orders, FulfilledOrders: value.Fulfilled, CancelledOrders: value.Cancelled, GrossMinorUnits: value.Gross})
+		bucket := SalesBucket{Day: day.UTC(), Currency: value.Currency, Orders: value.Orders, FulfilledOrders: value.Fulfilled, CancelledOrders: value.Cancelled, GrossMinorUnits: value.Gross}
+		if bucket.Validate() != nil {
+			return nil, fmt.Errorf("reporting clickhouse: invalid sales row")
+		}
+		rows = append(rows, bucket)
 	}
 	return rows, nil
 }
@@ -227,7 +236,11 @@ func (p *ClickHouseQueryPort) Inventory(ctx context.Context, scope tenancy.Scope
 		if err != nil {
 			return nil, fmt.Errorf("reporting clickhouse: invalid inventory row")
 		}
-		rows = append(rows, InventoryPosition{OfferID: value.OfferID, WarehouseID: value.WarehouseID, Quantity: value.Quantity, ChangedAt: changed.UTC(), EventID: value.EventID})
+		position := InventoryPosition{OfferID: value.OfferID, WarehouseID: value.WarehouseID, Quantity: value.Quantity, ChangedAt: changed.UTC(), EventID: value.EventID}
+		if position.Validate() != nil {
+			return nil, fmt.Errorf("reporting clickhouse: invalid inventory row")
+		}
+		rows = append(rows, position)
 	}
 	return rows, nil
 }
@@ -256,7 +269,11 @@ func (p *ClickHouseQueryPort) Freshness(ctx context.Context, scope tenancy.Scope
 		if e1 != nil || e2 != nil || e3 != nil || value.SourceLagSeconds < 0 {
 			return nil, fmt.Errorf("reporting clickhouse: invalid freshness row")
 		}
-		rows = append(rows, Freshness{EventFamily: value.EventFamily, LastOccurredAt: occurred.UTC(), LastIngestedAt: ingested.UTC(), ObservedAt: observed.UTC(), SourceLag: time.Duration(value.SourceLagSeconds) * time.Second, EventCount: value.EventCount})
+		freshness := Freshness{EventFamily: value.EventFamily, LastOccurredAt: occurred.UTC(), LastIngestedAt: ingested.UTC(), ObservedAt: observed.UTC(), SourceLag: time.Duration(value.SourceLagSeconds) * time.Second, EventCount: value.EventCount}
+		if freshness.Validate() != nil {
+			return nil, fmt.Errorf("reporting clickhouse: invalid freshness row")
+		}
+		rows = append(rows, freshness)
 	}
 	return rows, nil
 }

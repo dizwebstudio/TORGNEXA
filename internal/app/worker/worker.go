@@ -199,6 +199,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_reporting_kafka_consumer_startup_failed", err)
 	}
+	reportingIngestBatcher := newReportingBatcher(reportingBatchMaxItems, reportingBatchMaxDelay, func(batchCtx context.Context, events []eventbus.Event) error {
+		return reportingIngestor.Ingest(batchCtx, events, nil, "")
+	})
 
 	components := []component{
 		{name: "tenant-dispatch", run: func(componentCtx context.Context) error {
@@ -228,7 +231,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		// second transactional source of truth.
 		{name: "reporting-ingest", run: func(componentCtx context.Context) error {
 			return reportingConsumer.Run(componentCtx, func(eventCtx context.Context, delivery eventbus.Delivery) error {
-				if ingestErr := reportingIngestor.Ingest(eventCtx, []eventbus.Event{delivery.Event}, nil, ""); ingestErr != nil {
+				if ingestErr := reportingIngestBatcher.submit(eventCtx, delivery.Event); ingestErr != nil {
 					return eventbus.Retryable("reporting_ingest_failed")
 				}
 				return nil

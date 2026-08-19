@@ -51,9 +51,20 @@ type ProductReader interface {
 	Read(context.Context, sdk.PageRequest) (ProductPage, error)
 }
 
-type Registry struct{ http *httpTransport }
+type Registry struct {
+	http *httpTransport
 
-func New() *Registry { return &Registry{http: newHTTPTransport()} }
+	// gigachat is held across calls (unlike the other AI connectors, which
+	// are stateless and constructed per call) because it caches the OAuth
+	// access token exchanged per account; a per-call instance would re-do
+	// that OAuth round trip on every completion.
+	gigachat *gigachat.Connector
+}
+
+func New() *Registry {
+	transport := newHTTPTransport()
+	return &Registry{http: transport, gigachat: gigachat.New(gigaChatHTTP{transport}, nil)}
+}
 
 func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (ProductReader, error) {
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil {
@@ -299,7 +310,10 @@ func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtim
 	case "kimi":
 		return kimi.New(kimiHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "gigachat":
-		return gigachat.New(gigaChatHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+		if r.gigachat == nil {
+			return "", "", ErrUnavailable
+		}
+		return r.gigachat.Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "yandexgpt":
 		return yandexgpt.New(yandexGPTHTTP{r.http}, nil).Complete(ctx, account, runtime, folderID, model, systemPrompt, userPrompt)
 	default:

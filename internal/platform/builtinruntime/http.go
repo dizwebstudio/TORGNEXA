@@ -25,21 +25,63 @@ import (
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
 	yandexgpt "github.com/torgnexa/torgnexa/connectors/yandexgpt"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorsandbox"
 )
 
 const maxResponseBody = 16 << 20
 
 type httpTransport struct {
 	resolver *net.Resolver
-	timeout  time.Duration
+	client   *http.Client
 }
 
+// newHTTPTransport builds one pinned-dial http.Client shared by every
+// outbound call this process makes. The selected (already public-IP
+// verified) destination address travels per-request through dialTarget
+// rather than by rebuilding the transport, so keep-alive connections to the
+// same host are reused across calls instead of a fresh TCP+TLS handshake
+// per request.
 func newHTTPTransport() *httpTransport {
-	return &httpTransport{resolver: net.DefaultResolver, timeout: 30 * time.Second}
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport := &http.Transport{
+		Proxy: nil,
+		DialContext: func(dialCtx context.Context, network, _ string) (net.Conn, error) {
+			target, ok := dialTargetFromContext(dialCtx)
+			if !ok {
+				return nil, errors.New("provider http: missing dial target")
+			}
+			return dialer.DialContext(dialCtx, network, net.JoinHostPort(target, "443"))
+		},
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          64,
+		MaxIdleConnsPerHost:   8,
+		IdleConnTimeout:       60 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return &httpTransport{resolver: net.DefaultResolver, client: client}
 }
+
+type dialTargetKey struct{}
+
+func withDialTarget(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, dialTargetKey{}, ip)
+}
+
+func dialTargetFromContext(ctx context.Context) (string, bool) {
+	ip, ok := ctx.Value(dialTargetKey{}).(string)
+	return ip, ok && ip != ""
+}
+
+// publicIP delegates to the one SSRF address-blocklist shared with
+// connectorsandbox's sandboxed provider egress path; it must not reimplement
+// that blocklist locally (see connectorsandbox.PublicInternetAddress).
+func publicIP(a netip.Addr) bool { return connectorsandbox.PublicInternetAddress(a) }
 
 func (h *httpTransport) do(ctx context.Context, method, host, path string, query url.Values, body []byte, headers http.Header, basicUser, basicPass []byte) (int, []byte, string, int64, http.Header, error) {
-	if ctx == nil || h == nil || h.resolver == nil || method == "" || !validHost(host) || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") || len(body) > maxResponseBody {
+	if ctx == nil || h == nil || h.resolver == nil || h.client == nil || method == "" || !validHost(host) || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") || len(body) > maxResponseBody {
 		return 0, nil, "", 0, nil, errors.New("provider http: invalid request")
 	}
 	ips, err := h.resolver.LookupNetIP(ctx, "ip", host)
@@ -61,7 +103,7 @@ func (h *httpTransport) do(ctx context.Context, method, host, path string, query
 	}
 
 	target := &url.URL{Scheme: "https", Host: host, Path: path, RawQuery: query.Encode()}
-	req, err := http.NewRequestWithContext(ctx, method, target.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(withDialTarget(ctx, selected), method, target.String(), bytes.NewReader(body))
 	if err != nil {
 		return 0, nil, "", 0, nil, errors.New("provider http: request build failed")
 	}
@@ -78,20 +120,7 @@ func (h *httpTransport) do(ctx context.Context, method, host, path string, query
 		req.SetBasicAuth(string(basicUser), string(basicPass))
 	}
 
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
-	transport := &http.Transport{
-		Proxy: nil,
-		DialContext: func(dialCtx context.Context, network, _ string) (net.Conn, error) {
-			return dialer.DialContext(dialCtx, network, net.JoinHostPort(selected, "443"))
-		},
-		TLSClientConfig:   &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host},
-		ForceAttemptHTTP2: true,
-		MaxIdleConns:      32,
-		IdleConnTimeout:   60 * time.Second,
-	}
-	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: h.timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := client.Do(req)
+	resp, err := h.client.Do(req)
 	if err != nil {
 		return 0, nil, "", 0, nil, errors.New("provider http: transport failed")
 	}
@@ -131,20 +160,6 @@ func validHost(host string) bool {
 			if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-') {
 				return false
 			}
-		}
-	}
-	return true
-}
-
-func publicIP(a netip.Addr) bool {
-	if !a.IsValid() || !a.IsGlobalUnicast() || a.IsLoopback() || a.IsPrivate() || a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() || a.IsMulticast() || a.IsUnspecified() {
-		return false
-	}
-	for _, p := range []netip.Prefix{
-		netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("192.0.0.0/24"), netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("198.51.100.0/24"), netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("2001:db8::/32"),
-	} {
-		if p.Contains(a) {
-			return false
 		}
 	}
 	return true

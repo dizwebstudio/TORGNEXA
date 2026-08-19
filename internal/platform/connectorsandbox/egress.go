@@ -33,7 +33,7 @@ func (guard EgressGuard) Plan(ctx context.Context, plan pluginsecurity.Admission
 	result := make([]DialTarget, 0, len(values))
 	for _, value := range values {
 		value = value.Unmap()
-		if !publicInternetAddress(value) {
+		if !PublicInternetAddress(value) {
 			return nil, ErrEgressDenied
 		}
 		if _, exists := seen[value]; exists {
@@ -49,7 +49,11 @@ func (guard EgressGuard) Plan(ctx context.Context, plan pluginsecurity.Admission
 	return result, nil
 }
 
-func publicInternetAddress(value netip.Addr) bool {
+// PublicInternetAddress is the one SSRF address-blocklist shared by every
+// outbound host-mediated transport in the repository (sandboxed provider
+// egress here, and internal/platform/builtinruntime's first-party connector
+// transport). A security fix to this blocklist must only ever be made here.
+func PublicInternetAddress(value netip.Addr) bool {
 	if !value.IsValid() || !value.IsGlobalUnicast() || value.IsLoopback() || value.IsPrivate() || value.IsLinkLocalUnicast() || value.IsLinkLocalMulticast() || value.IsMulticast() || value.IsUnspecified() {
 		return false
 	}
