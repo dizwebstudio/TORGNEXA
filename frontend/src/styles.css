@@ -448,6 +448,7 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .dialog > header { padding:18px 20px; display:flex; justify-content:space-between; border-bottom:1px solid var(--border); }
 .dialog h2 { margin:0; }.dialog header p { margin:6px 0 0; color:var(--text-muted); }
 .dialog-body { padding:20px; }
+.token-reveal { display:block; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); word-break:break-all; font-size:13px; }
 .line-items { display:grid; gap:8px; }
 .line-item { display:grid; grid-template-columns:36px 1fr auto; gap:10px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:10px; }
 .line-icon { width:34px; height:34px; display:grid; place-items:center; background:var(--surface-soft); border-radius:8px; color:var(--brand); }

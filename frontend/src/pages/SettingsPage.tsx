@@ -5,6 +5,7 @@ import {useApi} from "../api/ApiProvider";
 import {ErrorBlock} from "../components/ApiState";
 import {IntegrationCatalog} from "../features/settings/IntegrationCatalog";
 import {AIProviderSettings} from "../features/settings/AIProviderSettings";
+import {MCPAccountSettings} from "../features/settings/MCPAccountSettings";
 import {WorkspaceSettings} from "../features/settings/WorkspaceSettings";
 import {MemberSettings} from "../features/settings/MemberSettings";
 import {NotificationSettings} from "../features/settings/NotificationSettings";
@@ -68,6 +69,9 @@ export function SettingsPage() {
     </div>
     <div id="settings-panel-notifications" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-notifications" tabIndex={0} hidden={activeTab !== "notifications"}>
       <NotificationSettings />
+    </div>
+    <div id="settings-panel-mcp" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-mcp" tabIndex={0} hidden={activeTab !== "mcp"}>
+      <MCPAccountSettings />
     </div>
   </Page>;
 }

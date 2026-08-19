@@ -2,6 +2,7 @@ export const settingsTabs = [
   {id: "general", label: "Основные"},
   {id: "identity", label: "Провайдеры входа"},
   {id: "notifications", label: "Каналы и важность"},
+  {id: "mcp", label: "MCP-агенты"},
 ] as const;
 
 export type SettingsTabID = typeof settingsTabs[number]["id"];

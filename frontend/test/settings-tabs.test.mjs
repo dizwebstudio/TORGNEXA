@@ -7,6 +7,7 @@ test("notification preferences have a dedicated settings tab", () => {
     {id: "general", label: "Основные"},
     {id: "identity", label: "Провайдеры входа"},
     {id: "notifications", label: "Каналы и важность"},
+    {id: "mcp", label: "MCP-агенты"},
   ]);
   assert.equal(isSettingsTabID("notifications"), true);
   assert.equal(isSettingsTabID("security"), false);
