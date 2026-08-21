@@ -15,12 +15,14 @@ import (
 	"strings"
 	"time"
 
+	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
 	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
+	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
@@ -294,6 +296,28 @@ func (t kimiHTTP) Do(ctx context.Context, r kimi.Request) (kimi.Response, error)
 	}
 	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
 	return kimi.Response{StatusCode: s, Body: b}, e
+}
+
+type qwenHTTP struct{ h *httpTransport }
+
+func (t qwenHTTP) Do(ctx context.Context, r qwen.Request) (qwen.Response, error) {
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return qwen.Response{StatusCode: s, Body: b}, e
+}
+
+type deepseekHTTP struct{ h *httpTransport }
+
+func (t deepseekHTTP) Do(ctx context.Context, r deepseek.Request) (deepseek.Response, error) {
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return deepseek.Response{StatusCode: s, Body: b}, e
 }
 
 type gigaChatHTTP struct{ h *httpTransport }

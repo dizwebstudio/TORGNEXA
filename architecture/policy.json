@@ -626,6 +626,16 @@
       "allowed_external_imports": []
     },
     {
+      "id": "deepseek",
+      "family": "ai",
+      "implementation": "connectors/deepseek",
+      "manifest": "connectors/deepseek/manifest.json",
+      "connector_spec": "docs/connectors/deepseek/spec.md",
+      "capability_audit": "docs/connectors/deepseek/capability-audit.md",
+      "conformance_plan": "docs/connectors/deepseek/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "diadoc",
       "family": "edo",
       "implementation": "connectors/diadoc",
@@ -773,6 +783,16 @@
       "connector_spec": "docs/connectors/prestashop/spec.md",
       "capability_audit": "docs/connectors/prestashop/capability-audit.md",
       "conformance_plan": "docs/connectors/prestashop/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "qwen",
+      "family": "ai",
+      "implementation": "connectors/qwen",
+      "manifest": "connectors/qwen/manifest.json",
+      "connector_spec": "docs/connectors/qwen/spec.md",
+      "capability_audit": "docs/connectors/qwen/capability-audit.md",
+      "conformance_plan": "docs/connectors/qwen/conformance-plan.md",
       "allowed_external_imports": []
     },
     {

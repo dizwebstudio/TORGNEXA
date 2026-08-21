@@ -78,6 +78,14 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["api_key"],
   },
   {
+    id: "deepseek",
+    name: "DeepSeek",
+    family: "ai",
+    version: "1.0.0",
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+  },
+  {
     id: "diadoc",
     name: "Kontur Diadoc",
     family: "edo",
@@ -198,6 +206,14 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     version: "1.0.0",
     capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read"],
     authKinds: ["basic"],
+  },
+  {
+    id: "qwen",
+    name: "Qwen (Alibaba Cloud)",
+    family: "ai",
+    version: "1.0.0",
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
   },
   {
     id: "rutube",

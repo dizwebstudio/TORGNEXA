@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
 	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
+	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
@@ -296,10 +298,10 @@ func (source wooConfigSource) Resolve(ctx context.Context, account sdk.Account) 
 
 // AIComplete resolves the registered AI connector for account.ConnectorID
 // and sends one bounded completion request through it. host is a bare
-// hostname override (only openai-compatible and kimi honor it); folderID is
-// required only by yandexgpt. This is the sole point in the repository that
-// branches on an AI provider identity, matching the exemption
-// architecture/policy.json grants provider_composition_module.
+// hostname override (openai-compatible, kimi, qwen and deepseek honor it);
+// folderID is required only by yandexgpt. This is the sole point in the
+// repository that branches on an AI provider identity, matching the
+// exemption architecture/policy.json grants provider_composition_module.
 func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtime sdk.Runtime, host, folderID, model, systemPrompt, userPrompt string) (text, resolvedModel string, err error) {
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil {
 		return "", "", ErrUnavailable
@@ -316,6 +318,10 @@ func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtim
 		return r.gigachat.Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "yandexgpt":
 		return yandexgpt.New(yandexGPTHTTP{r.http}, nil).Complete(ctx, account, runtime, folderID, model, systemPrompt, userPrompt)
+	case "qwen":
+		return qwen.New(qwenHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "deepseek":
+		return deepseek.New(deepseekHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	default:
 		return "", "", ErrUnavailable
 	}

@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-128",
+  "task": "128",
+  "change_class": "new_provider",
+  "summary": "Register DeepSeek as a further ai-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing connectors/openai-compatible or connectors/kimi (provider packages may not import each other).",
+  "scopes": [
+    "architecture/policy.json",
+    "architecture/reviews/128-deepseek-connector.json",
+    "connectors/deepseek/conformance.go",
+    "connectors/deepseek/connector.go",
+    "connectors/deepseek/connector_test.go",
+    "connectors/deepseek/manifest.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "deploy/postgres/catalog.tsv",
+    "docs/connectors/deepseek/capability-audit.md",
+    "docs/connectors/deepseek/conformance-plan.md",
+    "docs/connectors/deepseek/conformance-report.json",
+    "docs/connectors/deepseek/spec.md",
+    "frontend/src/features/settings/AIProviderSettings.tsx",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "migrations/000015_ai_provider_qwen_deepseek.sql",
+    "migrations/catalog.json",
+    "tasks/issues/128-deepseek-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0005-plugin-runtime.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0048-first-provider-admission-wildberries.md",
+    "adr/0097-ai-provider-settings-and-openai-compatible-admission.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "DeepSeek reuses the Task-122 ai_provider_accounts table and secret binding; it adds no tenant persistence of its own."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "The only tenant text that leaves TORGNEXA through this provider is the caller-assembled analytics prompt at analyze-call time; no response is persisted by this package."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "DeepSeek is reached through the existing Task-122 /settings/ai-providers:analyze operation; no new public operation is added, only the provider enum widened on already-additive schemas."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is published or consumed."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "Adds the deepseek provider under the existing ai family/ai.completion.generate capability; dispatch by provider id is confined to internal/platform/builtinruntime."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Migration 000015 widens the ai_provider_accounts_provider_check CHECK constraint to admit 'qwen' and 'deepseek'; purely additive expand-phase change, verified applied against a live PostgreSQL 18 instance alongside the full 15-migration active chain."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Provider code has no direct network authority; all HTTPS calls are host-mediated through builtinruntime's DNS-pinned, public-IP-only transport. Credential bytes are read only inside a host-owned UseSecret callback."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 ai.analyze / settings.ai_providers.* capability gates unchanged."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "Reuses the Task-122 audit entries unchanged."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "This capability performs no remote-state synchronization."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound calls use a host-injected transport to a fixed default host (api.deepseek.com) or an account-configured hostname override; no inbound webhook surface is added."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Remote non-2xx responses and empty/malformed completions normalize to a bounded error; the manifest's rate_limit/retry policy bounds concurrency and backoff."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Disabling the account row immediately stops further DeepSeek analyze calls; no other component depends on this provider."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Package tests cover the default-DeepSeek-host fallback and request shape; the canonical Task-064 conformance suite passes all thirteen checks (docs/connectors/deepseek/conformance-report.json), including sandbox_isolation verified under a privileged Linux runner."
+    }
+  ],
+  "provider": {
+    "id": "deepseek",
+    "route": "connector_sdk",
+    "manifest": "connectors/deepseek/manifest.json",
+    "connector_spec": "docs/connectors/deepseek/spec.md",
+    "capability_audit": "docs/connectors/deepseek/capability-audit.md",
+    "conformance_plan": "docs/connectors/deepseek/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

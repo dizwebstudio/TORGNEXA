@@ -7,10 +7,11 @@ import {EmptyState} from "../../components/EmptyState";
 import {StatusBadge} from "../../components/StatusBadge";
 import {useToast} from "../../components/Toast";
 
-type ProviderID="openai-compatible"|"gigachat"|"yandexgpt"|"kimi";
+type ProviderID="openai-compatible"|"gigachat"|"yandexgpt"|"kimi"|"qwen"|"deepseek";
 interface Account{id:string;provider:ProviderID;label:string;model:string;base_url?:string;folder_id?:string;enabled:boolean;version:number;created_at:string;updated_at:string}
-const providerLabels:Readonly<Record<ProviderID,string>>={"openai-compatible":"OpenAI-совместимый","gigachat":"GigaChat (Sber)","yandexgpt":"YandexGPT","kimi":"Kimi (Moonshot AI)"};
+const providerLabels:Readonly<Record<ProviderID,string>>={"openai-compatible":"OpenAI-совместимый","gigachat":"GigaChat (Sber)","yandexgpt":"YandexGPT","kimi":"Kimi (Moonshot AI)","qwen":"Qwen (Alibaba Cloud)","deepseek":"DeepSeek"};
 const providerKeys=Object.keys(providerLabels) as ProviderID[];
+const hostOverrideProviders:ReadonlySet<ProviderID>=new Set(["openai-compatible","kimi","qwen","deepseek"]);
 function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}
 
 export function AIProviderSettings(){
@@ -34,7 +35,7 @@ export function AIProviderSettings(){
      <label className="field"><span>Провайдер</span><select value={provider} onChange={e=>setProvider(e.target.value as ProviderID)}>{providerKeys.map(key=><option value={key} key={key}>{providerLabels[key]}</option>)}</select></label>
      <label className="field"><span>Название</span><input value={label} maxLength={120} placeholder="Например, «Сводка по продажам»" onChange={e=>setLabel(e.target.value)}/></label>
      <label className="field"><span>Модель</span><input value={model} maxLength={120} placeholder="gpt-4o-mini" onChange={e=>setModel(e.target.value)}/></label>
-     {provider==="openai-compatible"||provider==="kimi"?<label className="field"><span>Base URL (необязательно)</span><input value={baseUrl} maxLength={2039} placeholder="https://api.moonshot.ai" onChange={e=>setBaseUrl(e.target.value)}/></label>:null}
+     {hostOverrideProviders.has(provider)?<label className="field"><span>Base URL (необязательно)</span><input value={baseUrl} maxLength={2039} placeholder="https://api.moonshot.ai" onChange={e=>setBaseUrl(e.target.value)}/></label>:null}
      {provider==="yandexgpt"?<label className="field"><span>Folder ID</span><input value={folderId} maxLength={120} placeholder="b1gxxxxxxxxxxxxxxxx" onChange={e=>setFolderId(e.target.value)}/></label>:null}
      <label className="field"><span>API-ключ</span><input type="password" value={credential} maxLength={65536} autoComplete="off" onChange={e=>setCredential(e.target.value)}/></label>
     </div>
