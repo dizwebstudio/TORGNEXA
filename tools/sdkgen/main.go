@@ -49,12 +49,18 @@ type generatedFile struct {
 }
 
 var (
-	pathLine             = regexp.MustCompile(`^  (/.+):\s*$`)
-	methodLine           = regexp.MustCompile(`^    (get|post|put|patch|delete):\s*$`)
-	operationIDLine      = regexp.MustCompile(`^\s{6}operationId:\s*([A-Za-z][A-Za-z0-9]*)\s*$`)
-	inlineParameterLine  = regexp.MustCompile(`^- \{name: ([A-Za-z0-9_-]+), in: (query|path|header), required: (true|false), schema: \{type: (string|integer|boolean)(?:,|\})`)
-	inlineParametersLine = regexp.MustCompile(`^parameters: \[\{name: ([A-Za-z0-9_-]+), in: (query|path|header), required: (true|false), schema: \{type: (string|integer|boolean)(?:,|\})`)
-	refParameterLine     = regexp.MustCompile(`^- \{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}$`)
+	pathLine        = regexp.MustCompile(`^  (/.+):\s*$`)
+	methodLine      = regexp.MustCompile(`^    (get|post|put|patch|delete):\s*$`)
+	operationIDLine = regexp.MustCompile(`^\s{6}operationId:\s*([A-Za-z][A-Za-z0-9]*)\s*$`)
+	// The `required:` key is itself optional in the source spec: an omitted
+	// key means "not required" per OpenAPI 3.1, so it must not be mandatory
+	// in the regex either. When the group doesn't participate in the match,
+	// strconv.ParseBool("") below returns its false zero value, which is
+	// exactly the correct default.
+	inlineParameterLine    = regexp.MustCompile(`^- \{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
+	inlineParametersLine   = regexp.MustCompile(`^parameters: \[\{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
+	refParameterLine       = regexp.MustCompile(`^- \{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}$`)
+	inlineRefParameterLine = regexp.MustCompile(`^parameters: \[\{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}\]$`)
 )
 
 func main() {
@@ -113,6 +119,22 @@ func run(root string, check bool) error {
 	}
 	fmt.Printf("Generated %d SDK artifacts from %d OpenAPI operations\n", len(files), len(parsed.Operations))
 	return nil
+}
+
+// resolveParameterRef expands a `$ref: '#/components/parameters/NAME'` into
+// the concrete parameter it denotes. Both the multi-line list-item form
+// (`- {$ref: ...}`) and the single-line inline-array form
+// (`parameters: [{$ref: ...}]`) resolve through this one place so the two
+// shapes can never silently diverge again.
+func resolveParameterRef(name string) (parameter, error) {
+	switch name {
+	case "Cursor":
+		return parameter{Name: "cursor", Location: "query", Type: "string", Required: false}, nil
+	case "IdempotencyKey":
+		return parameter{Name: "Idempotency-Key", Location: "header", Type: "string", Required: true}, nil
+	default:
+		return parameter{}, fmt.Errorf("unsupported parameter reference %q", name)
+	}
 }
 
 func parseSpec(data []byte) (spec, error) {
@@ -237,14 +259,19 @@ func parseSpec(data []byte) (spec, error) {
 			continue
 		}
 		if match := refParameterLine.FindStringSubmatch(trimmed); match != nil {
-			switch match[1] {
-			case "Cursor":
-				current.Parameters = append(current.Parameters, parameter{Name: "cursor", Location: "query", Type: "string", Required: false})
-			case "IdempotencyKey":
-				addParameter(&current.Parameters, parameter{Name: "Idempotency-Key", Location: "header", Type: "string", Required: true})
-			default:
-				return spec{}, fmt.Errorf("unsupported parameter reference %q", match[1])
+			resolved, err := resolveParameterRef(match[1])
+			if err != nil {
+				return spec{}, err
 			}
+			addParameter(&current.Parameters, resolved)
+			continue
+		}
+		if match := inlineRefParameterLine.FindStringSubmatch(trimmed); match != nil {
+			resolved, err := resolveParameterRef(match[1])
+			if err != nil {
+				return spec{}, err
+			}
+			addParameter(&current.Parameters, resolved)
 		}
 	}
 	if err := flush(); err != nil {

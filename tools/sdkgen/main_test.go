@@ -201,3 +201,106 @@ components: {}
 		t.Fatalf("unexpected operation: %#v", s.Operations)
 	}
 }
+
+// This is the exact shape `contracts/openapi/torgnexa-v1.yaml` used for every
+// operation-level Idempotency-Key requirement (parameters as a single-line
+// inline array containing one $ref, not the multi-line `- {$ref: ...}` list
+// item form). It silently produced zero parameters until resolveParameterRef
+// grew a matching regex, which meant 26 write operations shipped generated
+// clients that never sent a header the backend requires and returned 400 for.
+func TestParseSpecResolvesCompactInlineParameterRef(t *testing.T) {
+	input := `openapi: 3.1.0
+info:
+  title: demo
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /jobs:
+    post:
+      operationId: createJob
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true}
+      responses: {'202': {description: accepted}}
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+`
+	s, err := parseSpec([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Operations) != 1 || len(s.Operations[0].Parameters) != 1 {
+		t.Fatalf("unexpected operation: %#v", s.Operations)
+	}
+	p := s.Operations[0].Parameters[0]
+	if p.Name != "Idempotency-Key" || p.Location != "header" || !p.Required {
+		t.Fatalf("unexpected parameter: %#v", p)
+	}
+	files, err := generate(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"sdk/go/torgnexa/client.gen.go", "sdk/typescript/src/client.gen.mjs", "sdk/python/torgnexa_sdk/client_gen.py"} {
+		found := false
+		for _, file := range files {
+			if file.Path == path {
+				found = strings.Contains(string(file.Data), "Idempotency-Key")
+			}
+		}
+		if !found {
+			t.Fatalf("%s does not bind Idempotency-Key for the compact inline $ref form", path)
+		}
+	}
+	for _, file := range files {
+		if file.Path == "sdk/typescript/src/client.gen.d.mts" && !strings.Contains(string(file.Data), "idempotencyKey") {
+			t.Fatalf("client.gen.d.mts does not type idempotencyKey for the compact inline $ref form")
+		}
+	}
+}
+
+// An optional parameter is legitimately written without a `required:` key at
+// all in the source spec (omitted means false per OpenAPI 3.1), e.g. the
+// `limit`/`base`/`quote` query parameters on listFXRates. The old regex
+// mandated a literal `required: (true|false)` substring, so every one of
+// these silently produced zero parameters and the query string was dropped.
+func TestParseSpecAcceptsOptionalParameterWithoutRequiredKey(t *testing.T) {
+	input := `openapi: 3.1.0
+info:
+  title: demo
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /fx/rates:
+    get:
+      operationId: listFXRates
+      parameters:
+        - {name: base, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses: {'200': {description: ok}}
+components: {}
+`
+	s, err := parseSpec([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Operations) != 1 || len(s.Operations[0].Parameters) != 2 {
+		t.Fatalf("unexpected operation: %#v", s.Operations)
+	}
+	for _, p := range s.Operations[0].Parameters {
+		if p.Location != "query" || p.Required {
+			t.Fatalf("unexpected parameter: %#v", p)
+		}
+	}
+	files, err := generate(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if file.Path == "sdk/typescript/src/client.gen.mjs" && !strings.Contains(string(file.Data), `query["base"]`) {
+			t.Fatalf("client.gen.mjs does not forward the optional base query parameter")
+		}
+	}
+}
