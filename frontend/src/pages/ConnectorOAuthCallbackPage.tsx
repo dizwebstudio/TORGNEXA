@@ -19,7 +19,7 @@ export function ConnectorOAuthCallbackPage() {
       return;
     }
     const callbackUrl = new URL("/oauth/connectors/callback", window.location.origin).toString();
-    void api.completeConnectorOAuth({body:{code,state,callback_url:callbackUrl}},{headers:{"Idempotency-Key":`oauth-callback:${state.slice(0,64)}`}})
+    void api.completeConnectorOAuth({idempotencyKey:`oauth-callback:${state.slice(0,64)}`,body:{code,state,callback_url:callbackUrl}})
       .then(() => {
         window.history.replaceState(null, "", "/oauth/connectors/callback");
         setStatus("done");

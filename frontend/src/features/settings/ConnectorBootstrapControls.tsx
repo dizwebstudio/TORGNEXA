@@ -32,9 +32,9 @@ export function ConnectorBootstrapControls({account}:{account:Account}) {
   const [enabled,setEnabled]=useState(true);
   useEffect(()=>{if(schedule){setMode(schedule.mode);setInterval(schedule.interval_minutes);setEnabled(schedule.enabled);}},[schedule?.version]);
   const refresh=()=>cache.invalidateQueries({queryKey:["connector-bootstrap-state"]});
-  const previewMutation=useMutation({mutationFn:()=>api.previewConnectorBootstrap({body:{account_id:account.id,expected_version:account.version}},{headers:{"Idempotency-Key":`bootstrap-preview:${account.id}:${account.version}:${Date.now()}`}}),onSuccess:refresh});
-  const startMutation=useMutation({mutationFn:()=>{if(!preview)throw new Error("preview required");return api.startConnectorBootstrap({body:{preview_id:preview.id}},{headers:{"Idempotency-Key":`bootstrap:${account.id}:${account.version}:${Date.now()}`}});},onSuccess:refresh});
-  const scheduleMutation=useMutation({mutationFn:()=>api.putConnectorSyncSchedule({body:{account_id:account.id,account_version:account.version,mode,interval_minutes:interval,enabled,expected_version:schedule?.version??0}},{headers:{"Idempotency-Key":`schedule:${account.id}:${schedule?.version??0}:${Date.now()}`}}),onSuccess:refresh});
+  const previewMutation=useMutation({mutationFn:()=>api.previewConnectorBootstrap({idempotencyKey:`bootstrap-preview:${account.id}:${account.version}:${Date.now()}`,body:{account_id:account.id,expected_version:account.version}}),onSuccess:refresh});
+  const startMutation=useMutation({mutationFn:()=>{if(!preview)throw new Error("preview required");return api.startConnectorBootstrap({idempotencyKey:`bootstrap:${account.id}:${account.version}:${Date.now()}`,body:{preview_id:preview.id}});},onSuccess:refresh});
+  const scheduleMutation=useMutation({mutationFn:()=>api.putConnectorSyncSchedule({idempotencyKey:`schedule:${account.id}:${schedule?.version??0}:${Date.now()}`,body:{account_id:account.id,account_version:account.version,mode,interval_minutes:interval,enabled,expected_version:schedule?.version??0}}),onSuccess:refresh});
   const activeHealthy=account.status==="active"&&account.health_status==="healthy";
   return <fieldset className="bootstrap-settings"><legend>Импорт и расписание</legend>
     <small>Предпросмотр ничего не меняет во внешней системе и действует 30 минут. Импорт и расписание выполняются сервером, даже если браузер закрыт.</small>

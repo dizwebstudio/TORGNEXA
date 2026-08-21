@@ -9,6 +9,8 @@ import {CatalogPage} from "../pages/CatalogPage";
 import {OrdersPage} from "../pages/OrdersPage";
 import {NotificationsPage} from "../pages/NotificationsPage";
 import {InventoryPage} from "../pages/InventoryPage";
+import {CounterpartiesPage} from "../pages/CounterpartiesPage";
+import {FinancePage} from "../pages/FinancePage";
 import {CompliancePage} from "../pages/CompliancePage";
 import {SettingsPage} from "../pages/SettingsPage";
 import {ReportsPage} from "../pages/ReportsPage";
@@ -35,6 +37,8 @@ function content(path: string) {
   if (path === "/compliance") return <CompliancePage />;
   if (path === "/notifications") return <NotificationsPage />;
   if (path === "/sync") return <SyncPage />;
+  if (path === "/counterparties") return <CounterpartiesPage />;
+  if (path === "/finance") return <FinancePage />;
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/reports") return <ReportsPage />;

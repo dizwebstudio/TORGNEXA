@@ -23,7 +23,10 @@ const paths: Record<IconName, string[]> = {
   warning:["M12 3 2 21h20z","M12 9v5","M12 18h.01"], error:["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18","M9 9l6 6","M15 9l-6 6"],
   info:["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18","M12 11v6","M12 7h.01"],
   activity:["M3 12h4l2-6 4 12 2-6h6"], filter:["M4 5h16l-6 7v6l-4 2v-8z"], sort:["M8 7h8","M8 12h6","M8 17h4"], columns:["M4 4h16v16H4z","M10 4v16","M15 4v16"], more:["M5 12h.01","M12 12h.01","M19 12h.01"], refresh:["M20 6v5h-5","M4 18v-5h5","M18.5 10A7 7 0 0 0 6 7.5L4 11","M5.5 14A7 7 0 0 0 18 16.5l2-3.5"],
-  warehouse:["M3 9 12 4l9 5v11H3z","M8 20v-6h8v6","M7 10h2","M15 10h2"], incident:["M12 2l10 19H2z","M12 8v5","M12 17h.01"], clock:["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18","M12 7v5l3 2"], arrowRight:["M5 12h14","m14 12-5-5","m14 12-5 5"], menu:["M4 7h16","M4 12h16","M4 17h16"]
+  warehouse:["M3 9 12 4l9 5v11H3z","M8 20v-6h8v6","M7 10h2","M15 10h2"], incident:["M12 2l10 19H2z","M12 8v5","M12 17h.01"], clock:["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18","M12 7v5l3 2"], arrowRight:["M5 12h14","m14 12-5-5","m14 12-5 5"], menu:["M4 7h16","M4 12h16","M4 17h16"],
+  counterparties:["M8 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7","M16 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7","M2 20c0-3 2.7-5 6-5s6 2 6 5","M10 20c0-3 2.7-5 6-5s6 2 6 5"],
+  webhook:["M12 3a5 5 0 0 1 5 5c0 1.9-1 3.6-2.5 4.6","M9.5 20a5 5 0 0 1-3-9","M14.5 21a5 5 0 0 0 3-9","M12 8v.01","M9 15v.01","M15 15v.01"],
+  finance:["M3 7h18v12H3z","M3 10h18","M7 15h.01","M12 15h4"]
 };
 
 export function Icon({name,size=18,className=""}:{name:IconName;size?:number;className?:string}) {

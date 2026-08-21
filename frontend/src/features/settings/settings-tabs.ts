@@ -3,6 +3,8 @@ export const settingsTabs = [
   {id: "identity", label: "Провайдеры входа"},
   {id: "notifications", label: "Каналы и важность"},
   {id: "mcp", label: "MCP-агенты"},
+  {id: "webhooks", label: "Webhooks"},
+  {id: "plugins", label: "Плагины"},
 ] as const;
 
 export type SettingsTabID = typeof settingsTabs[number]["id"];
