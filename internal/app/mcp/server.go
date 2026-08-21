@@ -25,6 +25,8 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
@@ -469,14 +471,16 @@ func governedMeta(agent agentgovernance.Agent, decision agentgovernance.Decision
 	return meta
 }
 
-// Run starts the transport with a deliberately fail-closed runtime composition.
-// IdentityResolver is now the real Postgres-backed mcp_client_accounts adapter
-// (see identity.go); Governor and Auditor remain the unavailable/deny
-// baseline. Task 079's real AgentGovernor (internal/platform/agentgovernance,
-// backed by the already-implemented internal/platform/postgres/agentgovernancerepo)
-// was never composed anywhere in this repository either, so even a valid
-// identity currently cannot pass tools/list or tools/call until that gap is
-// closed too and a policy is installed for the calling agent.
+// Run starts the transport with a fail-closed runtime composition.
+// IdentityResolver is the real Postgres-backed mcp_client_accounts adapter
+// (see identity.go); Governor and Auditor are now the real Task-079
+// agentgovernance.Service and audit.Service, backed by
+// internal/platform/postgres/agentgovernancerepo and .../auditrepo. Every
+// dimension the governor checks - kill switches, the agent/integration
+// policy allowlist, per-tool risk/approval/limits - denies by default when
+// no matching row exists, so a valid identity still cannot pass tools/list
+// or tools/call until an operator installs a Policy (InstallPolicy) for the
+// calling agent; there is no admin-facing surface for that yet (ADR 0098).
 func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
@@ -491,7 +495,23 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("mcp accounts repository: %w", err)
 	}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: unavailableGovernor{}, Auditor: unavailableAuditor{}})
+	auditRepository, err := auditrepo.New(db)
+	if err != nil {
+		return fmt.Errorf("mcp audit repository: %w", err)
+	}
+	auditService, err := audit.NewService(auditRepository)
+	if err != nil {
+		return fmt.Errorf("mcp audit service: %w", err)
+	}
+	governanceRepository, err := agentgovernancerepo.New(db)
+	if err != nil {
+		return fmt.Errorf("mcp agent governance repository: %w", err)
+	}
+	governanceService, err := agentgovernance.NewService(governanceRepository, governanceRepository, governanceRepository)
+	if err != nil {
+		return fmt.Errorf("mcp agent governance service: %w", err)
+	}
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService})
 	if err != nil {
 		return err
 	}
@@ -502,7 +522,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	httpServer := &http.Server{Handler: server.Handler(), ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout, MaxHeaderBytes: cfg.HTTP.MaxHeaderBytes, ErrorLog: log.New(mcpLogWriter{logger}, "", 0)}
 	errc := make(chan error, 1)
 	go func() { errc <- httpServer.Serve(listener) }()
-	logger.Info("mcp server ready", "event", "mcp.server_ready", "address", listener.Addr().String(), "protocol", ProtocolVersion, "auth", "identity_configured", "governance", "unavailable")
+	logger.Info("mcp server ready", "event", "mcp.server_ready", "address", listener.Addr().String(), "protocol", ProtocolVersion, "auth", "identity_configured", "governance", "enforced")
 	select {
 	case err := <-errc:
 		if errors.Is(err, http.ErrServerClosed) {
@@ -525,21 +545,6 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return nil
 	}
 	return err
-}
-
-type unavailableGovernor struct{}
-
-func (unavailableGovernor) Discover(context.Context, tenancy.Scope, agentgovernance.Agent, string, string, agentgovernance.Risk, bool) (agentgovernance.Decision, error) {
-	return agentgovernance.Decision{}, agentgovernance.ErrDenied
-}
-func (unavailableGovernor) AuthorizeCall(context.Context, tenancy.Scope, agentgovernance.Request) (agentgovernance.Decision, error) {
-	return agentgovernance.Decision{}, agentgovernance.ErrDenied
-}
-
-type unavailableAuditor struct{}
-
-func (unavailableAuditor) Capture(context.Context, tenancy.Scope, audit.Entry) (audit.Record, error) {
-	return audit.Record{}, ErrUnavailable
 }
 
 type mcpLogWriter struct{ logger *slog.Logger }
