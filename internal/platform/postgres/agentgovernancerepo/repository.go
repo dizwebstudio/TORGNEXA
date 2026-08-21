@@ -90,6 +90,25 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, policy.ID, scope.OrganizationID
 	})
 }
 
+// LatestPolicyVersion returns the highest version ever installed for policyID,
+// or 0 if none exists — the caller's next InstallPolicy call uses version+1.
+// Unlike ResolveAgentPolicy this ignores effective_from/effective_until, since
+// an admin installing a new version needs the true latest, not just what's
+// currently in its effective window.
+func (r *Repository) LatestPolicyVersion(ctx context.Context, scope tenancy.Scope, policyID string) (uint64, error) {
+	if err := validate(r, ctx, scope); err != nil {
+		return 0, agentgovernance.ErrInvalid
+	}
+	var version uint64
+	err := r.withReadTx(ctx, scope, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM ai_agent_policies WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), policyID).Scan(&version)
+	})
+	if err != nil {
+		return 0, fmt.Errorf("agent governance repository: latest policy version: %w", err)
+	}
+	return version, nil
+}
+
 // RecordKillSwitch appends a versioned tenant/agent/integration operational state.
 // Re-enabling is another immutable version; evidence is never updated in place.
 func (r *Repository) RecordKillSwitch(ctx context.Context, scope tenancy.Scope, change agentgovernance.KillChange) error {

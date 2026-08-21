@@ -8,6 +8,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/entitlements"
 	"github.com/torgnexa/torgnexa/internal/platform/lineage"
 	"github.com/torgnexa/torgnexa/internal/platform/notifications"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
@@ -68,10 +69,14 @@ type productionRouteDependencies struct {
 	fxRates            *fxrepo.Repository
 	cloudSubscription  *cloudbillingrepo.Repository
 	uploads            *uploads.Service
+	uploadStatus       uploadStatusReader
+	uploadAccess       uploadReleaseGate
+	uploadContent      uploads.ReleaseReader
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
 	aiRegistry         *builtinruntime.Registry
 	mcpAccounts        *mcpaccountsrepo.Repository
+	agentGovernance    *agentgovernancerepo.Repository
 	oidc               config.OIDC
 }
 
@@ -86,7 +91,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newRealtimeRoutes(deps.auditRepository)...)
 	routes = append(routes, newApprovalRoutes(deps.approvals, deps.search)...)
 	routes = append(routes, newSearchRoutes(deps.search, deps.auditService)...)
-	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images})...)
+	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
@@ -98,6 +103,8 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newWebhookRoutes(deps.webhooks)...)
 	routes = append(routes, newAIAdvisoryRoutes(deps.aiAdvisory, deps.secretProvider, deps.aiRegistry, deps.auditService)...)
 	routes = append(routes, newMCPAccountRoutes(deps.mcpAccounts, deps.auditService)...)
+	routes = append(routes, newMCPAgentPolicyRoutes(deps.mcpAccounts, deps.agentGovernance, deps.agentGovernance, deps.auditService)...)
+	routes = append(routes, newUploadReadRoutes(deps.uploadStatus, deps.uploadAccess, deps.uploadContent)...)
 	routes = append(routes, newReservedContractRoutes(deps, capabilityGuard)...)
 	return routes
 }

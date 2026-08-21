@@ -19,6 +19,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/entitlements"
 	"github.com/torgnexa/torgnexa/internal/platform/notifications"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
@@ -189,6 +190,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("mcp_accounts_repository_startup_failed", err)
 	}
+	agentGovernanceRepository, err := agentgovernancerepo.New(db)
+	if err != nil {
+		return newRuntimeError("agent_governance_repository_startup_failed", err)
+	}
 	inventoryRepository, err := inventoryrepo.New(db)
 	if err != nil {
 		return newRuntimeError("inventory_repository_startup_failed", err)
@@ -263,6 +268,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("upload_service_startup_failed", err)
 	}
+	uploadAccessGate, err := uploads.NewAccessGate(uploadRepository, uploadPolicy)
+	if err != nil {
+		return newRuntimeError("upload_access_gate_startup_failed", err)
+	}
 	lineageRepository, err := lineagerepo.New(db)
 	if err != nil {
 		return newRuntimeError("lineage_repository_startup_failed", err)
@@ -332,7 +341,8 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
-		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository,
+		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadContent: quarantineStore,
+		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository,
 	})
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes)
 	if err != nil {

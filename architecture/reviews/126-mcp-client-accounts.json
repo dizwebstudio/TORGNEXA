@@ -121,5 +121,6 @@
       "evidence": "internal/platform/mcpaccounts and internal/app/mcp/identity_test.go cover token encode/decode round-trip, ValidateCreate rejection paths, and the resolver's accepted/missing-header/tampered-secret/disabled-account/wrong-tenant paths. No Connector SDK conformance suite applies (this task does not touch connectors/); live verification against the running Docker stack with a real Keycloak-issued token is recorded in tasks/issues/126-mcp-client-accounts.md instead."
     }
   ],
+  "provider": null,
   "follow_up_tasks": []
 }
