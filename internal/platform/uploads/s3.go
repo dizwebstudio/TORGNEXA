@@ -115,12 +115,13 @@ type memoryQuarantinedObject struct{ *bytes.Reader }
 
 func (memoryQuarantinedObject) Close() error { return nil }
 
-// OpenQuarantined reads only the server-derived immutable quarantine key and
-// keeps the object bounded by the configured upload limit.
-func (store *S3QuarantineStore) OpenQuarantined(ctx context.Context, scope tenancy.Scope, id ID, key string) (QuarantinedObject, error) {
-	if ctx == nil || store == nil || !scope.Valid() || !id.Valid() || key != QuarantineObjectKey(scope, id) || store.config.MaxBytes < 1 {
-		return nil, ErrInvalid
-	}
+type memoryReleasedObject struct{ *bytes.Reader }
+
+func (memoryReleasedObject) Close() error { return nil }
+
+// getObject performs a signed GET against a server-derived key and returns
+// the full bounded payload. Callers validate the key shape before calling.
+func (store *S3QuarantineStore) getObject(ctx context.Context, key string) ([]byte, error) {
 	requestURL := strings.TrimRight(store.config.Endpoint, "/") + "/" + escapeS3Segment(store.config.Bucket) + "/" + escapeS3Key(key)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
@@ -144,7 +145,34 @@ func (store *S3QuarantineStore) OpenQuarantined(ctx context.Context, scope tenan
 	if err != nil || int64(len(payload)) > store.config.MaxBytes {
 		return nil, ErrStorage
 	}
+	return payload, nil
+}
+
+// OpenQuarantined reads only the server-derived immutable quarantine key and
+// keeps the object bounded by the configured upload limit.
+func (store *S3QuarantineStore) OpenQuarantined(ctx context.Context, scope tenancy.Scope, id ID, key string) (QuarantinedObject, error) {
+	if ctx == nil || store == nil || !scope.Valid() || !id.Valid() || key != QuarantineObjectKey(scope, id) || store.config.MaxBytes < 1 {
+		return nil, ErrInvalid
+	}
+	payload, err := store.getObject(ctx, key)
+	if err != nil {
+		return nil, err
+	}
 	return memoryQuarantinedObject{Reader: bytes.NewReader(payload)}, nil
+}
+
+// OpenReleased reads only the server-derived immutable released key. The
+// caller must have already proven authorization for this exact key (see
+// AccessGate.ResolveReleased) — this method trusts the key as given.
+func (store *S3QuarantineStore) OpenReleased(ctx context.Context, scope tenancy.Scope, id ID, key string) (ReleasedObject, error) {
+	if ctx == nil || store == nil || !scope.Valid() || !id.Valid() || key != ReleasedObjectKey(scope, id) || store.config.MaxBytes < 1 {
+		return nil, ErrInvalid
+	}
+	payload, err := store.getObject(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return memoryReleasedObject{Reader: bytes.NewReader(payload)}, nil
 }
 
 // Promote verifies the quarantine digest before writing the same bytes to the
@@ -192,3 +220,4 @@ func (store *S3QuarantineStore) Promote(ctx context.Context, scope tenancy.Scope
 var _ QuarantineStore = (*S3QuarantineStore)(nil)
 var _ QuarantineReader = (*S3QuarantineStore)(nil)
 var _ ReleaseStore = (*S3QuarantineStore)(nil)
+var _ ReleaseReader = (*S3QuarantineStore)(nil)

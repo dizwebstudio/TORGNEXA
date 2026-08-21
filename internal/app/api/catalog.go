@@ -17,15 +17,17 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 )
 
 const CatalogCategoriesPath = "/api/v1/catalog/categories"
 
 type catalogAPI struct {
-	catalog *catalogrepo.Repository
-	prices  *pricingrepo.Repository
-	pim     *pimrepo.Repository
-	images  *catalogimagerepo.Repository
+	catalog      *catalogrepo.Repository
+	prices       *pricingrepo.Repository
+	pim          *pimrepo.Repository
+	images       *catalogimagerepo.Repository
+	uploadAccess uploadReleaseGate
 }
 type productInput struct {
 	Code        string `json:"code"`
@@ -54,9 +56,33 @@ type categoryInput struct {
 }
 type imageInput struct {
 	URL      string `json:"url"`
+	UploadID string `json:"upload_id"`
 	AltText  string `json:"alt_text"`
 	Position int    `json:"position"`
 	Version  int64  `json:"version"`
+}
+
+// resolveImageURL returns the stored URL for an image write: either the
+// caller's own https:// URL, or — when upload_id is set instead — the
+// content path of an upload this exact tenant has already had released.
+// Exactly one of url/upload_id must be present; ResolveReleased fails
+// closed on anything else (wrong tenant, not yet scanned, rejected).
+func (a catalogAPI) resolveImageURL(ctx context.Context, scope tenancy.Scope, in imageInput) (string, error) {
+	hasURL, hasUpload := in.URL != "", in.UploadID != ""
+	if hasURL == hasUpload {
+		return "", catalogimagerepo.ErrInvalid
+	}
+	if hasURL {
+		return in.URL, nil
+	}
+	if a.uploadAccess == nil {
+		return "", catalogimagerepo.ErrInvalid
+	}
+	ref, err := a.uploadAccess.ResolveReleased(ctx, scope, uploads.ID(in.UploadID))
+	if err != nil {
+		return "", catalogimagerepo.ErrInvalid
+	}
+	return uploads.ContentPath(ref.UploadID()), nil
 }
 
 func newCatalogRoutes(a catalogAPI) []ProtectedRoute {
@@ -240,7 +266,12 @@ func (a catalogAPI) productSubroute(w http.ResponseWriter, r *http.Request) {
 			if !decodeCatalogJSON(w, r, &in) {
 				return
 			}
-			v, e := a.images.Create(r.Context(), mustScope(r), catalogimagerepo.Image{ID: newApprovalID(), ProductID: pid.String(), URL: in.URL, AltText: in.AltText, Position: in.Position})
+			url, e := a.resolveImageURL(r.Context(), mustScope(r), in)
+			if e != nil {
+				writeCatalogResult(w, 0, nil, e)
+				return
+			}
+			v, e := a.images.Create(r.Context(), mustScope(r), catalogimagerepo.Image{ID: newApprovalID(), ProductID: pid.String(), URL: url, AltText: in.AltText, Position: in.Position})
 			writeCatalogResult(w, 201, v, e)
 			return
 		}
@@ -249,7 +280,12 @@ func (a catalogAPI) productSubroute(w http.ResponseWriter, r *http.Request) {
 			if !decodeCatalogJSON(w, r, &in) {
 				return
 			}
-			v, e := a.images.Update(r.Context(), mustScope(r), catalogimagerepo.Image{ID: parts[2], ProductID: pid.String(), URL: in.URL, AltText: in.AltText, Position: in.Position, Version: in.Version})
+			url, e := a.resolveImageURL(r.Context(), mustScope(r), in)
+			if e != nil {
+				writeCatalogResult(w, 0, nil, e)
+				return
+			}
+			v, e := a.images.Update(r.Context(), mustScope(r), catalogimagerepo.Image{ID: parts[2], ProductID: pid.String(), URL: url, AltText: in.AltText, Position: in.Position, Version: in.Version})
 			writeCatalogResult(w, 200, v, e)
 			return
 		}

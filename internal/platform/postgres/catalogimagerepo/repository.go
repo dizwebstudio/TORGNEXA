@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 )
 
 var ErrInvalid = errors.New("catalog image: invalid")
@@ -31,9 +32,18 @@ func New(db *sql.DB) (*Repository, error) {
 	return &Repository{db: db}, nil
 }
 
+// validImage accepts either a real externally hosted https:// URL, or the
+// exact server-relative content path of a released upload (see
+// uploads.ContentPath) — never an arbitrary relative path.
 func validImage(v Image) bool {
+	if len(v.URL) > 2048 || len(strings.TrimSpace(v.AltText)) > 300 || v.Position < 0 || v.Position > 255 {
+		return false
+	}
+	if uploads.ValidContentPath(v.URL) {
+		return true
+	}
 	u, err := url.ParseRequestURI(v.URL)
-	return err == nil && u.Scheme == "https" && u.Host != "" && len(v.URL) <= 2048 && len(strings.TrimSpace(v.AltText)) <= 300 && v.Position >= 0 && v.Position <= 255
+	return err == nil && u.Scheme == "https" && u.Host != ""
 }
 
 func (r *Repository) List(ctx context.Context, scope tenancy.Scope, productID string) ([]Image, error) {

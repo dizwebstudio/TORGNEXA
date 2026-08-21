@@ -222,6 +222,19 @@ type ReleaseStore interface {
 	Promote(context.Context, tenancy.Scope, ID, string, string) (StoredObject, error)
 }
 
+// ReleasedObject is a bounded byte-stream view of an immutable released object.
+type ReleasedObject interface {
+	io.Reader
+	io.Closer
+}
+
+// ReleaseReader opens only the server-derived released object for an upload.
+// Callers must independently confirm release via AccessGate before opening;
+// the key alone is not proof of authorization.
+type ReleaseReader interface {
+	OpenReleased(context.Context, tenancy.Scope, ID, string) (ReleasedObject, error)
+}
+
 // ReleasedObjectRef is the only object reference downstream consumers may use.
 // Fields are private so callers cannot manufacture a released reference.
 type ReleasedObjectRef struct {
@@ -471,6 +484,26 @@ func ReleasedObjectKey(scope tenancy.Scope, id ID) string {
 		return ""
 	}
 	return "released/" + scope.OrganizationID().String() + "/" + scope.WorkspaceID().String() + "/" + id.String() + "/object"
+}
+
+var contentPathPattern = regexp.MustCompile(`^/api/v1/uploads/upl_[0-9a-f]{32}/content$`)
+
+// ContentPath is the single source of truth for the server-relative path a
+// released upload's bytes are served from. Consumers (e.g. a product image
+// reference) store this exact shape instead of a client-supplied URL; the
+// API layer serves it and ValidContentPath lets other layers recognize it
+// without duplicating the pattern.
+func ContentPath(id ID) string {
+	if !id.Valid() {
+		return ""
+	}
+	return "/api/v1/uploads/" + string(id) + "/content"
+}
+
+// ValidContentPath reports whether value is exactly the shape ContentPath
+// produces for some valid ID.
+func ValidContentPath(value string) bool {
+	return contentPathPattern.MatchString(value)
 }
 
 func newID(random io.Reader) (ID, error) {

@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
 import {decodeProductPage} from "../../api/decoders";
@@ -9,7 +9,8 @@ import {navigate} from "../../shell/useLocationPath";
 import {Drawer} from "../../components/Drawer";
 import {useToast} from "../../components/Toast";
 
-type R={body:any}; type Client={listProducts(x?:object):Promise<R>;getProduct(x:object):Promise<R>;createProduct(x:object):Promise<R>;updateProduct(x:object):Promise<R>;createProductOffer(x:object):Promise<R>;updateProductOffer(x:object):Promise<R>;createOfferPrice(x:object):Promise<R>;updateOfferPrice(x:object):Promise<R>;listCatalogCategories():Promise<R>;createCatalogCategory(x:object):Promise<R>;assignProductCategory(x:object):Promise<R>;createProductImage(x:object):Promise<R>};
+type R={body:any;headers:Headers}; type Client={listProducts(x?:object):Promise<R>;getProduct(x:object):Promise<R>;createProduct(x:object):Promise<R>;updateProduct(x:object):Promise<R>;createProductOffer(x:object):Promise<R>;updateProductOffer(x:object):Promise<R>;createOfferPrice(x:object):Promise<R>;updateOfferPrice(x:object):Promise<R>;listCatalogCategories():Promise<R>;createCatalogCategory(x:object):Promise<R>;assignProductCategory(x:object):Promise<R>;createProductImage(x:object):Promise<R>;createUpload(x:object):Promise<R>;getUpload(x:object):Promise<R>;getUploadContent(x:object):Promise<R>};
+const uploadContentPathPattern=/^\/api\/v1\/uploads\/upl_[0-9a-f]{32}\/content$/;
 type Detail={product:any;offers:any[];categories:any[];images:any[]};
 const val=(o:any,k:string)=>o?.[k]??o?.[k[0].toUpperCase()+k.slice(1)]??"";
 const normalized=(b:any):Detail=>({product:{id:val(b.product,"id"),code:val(b.product,"code"),title:val(b.product,"title"),description:val(b.product,"description"),status:val(b.product,"status"),version:val(b.product,"version")},offers:b.offers??[],categories:(b.categories??[]).map((x:any)=>({id:val(x,"id"),name:val(x,"name"),code:val(x,"code")})),images:(b.images??[]).map((x:any)=>({id:val(x,"id"),url:val(x,"uRL")||val(x,"url"),alt_text:val(x,"altText")||x.alt_text,position:val(x,"position")}))});
@@ -22,4 +23,49 @@ function Offers({api,product,items,refresh}:{api:Client;product:string;items:any
 function Offer({api,product,item,refresh}:{api:Client;product:string;item:any;refresh:()=>Promise<void>}){const [amount,setAmount]=useState(""),[kind,setKind]=useState("regular"),[gtin,setGtin]=useState(item.gtin??"");const add=useMutation({mutationFn:()=>api.createOfferPrice({productId:product,offerOrPriceId:item.id,body:{kind,currency:"RUB",minor_units:Math.round(Number(amount)*100)}}),onSuccess:refresh});const edit=useMutation({mutationFn:(body:object)=>api.updateProductOffer({productId:product,offerId:item.id,body}),onSuccess:refresh});return <article className="offer-card"><strong>{item.sku}</strong><form className="catalog-inline" onSubmit={e=>{e.preventDefault();edit.mutate({version:item.version,gtin})}}><input placeholder="GTIN" value={gtin} onChange={e=>setGtin(e.target.value)}/><button className="button ghost">Сохранить предложение</button><select value={item.status} onChange={e=>edit.mutate({version:item.version,status:e.target.value})}><option value="draft">Черновик</option><option value="active">Активно</option><option value="archived">Архив</option></select></form><div className="catalog-stack">{(item.prices??[]).map((x:any)=><Price key={x.id} api={api} product={product} price={x} refresh={refresh}/>)}</div><form className="catalog-inline" onSubmit={e=>{e.preventDefault();add.mutate()}}><select value={kind} onChange={e=>setKind(e.target.value)}><option value="regular">Цена</option><option value="compare_at">Старая цена</option><option value="cost">Себестоимость</option></select><input required type="number" min="0" step="0.01" placeholder="Сумма" value={amount} onChange={e=>setAmount(e.target.value)}/><button className="button ghost">Добавить цену</button></form></article>}
 function Price({api,product,price,refresh}:{api:Client;product:string;price:any;refresh:()=>Promise<void>}){const [amount,setAmount]=useState(String(price.minor_units/100));const edit=useMutation({mutationFn:()=>api.updateOfferPrice({productId:product,offerOrPriceId:price.id,body:{version:price.version,minor_units:Math.round(Number(amount)*100)}}),onSuccess:refresh});return <form className="catalog-inline" onSubmit={e=>{e.preventDefault();edit.mutate()}}><span className="chip">{price.kind} · {price.currency}</span><input required type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)}/><button className="button ghost">Изменить цену</button></form>}
 function Categories({api,product,assigned,refresh}:{api:Client;product:string;assigned:any[];refresh:()=>Promise<void>}){const q=useQuery({queryKey:["catalog-categories"],queryFn:async()=>normalized({categories:(await api.listCatalogCategories()).body.items}).categories});const [selected,setSelected]=useState(""),[code,setCode]=useState(""),[name,setName]=useState("");const assign=useMutation({mutationFn:()=>api.assignProductCategory({productId:product,categoryId:selected}),onSuccess:refresh});const create=useMutation({mutationFn:()=>api.createCatalogCategory({body:{code,name}}),onSuccess:()=>q.refetch()});return <div className="catalog-stack"><div className="chip-list">{assigned.map(x=><span className="chip" key={x.id}>{x.name}</span>)}</div><form className="catalog-inline" onSubmit={e=>{e.preventDefault();assign.mutate()}}><select required value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Выберите категорию</option>{q.data?.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select><button className="button primary">Назначить</button></form><form className="catalog-inline" onSubmit={e=>{e.preventDefault();create.mutate()}}><input required placeholder="Код" value={code} onChange={e=>setCode(e.target.value)}/><input required placeholder="Название" value={name} onChange={e=>setName(e.target.value)}/><button className="button ghost">Создать категорию</button></form></div>}
-function Images({api,product,items,refresh}:{api:Client;product:string;items:any[];refresh:()=>Promise<void>}){const [url,setUrl]=useState(""),[alt,setAlt]=useState("");const add=useMutation({mutationFn:()=>api.createProductImage({productId:product,body:{url,alt_text:alt,position:items.length}}),onSuccess:refresh});return <div className="catalog-stack"><form className="catalog-inline" onSubmit={e=>{e.preventDefault();add.mutate()}}><input required type="url" placeholder="https://…" value={url} onChange={e=>setUrl(e.target.value)}/><input placeholder="Описание" value={alt} onChange={e=>setAlt(e.target.value)}/><button className="button primary">Добавить изображение</button></form><div className="image-grid">{items.map(x=><figure key={x.id}><img src={x.url} alt={x.alt_text}/><figcaption>{x.alt_text||"Без описания"}</figcaption></figure>)}</div><small>Для карточки принимаются HTTPS-ссылки; загрузка файлов проходит через безопасный карантин.</small></div>}
+function Images({api,product,items,refresh}:{api:Client;product:string;items:any[];refresh:()=>Promise<void>}){
+ const toast=useToast();
+ const [url,setUrl]=useState(""),[alt,setAlt]=useState(""),[uploading,setUploading]=useState(false);
+ const addByUrl=useMutation({mutationFn:()=>api.createProductImage({productId:product,body:{url,alt_text:alt,position:items.length}}),onSuccess:async()=>{setUrl("");setAlt("");await refresh()},onError:()=>toast.push({kind:"error",title:"Не удалось добавить изображение",body:"Проверьте, что ссылка начинается с https://."})});
+ const uploadFile=useMutation({mutationFn:async(file:File)=>{
+  setUploading(true);
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  let binary="";for(const byte of bytes)binary+=String.fromCharCode(byte);
+  const created=(await api.createUpload({idempotencyKey:crypto.randomUUID(),body:{filename:file.name,declared_media_type:file.type||undefined,content_base64:btoa(binary)}})).body as {id?:unknown};
+  if(typeof created.id!=="string")throw new Error("invalid upload response");
+  for(let attempt=0;;attempt++){
+   if(attempt>=30)throw new Error("upload scan timed out");
+   const uploadStatus=(await api.getUpload({uploadId:created.id})).body as {state?:unknown};
+   if(uploadStatus.state==="released")break;
+   if(uploadStatus.state==="rejected")throw new Error("upload rejected by security scan");
+   await new Promise(resolve=>window.setTimeout(resolve,1000));
+  }
+  await api.createProductImage({productId:product,body:{upload_id:created.id,alt_text:alt,position:items.length}});
+ },onSuccess:async()=>{setAlt("");setUploading(false);await refresh()},onError:()=>{setUploading(false);toast.push({kind:"error",title:"Не удалось загрузить изображение",body:"Файл отклонён проверкой безопасности или превышен предел размера."})}});
+ return <div className="catalog-stack">
+  <form className="catalog-inline" onSubmit={e=>{e.preventDefault();addByUrl.mutate()}}>
+   <input type="url" placeholder="https://…" value={url} onChange={e=>setUrl(e.target.value)}/>
+   <input placeholder="Описание" value={alt} onChange={e=>setAlt(e.target.value)}/>
+   <button className="button primary" disabled={!url||addByUrl.isPending}>Добавить по ссылке</button>
+  </form>
+  <label className="catalog-inline">
+   <input type="file" accept="image/*" disabled={uploading} onChange={e=>{const target=e.target as unknown as HTMLInputElement;const file=target.files?.[0];if(file)uploadFile.mutate(file);target.value=""}}/>
+   {uploading?<small>Загружаем и проверяем файл…</small>:null}
+  </label>
+  <div className="image-grid">{items.map(x=><figure key={x.id}><ProductImage api={api} src={x.url} alt={x.alt_text}/><figcaption>{x.alt_text||"Без описания"}</figcaption></figure>)}</div>
+  <small>Ссылка должна быть HTTPS. Загруженный файл сначала проходит проверку безопасности — это может занять несколько секунд, прежде чем он появится на карточке.</small>
+ </div>
+}
+function ProductImage({api,src,alt}:{api:Client;src:string;alt:string}){
+ const internal=uploadContentPathPattern.test(src);
+ const q=useQuery({queryKey:["upload-content",src],enabled:internal,staleTime:Infinity,queryFn:async()=>{
+  const uploadId=src.split("/")[4];
+  const response=await api.getUploadContent({uploadId});
+  const contentType=response.headers.get("content-type")||"application/octet-stream";
+  return URL.createObjectURL(new Blob([response.body as ArrayBuffer],{type:contentType}));
+ }});
+ useEffect(()=>()=>{if(q.data)URL.revokeObjectURL(q.data)},[q.data]);
+ if(!internal)return <img src={src} alt={alt}/>;
+ if(!q.data)return <div className="image-placeholder" aria-label="Загрузка изображения"/>;
+ return <img src={q.data} alt={alt}/>;
+}
