@@ -311,6 +311,28 @@
       },
       "backfill": null,
       "sha256": "ef98de3aa3e4bee96df50c4cf3365d568d98e66ff60baec40db55bb22e2946bd"
+    },
+    {
+      "version": 15,
+      "name": "ai_provider_qwen_deepseek",
+      "file": "000015_ai_provider_qwen_deepseek.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [
+        14
+      ],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "3e3ef82b481eb027103bbe999db9a53a0bb4f2a01bf186a283f5fac2186766c7"
     }
   ]
 }

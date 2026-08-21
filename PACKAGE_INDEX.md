@@ -10,15 +10,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 374
+- docs: 382
 - adrs: 98
-- tasks: 128
+- tasks: 130
 - milestones: 14
 - codex_skills: 28
 - contracts: 216
 - prompts: 13
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2187
+- total source files (excluding local secrets/build/dependency/cache trees): 2217
 
 
 ## Task 126 additions
@@ -450,6 +450,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/124-gigachat-connector.json`
 - `architecture/reviews/125-yandexgpt-connector.json`
 - `architecture/reviews/126-mcp-client-accounts.json`
+- `architecture/reviews/127-qwen-connector.json`
+- `architecture/reviews/128-deepseek-connector.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -529,6 +531,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/cian/manifest.json`
 - `connectors/cian/property.go`
 - `connectors/cian/status.go`
+- `connectors/deepseek/conformance.go`
+- `connectors/deepseek/connector.go`
+- `connectors/deepseek/connector_test.go`
+- `connectors/deepseek/manifest.json`
 - `connectors/diadoc/candidate_transport.go`
 - `connectors/diadoc/conformance.go`
 - `connectors/diadoc/connector.go`
@@ -677,6 +683,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/prestashop/read.go`
 - `connectors/prestashop/remote.go`
 - `connectors/prestashop/write.go`
+- `connectors/qwen/conformance.go`
+- `connectors/qwen/connector.go`
+- `connectors/qwen/connector_test.go`
+- `connectors/qwen/manifest.json`
 - `connectors/rutube/config.go`
 - `connectors/rutube/conformance.go`
 - `connectors/rutube/connector.go`
@@ -1173,6 +1183,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/cian/property-mapping.md`
 - `docs/connectors/cian/reconciliation.md`
 - `docs/connectors/cian/spec.md`
+- `docs/connectors/deepseek/capability-audit.md`
+- `docs/connectors/deepseek/conformance-plan.md`
+- `docs/connectors/deepseek/conformance-report.json`
+- `docs/connectors/deepseek/spec.md`
 - `docs/connectors/diadoc/README.md`
 - `docs/connectors/diadoc/capability-audit.md`
 - `docs/connectors/diadoc/conformance-plan.md`
@@ -1263,6 +1277,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/prestashop/conformance-report.json`
 - `docs/connectors/prestashop/reconciliation.md`
 - `docs/connectors/prestashop/spec.md`
+- `docs/connectors/qwen/capability-audit.md`
+- `docs/connectors/qwen/conformance-plan.md`
+- `docs/connectors/qwen/conformance-report.json`
+- `docs/connectors/qwen/spec.md`
 - `docs/connectors/rutube/README.md`
 - `docs/connectors/rutube/capability-audit.md`
 - `docs/connectors/rutube/conformance-plan.md`
@@ -1463,7 +1481,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/features/settings/MCPAccountSettings.tsx`
 - `frontend/src/features/settings/MemberSettings.tsx`
 - `frontend/src/features/settings/NotificationSettings.tsx`
+- `frontend/src/features/settings/PluginsSettings.tsx`
 - `frontend/src/features/settings/SecuritySettings.tsx`
+- `frontend/src/features/settings/WebhookSettings.tsx`
 - `frontend/src/features/settings/WorkspaceSettings.tsx`
 - `frontend/src/features/settings/settings-tabs.ts`
 - `frontend/src/generated/connector-catalog.ts`
@@ -1473,7 +1493,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/CatalogPage.tsx`
 - `frontend/src/pages/CompliancePage.tsx`
 - `frontend/src/pages/ConnectorOAuthCallbackPage.tsx`
+- `frontend/src/pages/CounterpartiesPage.tsx`
 - `frontend/src/pages/DashboardPage.tsx`
+- `frontend/src/pages/FinancePage.tsx`
 - `frontend/src/pages/IncidentCenterPage.tsx`
 - `frontend/src/pages/IntegrationsPage.tsx`
 - `frontend/src/pages/InventoryPage.tsx`
@@ -1531,6 +1553,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/audit.go`
 - `internal/app/api/audit_test.go`
 - `internal/app/api/catalog.go`
+- `internal/app/api/catalog_images_test.go`
 - `internal/app/api/compliance.go`
 - `internal/app/api/compliance_test.go`
 - `internal/app/api/connector_accounts.go`
@@ -1551,6 +1574,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/lineage.go`
 - `internal/app/api/lineage_test.go`
 - `internal/app/api/mcp_accounts.go`
+- `internal/app/api/mcp_agent_policies.go`
+- `internal/app/api/mcp_agent_policies_test.go`
 - `internal/app/api/member_settings.go`
 - `internal/app/api/notification_delivery.go`
 - `internal/app/api/notification_routes.go`
@@ -1573,6 +1598,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/settings_security_test.go`
 - `internal/app/api/sync.go`
 - `internal/app/api/sync_test.go`
+- `internal/app/api/uploads_content.go`
+- `internal/app/api/uploads_content_test.go`
 - `internal/app/api/webhooks.go`
 - `internal/app/api/webhooks_test.go`
 - `internal/app/api/workspace_settings.go`
@@ -1949,6 +1976,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000012_ai_advisory.sql`
 - `migrations/000013_ai_provider_credential_class.sql`
 - `migrations/000014_mcp_client_accounts.sql`
+- `migrations/000015_ai_provider_qwen_deepseek.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2285,6 +2313,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/124-gigachat-connector.md`
 - `tasks/issues/125-yandexgpt-connector.md`
 - `tasks/issues/126-mcp-client-accounts.md`
+- `tasks/issues/127-qwen-connector.md`
+- `tasks/issues/128-deepseek-connector.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

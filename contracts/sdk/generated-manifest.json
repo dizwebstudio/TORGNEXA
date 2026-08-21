@@ -3,9 +3,9 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "bf76a645a37e5e53928699b1473fa2679d928cd133b5d26c3991a4ad750028cc",
+    "sha256": "27af7547a8b88540773661e8adb7391708dfc95a7c3862266f18e639696ee1d1",
     "openapi_version": "3.1.0",
-    "api_version": "0.17.0",
+    "api_version": "0.20.0",
     "server_path": "/api/v1"
   },
   "operations": [
@@ -225,6 +225,16 @@
       "path": "/lineage/timeline"
     },
     {
+      "operation_id": "getMCPAccountPolicy",
+      "method": "GET",
+      "path": "/settings/mcp-accounts/{account_id}:policy"
+    },
+    {
+      "operation_id": "getMCPAgentKillSwitch",
+      "method": "GET",
+      "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
       "operation_id": "getNotificationPreference",
       "method": "GET",
       "path": "/notification-preferences/{channel}"
@@ -255,6 +265,16 @@
       "path": "/sync/status"
     },
     {
+      "operation_id": "getUpload",
+      "method": "GET",
+      "path": "/uploads/{upload_id}"
+    },
+    {
+      "operation_id": "getUploadContent",
+      "method": "GET",
+      "path": "/uploads/{upload_id}/content"
+    },
+    {
       "operation_id": "getWarehouseIncident",
       "method": "GET",
       "path": "/inventory/warehouse-incidents/{incident_id}"
@@ -278,6 +298,11 @@
       "operation_id": "importInventory",
       "method": "POST",
       "path": "/inventory/import"
+    },
+    {
+      "operation_id": "installMCPAccountPolicy",
+      "method": "POST",
+      "path": "/settings/mcp-accounts/{account_id}:install-policy"
     },
     {
       "operation_id": "inviteWorkspaceMember",
@@ -513,6 +538,11 @@
       "operation_id": "searchLegalParties",
       "method": "GET",
       "path": "/counterparties/search"
+    },
+    {
+      "operation_id": "setMCPAgentKillSwitch",
+      "method": "POST",
+      "path": "/settings/mcp-agents:kill-switch"
     },
     {
       "operation_id": "startConnectorBootstrap",
