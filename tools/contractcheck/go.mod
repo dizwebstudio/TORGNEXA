@@ -2,7 +2,7 @@ module github.com/torgnexa/torgnexa/tools/contractcheck
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 require (
 	github.com/bufbuild/protocompile v0.14.1

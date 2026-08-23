@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
 )
 
@@ -17,23 +19,47 @@ const (
 	SettingsSecuritySessionsPath      = "/api/v1/settings/security/sessions"
 	SettingsSecurityLoginsPath        = "/api/v1/settings/security/logins"
 	SettingsSecurityAuditPath         = "/api/v1/settings/security/audit"
+	SettingsSecurityPosturePath       = "/api/v1/settings/security/posture"
 )
 
-type settingsSecurityAPI struct {
-	store securitysettings.Store
-	audit securitysettings.SettingsAuditReader
-	oidc  config.OIDC
+type runtimePostureInspector interface {
+	Inspect(context.Context) (runtimeposture.Assessment, error)
 }
 
-func newSettingsSecurityRoutes(store securitysettings.Store, reader securitysettings.SettingsAuditReader, oidc config.OIDC) []ProtectedRoute {
-	api := &settingsSecurityAPI{store: store, audit: reader, oidc: oidc}
+type settingsSecurityAPI struct {
+	store   securitysettings.Store
+	audit   securitysettings.SettingsAuditReader
+	oidc    config.OIDC
+	posture runtimePostureInspector
+}
+
+func newSettingsSecurityRoutes(store securitysettings.Store, reader securitysettings.SettingsAuditReader, oidc config.OIDC, posture runtimePostureInspector) []ProtectedRoute {
+	api := &settingsSecurityAPI{store: store, audit: reader, oidc: oidc, posture: posture}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: SettingsSecurityConfigurationPath, Permission: "settings.security.read", Handler: http.HandlerFunc(api.configuration)},
 		{Method: http.MethodGet, Path: SettingsSecuritySessionsPath, Permission: "settings.security.read", Handler: http.HandlerFunc(api.sessions)},
 		{Method: http.MethodPost, Path: SettingsSecuritySessionsPath + "/", PathPrefix: true, Permission: "settings.security.write", Handler: http.HandlerFunc(api.revoke)},
 		{Method: http.MethodGet, Path: SettingsSecurityLoginsPath, Permission: "settings.security.read", Handler: http.HandlerFunc(api.logins)},
 		{Method: http.MethodGet, Path: SettingsSecurityAuditPath, Permission: "settings.security.read", Handler: http.HandlerFunc(api.settingsAudit)},
+		{Method: http.MethodGet, Path: SettingsSecurityPosturePath, Permission: "settings.security.posture.read", Handler: http.HandlerFunc(api.runtimePosture)},
 	}
+}
+
+func (api *settingsSecurityAPI) runtimePosture(w http.ResponseWriter, r *http.Request) {
+	if api == nil || api.posture == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	assessment, err := api.posture.Inspect(r.Context())
+	if err != nil && !errors.Is(err, runtimeposture.ErrUnsafe) {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	status := http.StatusOK
+	if errors.Is(err, runtimeposture.ErrUnsafe) {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, assessment)
 }
 
 func (api *settingsSecurityAPI) configuration(w http.ResponseWriter, r *http.Request) {

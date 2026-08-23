@@ -10,7 +10,7 @@ The release workflow also retained an obsolete publication placeholder after the
 
 ## Decision
 
-P4 adds one fail-closed root command, `make p4-qualification`, bound to a clean exact semantic-version tag, Go 1.26.5 and Docker Compose. It executes P3 qualification and then verifies four external evidence classes: GitHub rules actually applied to the protected branch, recent reviewed non-secret production posture, independently reverified release signatures/provenance, and live connector health through the public TORGNEXA API.
+P4 adds one fail-closed root command, `make p4-qualification`, bound to a clean exact semantic-version tag, the security-patched Go 1.26.7 toolchain and Docker Compose. It executes P3 qualification and then verifies four external evidence classes: GitHub rules actually applied to the protected branch, recent reviewed non-secret production posture, independently reverified release signatures/provenance, and live connector health through the public TORGNEXA API.
 
 Hosted architecture protection is accepted only when applied GitHub rules expose deletion/force-push protection, pull-request approvals, a Team reviewer for architecture paths, and a SHA-pinned required workflow at `.github/workflows/architecture-required.yml`. Release identity is accepted only when Sigstore and SLSA evidence bind each first-party binary to the exact repository, release workflow, tag ref, source commit and push trigger.
 

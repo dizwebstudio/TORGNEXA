@@ -1,0 +1,81 @@
+import {useEffect, useState} from "react";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {useApi} from "../../api/ApiProvider";
+import {useAuth} from "../../auth/AuthProvider";
+import {ErrorBlock, LoadingBlock} from "../../components/ApiState";
+import {StatusBadge} from "../../components/StatusBadge";
+import {useToast} from "../../components/Toast";
+
+type Response={body:unknown};
+type Client={
+ getRuntimeSecurityPosture():Promise<Response>;
+ listSecurityEvidence(input:{limit:number}):Promise<Response>;
+ getAIEgressPolicy():Promise<Response>;
+ putAIEgressPolicy(input:{idempotencyKey:string;body:unknown}):Promise<Response>;
+ previewAIEgress(input:{body:unknown}):Promise<Response>;
+ runConnectorReplay(input:{idempotencyKey:string;body:unknown}):Promise<Response>;
+ createProfitabilityScenario(input:{idempotencyKey:string;body:unknown}):Promise<Response>;
+};
+interface Posture{status:"pass"|"fail";checked_at:string;go_version:string;minimum_go_version:string;go_runtime_patched:boolean;least_privilege:boolean;database:{role:string;superuser:boolean;bypass_rls:boolean;can_create_role:boolean;can_create_database:boolean;can_create_schema:boolean;owns_runtime_state:boolean}}
+interface Evidence{id:string;type:string;actor_ref:string;resource_type:string;resource_id:string;correlation_id:string;decision:string;summary:Record<string,unknown>;occurred_at:string}
+interface Policy{version:number;enabled:boolean;allowed_data_classes:string[];allowed_providers:string[];allowed_models:string[];max_prompt_bytes:number;monthly_request_limit:number;created_at:string}
+interface Preview{allowed:boolean;reason?:string;redacted_prompt?:string;policy_version?:number;persisted?:boolean}
+interface Replay{id:string;status:string;result:Record<string,unknown>;created_at:string;replayed:boolean}
+interface Scenario{id:string;name:string;algorithm_version:string;result:{currency:string;revenue_minor:number;marketplace_fee_minor:number;converted_costs_minor:number;contribution_profit_minor:number;margin_basis_points:number};created_at:string;replayed:boolean}
+
+const object=(value:unknown):Record<string,unknown>=>{if(!value||typeof value!=="object"||Array.isArray(value))throw new Error("invalid response");return value as Record<string,unknown>};
+const split=(value:string)=>[...new Set(value.split(",").map(item=>item.trim()).filter(Boolean))];
+const money=(minor:number,currency:string)=>new Intl.NumberFormat("ru-RU",{style:"currency",currency}).format(minor/100);
+
+export function TrustControlSettings(){
+ const api=useApi() as unknown as Client,auth=useAuth(),cache=useQueryClient(),toast=useToast();
+ const capabilities=auth.session?.capabilities??[];
+ const canPosture=capabilities.includes("settings.security.posture.read"),canEvidence=capabilities.includes("settings.security.evidence.read"),canPolicyRead=capabilities.includes("settings.ai_governance.read"),canPolicyWrite=capabilities.includes("settings.ai_governance.write"),canPreview=capabilities.includes("ai.analyze"),canReplay=capabilities.includes("connectors.replay.run"),canScenario=capabilities.includes("profitability.scenarios.write");
+ if(!(canPosture||canEvidence||canPolicyRead||canPreview||canReplay||canScenario))return null;
+ return <>
+  {canPosture||canEvidence?<RuntimeTrust api={api} canPosture={canPosture} canEvidence={canEvidence}/>:null}
+  {canPolicyRead||canPreview?<AIGovernance api={api} canWrite={canPolicyWrite} canPreview={canPreview} cache={cache} toast={toast}/>:null}
+  {canReplay?<ConnectorReplay api={api} toast={toast}/>:null}
+  {canScenario?<ProfitabilityLab api={api} toast={toast}/>:null}
+ </>;
+}
+
+function RuntimeTrust({api,canPosture,canEvidence}:{api:Client;canPosture:boolean;canEvidence:boolean}){
+ const posture=useQuery({queryKey:["trust","posture"],queryFn:async()=>object((await api.getRuntimeSecurityPosture()).body) as unknown as Posture,enabled:canPosture,staleTime:30_000,retry:false});
+ const evidence=useQuery({queryKey:["trust","evidence"],queryFn:async()=>{const value=object((await api.listSecurityEvidence({limit:25})).body);if(!Array.isArray(value.items))throw new Error("invalid evidence");return value.items as Evidence[]},enabled:canEvidence,staleTime:10_000});
+ return <section className="panel settings-card">
+  <div className="settings-card-heading"><div><p className="eyebrow">Runtime Security Self-Test</p><h2>Поза безопасности и evidence ledger</h2><p className="settings-copy">Проверка выполняется по фактическому Go runtime и PostgreSQL-роли приложения. Журнал хранит только минимизированные решения, хэши и исходы.</p></div>{posture.data?<StatusBadge value={posture.data.status}/>:null}</div>
+  {canPosture?(posture.isPending?<LoadingBlock/>:posture.isError?<ErrorBlock>Проверка runtime posture не пройдена или недоступна.</ErrorBlock>:<div className="security-config"><div><span>Go runtime</span><strong>{posture.data.go_version}</strong><small>Минимум {posture.data.minimum_go_version}</small></div><div><span>PostgreSQL role</span><strong>{posture.data.database.role}</strong><small>{posture.data.least_privilege?"Без superuser/BYPASSRLS/владения схемой":"Есть опасные привилегии"}</small></div><div><span>Последняя проверка</span><strong>{new Date(posture.data.checked_at).toLocaleString("ru-RU")}</strong><small>Fail-closed при старте сервисов</small></div></div>):null}
+  {canEvidence?<><div className="settings-card-heading security-subhead"><div><p className="eyebrow">Security Evidence</p><h3>Последние решения и исходы</h3></div></div>{evidence.isPending?<LoadingBlock/>:evidence.isError?<ErrorBlock>Не удалось загрузить журнал доказательств.</ErrorBlock>:evidence.data.length===0?<p className="settings-copy">Записей пока нет.</p>:<div className="security-timeline">{evidence.data.map(item=><article key={item.id}><strong>{item.type} · {item.decision}</strong><span>{item.resource_type} · {item.resource_id} · {new Date(item.occurred_at).toLocaleString("ru-RU")}</span><small className="mono">actor {item.actor_ref.slice(0,16)} · correlation {item.correlation_id}</small></article>)}</div>}</>:null}
+ </section>;
+}
+
+function AIGovernance({api,canWrite,canPreview,cache,toast}:{api:Client;canWrite:boolean;canPreview:boolean;cache:ReturnType<typeof useQueryClient>;toast:ReturnType<typeof useToast>}){
+ const query=useQuery({queryKey:["trust","ai-policy"],queryFn:async()=>object((await api.getAIEgressPolicy()).body) as unknown as Policy,retry:false});
+ const [enabled,setEnabled]=useState(true),[classes,setClasses]=useState("aggregate"),[providers,setProviders]=useState("openai-compatible"),[models,setModels]=useState("gpt-4o-mini"),[maxBytes,setMaxBytes]=useState(8000),[monthlyLimit,setMonthlyLimit]=useState(1000);
+ const [previewPrompt,setPreviewPrompt]=useState("Сводка для user@example.com"),[previewResult,setPreviewResult]=useState<Preview|null>(null);
+ useEffect(()=>{if(query.data){setEnabled(query.data.enabled);setClasses(query.data.allowed_data_classes.join(", "));setProviders(query.data.allowed_providers.join(", "));setModels(query.data.allowed_models.join(", "));setMaxBytes(query.data.max_prompt_bytes);setMonthlyLimit(query.data.monthly_request_limit)}},[query.data]);
+ const body=()=>({expected_version:query.data?.version??0,enabled,allowed_data_classes:split(classes),allowed_providers:split(providers),allowed_models:split(models),max_prompt_bytes:maxBytes,monthly_request_limit:monthlyLimit});
+ const save=useMutation({mutationFn:()=>api.putAIEgressPolicy({idempotencyKey:crypto.randomUUID(),body:body()}),onSuccess:async()=>{toast.push({kind:"success",title:"Новая ревизия AI-egress политики сохранена"});await cache.invalidateQueries({queryKey:["trust","ai-policy"]})},onError:()=>toast.push({kind:"error",title:"Не удалось сохранить политику",body:"Проверьте allowlist и ожидаемую версию."})});
+ const preview=useMutation({mutationFn:()=>api.previewAIEgress({body:{provider:split(providers)[0]??"",model:split(models)[0]??"",data_classes:split(classes),prompt:previewPrompt}}),onSuccess:result=>setPreviewResult(object(result.body) as unknown as Preview),onError:()=>toast.push({kind:"error",title:"Preview не выполнен"})});
+ const valid=split(classes).length>0&&split(providers).length>0&&split(models).length>0&&maxBytes>0&&monthlyLimit>0;
+ return <section className="panel settings-card">
+  <div className="settings-card-heading"><div><p className="eyebrow">AI Data/Egress Governance</p><h2>Политика внешней передачи данных</h2><p className="settings-copy">Default deny, точные allowlist классов данных/провайдеров/моделей, лимит запросов и редактирование чувствительных фрагментов до внешнего вызова.</p></div>{query.data?<StatusBadge value={`v${query.data.version}`}/>:<StatusBadge value="default deny"/>}</div>
+  {query.isPending?<LoadingBlock/>:query.isError?<p className="settings-note">Политика ещё не создана: внешние AI-вызовы запрещены.</p>:null}
+  <div className="settings-grid"><label className="field"><span>Классы данных через запятую</span><input value={classes} onChange={event=>setClasses(event.target.value)}/></label><label className="field"><span>Провайдеры</span><input value={providers} onChange={event=>setProviders(event.target.value)}/></label><label className="field"><span>Модели</span><input value={models} onChange={event=>setModels(event.target.value)}/></label><label className="field"><span>Максимум байт prompt</span><input type="number" min="1" max="32000" value={maxBytes} onChange={event=>setMaxBytes(Number(event.target.value))}/></label><label className="field"><span>Запросов в месяц</span><input type="number" min="1" max="1000000" value={monthlyLimit} onChange={event=>setMonthlyLimit(Number(event.target.value))}/></label><label className="check-row"><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)}/><span>Разрешить egress по этой политике</span></label></div>
+  {canWrite?<div className="account-actions"><button className="button primary" disabled={!valid||save.isPending} onClick={()=>save.mutate()}>{save.isPending?"Сохраняем…":"Сохранить новую ревизию"}</button></div>:null}
+  {canPreview?<section className="drawer-section"><h3>Безопасный preview</h3><p className="settings-note">Не сохраняется и не отправляется провайдеру.</p><label className="field"><span>Тестовый prompt</span><textarea value={previewPrompt} maxLength={32000} onChange={event=>setPreviewPrompt(event.target.value)}/></label><div className="account-actions"><button className="button ghost" disabled={!previewPrompt.trim()||preview.isPending} onClick={()=>preview.mutate()}>Проверить</button>{previewResult?<StatusBadge value={previewResult.allowed?"allowed":"denied"}/>:null}</div>{previewResult?.redacted_prompt?<code className="token-reveal">{previewResult.redacted_prompt}</code>:null}</section>:null}
+ </section>;
+}
+
+function ConnectorReplay({api,toast}:{api:Client;toast:ReturnType<typeof useToast>}){
+ const [family,setFamily]=useState("marketplace"),[capability,setCapability]=useState("catalog.products.read"),[fixture,setFixture]=useState('{"_synthetic":true,"items":[{"sku":"TEST-1"}]}'),[result,setResult]=useState<Replay|null>(null);
+ const run=useMutation({mutationFn:()=>api.runConnectorReplay({idempotencyKey:crypto.randomUUID(),body:{connector_family:family.trim(),capability:capability.trim(),fixture:JSON.parse(fixture)}}),onSuccess:value=>{setResult(object(value.body) as unknown as Replay);toast.push({kind:"success",title:"Synthetic replay завершён без remote IO"})},onError:()=>toast.push({kind:"error",title:"Replay отклонён",body:"Разрешены только bounded synthetic fixtures без credential-полей."})});
+ return <section className="panel settings-card"><div className="settings-card-heading"><div><p className="eyebrow">Connector Replay Lab</p><h2>Проверка fixture без внешних вызовов</h2><p className="settings-copy">Лаборатория принимает только явно синтетический JSON, рекурсивно отклоняет credential-shaped поля и фиксирует нулевые remote calls/writes.</p></div>{result?<StatusBadge value={result.status}/>:null}</div><div className="settings-grid"><label className="field"><span>Семейство</span><input value={family} onChange={event=>setFamily(event.target.value)}/></label><label className="field"><span>Capability</span><input value={capability} onChange={event=>setCapability(event.target.value)}/></label></div><label className="field"><span>Synthetic fixture</span><textarea value={fixture} rows={6} onChange={event=>setFixture(event.target.value)}/></label><div className="account-actions"><button className="button primary" disabled={run.isPending} onClick={()=>run.mutate()}>{run.isPending?"Проверяем…":"Запустить replay"}</button></div>{result?<code className="token-reveal">{JSON.stringify(result.result,null,2)}</code>:null}</section>;
+}
+
+function ProfitabilityLab({api,toast}:{api:Client;toast:ReturnType<typeof useToast>}){
+ const [name,setName]=useState("Базовый сценарий"),[quantity,setQuantity]=useState(1000),[salePrice,setSalePrice]=useState(10000),[cost,setCost]=useState(5000),[logistics,setLogistics]=useState(1000),[advertising,setAdvertising]=useState(500),[fee,setFee]=useState(1500),[fx,setFX]=useState(1_000_000),[result,setResult]=useState<Scenario|null>(null);
+ const calculate=useMutation({mutationFn:()=>api.createProfitabilityScenario({idempotencyKey:crypto.randomUUID(),body:{name,sale_currency:"RUB",cost_currency:"RUB",quantity_milli:quantity,sale_unit_price_minor:salePrice,cost_unit_minor:cost,logistics_total_cost_minor:logistics,advertising_total_cost_minor:advertising,marketplace_fee_basis_points:fee,cost_to_sale_fx_rate_micros:fx}}),onSuccess:value=>setResult(object(value.body) as unknown as Scenario),onError:()=>toast.push({kind:"error",title:"Сценарий не рассчитан",body:"Проверьте целочисленные minor/milli/micros значения."})});
+ return <section className="panel settings-card"><div className="settings-card-heading"><div><p className="eyebrow">Profitability Scenario Lab</p><h2>Фиксированный what-if расчёт</h2><p className="settings-copy">Все суммы — integer minor units, количество — milli, FX — micros. Входной snapshot и версия алгоритма сохраняются неизменно.</p></div>{result?<StatusBadge value={result.algorithm_version}/>:null}</div><div className="settings-grid"><label className="field"><span>Название</span><input value={name} maxLength={120} onChange={event=>setName(event.target.value)}/></label><label className="field"><span>Количество, milli</span><input type="number" min="1" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></label><label className="field"><span>Цена за единицу, minor</span><input type="number" min="0" value={salePrice} onChange={event=>setSalePrice(Number(event.target.value))}/></label><label className="field"><span>Себестоимость единицы, minor</span><input type="number" min="0" value={cost} onChange={event=>setCost(Number(event.target.value))}/></label><label className="field"><span>Логистика, minor</span><input type="number" min="0" value={logistics} onChange={event=>setLogistics(Number(event.target.value))}/></label><label className="field"><span>Реклама, minor</span><input type="number" min="0" value={advertising} onChange={event=>setAdvertising(Number(event.target.value))}/></label><label className="field"><span>Комиссия, basis points</span><input type="number" min="0" max="10000" value={fee} onChange={event=>setFee(Number(event.target.value))}/></label><label className="field"><span>FX cost→sale, micros</span><input type="number" min="1" value={fx} onChange={event=>setFX(Number(event.target.value))}/></label></div><div className="account-actions"><button className="button primary" disabled={calculate.isPending||!name.trim()} onClick={()=>calculate.mutate()}>{calculate.isPending?"Считаем…":"Сохранить и рассчитать"}</button></div>{result?<dl className="settings-facts"><div><dt>Выручка</dt><dd>{money(result.result.revenue_minor,result.result.currency)}</dd></div><div><dt>Contribution profit</dt><dd>{money(result.result.contribution_profit_minor,result.result.currency)}</dd></div><div><dt>Marketplace fee</dt><dd>{money(result.result.marketplace_fee_minor,result.result.currency)}</dd></div><div><dt>Маржа</dt><dd>{(result.result.margin_basis_points/100).toLocaleString("ru-RU")}%</dd></div></dl>:null}</section>;
+}

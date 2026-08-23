@@ -58,7 +58,7 @@ function Images({api,product,items,refresh}:{api:Client;product:string;items:any
 }
 function ProductImage({api,src,alt}:{api:Client;src:string;alt:string}){
  const internal=uploadContentPathPattern.test(src);
- const q=useQuery({queryKey:["upload-content",src],enabled:internal,staleTime:Infinity,queryFn:async()=>{
+ const q=useQuery({queryKey:["upload-content",src],enabled:internal,staleTime:0,gcTime:0,queryFn:async()=>{
   const uploadId=src.split("/")[4];
   const response=await api.getUploadContent({uploadId});
   const contentType=response.headers.get("content-type")||"application/octet-stream";

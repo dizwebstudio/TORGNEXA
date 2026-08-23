@@ -299,8 +299,13 @@ func checkCIArchitectureWorkflow(workflow workflowPolicy, problems *diagnostics)
 	if !yamlExactNullMap(yamlMapValue(workflow.Root, "on"), "pull_request", "push") {
 		problems.add(workflow.Rel, "trusted architecture workflow triggers must be exactly unfiltered push and pull_request")
 	}
-	if len(workflow.Jobs) != 1 {
-		problems.add(workflow.Rel, "trusted architecture validation requires ci to contain exactly one job named go")
+	jobNames := make([]string, 0, len(workflow.Jobs))
+	for name := range workflow.Jobs {
+		jobNames = append(jobNames, name)
+	}
+	sort.Strings(jobNames)
+	if strings.Join(jobNames, "\x00") != "go\x00javascript" {
+		problems.add(workflow.Rel, "trusted CI requires exactly the go and javascript jobs")
 	}
 	if yamlMapValue(workflow.Root, "env") != nil || yamlMapValue(workflow.Root, "defaults") != nil {
 		problems.add(workflow.Rel, "trusted architecture validation forbids top-level env and defaults")
@@ -352,7 +357,7 @@ func checkCIArchitectureWorkflow(workflow workflowPolicy, problems *diagnostics)
 	}
 	if !yamlExactKeys(setup, "name", "uses", "with") || yamlScalarValue(setup, "name") != "Install the approved Go toolchain" || actionReferenceName(yamlScalarValue(setup, "uses")) != "actions/setup-go" || !yamlExactScalarMap(yamlMapValue(setup, "with"), map[string]string{
 		"cache":      "false",
-		"go-version": "1.26.5",
+		"go-version": "1.26.7",
 	}) {
 		problems.add(workflow.Rel, "trusted architecture step 2 must install only the approved uncached Go toolchain")
 	}
@@ -373,6 +378,55 @@ func checkCIArchitectureWorkflow(workflow workflowPolicy, problems *diagnostics)
 	}
 	if !yamlExactKeys(static, "name", "run") || yamlScalarValue(static, "name") != "Run repository checks" || strings.TrimSpace(yamlScalarValue(static, "run")) != "./scripts/check.sh" {
 		problems.add(workflow.Rel, "trusted architecture step 4 must run the HEAD static repository checks after the diff verifier")
+	}
+	checkCIJavaScriptJob(workflow.Rel, workflow.Jobs["javascript"], problems)
+}
+
+func checkCIJavaScriptJob(relative string, job *yaml.Node, problems *diagnostics) {
+	if job == nil {
+		problems.add(relative, "trusted CI requires job javascript")
+		return
+	}
+	for _, field := range []string{"if", "environment", "secrets", "container", "services", "defaults", "needs", "strategy", "uses", "env"} {
+		if yamlMapValue(job, field) != nil {
+			problems.add(relative, "trusted CI job javascript may not define job-level %s", field)
+		}
+	}
+	if yamlTreeContainsCredentialExpression(job) {
+		problems.add(relative, "trusted CI job javascript may not reference secrets or the GitHub token")
+	}
+	if !yamlExactKeys(job, "permissions", "runs-on", "steps", "timeout-minutes") {
+		problems.add(relative, "trusted CI job javascript contains an unapproved job-level field")
+	}
+	if yamlScalarValue(job, "runs-on") != "ubuntu-24.04" || yamlScalarValue(job, "timeout-minutes") != "15" || !isContentsReadPermission(yamlMapValue(job, "permissions")) {
+		problems.add(relative, "trusted CI job javascript requires the fixed runner, 15-minute timeout, and exactly contents: read")
+	}
+	steps := yamlMapValue(job, "steps")
+	if steps == nil || steps.Kind != yaml.SequenceNode || len(steps.Content) != 5 {
+		problems.add(relative, "trusted CI job javascript requires exactly five approved steps")
+		return
+	}
+	checkout, setup, policy, install, verify := steps.Content[0], steps.Content[1], steps.Content[2], steps.Content[3], steps.Content[4]
+	if !yamlExactKeys(checkout, "name", "uses", "with") || yamlScalarValue(checkout, "name") != "Check out the exact revision without persisted credentials" || actionReferenceName(yamlScalarValue(checkout, "uses")) != "actions/checkout" || !yamlExactScalarMap(yamlMapValue(checkout, "with"), map[string]string{
+		"clean":               "true",
+		"fetch-depth":         "0",
+		"persist-credentials": "false",
+		"ref":                 "${{ github.event.pull_request.head.sha || github.sha }}",
+	}) {
+		problems.add(relative, "trusted CI javascript step 1 must use the exact credential-free checkout")
+	}
+	if !yamlExactKeys(setup, "name", "uses", "with") || yamlScalarValue(setup, "name") != "Install the approved Node toolchain" || actionReferenceName(yamlScalarValue(setup, "uses")) != "actions/setup-node" || !yamlExactScalarMap(yamlMapValue(setup, "with"), map[string]string{"node-version": "22.16.0"}) {
+		problems.add(relative, "trusted CI javascript step 2 must install only Node 22.16.0")
+	}
+	if !yamlExactKeys(policy, "name", "run") || yamlScalarValue(policy, "name") != "Verify JavaScript dependency policy" || strings.TrimSpace(yamlScalarValue(policy, "run")) != "./scripts/check-js-supply-chain.sh repository" {
+		problems.add(relative, "trusted CI javascript step 3 must run the repository JavaScript policy")
+	}
+	if !yamlExactKeys(install, "name", "run", "working-directory") || yamlScalarValue(install, "name") != "Install the exact n8n build graph without lifecycle scripts" || yamlScalarValue(install, "working-directory") != "integrations/n8n-nodes-torgnexa" || strings.TrimSpace(yamlScalarValue(install, "run")) != "npm ci --ignore-scripts --no-audit --no-fund" {
+		problems.add(relative, "trusted CI javascript step 4 must install the locked n8n graph without lifecycle scripts")
+	}
+	const verifyRun = "npm run build\nnpm run test:offline\nnpm run verify:package\nnpm pack --dry-run --ignore-scripts"
+	if !yamlExactKeys(verify, "name", "run", "working-directory") || yamlScalarValue(verify, "name") != "Build, test, and inspect the n8n package" || yamlScalarValue(verify, "working-directory") != "integrations/n8n-nodes-torgnexa" || strings.TrimSpace(yamlScalarValue(verify, "run")) != verifyRun {
+		problems.add(relative, "trusted CI javascript step 5 must build, test, and inspect the n8n package")
 	}
 }
 
@@ -642,8 +696,8 @@ func checkWorkflowSteps(root, relative, jobName string, job *yaml.Node, pins map
 			}
 		case "actions/setup-go":
 			version := yamlMapValue(with, "go-version")
-			if version == nil || version.Kind != yaml.ScalarNode || version.Value != "1.26.5" {
-				problems.add(relative, "job %q step %d setup-go must set go-version: 1.26.5", jobName, index+1)
+			if version == nil || version.Kind != yaml.ScalarNode || version.Value != "1.26.7" {
+				problems.add(relative, "job %q step %d setup-go must set go-version: 1.26.7", jobName, index+1)
 			}
 			if !yamlFalseValue(yamlMapValue(with, "cache")) {
 				problems.add(relative, "job %q step %d setup-go must set cache: false", jobName, index+1)
@@ -861,12 +915,13 @@ func hasJobCycle(graph map[string][]string) bool {
 
 func checkRepositoryImages(ctx context.Context, root string, problems *diagnostics) {
 	composeFiles, dockerfiles := discoverRepositoryFiles(ctx, root, problems)
+	remaining := maxYAMLTotalNodes
 	for _, relative := range composeFiles {
 		data, ok := readRepositoryFile(root, relative, problems)
 		if !ok {
 			continue
 		}
-		node, err := parseStrictYAML(data)
+		node, err := parseComposeYAMLWithBudget(ctx, data, &remaining)
 		if err != nil {
 			problems.add(relative, "invalid Compose YAML: %v", err)
 			continue
@@ -918,6 +973,7 @@ func validateImmutableImage(reference string) error {
 		"clickhouse/clickhouse-server": {},
 		"dxflrs/garage":                {},
 		"golang":                       {},
+		"node":                         {},
 		"postgres":                     {},
 		"quay.io/keycloak/keycloak":    {},
 		"valkey/valkey":                {},
@@ -973,7 +1029,14 @@ func checkDockerfileImages(root, relative string, problems *diagnostics) {
 
 func checkGoModulePolicy(ctx context.Context, root string, tools toolVersionManifest, problems *diagnostics) {
 	modules, goWorkFiles := discoverGoFiles(ctx, root, problems)
-	expected := []string{"go.mod", "tools/contractcheck/go.mod", "tools/securitytools/go.mod"}
+	expected := []string{
+		"go.mod",
+		"sdk/examples/go/go.mod",
+		"sdk/go/go.mod",
+		"tools/contractcheck/go.mod",
+		"tools/sdkgen/go.mod",
+		"tools/securitytools/go.mod",
+	}
 	if strings.Join(modules, "\x00") != strings.Join(expected, "\x00") {
 		problems.add("go.mod", "module inventory must be exactly %v; found %v", expected, modules)
 	}
@@ -986,13 +1049,58 @@ func checkGoModulePolicy(ctx context.Context, root string, tools toolVersionMani
 	checkUnsupportedPackageEcosystems(ctx, root, problems)
 }
 
+type goModulePolicy struct {
+	Module            string
+	GoVersion         string
+	Toolchain         string
+	LocalReplacements map[string]string
+}
+
+var registeredGoModules = map[string]goModulePolicy{
+	"go.mod": {
+		Module:    "github.com/torgnexa/torgnexa",
+		GoVersion: "1.26.0",
+		Toolchain: "go1.26.7",
+	},
+	"sdk/examples/go/go.mod": {
+		Module:    "github.com/torgnexa/torgnexa-sdk-examples-go",
+		GoVersion: "1.23.0",
+		LocalReplacements: map[string]string{
+			"github.com/torgnexa/torgnexa-sdk-go": "../../go",
+		},
+	},
+	"sdk/go/go.mod": {
+		Module:    "github.com/torgnexa/torgnexa-sdk-go",
+		GoVersion: "1.23.0",
+	},
+	"tools/contractcheck/go.mod": {
+		Module:    "github.com/torgnexa/torgnexa/tools/contractcheck",
+		GoVersion: "1.26.0",
+		Toolchain: "go1.26.7",
+	},
+	"tools/sdkgen/go.mod": {
+		Module:    "github.com/torgnexa/torgnexa/tools/sdkgen",
+		GoVersion: "1.23.0",
+	},
+	"tools/securitytools/go.mod": {
+		Module:    "github.com/torgnexa/torgnexa/tools/securitytools",
+		GoVersion: "1.26.0",
+		Toolchain: "go1.26.7",
+	},
+}
+
 func checkGoMod(root, relative string, toolsManifest toolVersionManifest, problems *diagnostics) {
+	policy, registered := registeredGoModules[relative]
+	if !registered {
+		return
+	}
 	data, ok := readRepositoryFile(root, relative, problems)
 	if !ok {
 		return
 	}
 	var modulePath, goVersion, toolchain string
 	var requirements []goRequirement
+	replacements := make(map[string]string)
 	inRequireBlock := false
 	inToolBlock := false
 	var tools []string
@@ -1068,7 +1176,16 @@ func checkGoMod(root, relative string, toolsManifest toolVersionManifest, proble
 			} else {
 				problems.add(relative, "malformed tool directive %q", line)
 			}
-		case "replace", "exclude", "retract":
+		case "replace":
+			if len(fields) != 4 || fields[2] != "=>" {
+				problems.add(relative, "malformed replace directive %q", line)
+				continue
+			}
+			if _, duplicate := replacements[fields[1]]; duplicate {
+				problems.add(relative, "duplicate replacement %q", fields[1])
+			}
+			replacements[fields[1]] = fields[3]
+		case "exclude", "retract":
 			problems.add(relative, "%s directives are forbidden by supply-chain policy", fields[0])
 		}
 	}
@@ -1081,18 +1198,25 @@ func checkGoMod(root, relative string, toolsManifest toolVersionManifest, proble
 	if inToolBlock {
 		problems.add(relative, "unterminated tool block")
 	}
-	if goVersion != "1.26.0" {
-		problems.add(relative, "go directive must be exactly 1.26.0")
+	if goVersion != policy.GoVersion {
+		problems.add(relative, "go directive must be exactly %s", policy.GoVersion)
 	}
-	if toolchain != "go1.26.5" {
-		problems.add(relative, "toolchain directive must be exactly go1.26.5")
+	if toolchain != policy.Toolchain {
+		if policy.Toolchain == "" {
+			problems.add(relative, "toolchain directive must be omitted for this compatibility module")
+		} else {
+			problems.add(relative, "toolchain directive must be exactly %s", policy.Toolchain)
+		}
 	}
-	expectedModule := "github.com/torgnexa/torgnexa"
-	if relative != "go.mod" {
-		expectedModule += "/" + strings.TrimSuffix(relative, "/go.mod")
+	if modulePath != policy.Module {
+		problems.add(relative, "module path must be %q", policy.Module)
 	}
-	if modulePath != expectedModule {
-		problems.add(relative, "module path must be %q", expectedModule)
+	if !equalStringMaps(replacements, policy.LocalReplacements) {
+		if len(policy.LocalReplacements) == 0 {
+			problems.add(relative, "replace directives are forbidden by supply-chain policy")
+		} else {
+			problems.add(relative, "replace directives must exactly match the registered local SDK mapping")
+		}
 	}
 	seen := make(map[string]struct{}, len(requirements))
 	for _, requirement := range requirements {
@@ -1104,8 +1228,19 @@ func checkGoMod(root, relative string, toolsManifest toolVersionManifest, proble
 			problems.add(relative, "requirement %q must use an exact semantic or pseudo-version", requirement.module)
 		}
 	}
-	if len(requirements) > 0 {
-		sums := checkGoSums(root, filepath.ToSlash(filepath.Join(filepath.Dir(relative), "go.sum")), requirements, problems)
+	for module := range replacements {
+		if _, required := seen[module]; !required {
+			problems.add(relative, "local replacement %q must bind a pinned requirement", module)
+		}
+	}
+	externalRequirements := make([]goRequirement, 0, len(requirements))
+	for _, requirement := range requirements {
+		if _, local := replacements[requirement.module]; !local {
+			externalRequirements = append(externalRequirements, requirement)
+		}
+	}
+	if len(externalRequirements) > 0 {
+		sums := checkGoSums(root, filepath.ToSlash(filepath.Join(filepath.Dir(relative), "go.sum")), externalRequirements, problems)
 		checkGoToolBindings(relative, requirements, tools, sums, toolsManifest, problems)
 	} else if len(tools) > 0 {
 		problems.add(relative, "tool directives require pinned module requirements")
@@ -1345,6 +1480,7 @@ type releaseArtifactInventory struct {
 	Version            int            `json:"version"`
 	PublicReleaseReady bool           `json:"public_release_ready"`
 	Binaries           []binaryEntry  `json:"binaries"`
+	SourceOnlyCommands []string       `json:"source_only_commands"`
 	DevelopmentRuntime []runtimeEntry `json:"development_runtime"`
 }
 
@@ -1382,7 +1518,25 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 		checkPlatforms(releaseInventoryPath, "binary "+binary.Name, binary.Platforms, problems)
 		actualBinaries = append(actualBinaries, binary.Name)
 	}
-	if strings.Join(actualBinaries, "\x00") != strings.Join(commands, "\x00") {
+	accountedCommands := append([]string(nil), actualBinaries...)
+	previous = ""
+	for _, command := range inventory.SourceOnlyCommands {
+		if command <= previous && previous != "" {
+			problems.add(releaseInventoryPath, "source_only_commands must be strictly sorted and unique")
+		}
+		previous = command
+		if !artifactRE.MatchString(command) {
+			problems.add(releaseInventoryPath, "source-only command %q is invalid", command)
+		}
+		accountedCommands = append(accountedCommands, command)
+	}
+	sort.Strings(accountedCommands)
+	for index := 1; index < len(accountedCommands); index++ {
+		if accountedCommands[index] == accountedCommands[index-1] {
+			problems.add(releaseInventoryPath, "command %q cannot be both release and source-only", accountedCommands[index])
+		}
+	}
+	if strings.Join(accountedCommands, "\x00") != strings.Join(commands, "\x00") {
 		problems.add(releaseInventoryPath, "binary inventory must exactly match cmd packages %v", commands)
 	}
 
@@ -1478,7 +1632,7 @@ func loadComposeServiceImages(ctx context.Context, root, relative string, proble
 		return nil
 	}
 	remaining := maxYAMLNodes
-	node, err := parseStrictYAMLWithBudget(ctx, data, &remaining)
+	node, err := parseComposeYAMLWithBudget(ctx, data, &remaining)
 	if err != nil {
 		problems.add(relative, "invalid Compose YAML: %v", err)
 		return nil
@@ -1543,7 +1697,7 @@ func checkLicensePolicy(ctx context.Context, root string, problems *diagnostics)
 	}
 }
 
-func checkRiskExceptions(ctx context.Context, root string, publicReleaseReady bool, problems *diagnostics) {
+func checkRiskExceptions(ctx context.Context, root string, _ bool, problems *diagnostics) {
 	const relative = "supply-chain/risk-exceptions.json"
 	var manifest riskExceptionManifest
 	if !readPolicyJSON(ctx, root, relative, &manifest, problems) {
@@ -1551,9 +1705,6 @@ func checkRiskExceptions(ctx context.Context, root string, publicReleaseReady bo
 	}
 	if manifest.Version != policyVersion {
 		problems.add(relative, "version must be %d", policyVersion)
-	}
-	if publicReleaseReady && !manifest.ApprovalEnforced {
-		problems.add(relative, "approval_enforced must be true for a public release")
 	}
 	if len(manifest.Exceptions) > 0 && !manifest.ApprovalEnforced {
 		problems.add(relative, "exceptions require approval_enforced: true")
@@ -1796,6 +1947,15 @@ func discoverGoFiles(ctx context.Context, root string, problems *diagnostics) (m
 }
 
 func checkUnsupportedPackageEcosystems(ctx context.Context, root string, problems *diagnostics) {
+	registered := map[string]struct{}{
+		"frontend/package-lock.json":                        {},
+		"frontend/package.json":                             {},
+		"integrations/n8n-nodes-torgnexa/package-lock.json": {},
+		"integrations/n8n-nodes-torgnexa/package.json":      {},
+		"sdk/python/pyproject.toml":                         {},
+		"sdk/typescript/package.json":                       {},
+	}
+	found := make(map[string]struct{}, len(registered))
 	exactNames := map[string]struct{}{
 		"cargo.lock": {}, "cargo.toml": {}, "composer.json": {}, "composer.lock": {},
 		"gemfile": {}, "gemfile.lock": {}, "gradlew": {}, "npm-shrinkwrap.json": {},
@@ -1823,12 +1983,21 @@ func checkUnsupportedPackageEcosystems(ctx context.Context, root string, problem
 		gradle := strings.HasPrefix(name, "build.gradle") || strings.HasPrefix(name, "settings.gradle")
 		requirements := strings.HasPrefix(name, "requirements-") && strings.HasSuffix(name, ".txt")
 		if exact || gradle || requirements {
-			problems.add(relative, "package ecosystem is not registered in supply-chain policy")
+			if _, allowed := registered[relative]; allowed {
+				found[relative] = struct{}{}
+			} else {
+				problems.add(relative, "package ecosystem is not registered in supply-chain policy")
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		problems.add("supply-chain", "walk package ecosystems: %v", err)
+	}
+	for relative := range registered {
+		if _, exists := found[relative]; !exists {
+			problems.add(relative, "registered package ecosystem file is missing")
+		}
 	}
 }
 

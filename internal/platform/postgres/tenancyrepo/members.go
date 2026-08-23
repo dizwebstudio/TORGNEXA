@@ -13,11 +13,63 @@ import (
 
 var ErrMemberConflict = errors.New("workspace member conflict")
 var ErrLastAdministrator = errors.New("last active workspace administrator")
+var ErrMemberNotFound = errors.New("active workspace member not found")
 
 type Member struct {
 	ID, Email, DisplayName, OIDCSubject, Role, Status, InvitationKey string
 	Version                                                          int64
 	InvitedAt, UpdatedAt                                             time.Time
+}
+
+// ResolveActiveMember returns the database-authoritative workspace role. When
+// an invited row has the same normalized email, the first successful login
+// binds its opaque issuer+subject reference and activates it atomically.
+func (r *Repository) ResolveActiveMember(ctx context.Context, scope tenancy.Scope, subjectRef, email string) (Member, error) {
+	subjectRef = strings.TrimSpace(subjectRef)
+	email = strings.ToLower(strings.TrimSpace(email))
+	if len(subjectRef) != 64 || (email != "" && (!strings.Contains(email, "@") || len(email) > 254)) {
+		return Member{}, ErrMemberNotFound
+	}
+	var member Member
+	err := r.withWriteScope(ctx, scope, func(q queryer) error {
+		err := scanMember(q.QueryRowContext(ctx, `SELECT id,email,display_name,COALESCE(oidc_subject,''),role_code,status,invitation_key,version,invited_at,updated_at FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND oidc_subject=$3 AND status='active'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), subjectRef), &member)
+		if err == nil || !errors.Is(err, sql.ErrNoRows) || email == "" {
+			return err
+		}
+		return scanMember(q.QueryRowContext(ctx, `UPDATE workspace_members SET oidc_subject=$3,status='active',version=version+1,updated_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND id=(SELECT id FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND email=$4 AND status='invited' AND oidc_subject IS NULL FOR UPDATE) RETURNING id,email,display_name,COALESCE(oidc_subject,''),role_code,status,invitation_key,version,invited_at,updated_at`, scope.OrganizationID().String(), scope.WorkspaceID().String(), subjectRef, email), &member)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Member{}, ErrMemberNotFound
+	}
+	if err != nil || member.Status != "active" || member.OIDCSubject != subjectRef || !validMemberRole(member.Role) {
+		if err != nil {
+			return Member{}, fmt.Errorf("resolve active member: %w", err)
+		}
+		return Member{}, ErrMemberNotFound
+	}
+	return member, nil
+}
+
+// BootstrapDevelopmentAdministrator creates the first member only for an
+// explicitly development-scoped composition. Callers must never expose this
+// method as a production or HTTP operation.
+func (r *Repository) BootstrapDevelopmentAdministrator(ctx context.Context, scope tenancy.Scope, subjectRef, email string) (Member, error) {
+	subjectRef = strings.TrimSpace(subjectRef)
+	email = strings.ToLower(strings.TrimSpace(email))
+	if len(subjectRef) != 64 || !strings.Contains(email, "@") || len(email) > 254 {
+		return Member{}, ErrMemberConflict
+	}
+	var member Member
+	err := r.withWriteScope(ctx, scope, func(q queryer) error {
+		return scanMember(q.QueryRowContext(ctx, `INSERT INTO workspace_members(id,organization_id,workspace_id,email,display_name,oidc_subject,role_code,status,invitation_key) SELECT $3,$1,$2,$4,'Community administrator',$5,'admin','active',$6 WHERE NOT EXISTS(SELECT 1 FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2) ON CONFLICT DO NOTHING RETURNING id,email,display_name,COALESCE(oidc_subject,''),role_code,status,invitation_key,version,invited_at,updated_at`, scope.OrganizationID().String(), scope.WorkspaceID().String(), "dev-"+subjectRef[:26], email, subjectRef, "development-bootstrap:"+subjectRef[:32]), &member)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Member{}, ErrMemberConflict
+	}
+	if err != nil {
+		return Member{}, fmt.Errorf("bootstrap development administrator: %w", err)
+	}
+	return member, nil
 }
 
 func (r *Repository) ListMembers(ctx context.Context, scope tenancy.Scope, after string, limit int) ([]Member, error) {

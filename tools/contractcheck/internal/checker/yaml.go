@@ -44,6 +44,18 @@ func parseStrictYAML(data []byte) (*yaml.Node, error) {
 }
 
 func parseStrictYAMLWithBudget(ctx context.Context, data []byte, totalRemaining *int) (*yaml.Node, error) {
+	return parseYAMLWithBudget(ctx, data, totalRemaining, false)
+}
+
+// parseComposeYAMLWithBudget retains strict syntax and node limits while
+// allowing Compose's standard extension anchors and merge aliases. Alias
+// targets are never recursively expanded by the checker, so anchors cannot
+// amplify the validation workload or hide image nodes from the tree walk.
+func parseComposeYAMLWithBudget(ctx context.Context, data []byte, totalRemaining *int) (*yaml.Node, error) {
+	return parseYAMLWithBudget(ctx, data, totalRemaining, true)
+}
+
+func parseYAMLWithBudget(ctx context.Context, data []byte, totalRemaining *int, allowComposeAliases bool) (*yaml.Node, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("context is required")
 	}
@@ -75,13 +87,17 @@ func parseStrictYAMLWithBudget(ctx context.Context, data []byte, totalRemaining 
 		return nil, err
 	}
 	count := 0
-	if err := validateYAMLNode(ctx, &document, 0, &count, totalRemaining); err != nil {
+	if err := validateYAMLNodeWithOptions(ctx, &document, 0, &count, totalRemaining, allowComposeAliases); err != nil {
 		return nil, err
 	}
 	return &document, nil
 }
 
 func validateYAMLNode(ctx context.Context, node *yaml.Node, depth int, count, totalRemaining *int) error {
+	return validateYAMLNodeWithOptions(ctx, node, depth, count, totalRemaining, false)
+}
+
+func validateYAMLNodeWithOptions(ctx context.Context, node *yaml.Node, depth int, count, totalRemaining *int, allowComposeAliases bool) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("validation interrupted: %w", err)
 	}
@@ -96,10 +112,10 @@ func validateYAMLNode(ctx context.Context, node *yaml.Node, depth int, count, to
 	if depth > maxDocumentDepth {
 		return fmt.Errorf("document nesting exceeds %d", maxDocumentDepth)
 	}
-	if node.Kind == yaml.AliasNode || node.Anchor != "" {
+	if !allowComposeAliases && (node.Kind == yaml.AliasNode || node.Anchor != "") {
 		return fmt.Errorf("aliases and anchors are forbidden")
 	}
-	if !isAllowedYAMLTag(node.Tag) {
+	if !isAllowedYAMLTag(node.Tag) && !(allowComposeAliases && node.Tag == "!!merge") {
 		return fmt.Errorf("YAML tag %q is forbidden", node.Tag)
 	}
 	if len(node.Content) > maxYAMLNodes-*count {
@@ -121,7 +137,7 @@ func validateYAMLNode(ctx context.Context, node *yaml.Node, depth int, count, to
 			if key.Kind != yaml.ScalarNode {
 				return fmt.Errorf("mapping keys must be scalars")
 			}
-			if key.Value == "<<" {
+			if key.Value == "<<" && !allowComposeAliases {
 				return fmt.Errorf("YAML merge keys are forbidden")
 			}
 			if _, duplicate := seen[key.Value]; duplicate {
@@ -131,7 +147,7 @@ func validateYAMLNode(ctx context.Context, node *yaml.Node, depth int, count, to
 		}
 	}
 	for _, child := range node.Content {
-		if err := validateYAMLNode(ctx, child, depth+1, count, totalRemaining); err != nil {
+		if err := validateYAMLNodeWithOptions(ctx, child, depth+1, count, totalRemaining, allowComposeAliases); err != nil {
 			return err
 		}
 	}

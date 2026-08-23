@@ -2,11 +2,11 @@
 set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_root"
-required=(postgres keycloak-db-init migrate kafka valkey clickhouse garage-config garage keycloak api worker scheduler mcp)
+required=(postgres keycloak-db-init migrate app-db-role kafka valkey clickhouse garage-config garage keycloak api worker scheduler mcp)
 for svc in "${required[@]}"; do
   grep -Eq "^  ${svc}:$" docker-compose.yml || { echo "missing compose service: $svc" >&2; exit 1; }
 done
-for f in Dockerfile .dockerignore deploy/postgres/migrate.sh deploy/postgres/rebaseline-pre-v1.sh deploy/postgres/catalog.tsv deploy/postgres/legacy_pre_v1_catalog.tsv deploy/postgres/legacy_pre_v1_catalog.sha256 deploy/keycloak/init-db.sh deploy/keycloak/torgnexa-realm.json deploy/garage/render-config.sh; do
+for f in Dockerfile .dockerignore deploy/postgres/migrate.sh deploy/postgres/configure-app-role.sh deploy/postgres/rebaseline-pre-v1.sh deploy/postgres/catalog.tsv deploy/postgres/legacy_pre_v1_catalog.tsv deploy/postgres/legacy_pre_v1_catalog.sha256 deploy/keycloak/init-db.sh deploy/keycloak/torgnexa-realm.json deploy/garage/render-config.sh; do
   [[ -f "$f" && ! -L "$f" ]] || { echo "missing/unsafe deployment file: $f" >&2; exit 1; }
 done
 if grep -Eq 'image:[[:space:]]+[^#[:space:]]*:latest([[:space:]]|$)' docker-compose.yml; then
@@ -73,6 +73,7 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
   cat > "$tmp" <<'EOF'
 POSTGRES_PASSWORD=test-postgres-secret
+TORGNEXA_APP_DB_PASSWORD=test-app-role-secret
 TORGNEXA_SECRETS_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 KEYCLOAK_DB_PASSWORD=test-keycloak-db-secret
 KEYCLOAK_ADMIN_PASSWORD=test-keycloak-admin-secret

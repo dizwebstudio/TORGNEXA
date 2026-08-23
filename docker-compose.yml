@@ -6,7 +6,7 @@ x-app-env: &app-env
   TORGNEXA_LOG_FORMAT: json
   TORGNEXA_LOG_ADD_SOURCE: "false"
   TORGNEXA_SHUTDOWN_TIMEOUT: 15s
-  DATABASE_URL: postgres://torgnexa:${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}@postgres:5432/torgnexa?sslmode=disable
+  DATABASE_URL: postgres://torgnexa_app:${TORGNEXA_APP_DB_PASSWORD:?run scripts/init-community-env.sh}@postgres:5432/torgnexa?sslmode=disable
   TORGNEXA_DB_MAX_OPEN_CONNS: ${TORGNEXA_DB_MAX_OPEN_CONNS:-20}
   TORGNEXA_DB_MAX_IDLE_CONNS: ${TORGNEXA_DB_MAX_IDLE_CONNS:-10}
   TORGNEXA_DB_CONN_MAX_LIFETIME: ${TORGNEXA_DB_CONN_MAX_LIFETIME:-30m}
@@ -109,6 +109,25 @@ services:
       - ./migrations:/migrations:ro
       - ./deploy/postgres:/deploy/postgres:ro
     entrypoint: [/bin/sh, /deploy/postgres/migrate.sh]
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  app-db-role:
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    restart: "no"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGDATABASE: torgnexa
+      PGUSER: torgnexa
+      PGPASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-community-env.sh}
+      TORGNEXA_APP_DB_PASSWORD: ${TORGNEXA_APP_DB_PASSWORD:?run scripts/init-community-env.sh}
+    volumes:
+      - ./deploy/postgres/configure-app-role.sh:/configure-app-role.sh:ro
+    entrypoint: [/bin/sh, /configure-app-role.sh]
     networks: [backend]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -258,7 +277,7 @@ services:
       <<: *app-env
       TORGNEXA_HTTP_ADDR: 0.0.0.0:8080
     depends_on:
-      migrate:
+      app-db-role:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
@@ -287,7 +306,7 @@ services:
       TORGNEXA_WORKER_UPLOADS_ENABLED: ${TORGNEXA_WORKER_UPLOADS_ENABLED:-false}
       TORGNEXA_KAFKA_CONSUMER_GROUP: ${TORGNEXA_KAFKA_CONSUMER_GROUP:-torgnexa.webhooks.v1}
     depends_on:
-      migrate:
+      app-db-role:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
@@ -298,7 +317,7 @@ services:
     <<: *app-common
     entrypoint: [/app/torgnexa-scheduler]
     depends_on:
-      migrate:
+      app-db-role:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
@@ -312,7 +331,7 @@ services:
       <<: *app-env
       TORGNEXA_HTTP_ADDR: 0.0.0.0:8090
     depends_on:
-      migrate:
+      app-db-role:
         condition: service_completed_successfully
       keycloak:
         condition: service_healthy

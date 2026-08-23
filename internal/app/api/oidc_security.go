@@ -15,6 +15,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
 )
 
@@ -45,9 +46,15 @@ type oidcClaims struct {
 
 type userInfoClaims struct {
 	Subject string `json:"sub"`
+	Email   string `json:"email"`
 }
 
-func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store) (Authenticator, TenantResolver, Authorizer, error) {
+type workspaceMembershipStore interface {
+	ResolveActiveMember(context.Context, tenancy.Scope, string, string) (tenancyrepo.Member, error)
+	BootstrapDevelopmentAdministrator(context.Context, tenancy.Scope, string, string) (tenancyrepo.Member, error)
+}
+
+func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store, memberships workspaceMembershipStore) (Authenticator, TenantResolver, Authorizer, error) {
 	if err := validateOIDCConfig(cfg); err != nil {
 		return nil, nil, nil, err
 	}
@@ -59,8 +66,11 @@ func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store) (Authen
 		Timeout:       cfg.OIDC.RequestTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}
-	resolver := claimTenantResolver{environment: cfg.Environment, organizationID: cfg.OIDC.DevelopmentOrganization, workspaceID: cfg.OIDC.DevelopmentWorkspace}
-	return authenticator, resolver, roleAuthorizer{}, nil
+	if memberships == nil {
+		return nil, nil, nil, ErrSecurityCompositionInvalid
+	}
+	resolver := claimTenantResolver{environment: cfg.Environment, organizationID: cfg.OIDC.DevelopmentOrganization, workspaceID: cfg.OIDC.DevelopmentWorkspace, memberships: memberships}
+	return authenticator, resolver, roleAuthorizer{memberships: memberships}, nil
 }
 
 func validateOIDCConfig(cfg config.Config) error {
@@ -150,7 +160,7 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if authenticator.sessions == nil || authenticator.sessions.Observe(ctx, scope, securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}) != nil {
 		return Principal{}, ErrUnauthenticated
 	}
-	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: strings.ToLower(strings.TrimSpace(info.Email)), Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
 }
 
 func identityReference(issuer, value string) string {
@@ -193,9 +203,10 @@ type claimTenantResolver struct {
 	environment    config.Environment
 	organizationID string
 	workspaceID    string
+	memberships    workspaceMembershipStore
 }
 
-func (resolver claimTenantResolver) ResolveTenant(_ context.Context, principal Principal, _ *http.Request) (tenancy.Scope, error) {
+func (resolver claimTenantResolver) ResolveTenant(ctx context.Context, principal Principal, _ *http.Request) (tenancy.Scope, error) {
 	organizationID, workspaceID := principal.OrganizationID, principal.WorkspaceID
 	if resolver.environment == config.EnvironmentDevelopment && organizationID == "" && workspaceID == "" {
 		organizationID, workspaceID = resolver.organizationID, resolver.workspaceID
@@ -204,17 +215,48 @@ func (resolver claimTenantResolver) ResolveTenant(_ context.Context, principal P
 	if err != nil {
 		return tenancy.Scope{}, ErrUnauthorized
 	}
+	if resolver.memberships == nil || principal.SubjectRef == "" {
+		return tenancy.Scope{}, ErrUnauthorized
+	}
+	if _, err := resolver.memberships.ResolveActiveMember(ctx, scope, principal.SubjectRef, principal.Email); err != nil {
+		if resolver.environment != config.EnvironmentDevelopment || !principalHasRole(principal, "admin") {
+			return tenancy.Scope{}, ErrUnauthorized
+		}
+		email := principal.Email
+		if email == "" {
+			email = "dev-" + principal.SubjectRef[:16] + "@local.invalid"
+		}
+		if _, bootstrapErr := resolver.memberships.BootstrapDevelopmentAdministrator(ctx, scope, principal.SubjectRef, email); bootstrapErr != nil {
+			return tenancy.Scope{}, ErrUnauthorized
+		}
+	}
 	return scope, nil
 }
 
-type roleAuthorizer struct{}
+type roleAuthorizer struct{ memberships workspaceMembershipStore }
 
-func (roleAuthorizer) Authorize(_ context.Context, principal Principal, _ tenancy.Scope, permission string) error {
-	for _, role := range principal.Roles {
-		readPermission := permission == "connectors.accounts.read" || permission == "products.read" || permission == "orders.read" || permission == "stock.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "settings.workspace.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read"
-		if role == "admin" || (permission == "orders.demo.write" && (role == "manager" || role == "operator")) || (permission == "ai.analyze" && (role == "manager" || role == "operator")) || (readPermission && (role == "manager" || role == "operator" || role == "viewer")) {
-			return nil
-		}
+func (authorizer roleAuthorizer) Authorize(ctx context.Context, principal Principal, scope tenancy.Scope, permission string) error {
+	if authorizer.memberships == nil {
+		return ErrUnauthorized
+	}
+	member, err := authorizer.memberships.ResolveActiveMember(ctx, scope, principal.SubjectRef, "")
+	if err != nil {
+		return ErrUnauthorized
+	}
+	role := member.Role
+	readPermission := permission == "connectors.accounts.read" || permission == "products.read" || permission == "orders.read" || permission == "stock.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "settings.workspace.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read" || permission == "settings.ai_governance.read"
+	operatorPermission := permission == "orders.demo.write" || permission == "ai.analyze" || permission == "connectors.replay.run" || permission == "profitability.scenarios.write"
+	if role == "admin" || (operatorPermission && (role == "manager" || role == "operator")) || (readPermission && (role == "manager" || role == "operator" || role == "viewer")) {
+		return nil
 	}
 	return ErrUnauthorized
+}
+
+func principalHasRole(principal Principal, expected string) bool {
+	for _, role := range principal.Roles {
+		if role == expected {
+			return true
+		}
+	}
+	return false
 }

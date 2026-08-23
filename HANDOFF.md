@@ -1,20 +1,30 @@
-# TORGNEXA handoff — MCP identity + AI provider connectors + P4 + Enterprise UX + pre-v1 migration baseline
+# TORGNEXA handoff — Trust control plane + decision labs + MCP/AI + P4
 
-Date: 2026-08-20
+Date: 2026-08-24
 
 ## Current state
 
-Tasks `001`–`128` are repository-implemented. Task 118 adds the fail-closed P4 go-live evidence/publication layer; Task 119 closes the base operator UI/UX gap; Task 120 upgrades enterprise operations with server-owned grids, realtime invalidation, unified incidents, deep/server search and reporting-backed analytics; Task 121 replaces the 74-file development migration install path with an 11-file pre-v1 baseline and verified legacy rebaseline; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers on the same capability; Task 126 gives `cmd/mcp` its first non-deny `IdentityResolver` via a new tenant-scoped MCP client account capability; Tasks 127–128 add Qwen and DeepSeek as two further `ai`-family providers on the Task-122 capability.
+Tasks `001`–`129` are repository-implemented. Task 129 adds a database-authoritative trust control plane, least-privilege runtime role/posture enforcement, durable idempotency/evidence, MCP credential lifecycle, governed AI egress, Connector Replay Lab and Profitability Scenario Lab. Tasks 118–128 remain as described below.
 
 Current repository inventory:
 
-- architecture: **121 registered modules / 38 provider modules / 119 reviews**;
-- active PostgreSQL baseline: **15 migrations**, latest `000015_ai_provider_qwen_deepseek.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
-- public OpenAPI/generated SDK surface: **121 operations / OpenAPI 0.20.0**;
+- architecture: **124 registered modules / 38 provider modules / 120 reviews**;
+- active PostgreSQL baseline: **16 migrations**, latest `000016_trust_control_plane.sql`; archived immutable pre-v1 lineage: **74 migrations**, legacy head `000074_fulfillment_failover_execution.sql`;
+- public OpenAPI/generated SDK surface: **129 operations / OpenAPI 0.21.0**;
 - connector catalog: **38 connectors**;
 - repository license: **Apache-2.0**.
 
-Repository completion is still distinct from release-topology qualification. Task 117 makes runtime qualification mandatory in the release workflow, but this source archive cannot manufacture Docker, OIDC, GitHub Ruleset or live provider evidence.
+Repository/Community completion is still distinct from release-topology qualification. Task 117 makes runtime qualification mandatory in the release workflow; the local Community runtime is verified, while hosted OIDC/GitHub Ruleset, exact tagged release-topology and live-provider evidence remain external facts.
+
+## Task 129 trust control plane and decision labs
+
+Community runtimes now connect as `torgnexa_app`, a non-owner `NOSUPERUSER`/`NOBYPASSRLS` role provisioned after migrations. API, worker, scheduler and MCP fail startup unless the live database identity and Go runtime satisfy the posture policy. OIDC claims only route a request: an active `workspace_members` binding and its current database role are authoritative for every permission check.
+
+Migration `000016` adds forced-RLS idempotency receipts, append-only security evidence, AI policy/usage, MCP activity, synthetic connector replay and immutable profitability scenarios. MCP tokens expire, rotate, revoke and record bounded usage metadata; MCP now shares the REST trusted-proxy/origin/rate-limit/request-size edge. AI egress is default-deny with exact data/destination/model allowlists, redaction and a serialized monthly budget. Replay performs no network calls and accepts only bounded explicitly synthetic fixtures; profitability uses minor units, milli-quantity, basis points and fixed-decimal FX.
+
+The operator surface is **Настройки → Контроль и сценарии**. OpenAPI 0.21.0 and all generated SDKs expose 129 operations. Upload delivery is no-store/image-only, S3 upload limits are wired, ZIP64 metadata cannot bypass archive bounds, and `.claude/` is excluded from Docker build context. Existing Community `.env` files can be upgraded safely by rerunning `scripts/init-community-env.sh`; existing secrets are preserved and only the missing application-role password is appended.
+
+The aggregate supply-chain checker is reconciled with the current repository without weakening default deny: both constrained CI jobs, all six registered Go modules, registered npm/Python package surfaces, bounded Compose anchors, the pinned Node build image, four release binaries and four explicitly source-only commands are covered. The existing Community `.env` was upgraded in place without rotating prior secrets and the live stack was rebuilt/recreated successfully: migration 16 is applied, API/MCP/frontend are healthy, scheduler/worker are running, seven PostgreSQL sessions use `torgnexa_app`, and the role is neither owner nor privileged and has no database/schema CREATE permission.
 
 ## Post-126 session: sdkgen parser gap, AgentGovernor composition, upload→product-image wiring, MCP agent policy admin surface
 
@@ -69,7 +79,7 @@ Local Task 121 gates verify the compact catalog, archived checksums and baseline
 
 ## Task 120 Enterprise Operations UX
 
-Catalog and Orders now use server-owned PostgreSQL text/status/cursor pages rather than filtering a bounded browser sample. The protected `/api/v1/realtime` SSE endpoint sends only tenant-scoped invalidation/liveness metadata; React Query then rereads normal authorized APIs. Audit-backed invalidations are low-latency and heartbeat frames provide a bounded refresh fallback for worker-originated state.
+Catalog and Orders now use server-owned PostgreSQL text/status/cursor pages rather than filtering a bounded browser sample. The protected `/api/v1/realtime` SSE endpoint sends only tenant-scoped invalidation/liveness metadata; React Query rereads normal authorized APIs only after explicit audit-backed invalidation frames. Heartbeat and ready frames report connection health without invalidating frontend query data.
 
 The new Incident Center composes warehouse incidents, open drift, degraded connector accounts and pending approvals. Catalog/Order/Incident URLs are durable deep links. Command Palette product/order search is server-side and capability-aware. Dashboard order/GMV KPIs come from the replay-safe reporting projection and Reports use accessible SVG analytics with 7/30/90-day presets. Task 120 adds one additive OpenAPI operation (`streamRealtimeInvalidations`), moves the contract to 0.15.0 / 108 generated operations, and adds no database migration or event schema.
 
@@ -81,7 +91,7 @@ Catalog, Orders and Inventory preserve list context while details open in drawer
 
 ## P4 go-live evidence
 
-`make p4-qualification` is the final release/topology/hosting gate. It requires the exact clean release tag, Go 1.26.5, Docker, a real production posture statement, GitHub applied branch rules, protected release evidence, live connector accounts and environment-only credentials. It re-runs P3, independently verifies Sigstore/SLSA identity, compares GitHub draft asset SHA-256 digests with the locally verified release bytes, and performs two consecutive remote health checks for every active production connector account; omission of any active account is a qualification failure.
+`make p4-qualification` is the final release/topology/hosting gate. It requires the exact clean release tag, Go 1.26.7, Docker, a real production posture statement, GitHub applied branch rules, protected release evidence, live connector accounts and environment-only credentials. It re-runs P3, independently verifies Sigstore/SLSA identity, compares GitHub draft asset SHA-256 digests with the locally verified release bytes, and performs two consecutive remote health checks for every active production connector account; omission of any active account is a qualification failure.
 
 The protected release workflow now stages a **non-public draft** after its internal verify job. It does not publish that draft. Only a retained `p4-go-live.json` with `status: PASS` can be supplied to `make p4-publish`, which then re-verifies all subordinate evidence hashes, proves the draft asset set/digests are unchanged, uploads `p4-go-live.json`, and clears the draft flag.
 
@@ -139,7 +149,7 @@ Repository P4 machinery is complete, but public promotion remains independently 
 - Task 065 protected OIDC signing/provenance and current vulnerability/image evidence (verified from the exact protected release evidence);
 - Task 080 hosted Required Workflow / branch Ruleset / reviewer evidence (captured from GitHub applied rules);
 - exact release-topology Docker P3 qualification;
-- full Go 1.26.5 test/vet/check suite;
+- full Go 1.26.7 test/vet/check suite;
 - release backup/restore and upgrade evidence;
 - live connector qualification where seller/provider credentials are required.
 
@@ -157,7 +167,9 @@ Available local checks for the P4 repository delta:
 - Task-064 provider conformance for the four new `ai`-family connectors (`openai-compatible`, `kimi`, `gigachat`, `yandexgpt`): **PASS — 13/13 each**;
 - Task 126 MCP client account identity path: **PASS — verified live** (real Keycloak-authenticated session, real issued MCP bearer token accepted end-to-end, tampered/disabled tokens correctly rejected), not only unit tests;
 - JS supply-chain repository/lock and Community deployment policies: **PASS**;
+- aggregate repository supply-chain policy: **PASS**;
+- live Community upgrade/startup posture: **PASS — migration 16/16, seven `torgnexa_app` sessions, seven FORCE-RLS trust tables**;
 - release and required-workflow YAML/P4 static invariants: **PASS**;
 - all new P4 shell/Python source syntax checks: **PASS**.
 
-The host still exposes Go 1.23.2 and has no Docker command/network access to fetch the pinned Go 1.26.5 toolchain or missing modules. Therefore this handoff does not claim a fresh full-tree Go 1.26.5 PASS or deployment-level P3 PASS. The repository gates deliberately fail closed on a capable release runner until those facts are proven.
+The host has Docker but no host `go` binary. Task 129 therefore ran the full Go test/vet/build and security checks in the exact digest-pinned Go 1.26.7 image. Deployment-level P3/P4, hosted GitHub/OIDC evidence and live-provider qualification remain external facts and are not claimed here.

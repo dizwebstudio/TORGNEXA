@@ -1,6 +1,6 @@
-# Package status — 2026-08-20
+# Package status — 2026-08-23
 
-**Tasks 001–126 are repository-implemented.** P4 adds final go-live evidence/publication controls; Tasks 119–120 close the operator/enterprise UX backlog; Task 121 compacts the pre-v1 database install path; Task 122 admits the tenant-scoped AI provider settings/analyze capability and its first provider, `openai-compatible`; Tasks 123–125 add Kimi, GigaChat and YandexGPT as three further `ai`-family providers; Task 126 adds MCP client accounts and `cmd/mcp`'s first non-deny `IdentityResolver`. Architecture policy: **121 modules / 36 providers / 117 reviews**. Active migrations are **14**, latest `000014`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **115 operations / 0.17.0**.
+**Tasks 001–129 are repository-implemented.** Task 129 adds the trust control plane and three governed decision capabilities on top of the P4, enterprise UX, compact migration baseline, AI connector and MCP identity work from Tasks 118–128. Architecture policy: **124 modules / 38 providers / 120 reviews**. Active migrations are **16**, latest `000016`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **129 operations / 0.21.0**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `HANDOFF.md` and `VALIDATION_REPORT.md`.
 
@@ -10,16 +10,27 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 382
-- adrs: 98
-- tasks: 130
+- docs: 383
+- adrs: 99
+- tasks: 131
 - milestones: 14
 - codex_skills: 28
 - contracts: 216
 - prompts: 13
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2217
+- total source files (excluding local secrets/build/dependency/cache trees): 2236
 
+
+## Task 129 additions
+
+- fail-closed Go/database runtime posture and a separate non-owner Community application role;
+- database-authoritative workspace membership/role authorization for human OIDC sessions;
+- forced-RLS operation receipts, append-only security evidence and atomic governed sensitive writes;
+- MCP credential expiry, rotation, revocation and last-used/use-count evidence behind the common security edge;
+- default-deny AI egress policy with data classification, redaction, exact destination/model allowlists and serialized monthly budgets;
+- synthetic no-network Connector Replay Lab and immutable fixed-decimal Profitability Scenario Lab;
+- OpenAPI 0.21.0 / 129 generated SDK operations and the **Контроль и сценарии** operator UI;
+- upload content hardening, ZIP64 size-overflow rejection, Go 1.26.7/compress 1.18.7 and Docker build-context secret exclusion.
 
 ## Task 126 additions
 
@@ -332,6 +343,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0096-pre-v1-migration-baseline-and-verified-rebaseline.md`
 - `adr/0097-ai-provider-settings-and-openai-compatible-admission.md`
 - `adr/0098-mcp-client-accounts-and-identity-resolver.md`
+- `adr/0099-trust-control-plane-and-decision-labs.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -452,6 +464,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/126-mcp-client-accounts.json`
 - `architecture/reviews/127-qwen-connector.json`
 - `architecture/reviews/128-deepseek-connector.json`
+- `architecture/reviews/129-trust-control-plane-decision-labs.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1050,6 +1063,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `deploy/keycloak/torgnexa-realm.json`
 - `deploy/nginx/security-edge.conf`
 - `deploy/postgres/catalog.tsv`
+- `deploy/postgres/configure-app-role.sh`
 - `deploy/postgres/legacy_pre_v1_catalog.sha256`
 - `deploy/postgres/legacy_pre_v1_catalog.tsv`
 - `deploy/postgres/migrate.sh`
@@ -1128,6 +1142,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/69-frontend-shell.md`
 - `docs/70-mcp-server.md`
 - `docs/71-social-core.md`
+- `docs/71-trust-control-plane.md`
 - `docs/72-n8n-node.md`
 - `docs/73-settings-security.md`
 - `docs/74-connector-authentication.md`
@@ -1450,6 +1465,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/api/decoders.ts`
 - `frontend/src/app/App.tsx`
 - `frontend/src/app/UiProvider.tsx`
+- `frontend/src/app/realtime-events.ts`
 - `frontend/src/app/useRealtime.ts`
 - `frontend/src/auth/AuthBoundary.tsx`
 - `frontend/src/auth/AuthProvider.tsx`
@@ -1483,6 +1499,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/features/settings/NotificationSettings.tsx`
 - `frontend/src/features/settings/PluginsSettings.tsx`
 - `frontend/src/features/settings/SecuritySettings.tsx`
+- `frontend/src/features/settings/TrustControlSettings.tsx`
 - `frontend/src/features/settings/WebhookSettings.tsx`
 - `frontend/src/features/settings/WorkspaceSettings.tsx`
 - `frontend/src/features/settings/settings-tabs.ts`
@@ -1513,6 +1530,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/styles.css`
 - `frontend/test/decoders.test.mjs`
 - `frontend/test/navigation.test.mjs`
+- `frontend/test/realtime.test.mjs`
 - `frontend/test/session.test.mjs`
 - `frontend/test/settings-tabs.test.mjs`
 - `frontend/test/ui-experience.test.mjs`
@@ -1581,6 +1599,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/notification_routes.go`
 - `internal/app/api/notifications.go`
 - `internal/app/api/notifications_test.go`
+- `internal/app/api/oidc_membership_test.go`
 - `internal/app/api/oidc_security.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
 - `internal/app/api/production_routes.go`
@@ -1598,6 +1617,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/settings_security_test.go`
 - `internal/app/api/sync.go`
 - `internal/app/api/sync_test.go`
+- `internal/app/api/trust_control.go`
 - `internal/app/api/uploads_content.go`
 - `internal/app/api/uploads_content_test.go`
 - `internal/app/api/webhooks.go`
@@ -1844,6 +1864,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/lineagerepo/migration_test.go`
 - `internal/platform/postgres/lineagerepo/repository.go`
 - `internal/platform/postgres/mcpaccountsrepo/repository.go`
+- `internal/platform/postgres/mcpaccountsrepo/repository_test.go`
 - `internal/platform/postgres/notificationrepo/destinations.go`
 - `internal/platform/postgres/notificationrepo/migration_test.go`
 - `internal/platform/postgres/notificationrepo/repository.go`
@@ -1891,6 +1912,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/tenancyrepo/migration_test.go`
 - `internal/platform/postgres/tenancyrepo/repository.go`
 - `internal/platform/postgres/tenancyrepo/repository_test.go`
+- `internal/platform/postgres/trustcontrolrepo/migration_test.go`
+- `internal/platform/postgres/trustcontrolrepo/repository.go`
 - `internal/platform/postgres/uploadrepo/migration_test.go`
 - `internal/platform/postgres/uploadrepo/repository.go`
 - `internal/platform/postgres/webhookrepo/migration_test.go`
@@ -1920,6 +1943,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/reporting/wire.go`
 - `internal/platform/retention/retention.go`
 - `internal/platform/retention/retention_test.go`
+- `internal/platform/runtimeposture/posture.go`
+- `internal/platform/runtimeposture/posture_test.go`
 - `internal/platform/search/search.go`
 - `internal/platform/search/search_test.go`
 - `internal/platform/secrets/keyring.go`
@@ -1945,6 +1970,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/syncengine/schedule_test.go`
 - `internal/platform/syncengine/syncengine.go`
 - `internal/platform/syncengine/syncengine_test.go`
+- `internal/platform/trustcontrol/trustcontrol.go`
+- `internal/platform/trustcontrol/trustcontrol_test.go`
 - `internal/platform/uploads/clamav.go`
 - `internal/platform/uploads/clamav_test.go`
 - `internal/platform/uploads/pipeline.go`
@@ -1977,6 +2004,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000013_ai_provider_credential_class.sql`
 - `migrations/000014_mcp_client_accounts.sql`
 - `migrations/000015_ai_provider_qwen_deepseek.sql`
+- `migrations/000016_trust_control_plane.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2103,6 +2131,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-semver.sh`
 - `scripts/check-supply-chain.sh`
 - `scripts/check-tenancy-postgres.sh`
+- `scripts/check-trust-control-postgres.sh`
 - `scripts/check.sh`
 - `scripts/dzen-content-transformer-test.py`
 - `scripts/dzen-content-transformer.py`
@@ -2315,6 +2344,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/126-mcp-client-accounts.md`
 - `tasks/issues/127-qwen-connector.md`
 - `tasks/issues/128-deepseek-connector.md`
+- `tasks/issues/129-trust-control-plane-decision-labs.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

@@ -23,7 +23,7 @@ Generated evidence is written below `qualification/evidence/<UTC timestamp>/` an
 
 Required inputs:
 
-- exact clean Git tag `v$TORGNEXA_P4_VERSION` and Go 1.26.5;
+- exact clean Git tag `v$TORGNEXA_P4_VERSION` and Go 1.26.7;
 - Docker Compose v2 for the full P3 topology/restart/restore/upgrade drills;
 - `TORGNEXA_P4_REPOSITORY=OWNER/NAME` and `TORGNEXA_P4_PROTECTED_BRANCH`;
 - optional `TORGNEXA_P4_GITHUB_TOKEN` for private GitHub repositories; it is never retained;

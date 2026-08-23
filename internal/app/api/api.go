@@ -48,10 +48,12 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/uploadrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/webhookrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reporting"
 	"github.com/torgnexa/torgnexa/internal/platform/retention"
+	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/securityedge"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
@@ -110,6 +112,13 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}
 	}()
 	logger.Info("database pool ready", "event", "database.pool_ready", "max_open_connections", cfg.Database.MaxOpenConns, "max_idle_connections", cfg.Database.MaxIdleConns)
+	postureInspector, err := runtimeposture.NewInspector(db)
+	if err != nil {
+		return newRuntimeError("runtime_posture_startup_failed", err)
+	}
+	if _, err := postureInspector.Inspect(ctx); err != nil {
+		return newRuntimeError("runtime_posture_unsafe", err)
+	}
 	accountRepository, err := connectorrepo.New(db)
 	if err != nil {
 		return newRuntimeError("connector_repository_startup_failed", err)
@@ -194,6 +203,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("agent_governance_repository_startup_failed", err)
 	}
+	trustControlRepository, err := trustcontrolrepo.New(db)
+	if err != nil {
+		return newRuntimeError("trust_control_repository_startup_failed", err)
+	}
 	inventoryRepository, err := inventoryrepo.New(db)
 	if err != nil {
 		return newRuntimeError("inventory_repository_startup_failed", err)
@@ -258,7 +271,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("upload_repository_startup_failed", err)
 	}
-	quarantineStore, err := uploads.NewS3QuarantineStore(uploads.S3Config{Endpoint: cfg.ObjectStorage.Endpoint, Bucket: cfg.ObjectStorage.Bucket, Region: cfg.ObjectStorage.Region, AccessKey: cfg.ObjectStorage.AccessKey, SecretKey: cfg.ObjectStorage.SecretKey, Timeout: cfg.ObjectStorage.Timeout})
+	quarantineStore, err := uploads.NewS3QuarantineStore(uploads.S3Config{Endpoint: cfg.ObjectStorage.Endpoint, Bucket: cfg.ObjectStorage.Bucket, Region: cfg.ObjectStorage.Region, AccessKey: cfg.ObjectStorage.AccessKey, SecretKey: cfg.ObjectStorage.SecretKey, Timeout: cfg.ObjectStorage.Timeout, MaxBytes: cfg.Security.MaxUploadBytes})
 	if err != nil {
 		return newRuntimeError("upload_storage_startup_failed", err)
 	}
@@ -315,7 +328,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("clickhouse_reporting_startup_failed", err)
 	}
-	authn, tenantResolver, authz, err := newOIDCSecurity(cfg, settingsSecurityRepository)
+	authn, tenantResolver, authz, err := newOIDCSecurity(cfg, settingsSecurityRepository, tenantRepository)
 	if err != nil {
 		return newRuntimeError("oidc_security_startup_failed", err)
 	}
@@ -342,7 +355,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadContent: quarantineStore,
-		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository,
+		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository,
 	})
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes)
 	if err != nil {

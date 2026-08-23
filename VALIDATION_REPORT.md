@@ -1,13 +1,35 @@
-# Repository validation report — P4 + Tasks 119–121 — 2026-08-18
+# Repository validation report — Tasks through 129 — 2026-08-24
 
 ## Inventory
 
-- repository-implemented tasks: `001`–`121`;
-- architecture: **117 modules / 32 provider modules / 112 reviews**;
-- active PostgreSQL baseline: **11 migrations**, latest `000011`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
-- public OpenAPI/generated SDK surface: **108 operations / OpenAPI 0.15.0**;
-- connector catalog: **32 connectors**;
+- repository-implemented tasks: `001`–`129`;
+- architecture: **124 modules / 38 provider modules / 120 reviews**;
+- active PostgreSQL baseline: **16 migrations**, latest `000016`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
+- public OpenAPI/generated SDK surface: **129 operations / OpenAPI 0.21.0**;
+- connector catalog: **38 connectors**;
 - repository license: **Apache-2.0**.
+
+## Task 129 validation
+
+- `go test ./...` with `git` available in the digest-pinned Go 1.26.7 image: **PASS**;
+- `go vet ./...`: **PASS**;
+- `govulncheck -test ./...`: **PASS — no reachable vulnerabilities**;
+- OpenAPI/contracts/runtime parity: **PASS — 129 operations / 0.21.0**;
+- generated Go/Python/TypeScript SDK drift and runtime tests: **PASS**;
+- frontend typechecks, 24 tests, static policy and production Vite build: **PASS**;
+- migration inventory/baseline: **PASS — 16 active / latest 000016**;
+- isolated PostgreSQL 18 migration/application-role/RLS/append-only smoke: **PASS**;
+- architecture: **PASS — 124 modules / 38 providers / 120 reviews**;
+- Community deployment and JavaScript supply-chain policy: **PASS**;
+- aggregate repository supply-chain policy: **PASS — current CI, Go/JS/Python module, image and command inventories are covered fail-closed**;
+- scratch runtime Docker build from the pinned Go image: **PASS — five binaries**;
+- existing `.env` upgrade path: **PASS — preserves current values and adds one 64-hex application-role password idempotently**;
+- live Community upgrade: **PASS — migration 16/16; API/MCP/frontend healthy; scheduler/worker running; seven runtime sessions use `torgnexa_app`; seven trust tables have FORCE RLS**;
+- upload-security ZIP64 overflow regression and targeted scan: **PASS**; the remaining ClamAV chunk-size cast warning is pre-existing and bounded by the fixed 64 KiB buffer.
+
+`scripts/check-supply-chain.sh` now validates the current repository topology rather than a stale smaller inventory. It requires exactly the constrained `go` and `javascript` CI jobs, recognizes six exact Go modules (including one exact local SDK example replacement), accepts only registered npm/Python package files, safely parses bounded Compose anchors while retaining strict contract YAML parsing, admits the digest-pinned Node build image, and accounts for every `cmd/*` as either a release binary or an explicit source-only command. Unknown modules, ecosystems, jobs, images, replacements and commands remain denied.
+
+The sections below retain historical Task 118–121 evidence. Their old host/tool availability notes are superseded by the Task 129 containerized checks above.
 
 
 ## P4 repository checks

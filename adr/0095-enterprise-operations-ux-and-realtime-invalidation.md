@@ -14,7 +14,7 @@ Task 120 introduces five coordinated operator-surface changes.
 
 First, Catalog and Orders use a controlled `ServerDataGrid`: query, status filter and cursor pagination are sent to the existing PostgreSQL search endpoints. The grid intentionally preserves canonical backend ordering; arbitrary browser sort is not presented as authoritative when it is not part of the cursor contract.
 
-Second, the API exposes protected `GET /api/v1/realtime` (`operations.realtime.read`). It is a long-lived SSE invalidation channel over the normal authentication/tenant/authorization composition. The server polls the tenant-scoped immutable audit head and emits only `{reason,cursor,at}` metadata. It never streams audit summaries, entity payloads, connector credentials or tenant selectors. Heartbeats provide connection liveness and a bounded fallback refresh opportunity for state produced outside audited HTTP mutations. The browser reacts by invalidating TanStack Query entries and rereading normal capability-protected APIs.
+Second, the API exposes protected `GET /api/v1/realtime` (`operations.realtime.read`). It is a long-lived SSE invalidation channel over the normal authentication/tenant/authorization composition. The server polls the tenant-scoped immutable audit head and emits only `{reason,cursor,at}` metadata. It never streams audit summaries, entity payloads, connector credentials or tenant selectors. The browser reacts to explicit `invalidate` frames by invalidating TanStack Query entries and rereading normal capability-protected APIs.
 
 Third, `/incidents` composes warehouse incidents, open reconciliation drift, degraded connectors and pending approvals into one operator queue. It does not persist a new incident model; each source domain remains authoritative.
 
@@ -40,11 +40,11 @@ A dedicated unified global-search endpoint was rejected because a single route p
 
 Operators can work on cursor-sized pages regardless of tenant dataset size, receive near-realtime invalidation, triage one incident queue, copy durable entity links and use reporting-backed KPIs. Realtime is deliberately invalidation-based rather than payload replication, reducing browser consistency and privacy risk.
 
-The audit-head poll gives low-latency refresh for audited API mutations. Heartbeats provide liveness/fallback; if sub-second worker-originated notifications become an SLO later, a durable event-to-realtime gateway may be introduced under a separate event-platform review rather than coupling browser delivery directly to Kafka.
+The audit-head poll gives low-latency refresh for audited API mutations. Heartbeats provide connection liveness without triggering data reads. If worker-originated notifications become an SLO later, a domain-specific invalidation source or durable event-to-realtime gateway may be introduced under a separate event-platform review rather than coupling browser delivery directly to Kafka.
 
 ## Testing and rollback
 
-Frontend regression coverage expands from 18 to 23 deterministic tests. A focused API handler test proves that a scoped realtime stream emits a ready frame and does not leak raw audit content. The generated SDK gate confirms the additive operation/version. Rollback is the previous API/frontend pair; there is no schema rollback.
+Frontend regression coverage includes a deterministic event-classification test proving that heartbeat and ready frames do not invalidate queries. A focused API handler test proves that a scoped realtime stream emits a ready frame and does not leak raw audit content. The generated SDK gate confirms the additive operation/version. Rollback is the previous API/frontend pair; there is no schema rollback.
 
 ## Consequences
 

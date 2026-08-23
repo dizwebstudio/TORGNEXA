@@ -440,6 +440,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/trustcontrolrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/uploadrepo",
       "kind": "infrastructure_adapter"
     },
@@ -484,6 +488,10 @@
       "kind": "platform_capability"
     },
     {
+      "path": "internal/platform/runtimeposture",
+      "kind": "platform_capability"
+    },
+    {
       "path": "internal/platform/search",
       "kind": "sdk_port"
     },
@@ -521,6 +529,10 @@
     },
     {
       "path": "internal/platform/syncengine",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/trustcontrol",
       "kind": "platform_capability"
     },
     {

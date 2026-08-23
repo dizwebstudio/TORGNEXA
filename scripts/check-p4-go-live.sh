@@ -5,7 +5,7 @@ export LC_ALL=C TZ=UTC GOTELEMETRY=off GOTOOLCHAIN=local GOWORK=off
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"; cd "$root"
 fail(){ echo "P4 go-live qualification: $*" >&2; exit 1; }
 for cmd in go docker python3 jq sha256sum git; do command -v "$cmd" >/dev/null || fail "$cmd is required"; done
-[[ "$(go env GOVERSION)" == go1.26.5 ]] || fail "Go 1.26.5 is required; got $(go env GOVERSION)"
+[[ "$(go env GOVERSION)" == go1.26.7 ]] || fail "Go 1.26.7 is required; got $(go env GOVERSION)"
 docker compose version >/dev/null || fail "Docker Compose v2 is required"
 [[ -z "$(git status --porcelain)" ]] || fail "qualification requires a clean Git worktree"
 [[ ! -e "$root/.env" ]] || fail "source worktree must not contain .env; production credentials must stay outside the repository"

@@ -23,7 +23,7 @@ export function AIProviderSettings(){
  const refresh=()=>cache.invalidateQueries({queryKey:["settings","ai-providers"]});
  const reset=()=>{setLabel("");setModel("");setBaseUrl("");setFolderId("");setCredential("")};
  const create=useMutation({mutationFn:()=>api.createAIProviderAccount({idempotencyKey:crypto.randomUUID(),body:{provider,label:label.trim(),model:model.trim(),base_url:baseUrl.trim()||undefined,folder_id:folderId.trim()||undefined,credential}}),onSuccess:async()=>{toast.push({kind:"success",title:"Аккаунт AI-провайдера добавлен"});reset();await refresh()},onError:()=>toast.push({kind:"error",title:"Не удалось добавить аккаунт",body:"Проверьте провайдера, модель, ключ и обязательные поля."})});
- const disable=useMutation({mutationFn:(account:Account)=>api.disableAIProviderAccount({body:{account_id:account.id,expected_version:account.version}}),onSuccess:async()=>{toast.push({kind:"success",title:"Аккаунт отключён"});await refresh()},onError:()=>toast.push({kind:"error",title:"Не удалось отключить аккаунт"})});
+ const disable=useMutation({mutationFn:(account:Account)=>api.disableAIProviderAccount({idempotencyKey:crypto.randomUUID(),body:{account_id:account.id,expected_version:account.version}}),onSuccess:async()=>{toast.push({kind:"success",title:"Аккаунт отключён"});await refresh()},onError:()=>toast.push({kind:"error",title:"Не удалось отключить аккаунт"})});
  if(!canRead)return null;
  const valid=!!label.trim()&&!!model.trim()&&!!credential&&(provider!=="yandexgpt"||!!folderId.trim());
  return <section className="panel settings-card">

@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
+	"github.com/torgnexa/torgnexa/internal/platform/trustcontrol"
 )
 
 const (
@@ -26,8 +29,8 @@ const (
 type aiAdvisoryRepository interface {
 	List(context.Context, tenancy.Scope) ([]aiadvisory.Account, error)
 	Get(context.Context, tenancy.Scope, string) (aiadvisory.Account, error)
-	Create(context.Context, tenancy.Scope, string, aiadvisory.CreateAccount, string) (aiadvisory.Account, error)
-	Disable(context.Context, tenancy.Scope, string, int64) (aiadvisory.Account, error)
+	CreateGoverned(context.Context, tenancy.Scope, string, aiadvisory.CreateAccount, string, string, []byte, string, string) (aiadvisory.Account, bool, error)
+	DisableGoverned(context.Context, tenancy.Scope, string, int64, string, []byte, string, string) (aiadvisory.Account, bool, error)
 }
 
 type aiAdvisoryAPI struct {
@@ -35,10 +38,18 @@ type aiAdvisoryAPI struct {
 	secrets    secrets.SecretProvider
 	registry   *builtinruntime.Registry
 	audit      auditCapturer
+	governance aiEgressGovernance
 }
 
-func newAIAdvisoryRoutes(repository aiAdvisoryRepository, secretProvider secrets.SecretProvider, registry *builtinruntime.Registry, auditService auditCapturer) []ProtectedRoute {
-	api := &aiAdvisoryAPI{repository: repository, secrets: secretProvider, registry: registry, audit: auditService}
+type aiEgressGovernance interface {
+	AuthorizeAI(context.Context, tenancy.Scope, string, string, string, string, trustcontrol.EgressRequest, []byte) (trustcontrol.Policy, error)
+	RecordAI(context.Context, tenancy.Scope, string, string, string, string, string, string, trustcontrol.EgressRequest, trustcontrol.Policy, []byte) error
+	ReserveExternal(context.Context, tenancy.Scope, string, string, []byte) (bool, error)
+	CompleteExternal(context.Context, tenancy.Scope, string, string, string, string, string) error
+}
+
+func newAIAdvisoryRoutes(repository aiAdvisoryRepository, secretProvider secrets.SecretProvider, registry *builtinruntime.Registry, auditService auditCapturer, governance aiEgressGovernance) []ProtectedRoute {
+	api := &aiAdvisoryAPI{repository: repository, secrets: secretProvider, registry: registry, audit: auditService, governance: governance}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: AIProviderAccountsPath, Permission: "settings.ai_providers.read", Handler: http.HandlerFunc(api.list)},
 		{Method: http.MethodPost, Path: AIProviderAccountsPath, Permission: "settings.ai_providers.write", Handler: http.HandlerFunc(api.create)},
@@ -116,6 +127,13 @@ func (api *aiAdvisoryAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	credentialDigest := sha256.Sum256(cmd.Credential)
+	_, digest, err := trustcontrol.DigestJSON(map[string]any{"provider": input.Provider, "label": input.Label, "model": input.Model, "base_url": input.BaseURL, "folder_id": input.FolderID, "credential_sha256": hex.EncodeToString(credentialDigest[:])})
+	if err != nil {
+		zero(cmd.Credential)
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
 	created, err := api.secrets.Create(r.Context(), scope, secrets.ClassAIProviderCredential, cmd.Credential)
 	zero(cmd.Credential)
 	if err != nil {
@@ -123,7 +141,7 @@ func (api *aiAdvisoryAPI) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := newApprovalID()
-	account, err := api.repository.Create(r.Context(), scope, id, cmd, created.Reference.String())
+	account, replayed, err := api.repository.CreateGoverned(r.Context(), scope, id, cmd, created.Reference.String(), correlation, digest, principal.SubjectRef, id+".e")
 	if err != nil {
 		if created.Reference.Valid() {
 			_, _ = api.secrets.Revoke(r.Context(), scope, created.Reference)
@@ -135,11 +153,17 @@ func (api *aiAdvisoryAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
+	if replayed && created.Reference.Valid() {
+		_, _ = api.secrets.Revoke(r.Context(), scope, created.Reference)
+	}
+	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
 		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.create", ResourceType: "ai_provider_account",
 		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
 		Summary: audit.Summary{"provider": string(account.Provider), "label": account.Label},
-	})
+	}); auditErr != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		return
+	}
 	writeJSON(w, http.StatusCreated, aiProviderAccountToView(account))
 }
 
@@ -151,7 +175,8 @@ type aiProviderAccountDisableRequest struct {
 func (api *aiAdvisoryAPI) disable(w http.ResponseWriter, r *http.Request) {
 	scope, ok := ScopeFromContext(r.Context())
 	principal, principalOK := PrincipalFromContext(r.Context())
-	if !ok || !principalOK || api == nil || api.repository == nil || api.audit == nil {
+	correlation := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !ok || !principalOK || correlation == "" || len(correlation) > 128 || api == nil || api.repository == nil || api.audit == nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -159,7 +184,12 @@ func (api *aiAdvisoryAPI) disable(w http.ResponseWriter, r *http.Request) {
 	if !decodeCatalogJSON(w, r, &input) {
 		return
 	}
-	account, err := api.repository.Disable(r.Context(), scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion)
+	_, digest, err := trustcontrol.DigestJSON(input)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, _, err := api.repository.DisableGoverned(r.Context(), scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion, correlation, digest, principal.SubjectRef, newApprovalID())
 	if err != nil {
 		if errors.Is(err, aiadvisory.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
@@ -168,18 +198,22 @@ func (api *aiAdvisoryAPI) disable(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
+	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
 		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.disable", ResourceType: "ai_provider_account",
-		ResourceID: account.ID, CorrelationID: newApprovalID(), Risk: audit.RiskWriteSensitive,
+		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
 		Summary: audit.Summary{"provider": string(account.Provider)},
-	})
+	}); auditErr != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, aiProviderAccountToView(account))
 }
 
 type aiAnalyzeRequest struct {
-	AccountID    string `json:"account_id"`
-	SystemPrompt string `json:"system_prompt,omitempty"`
-	Prompt       string `json:"prompt"`
+	AccountID    string   `json:"account_id"`
+	SystemPrompt string   `json:"system_prompt,omitempty"`
+	Prompt       string   `json:"prompt"`
+	DataClasses  []string `json:"data_classes"`
 }
 type aiAnalyzeResponse struct {
 	Text     string `json:"text"`
@@ -195,7 +229,8 @@ type aiAnalyzeResponse struct {
 func (api *aiAdvisoryAPI) analyze(w http.ResponseWriter, r *http.Request) {
 	scope, ok := ScopeFromContext(r.Context())
 	principal, principalOK := PrincipalFromContext(r.Context())
-	if !ok || !principalOK || api == nil || api.repository == nil || api.secrets == nil || api.registry == nil || api.audit == nil {
+	correlation := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !ok || !principalOK || correlation == "" || len(correlation) > 128 || api == nil || api.repository == nil || api.secrets == nil || api.registry == nil || api.audit == nil || api.governance == nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -214,6 +249,51 @@ func (api *aiAdvisoryAPI) analyze(w http.ResponseWriter, r *http.Request) {
 	}
 	if !account.Enabled {
 		writeProblem(w, http.StatusConflict, "AI provider account is disabled")
+		return
+	}
+	promptBytes := len(input.SystemPrompt) + len(input.Prompt)
+	egressRequest := trustcontrol.EgressRequest{Destination: string(account.Provider), Model: account.Model, DataClasses: input.DataClasses, PromptBytes: promptBytes}
+	_, promptDigest, err := trustcontrol.DigestJSON(map[string]any{"system_prompt": input.SystemPrompt, "prompt": input.Prompt})
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	_, operationDigest, err := trustcontrol.DigestJSON(map[string]any{"account_id": account.ID, "provider": string(account.Provider), "model": account.Model, "data_classes": input.DataClasses, "prompt_sha256": hex.EncodeToString(promptDigest)})
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	claimed, err := api.governance.ReserveExternal(r.Context(), scope, "ai_egress.analyze", correlation, operationDigest)
+	if err != nil || !claimed {
+		writeProblem(w, http.StatusConflict, "Idempotent operation already consumed")
+		return
+	}
+	policy, err := api.governance.AuthorizeAI(r.Context(), scope, newApprovalID(), principal.SubjectRef, correlation, account.ID, egressRequest, promptDigest)
+	if err != nil {
+		if errors.Is(err, trustcontrol.ErrDenied) {
+			if completeErr := api.governance.CompleteExternal(r.Context(), scope, "ai_egress.analyze", correlation, "ai_provider_account", account.ID, "denied"); completeErr != nil {
+				writeProblem(w, http.StatusServiceUnavailable, "Idempotency evidence unavailable")
+				return
+			}
+			writeProblem(w, http.StatusForbidden, "AI egress denied")
+			return
+		}
+		writeProblem(w, http.StatusServiceUnavailable, "AI egress evidence unavailable")
+		return
+	}
+	redactedSystem, err := redactOptionalPrompt(input.SystemPrompt, policy.MaxPromptBytes)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	redactedPrompt, err := trustcontrol.RedactPrompt(input.Prompt, policy.MaxPromptBytes)
+	if err != nil || len(redactedSystem)+len(redactedPrompt) > policy.MaxPromptBytes {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	_, promptDigest, err = trustcontrol.DigestJSON(map[string]any{"system_prompt": redactedSystem, "prompt": redactedPrompt})
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
 	secretReference, err := sdk.ParseSecretReference(account.SecretReference)
@@ -237,17 +317,39 @@ func (api *aiAdvisoryAPI) analyze(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	text, model, err := api.registry.AICompletion(r.Context(), sdkAccount, runtime, host, account.FolderID, account.Model, input.SystemPrompt, input.Prompt)
-	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
+	text, model, err := api.registry.AICompletion(r.Context(), sdkAccount, runtime, host, account.FolderID, account.Model, redactedSystem, redactedPrompt)
+	outcome := "succeeded"
+	if err != nil {
+		outcome = "failed"
+	}
+	if evidenceErr := api.governance.RecordAI(r.Context(), scope, newApprovalID(), principal.SubjectRef, correlation, account.ID, "outcome", outcome, egressRequest, policy, promptDigest); evidenceErr != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "AI egress evidence unavailable")
+		return
+	}
+	if receiptErr := api.governance.CompleteExternal(r.Context(), scope, "ai_egress.analyze", correlation, "ai_provider_account", account.ID, outcome); receiptErr != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Idempotency evidence unavailable")
+		return
+	}
+	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
 		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.analyze", ResourceType: "ai_provider_account",
-		ResourceID: account.ID, CorrelationID: newApprovalID(), Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"provider": string(account.Provider), "ok": err == nil},
-	})
+		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+		Summary: audit.Summary{"provider": string(account.Provider), "ok": err == nil, "policy_version": policy.Version},
+	}); auditErr != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusBadGateway, "AI provider request failed")
 		return
 	}
 	writeJSON(w, http.StatusOK, aiAnalyzeResponse{Text: text, Provider: string(account.Provider), Model: model})
+}
+
+func redactOptionalPrompt(value string, maxBytes int) (string, error) {
+	if strings.TrimSpace(value) == "" {
+		return "", nil
+	}
+	return trustcontrol.RedactPrompt(value, maxBytes)
 }
 
 // hostFromBaseURL extracts the bare hostname builtinruntime.AICompletion's

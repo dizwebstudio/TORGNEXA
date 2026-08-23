@@ -2,7 +2,7 @@ module github.com/torgnexa/torgnexa/tools/securitytools
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 tool (
 	github.com/securego/gosec/v2/cmd/gosec

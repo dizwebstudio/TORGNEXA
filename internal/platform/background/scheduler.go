@@ -20,6 +20,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
+	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 )
 
@@ -68,6 +69,13 @@ func RunScheduler(ctx context.Context, cfg config.Config, logger *slog.Logger) e
 		return err
 	}
 	defer db.Close()
+	postureInspector, err := runtimeposture.NewInspector(db)
+	if err != nil {
+		return fmt.Errorf("scheduler runtime posture: %w", err)
+	}
+	if _, err := postureInspector.Inspect(ctx); err != nil {
+		return fmt.Errorf("scheduler runtime posture unsafe: %w", err)
+	}
 	syncStore, err := syncrepo.New(db)
 	if err != nil {
 		return err

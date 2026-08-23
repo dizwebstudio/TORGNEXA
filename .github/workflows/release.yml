@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Install the approved Node toolchain
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -75,7 +75,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Validate API, event, schema, and protobuf contracts
         run: ./scripts/check-contracts.sh
@@ -95,7 +95,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Verify deterministic JavaScript dependency policy
         run: ./scripts/check-js-supply-chain.sh release
@@ -120,7 +120,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Qualify deployed worker, Kafka, PostgreSQL, and warehouse execution
         run: |
@@ -166,7 +166,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Derive and validate immutable release context
         id: context
@@ -267,7 +267,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - name: Install checksum-verified security tools
         run: |
@@ -321,7 +321,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -448,7 +448,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: "1.26.5"
+          go-version: "1.26.7"
           cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:

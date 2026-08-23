@@ -6,6 +6,7 @@ import {ErrorBlock} from "../components/ApiState";
 import {IntegrationCatalog} from "../features/settings/IntegrationCatalog";
 import {AIProviderSettings} from "../features/settings/AIProviderSettings";
 import {MCPAccountSettings} from "../features/settings/MCPAccountSettings";
+import {TrustControlSettings} from "../features/settings/TrustControlSettings";
 import {WebhookSettings} from "../features/settings/WebhookSettings";
 import {PluginsSettings} from "../features/settings/PluginsSettings";
 import {WorkspaceSettings} from "../features/settings/WorkspaceSettings";
@@ -74,6 +75,9 @@ export function SettingsPage() {
     </div>
     <div id="settings-panel-mcp" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-mcp" tabIndex={0} hidden={activeTab !== "mcp"}>
       <MCPAccountSettings />
+    </div>
+    <div id="settings-panel-trust" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-trust" tabIndex={0} hidden={activeTab !== "trust"}>
+      <TrustControlSettings />
     </div>
     <div id="settings-panel-webhooks" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-webhooks" tabIndex={0} hidden={activeTab !== "webhooks"}>
       <WebhookSettings />

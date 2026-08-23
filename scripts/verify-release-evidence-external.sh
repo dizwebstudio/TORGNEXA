@@ -16,7 +16,7 @@ fail(){ echo "external release verification: $*" >&2; exit 1; }
 for x in "$evidence" "$tools"; do [[ "$x" == /* && -d "$x" && ! -L "$x" ]] || fail "absolute non-symlink directories required"; done
 [[ "$output" == /* ]] || fail "absolute output path required"
 for cmd in go jq sha256sum; do command -v "$cmd" >/dev/null || fail "$cmd is required"; done
-[[ "$(go env GOVERSION)" == go1.26.5 ]] || fail "Go 1.26.5 is required"
+[[ "$(go env GOVERSION)" == go1.26.7 ]] || fail "Go 1.26.7 is required"
 cosign="$tools/cosign"; [[ -x "$cosign" && ! -L "$cosign" ]] || fail "verified cosign binary is required"
 manifest="$evidence/evidence.json"; [[ -f "$manifest" && ! -L "$manifest" ]] || fail "evidence.json missing"
 go -C "$root/tools/contractcheck" run ./cmd/releasecheck -root "$evidence" -manifest evidence.json -mode public >/dev/null

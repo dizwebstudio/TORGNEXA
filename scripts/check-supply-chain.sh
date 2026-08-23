@@ -19,7 +19,13 @@ for version in v1.2.3 01.2.3 1.02.3 1.2.03 1.2.3-01 1.2.3-alpha.01 1.2.3-a..b; d
   fi
 done
 
-for module in "$repo_root" "$repo_root/tools/contractcheck" "$repo_root/tools/securitytools"; do
+for module in \
+  "$repo_root" \
+  "$repo_root/sdk/examples/go" \
+  "$repo_root/sdk/go" \
+  "$repo_root/tools/contractcheck" \
+  "$repo_root/tools/sdkgen" \
+  "$repo_root/tools/securitytools"; do
   go -C "$module" mod tidy -diff
   GOFLAGS=-mod=readonly go -C "$module" mod download
   go -C "$module" mod verify

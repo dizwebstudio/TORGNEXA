@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-129",
+  "task": "129",
+  "change_class": "pillar_change",
+  "summary": "Close audited runtime privilege, human authorization, idempotency, credential lifecycle and AI-egress gaps through one tenant-scoped trust control plane, then expose bounded connector replay and deterministic profitability decision labs without introducing a service or privileged bypass.",
+  "scopes": [
+    ".dockerignore",
+    ".env.example",
+    ".github/workflows/architecture-required.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/security.yml",
+    ".gitignore",
+    "Dockerfile",
+    "HANDOFF.md",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0093-p4-go-live-evidence-and-publication.md",
+    "adr/0095-enterprise-operations-ux-and-realtime-invalidation.md",
+    "adr/0099-trust-control-plane-and-decision-labs.md",
+    "architecture/policy.json",
+    "architecture/reviews/129-trust-control-plane-decision-labs.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "contracts/sdk/generated-manifest.json",
+    "deploy/postgres/catalog.tsv",
+    "deploy/postgres/configure-app-role.sh",
+    "docker-compose.yml",
+    "docs/18-version-baseline.md",
+    "docs/69-frontend-shell.md",
+    "docs/71-trust-control-plane.md",
+    "frontend/repository-shims.d.ts",
+    "frontend/src/app/realtime-events.ts",
+    "frontend/src/app/useRealtime.ts",
+    "frontend/src/auth/keycloak-adapter.ts",
+    "frontend/src/features/catalog/ProductList.tsx",
+    "frontend/src/features/reports/AskAI.tsx",
+    "frontend/src/features/settings/AIProviderSettings.tsx",
+    "frontend/src/features/settings/MCPAccountSettings.tsx",
+    "frontend/src/features/settings/TrustControlSettings.tsx",
+    "frontend/src/features/settings/settings-tabs.ts",
+    "frontend/src/pages/SettingsPage.tsx",
+    "frontend/src/styles.css",
+    "frontend/test/realtime.test.mjs",
+    "frontend/test/settings-tabs.test.mjs",
+    "frontend/tsconfig.logic.json",
+    "go.mod",
+    "go.sum",
+    "internal/app/api/ai_advisory.go",
+    "internal/app/api/api.go",
+    "internal/app/api/mcp_accounts.go",
+    "internal/app/api/oidc_membership_test.go",
+    "internal/app/api/oidc_security.go",
+    "internal/app/api/openapi_runtime_parity_test.go",
+    "internal/app/api/production_routes.go",
+    "internal/app/api/security_composition.go",
+    "internal/app/api/settings_security.go",
+    "internal/app/api/trust_control.go",
+    "internal/app/api/uploads_content.go",
+    "internal/app/mcp/identity.go",
+    "internal/app/mcp/server.go",
+    "internal/app/worker/worker.go",
+    "internal/platform/background/scheduler.go",
+    "internal/platform/mcpaccounts/mcpaccounts.go",
+    "internal/platform/migration/catalog_test.go",
+    "internal/platform/postgres/aiadvisoryrepo/repository.go",
+    "internal/platform/postgres/mcpaccountsrepo/repository.go",
+    "internal/platform/postgres/mcpaccountsrepo/repository_test.go",
+    "internal/platform/postgres/tenancyrepo/members.go",
+    "internal/platform/postgres/trustcontrolrepo/migration_test.go",
+    "internal/platform/postgres/trustcontrolrepo/repository.go",
+    "internal/platform/runtimeposture/posture.go",
+    "internal/platform/runtimeposture/posture_test.go",
+    "internal/platform/trustcontrol/trustcontrol.go",
+    "internal/platform/trustcontrol/trustcontrol_test.go",
+    "internal/platform/uploads/pipeline.go",
+    "internal/platform/uploads/pipeline_test.go",
+    "migrations/000016_trust_control_plane.sql",
+    "migrations/catalog.json",
+    "qualification/README.md",
+    "scripts/check-community-deployment.sh",
+    "scripts/check-p3-release-qualification.sh",
+    "scripts/check-p4-go-live.sh",
+    "scripts/check-supply-chain.sh",
+    "scripts/check-trust-control-postgres.sh",
+    "scripts/init-community-env.sh",
+    "scripts/verify-release-evidence-external.sh",
+    "sdk/go/torgnexa/client.gen.go",
+    "sdk/python/torgnexa_sdk/client_gen.py",
+    "sdk/typescript/src/client.gen.d.mts",
+    "sdk/typescript/src/client.gen.mjs",
+    "supply-chain/release-artifacts.json",
+    "tasks/issues/120-enterprise-operations-ux.md",
+    "tasks/issues/129-trust-control-plane-decision-labs.md",
+    "tools/contractcheck/go.mod",
+    "tools/contractcheck/internal/checker/supplychain.go",
+    "tools/contractcheck/internal/checker/supplychain_test.go",
+    "tools/contractcheck/internal/checker/syntax_test.go",
+    "tools/contractcheck/internal/checker/yaml.go",
+    "tools/securitytools/go.mod"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning",
+    "developer-surfaces",
+    "enterprise-iam-siem-cloud-upload-edge"
+  ],
+  "adr": "adr/0099-trust-control-plane-and-decision-labs.md",
+  "existing_adrs": [
+    "adr/0003-postgresql-system-of-record.md",
+    "adr/0006-approval-security.md",
+    "adr/0008-mcp-openclaw.md",
+    "adr/0011-privacy-by-design.md",
+    "adr/0017-release-supply-chain-security.md",
+    "adr/0021-ai-agent-guardrails.md",
+    "adr/0026-enterprise-iam-federation.md",
+    "adr/0034-security-edge-contract.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0096-pre-v1-migration-baseline-and-verified-rebaseline.md",
+    "adr/0097-ai-provider-settings-and-openai-compatible-admission.md",
+    "adr/0098-mcp-client-accounts-and-identity-resolver.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "Every new row carries organization_id/workspace_id, forced RLS and a workspace foreign key. Verified OIDC issuer/subject references must resolve to an active workspace_members row on every request; the stored workspace role is authoritative and member disable is immediate."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Receipts and evidence store bounded metadata and SHA-256 digests only. Raw MCP/provider credentials, prompts, provider responses and production fixtures are excluded; AI preview text is redacted and never persisted."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "affected",
+      "evidence": "OpenAPI 0.21.0 adds seven operations and lifecycle fields, requires idempotency on retryable AI/MCP mutations, and preserves existing AI/MCP account response shapes. Generated Go, Python and TypeScript SDKs now contain 129 operations."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event envelope, event schema, producer or consumer changes. Trust records are local PostgreSQL control-plane state."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector Replay Lab performs host-side synthetic admission only and does not alter the Connector SDK, provider manifests or plugin ABI."
+    },
+    {
+      "area": "database_migration",
+      "status": "affected",
+      "evidence": "Expand migration 000016 adds MCP lifecycle columns plus receipt, evidence, AI governance, replay and scenario tables with bounded checks, forced RLS and append/lifecycle guards. It does not rewrite ledger/audit history."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Community runtimes use a NOSUPERUSER/NOBYPASSRLS non-owner role, startup posture is fail-closed, MCP shares the REST edge controls, tokens expire/rotate/revoke, and Go/compress baselines are patched and image-pinned. Upload delivery is no-store and restricted to inert image media types."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Trust-policy and credential lifecycle mutations are administrator-only write-sensitive operations; replay/profitability are bounded operator operations without remote write authority. Existing dangerous-action policy/approval enforcement is unchanged."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Sensitive local mutations commit their business row, receipt and append-only evidence atomically. External AI calls persist authorization before egress and outcome afterward; audit capture failures are no longer ignored."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "A universal operation_receipts state machine binds tenant, operation, idempotency key and request digest, rejects payload drift and returns the terminal local resource on valid retry. AI external calls reserve before egress and never re-execute a consumed key."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "AI is the only new external egress: exact provider/model/data-class allowlists, prompt-size and monthly limits are checked before secrets are resolved or a network call starts. Connector replay performs zero network calls."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Runtime posture and minimized evidence are exposed to administrators; MCP usage count/last-used time and AI authorization/outcome metadata provide bounded operational signals without payload capture."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "AI egress can be disabled by appending a policy revision, MCP tokens can be revoked immediately, and runtimes refuse unsafe database identities. Migration rollback is restore/roll-forward because append-only evidence is intentionally not deleted."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Unit tests cover runtime version/role posture, database-authoritative membership, token canonicalization/lifecycle, policy denial/redaction, synthetic fixture rejection, fixed-decimal math, migration inventory and OpenAPI/runtime parity. PostgreSQL, frontend, contract, SDK and supply-chain gates are required by Task 129 acceptance."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

@@ -18,7 +18,7 @@ Turn the Task 119 operator shell into an enterprise operations surface that rema
 ### 2. Realtime operations
 - [x] add protected `GET /api/v1/realtime` as an authenticated SSE invalidation channel;
 - [x] stream metadata-only `ready`/`invalidate`/`heartbeat` frames, never entity/audit payloads;
-- [x] drive invalidation from the tenant-scoped PostgreSQL audit watermark and retain a heartbeat fallback for non-audited worker-originated state;
+- [x] drive invalidation from the tenant-scoped PostgreSQL audit watermark and keep heartbeat frames liveness-only so they never trigger global cache refreshes;
 - [x] reconnect with bounded backoff and refetch through the normal generated/API capability boundary;
 - [x] show live/connecting/offline state in the application shell.
 
@@ -59,7 +59,7 @@ Turn the Task 119 operator shell into an enterprise operations surface that rema
 - migration count remains `74`, latest `000074`.
 
 ## Acceptance
-- `./scripts/check-frontend-shell.sh` passes with 23 deterministic UX tests;
+- `./scripts/check-frontend-shell.sh` includes deterministic coverage that heartbeat and ready frames do not invalidate query data;
 - generated SDK gate passes with 108 operations / OpenAPI 0.15.0;
 - JS supply-chain and Community deployment policies remain green;
 - architecture review covers the exact Task 119 → Task 120 diff;

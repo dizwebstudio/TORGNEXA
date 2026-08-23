@@ -13,7 +13,7 @@ cd "$root"
 
 fail() { echo "P3 release qualification: $*" >&2; exit 1; }
 for cmd in go docker python3 sha256sum; do command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is required"; done
-[[ "$(go env GOVERSION)" == "go1.26.5" ]] || fail "Go 1.26.5 is required; got $(go env GOVERSION)"
+[[ "$(go env GOVERSION)" == "go1.26.7" ]] || fail "Go 1.26.7 is required; got $(go env GOVERSION)"
 docker compose version >/dev/null || fail "Docker Compose v2 is required"
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"

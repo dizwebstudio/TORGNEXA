@@ -461,6 +461,17 @@ func TestExpansionRatioDoesNotTruncateFractionalOverflow(t *testing.T) {
 	}
 }
 
+func TestArchiveSizeRejectsUint64OverflowBeforeConversion(t *testing.T) {
+	if _, ok := archiveSizeWithinLimit(^uint64(0), DefaultPolicy().MaxArchiveEntryBytes); ok {
+		t.Fatal("ZIP64 size above int64/policy limit must be rejected")
+	}
+	want := DefaultPolicy().MaxArchiveEntryBytes
+	got, ok := archiveSizeWithinLimit(uint64(128*1024*1024), want)
+	if !ok || got != want {
+		t.Fatalf("boundary size got=%d ok=%v want=%d", got, ok, want)
+	}
+}
+
 func TestScannerMetadataRejectsCredentialShapedText(t *testing.T) {
 	result := ScanResult{
 		ScannerName:      "clamav",

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TORGNEXA API
-  version: 0.20.0
+  version: 0.21.0
 servers:
   - url: /api/v1
 paths:
@@ -158,6 +158,24 @@ paths:
       responses:
         '200': {description: Cursor-paginated settings mutation evidence with actor and correlation, content: {application/json: {schema: {$ref: '#/components/schemas/AuditPage'}}}}
         '403': {description: Caller lacks settings.security.read}
+  /settings/security/posture:
+    get:
+      operationId: getRuntimeSecurityPosture
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Runtime uses a patched Go toolchain and non-privileged application database role, content: {application/json: {schema: {$ref: '#/components/schemas/RuntimeSecurityPosture'}}}}
+        '403': {description: Administrator permission required}
+        '503': {description: Mandatory runtime posture is unsafe or cannot be measured}
+  /settings/security/evidence:
+    get:
+      operationId: listSecurityEvidence
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: before, in: query, required: false, schema: {type: string, format: date-time}}
+      responses:
+        '200': {description: Minimized append-only security decisions and outcomes, content: {application/json: {schema: {$ref: '#/components/schemas/SecurityEvidencePage'}}}}
+        '403': {description: Administrator permission required}
   /settings/identity-providers:
     get:
       operationId: listSettingsIdentityProviders
@@ -242,6 +260,8 @@ paths:
     post:
       operationId: disableAIProviderAccount
       security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountDisable'}}}}
       responses:
         '200': {description: AI provider account disabled with optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
@@ -250,12 +270,37 @@ paths:
     post:
       operationId: analyzeWithAIProvider
       security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIAnalyzeRequest'}}}}
       responses:
         '200': {description: Provider's completion text for the caller-assembled analytics prompt, content: {application/json: {schema: {$ref: '#/components/schemas/AIAnalyzeResponse'}}}}
         '404': {description: AI provider account not found}
         '409': {description: AI provider account is disabled}
         '502': {description: The external AI provider request failed}
+  /settings/ai-egress-policy:
+    get:
+      operationId: getAIEgressPolicy
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Current immutable tenant AI egress policy revision, content: {application/json: {schema: {$ref: '#/components/schemas/AIEgressPolicy'}}}}
+        '404': {description: No policy exists; egress is denied by default}
+    put:
+      operationId: putAIEgressPolicy
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIEgressPolicyWrite'}}}}
+      responses:
+        '200': {description: 'New policy revision, receipt and evidence committed atomically'}
+        '409': {description: Version or idempotency conflict}
+  /settings/ai-egress-policy:preview:
+    post:
+      operationId: previewAIEgress
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIEgressPreviewWrite'}}}}
+      responses:
+        '200': {description: Non-persisted redacted preview and allow/deny decision, content: {application/json: {schema: {$ref: '#/components/schemas/AIEgressPreview'}}}}
   /settings/mcp-accounts:
     get:
       operationId: listMCPAccounts
@@ -277,10 +322,43 @@ paths:
     post:
       operationId: disableMCPAccount
       security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountDisable'}}}}
       responses:
         '200': {description: MCP client account disabled with optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccount'}}}}
         '409': {description: Optimistic version conflict}
+  /settings/mcp-accounts:rotate:
+    post:
+      operationId: rotateMCPAccount
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountRotate'}}}}
+      responses:
+        '201': {description: Replacement token returned once and predecessor revoked atomically, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreateResponse'}}}}
+        '409': {description: Version or idempotency conflict}
+  /settings/connector-replay:run:
+    post:
+      operationId: runConnectorReplay
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorReplayWrite'}}}}
+      responses:
+        '201': {description: 'Synthetic fixture validated without credentials, remote calls or writes', content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorReplayResult'}}}}
+        '400': {description: 'Fixture is not explicitly synthetic, is unbounded or contains credential-shaped fields'}
+        '409': {description: Idempotency conflict}
+  /profitability/scenarios:
+    post:
+      operationId: createProfitabilityScenario
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProfitabilityScenarioWrite'}}}}
+      responses:
+        '201': {description: Immutable fixed-decimal what-if snapshot and result, content: {application/json: {schema: {$ref: '#/components/schemas/ProfitabilityScenarioResult'}}}}
+        '409': {description: Idempotency conflict}
   /settings/mcp-accounts/{account_id}:policy:
     parameters:
       - {name: account_id, in: path, required: true, schema: {type: string}}
@@ -2030,11 +2108,12 @@ components:
     AIAnalyzeRequest:
       type: object
       additionalProperties: false
-      required: [account_id, prompt]
+      required: [account_id, prompt, data_classes]
       properties:
         account_id: {type: string, minLength: 1, maxLength: 128}
         system_prompt: {type: string, maxLength: 32000}
         prompt: {type: string, minLength: 1, maxLength: 32000}
+        data_classes: {type: array, minItems: 1, maxItems: 8, uniqueItems: true, items: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$'}}
     AIAnalyzeResponse:
       type: object
       additionalProperties: false
@@ -2043,10 +2122,54 @@ components:
         text: {type: string}
         provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek]}
         model: {type: string}
+    AIEgressPolicy:
+      type: object
+      additionalProperties: false
+      required: [version, enabled, allowed_data_classes, allowed_providers, allowed_models, max_prompt_bytes, monthly_request_limit, created_at]
+      properties:
+        version: {type: integer, format: int64, minimum: 1}
+        enabled: {type: boolean}
+        allowed_data_classes: {type: array, minItems: 1, maxItems: 8, uniqueItems: true, items: {type: string}}
+        allowed_providers: {type: array, minItems: 1, maxItems: 16, uniqueItems: true, items: {type: string}}
+        allowed_models: {type: array, minItems: 1, maxItems: 32, uniqueItems: true, items: {type: string}}
+        max_prompt_bytes: {type: integer, minimum: 1, maximum: 32000}
+        monthly_request_limit: {type: integer, minimum: 1, maximum: 1000000}
+        created_at: {type: string, format: date-time}
+    AIEgressPolicyWrite:
+      type: object
+      additionalProperties: false
+      required: [expected_version, enabled, allowed_data_classes, allowed_providers, allowed_models, max_prompt_bytes, monthly_request_limit]
+      properties:
+        expected_version: {type: integer, format: int64, minimum: 0}
+        enabled: {type: boolean}
+        allowed_data_classes: {type: array, minItems: 1, maxItems: 8, uniqueItems: true, items: {type: string}}
+        allowed_providers: {type: array, minItems: 1, maxItems: 16, uniqueItems: true, items: {type: string}}
+        allowed_models: {type: array, minItems: 1, maxItems: 32, uniqueItems: true, items: {type: string}}
+        max_prompt_bytes: {type: integer, minimum: 1, maximum: 32000}
+        monthly_request_limit: {type: integer, minimum: 1, maximum: 1000000}
+    AIEgressPreviewWrite:
+      type: object
+      additionalProperties: false
+      required: [provider, model, data_classes, prompt]
+      properties:
+        provider: {type: string, minLength: 1, maxLength: 63}
+        model: {type: string, minLength: 1, maxLength: 120}
+        data_classes: {type: array, minItems: 1, maxItems: 8, uniqueItems: true, items: {type: string}}
+        prompt: {type: string, minLength: 1, maxLength: 32000}
+    AIEgressPreview:
+      type: object
+      additionalProperties: false
+      required: [allowed]
+      properties:
+        allowed: {type: boolean}
+        reason: {type: string, enum: [policy_denied]}
+        redacted_prompt: {type: string, maxLength: 32000}
+        policy_version: {type: integer, format: int64, minimum: 1}
+        persisted: {type: boolean, const: false}
     MCPAccount:
       type: object
       additionalProperties: false
-      required: [id, label, agent_id, model_id, integration_id, permissions, enabled, version, created_at, updated_at]
+      required: [id, label, agent_id, model_id, integration_id, permissions, enabled, version, credential_status, expires_at, use_count, created_at, updated_at]
       properties:
         id: {type: string, minLength: 1, maxLength: 128}
         label: {type: string, minLength: 1, maxLength: 120}
@@ -2056,6 +2179,12 @@ components:
         permissions: {type: array, minItems: 1, maxItems: 4, items: {type: string, enum: [commerce.products.read, commerce.orders.read, party.counterparties.read, commerce.price.change.request]}}
         enabled: {type: boolean}
         version: {type: integer, minimum: 1}
+        credential_status: {type: string, enum: [active, expired, revoked]}
+        expires_at: {type: string, format: date-time}
+        rotated_from_id: {type: string, minLength: 1, maxLength: 64}
+        revoked_at: {type: string, format: date-time}
+        last_used_at: {type: string, format: date-time}
+        use_count: {type: integer, format: int64, minimum: 0}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     MCPAccountPage:
@@ -2074,13 +2203,15 @@ components:
         model_id: {type: string, minLength: 1, maxLength: 160}
         integration_id: {type: string, minLength: 1, maxLength: 160}
         permissions: {type: array, minItems: 1, maxItems: 4, items: {type: string, enum: [commerce.products.read, commerce.orders.read, party.counterparties.read, commerce.price.change.request]}}
+        expires_in_days: {type: integer, minimum: 1, maximum: 365, default: 90}
     MCPAccountCreateResponse:
       type: object
       additionalProperties: false
-      required: [account, token]
+      required: [account, replayed]
       properties:
         account: {$ref: '#/components/schemas/MCPAccount'}
-        token: {type: string, format: password, minLength: 1, writeOnly: true}
+        token: {type: string, format: password, minLength: 1, writeOnly: true, description: Present only on the first successful execution; never persisted or replayed}
+        replayed: {type: boolean}
     MCPAccountDisable:
       type: object
       additionalProperties: false
@@ -2088,6 +2219,74 @@ components:
       properties:
         account_id: {type: string, minLength: 1, maxLength: 128}
         expected_version: {type: integer, minimum: 1}
+    MCPAccountRotate:
+      type: object
+      additionalProperties: false
+      required: [account_id, expected_version]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        expected_version: {type: integer, minimum: 1}
+        expires_in_days: {type: integer, minimum: 1, maximum: 365, default: 90}
+    ConnectorReplayWrite:
+      type: object
+      additionalProperties: false
+      required: [connector_family, capability, fixture]
+      properties:
+        connector_family: {type: string, pattern: '^[a-z][a-z0-9_-]{1,62}$'}
+        capability: {type: string, pattern: '^[a-z][a-z0-9_.-]{2,95}$'}
+        fixture:
+          type: object
+          required: [_synthetic]
+          properties: {_synthetic: {type: boolean, const: true}}
+          additionalProperties: true
+          description: Bounded synthetic data only; credential-shaped fields are rejected recursively
+    ConnectorReplayResult:
+      type: object
+      additionalProperties: false
+      required: [id, status, result, created_at, replayed]
+      properties:
+        id: {type: string}
+        status: {type: string, enum: [passed, rejected]}
+        result: {type: object, additionalProperties: true}
+        created_at: {type: string, format: date-time}
+        replayed: {type: boolean}
+    ProfitabilityScenarioWrite:
+      type: object
+      additionalProperties: false
+      required: [name, sale_currency, cost_currency, quantity_milli, sale_unit_price_minor, cost_unit_minor, logistics_total_cost_minor, advertising_total_cost_minor, marketplace_fee_basis_points, cost_to_sale_fx_rate_micros]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        sale_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        cost_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        quantity_milli: {type: integer, format: int64, minimum: 1}
+        sale_unit_price_minor: {type: integer, format: int64, minimum: 0}
+        cost_unit_minor: {type: integer, format: int64, minimum: 0}
+        logistics_total_cost_minor: {type: integer, format: int64, minimum: 0}
+        advertising_total_cost_minor: {type: integer, format: int64, minimum: 0}
+        marketplace_fee_basis_points: {type: integer, format: int64, minimum: 0, maximum: 10000}
+        cost_to_sale_fx_rate_micros: {type: integer, format: int64, minimum: 1}
+    ProfitabilityScenarioResult:
+      type: object
+      additionalProperties: false
+      required: [id, name, algorithm_version, result, created_at, replayed]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        algorithm_version: {type: string, const: profitability-v1}
+        result:
+          type: object
+          additionalProperties: false
+          required: [algorithm_version, currency, revenue_minor, marketplace_fee_minor, converted_costs_minor, contribution_profit_minor, margin_basis_points]
+          properties:
+            algorithm_version: {type: string, const: profitability-v1}
+            currency: {type: string, pattern: '^[A-Z]{3}$'}
+            revenue_minor: {type: integer, format: int64}
+            marketplace_fee_minor: {type: integer, format: int64}
+            converted_costs_minor: {type: integer, format: int64}
+            contribution_profit_minor: {type: integer, format: int64}
+            margin_basis_points: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
+        replayed: {type: boolean}
     MCPAgentPolicyRule:
       type: object
       additionalProperties: false
@@ -2217,6 +2416,50 @@ components:
         configuration_status: {type: string, enum: [configured]}
         configuration_source: {type: string, enum: [runtime]}
         provider_health: {type: string, enum: [not_verified]}
+    RuntimeSecurityPosture:
+      type: object
+      additionalProperties: false
+      required: [status, checked_at, go_version, minimum_go_version, database, go_runtime_patched, least_privilege]
+      properties:
+        status: {type: string, enum: [pass, fail]}
+        checked_at: {type: string, format: date-time}
+        go_version: {type: string, pattern: '^go[0-9]+\.[0-9]+\.[0-9]+$'}
+        minimum_go_version: {type: string, const: go1.26.7}
+        go_runtime_patched: {type: boolean}
+        least_privilege: {type: boolean}
+        database:
+          type: object
+          additionalProperties: false
+          required: [role, superuser, bypass_rls, can_create_role, can_create_database, can_create_schema, owns_runtime_state]
+          properties:
+            role: {type: string, minLength: 1, maxLength: 63}
+            superuser: {type: boolean}
+            bypass_rls: {type: boolean}
+            can_create_role: {type: boolean}
+            can_create_database: {type: boolean}
+            can_create_schema: {type: boolean}
+            owns_runtime_state: {type: boolean}
+    SecurityEvidence:
+      type: object
+      additionalProperties: false
+      required: [id, type, actor_ref, resource_type, resource_id, correlation_id, decision, summary, occurred_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 160}
+        type: {type: string, pattern: '^[a-z][a-z0-9_.]{2,95}$'}
+        actor_ref: {type: string, minLength: 1, maxLength: 160}
+        resource_type: {type: string, minLength: 1, maxLength: 80}
+        resource_id: {type: string, minLength: 1, maxLength: 160}
+        correlation_id: {type: string, minLength: 1, maxLength: 128}
+        decision: {type: string, enum: [allowed, denied, succeeded, failed, revoked, rotated]}
+        request_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        summary: {type: object, additionalProperties: true}
+        occurred_at: {type: string, format: date-time}
+    SecurityEvidencePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SecurityEvidence'}}
     SettingsSecuritySession:
       type: object
       additionalProperties: false

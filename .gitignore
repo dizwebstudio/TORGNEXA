@@ -6,7 +6,7 @@
 # Generated release/security evidence must be recreated in an isolated temp
 # directory and uploaded by CI, never committed with source.
 dist/
-reports/
+/reports/
 .security-tools/
 coverage.out
 *.test

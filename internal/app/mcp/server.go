@@ -29,7 +29,9 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
+	"github.com/torgnexa/torgnexa/internal/platform/securityedge"
 )
 
 const (
@@ -127,33 +129,50 @@ type Dependencies struct {
 	LegalParties     LegalPartySearcher
 	PriceChanges     PriceChangeRequester
 	AllowedOrigins   []string
+	Edge             securityedge.Config
+	Limiter          *securityedge.Limiter
 }
 
 type Server struct {
-	logger         *slog.Logger
-	resolver       IdentityResolver
-	authorizer     Authorizer
-	governor       AgentGovernor
-	auditor        Auditor
-	search         search.Provider
-	legalParties   LegalPartySearcher
-	priceChanges   PriceChangeRequester
-	allowedOrigins map[string]struct{}
+	logger       *slog.Logger
+	resolver     IdentityResolver
+	authorizer   Authorizer
+	governor     AgentGovernor
+	auditor      Auditor
+	search       search.Provider
+	legalParties LegalPartySearcher
+	priceChanges PriceChangeRequester
+	edge         securityedge.Config
+	limiter      *securityedge.Limiter
 }
 
 func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if logger == nil || deps.IdentityResolver == nil || deps.Authorizer == nil || deps.Governor == nil || deps.Auditor == nil {
 		return nil, ErrInvalid
 	}
-	origins := make(map[string]struct{}, len(deps.AllowedOrigins))
+	origins := make([]string, 0, len(deps.AllowedOrigins))
 	for _, raw := range deps.AllowedOrigins {
 		origin := strings.TrimSpace(raw)
 		if origin == "" || strings.ContainsAny(origin, "\r\n") {
 			return nil, ErrInvalid
 		}
-		origins[origin] = struct{}{}
+		origins = append(origins, origin)
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, allowedOrigins: origins}, nil
+	edge := deps.Edge
+	if edge.MaxRequestBytes == 0 {
+		edge = securityedge.Config{AllowedOrigins: origins, MaxRequestBytes: maxRequestBytes, MaxUploadBytes: maxRequestBytes, RatePerMinute: 600, HSTSSeconds: 31536000}
+	}
+	if len(edge.AllowedOrigins) == 0 {
+		edge.AllowedOrigins = origins
+	}
+	if edge.Validate() != nil {
+		return nil, ErrInvalid
+	}
+	limiter := deps.Limiter
+	if limiter == nil {
+		limiter = securityedge.NewLimiter()
+	}
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, edge: edge, limiter: limiter}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -161,7 +180,24 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	secureHeaders(w)
+	for name, value := range securityedge.SecurityHeaders(s.edge) {
+		w.Header().Set(name, value)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	clientIP, edgeErr := securityedge.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), s.edge)
+	if edgeErr != nil {
+		writeRPCError(w, http.StatusBadRequest, json.RawMessage("null"), -32000, "Bad Request", nil)
+		return
+	}
+	if edgeErr = s.limiter.Allow(clientIP.String(), s.edge); edgeErr != nil {
+		if errors.Is(edgeErr, securityedge.ErrRateLimited) {
+			w.Header().Set("Retry-After", "60")
+			writeRPCError(w, http.StatusTooManyRequests, json.RawMessage("null"), -32000, "Too Many Requests", nil)
+			return
+		}
+		writeRPCError(w, http.StatusBadRequest, json.RawMessage("null"), -32000, "Bad Request", nil)
+		return
+	}
 	if r.URL.Path != EndpointPath {
 		http.NotFound(w, r)
 		return
@@ -172,7 +208,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {
-		if _, ok := s.allowedOrigins[origin]; !ok {
+		if !securityedge.OriginAllowed(origin, s.edge) {
 			writeRPCError(w, http.StatusForbidden, json.RawMessage("null"), -32000, "Forbidden", nil)
 			return
 		}
@@ -186,7 +222,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	body := http.MaxBytesReader(w, r.Body, s.edge.MaxRequestBytes)
 	dec := json.NewDecoder(body)
 	dec.DisallowUnknownFields()
 	var request rpcRequest
@@ -491,6 +527,13 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			logger.Error("database pool close failed", "event", "database.pool_close_failed")
 		}
 	}()
+	postureInspector, err := runtimeposture.NewInspector(db)
+	if err != nil {
+		return fmt.Errorf("mcp runtime posture: %w", err)
+	}
+	if _, err := postureInspector.Inspect(ctx); err != nil {
+		return fmt.Errorf("mcp runtime posture unsafe: %w", err)
+	}
 	mcpAccounts, err := mcpaccountsrepo.New(db)
 	if err != nil {
 		return fmt.Errorf("mcp accounts repository: %w", err)
@@ -511,7 +554,8 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService})
+	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

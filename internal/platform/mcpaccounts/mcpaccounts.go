@@ -55,6 +55,11 @@ type Account struct {
 	Permissions   []string
 	Enabled       bool
 	Version       int64
+	RotatedFromID string
+	ExpiresAt     time.Time
+	RevokedAt     *time.Time
+	LastUsedAt    *time.Time
+	UseCount      int64
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -167,7 +172,7 @@ func DecodeToken(token string) (DecodedToken, error) {
 	decoded := make([][]byte, len(parts))
 	for i, part := range parts {
 		value, err := base64.RawURLEncoding.DecodeString(part)
-		if err != nil || len(value) == 0 {
+		if err != nil || len(value) == 0 || base64.RawURLEncoding.EncodeToString(value) != part {
 			return DecodedToken{}, ErrInvalid
 		}
 		decoded[i] = value

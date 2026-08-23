@@ -14,6 +14,7 @@
     "src/auth/oidc-urls.ts",
     "src/features/settings/settings-tabs.ts",
     "src/generated/connector-catalog.ts",
-    "src/api/decoders.ts"
+    "src/api/decoders.ts",
+    "src/app/realtime-events.ts"
   ]
 }

@@ -2,7 +2,7 @@
 
 | Component | Baseline | Notes |
 |---|---:|---|
-| Go | 1.26.5 | minimum language version 1.26.0; exact toolchain pinned in `go.mod` |
+| Go | 1.26.7 | minimum language version 1.26.0; exact patched toolchain pinned in `go.mod` |
 | PostgreSQL | 18.4 | readable tag plus immutable OCI index digest in the release inventory |
 | Apache Kafka | 4.3.1 | supported bugfix release, KRaft |
 | Valkey | 9.1.1 | current 9.1 bugfix |

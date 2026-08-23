@@ -109,8 +109,16 @@ func getUploadContent(w http.ResponseWriter, r *http.Request, scope tenancy.Scop
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	w.Header().Set("Content-Type", http.DetectContentType(sniff[:n]))
-	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	mediaType := http.DetectContentType(sniff[:n])
+	switch mediaType {
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif":
+	default:
+		writeProblem(w, http.StatusUnsupportedMediaType, "Unsupported Media Type")
+		return
+	}
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("Cache-Control", "private, no-store, max-age=0")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(sniff[:n])

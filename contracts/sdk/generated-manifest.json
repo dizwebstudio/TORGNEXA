@@ -3,9 +3,9 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "27af7547a8b88540773661e8adb7391708dfc95a7c3862266f18e639696ee1d1",
+    "sha256": "11df07d6d7b2f09ab31b81954fabe41d6daabf30b54e2c36ff24211f447f00e9",
     "openapi_version": "3.1.0",
-    "api_version": "0.20.0",
+    "api_version": "0.21.0",
     "server_path": "/api/v1"
   },
   "operations": [
@@ -110,6 +110,11 @@
       "path": "/products/{product_id}/offers"
     },
     {
+      "operation_id": "createProfitabilityScenario",
+      "method": "POST",
+      "path": "/profitability/scenarios"
+    },
+    {
       "operation_id": "createReconciliationJob",
       "method": "POST",
       "path": "/reconciliation/jobs"
@@ -190,6 +195,11 @@
       "path": "/approvals/{request_id}/execute"
     },
     {
+      "operation_id": "getAIEgressPolicy",
+      "method": "GET",
+      "path": "/settings/ai-egress-policy"
+    },
+    {
       "operation_id": "getCloudSubscription",
       "method": "GET",
       "path": "/cloud/subscription"
@@ -253,6 +263,11 @@
       "operation_id": "getReportData",
       "method": "GET",
       "path": "/reports/{report_id}"
+    },
+    {
+      "operation_id": "getRuntimeSecurityPosture",
+      "method": "GET",
+      "path": "/settings/security/posture"
     },
     {
       "operation_id": "getSettingsSecurityConfiguration",
@@ -415,6 +430,11 @@
       "path": "/reports"
     },
     {
+      "operation_id": "listSecurityEvidence",
+      "method": "GET",
+      "path": "/settings/security/evidence"
+    },
+    {
       "operation_id": "listSettingsIdentityProviders",
       "method": "GET",
       "path": "/settings/identity-providers"
@@ -460,9 +480,19 @@
       "path": "/notifications/{notification_id}/read"
     },
     {
+      "operation_id": "previewAIEgress",
+      "method": "POST",
+      "path": "/settings/ai-egress-policy:preview"
+    },
+    {
       "operation_id": "previewConnectorBootstrap",
       "method": "POST",
       "path": "/connector-accounts:bootstrap-preview"
+    },
+    {
+      "operation_id": "putAIEgressPolicy",
+      "method": "PUT",
+      "path": "/settings/ai-egress-policy"
     },
     {
       "operation_id": "putConnectorRuntimeConfig",
@@ -520,9 +550,19 @@
       "path": "/settings/identity-providers/{provider_id}:rollback"
     },
     {
+      "operation_id": "rotateMCPAccount",
+      "method": "POST",
+      "path": "/settings/mcp-accounts:rotate"
+    },
+    {
       "operation_id": "rotateWebhookSigningSecret",
       "method": "POST",
       "path": "/webhook-subscriptions/{subscription_id}/rotate-secret"
+    },
+    {
+      "operation_id": "runConnectorReplay",
+      "method": "POST",
+      "path": "/settings/connector-replay:run"
     },
     {
       "operation_id": "runSyncPolicy",

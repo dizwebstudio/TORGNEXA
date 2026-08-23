@@ -27,6 +27,7 @@ type Principal struct {
 	Subject        string
 	SessionRef     string
 	SubjectRef     string
+	Email          string
 	Roles          []string
 	OrganizationID string
 	WorkspaceID    string

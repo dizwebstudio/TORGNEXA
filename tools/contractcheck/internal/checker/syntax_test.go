@@ -102,6 +102,19 @@ func TestParseStrictYAML(t *testing.T) {
 	}
 }
 
+func TestParseComposeYAMLAllowsAnchorsWithoutWeakeningSyntaxChecks(t *testing.T) {
+	t.Parallel()
+	remaining := maxYAMLTotalNodes
+	_, err := parseComposeYAMLWithBudget(context.Background(), []byte("x-common: &common\n  image: postgres:18-alpine@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nservices:\n  postgres:\n    <<: *common\n"), &remaining)
+	if err != nil {
+		t.Fatalf("valid Compose anchor rejected: %v", err)
+	}
+
+	remaining = maxYAMLTotalNodes
+	_, err = parseComposeYAMLWithBudget(context.Background(), []byte("services:\n  unsafe: !danger value\n"), &remaining)
+	assertErrorContains(t, err, "tag")
+}
+
 func TestParseStrictYAMLNodeBudgetsAndContext(t *testing.T) {
 	t.Parallel()
 	totalRemaining := 2

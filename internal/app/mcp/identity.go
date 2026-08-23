@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
@@ -17,6 +18,10 @@ import (
 // PostgresIdentityResolver.ResolveMCPIdentity), never bypassed.
 type mcpAccountFinder interface {
 	FindByID(ctx context.Context, scope tenancy.Scope, id string) (mcpaccounts.Account, []byte, error)
+}
+
+type mcpAccountActivityRecorder interface {
+	RecordUse(context.Context, tenancy.Scope, string, time.Time) error
 }
 
 // PostgresIdentityResolver is the production IdentityResolver: it trusts
@@ -44,11 +49,16 @@ func (resolver PostgresIdentityResolver) ResolveMCPIdentity(r *http.Request) (Id
 		return Identity{}, ErrUnauthorized
 	}
 	account, tokenHash, err := resolver.Accounts.FindByID(r.Context(), scope, token.AccountID)
-	if err != nil || !account.Enabled {
+	if err != nil || !account.Enabled || account.RevokedAt != nil || (!account.ExpiresAt.IsZero() && !time.Now().UTC().Before(account.ExpiresAt)) {
 		return Identity{}, ErrUnauthorized
 	}
 	if subtle.ConstantTimeCompare(mcpaccounts.HashSecret(token.Secret), tokenHash) != 1 {
 		return Identity{}, ErrUnauthorized
+	}
+	if recorder, ok := resolver.Accounts.(mcpAccountActivityRecorder); ok {
+		if err := recorder.RecordUse(r.Context(), scope, account.ID, time.Now().UTC()); err != nil {
+			return Identity{}, ErrUnauthorized
+		}
 	}
 	runID, err := sortableIDs{}.NewID()
 	if err != nil {

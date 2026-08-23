@@ -299,7 +299,7 @@ func TestSupplyChainPolicyRejectsUnsafeConfigurations(t *testing.T) {
 			mutate: func(t *testing.T, root string) {
 				appendFixture(t, root, ".github/workflows/ci.yml", "  bypass:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    permissions:\n      contents: read\n    steps:\n      - run: ./untrusted.sh\n")
 			},
-			wantErr: "exactly one job named go",
+			wantErr: "exactly the go and javascript jobs",
 		},
 		{
 			name: "release omits architecture gate",
@@ -354,7 +354,7 @@ func TestSupplyChainPolicyRejectsUnsafeConfigurations(t *testing.T) {
 			name: "unregistered module",
 			mutate: func(t *testing.T, root string) {
 				mustMkdirAll(t, filepath.Join(root, "tools", "extra"))
-				mustWriteFile(t, filepath.Join(root, "tools", "extra", "go.mod"), []byte("module github.com/torgnexa/torgnexa/tools/extra\n\ngo 1.26.0\n\ntoolchain go1.26.5\n"))
+				mustWriteFile(t, filepath.Join(root, "tools", "extra", "go.mod"), []byte("module github.com/torgnexa/torgnexa/tools/extra\n\ngo 1.26.0\n\ntoolchain go1.26.7\n"))
 			},
 			wantErr: "module inventory must be exactly",
 		},
@@ -510,13 +510,16 @@ func writeValidSupplyChainRepository(t *testing.T) string {
 		mustMkdirAll(t, filepath.Join(root, "cmd", command))
 		mustWriteFile(t, filepath.Join(root, "cmd", command, "main.go"), []byte("package main\nfunc main() {}\n"))
 	}
-	mustWriteFixture(t, root, "go.mod", "module github.com/torgnexa/torgnexa\n\ngo 1.26.0\n\ntoolchain go1.26.5\n")
-	mustWriteFixture(t, root, "tools/contractcheck/go.mod", "module github.com/torgnexa/torgnexa/tools/contractcheck\n\ngo 1.26.0\n\ntoolchain go1.26.5\n")
+	mustWriteFixture(t, root, "go.mod", "module github.com/torgnexa/torgnexa\n\ngo 1.26.0\n\ntoolchain go1.26.7\n")
+	mustWriteFixture(t, root, "sdk/go/go.mod", "module github.com/torgnexa/torgnexa-sdk-go\n\ngo 1.23.0\n")
+	mustWriteFixture(t, root, "sdk/examples/go/go.mod", "module github.com/torgnexa/torgnexa-sdk-examples-go\n\ngo 1.23.0\n\nrequire github.com/torgnexa/torgnexa-sdk-go v0.0.0\n\nreplace github.com/torgnexa/torgnexa-sdk-go => ../../go\n")
+	mustWriteFixture(t, root, "tools/contractcheck/go.mod", "module github.com/torgnexa/torgnexa/tools/contractcheck\n\ngo 1.26.0\n\ntoolchain go1.26.7\n")
+	mustWriteFixture(t, root, "tools/sdkgen/go.mod", "module github.com/torgnexa/torgnexa/tools/sdkgen\n\ngo 1.23.0\n")
 	mustWriteFixture(t, root, "tools/securitytools/go.mod", `module github.com/torgnexa/torgnexa/tools/securitytools
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 tool (
 	github.com/securego/gosec/v2/cmd/gosec
@@ -533,6 +536,16 @@ github.com/securego/gosec/v2 v2.28.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 golang.org/x/vuln v1.6.0 h1:FeMO9Rm/HwyduOztbvKcOw+zvDEPr4I4aQNSfevFcKY=
 golang.org/x/vuln v1.6.0/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
 `)
+	for _, relative := range []string{
+		"frontend/package-lock.json",
+		"frontend/package.json",
+		"integrations/n8n-nodes-torgnexa/package-lock.json",
+		"integrations/n8n-nodes-torgnexa/package.json",
+		"sdk/python/pyproject.toml",
+		"sdk/typescript/package.json",
+	} {
+		mustWriteFixture(t, root, relative, "{}\n")
+	}
 	mustWriteFixture(t, root, "docker-compose.yml", validComposeFixture())
 	mustWriteFixture(t, root, actionPinsPath, validActionPinsFixture())
 	mustWriteFixture(t, root, toolVersionsPath, validToolVersionsFixture())
@@ -622,7 +635,7 @@ jobs:
       - name: Install the approved Go toolchain
         uses: actions/setup-go@` + testSetupGoCommit + `
         with:
-          go-version: 1.26.5
+          go-version: 1.26.7
           cache: false
       - name: Build the trusted base verifier and validate the pull-request diff
         if: github.event_name == 'pull_request'
@@ -633,6 +646,35 @@ jobs:
           ` + strings.ReplaceAll(trustedArchitectureRun, "\n", "\n          ") + `
       - name: Run repository checks
         run: ./scripts/check.sh
+  javascript:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact revision without persisted credentials
+        uses: actions/checkout@` + testCheckoutCommit + `
+        with:
+          clean: true
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install the approved Node toolchain
+        uses: actions/setup-node@` + testSetupNodeCommit + `
+        with:
+          node-version: 22.16.0
+      - name: Verify JavaScript dependency policy
+        run: ./scripts/check-js-supply-chain.sh repository
+      - name: Install the exact n8n build graph without lifecycle scripts
+        working-directory: integrations/n8n-nodes-torgnexa
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build, test, and inspect the n8n package
+        working-directory: integrations/n8n-nodes-torgnexa
+        run: |
+          npm run build
+          npm run test:offline
+          npm run verify:package
+          npm pack --dry-run --ignore-scripts
 `
 }
 
@@ -781,7 +823,8 @@ func appendFixture(t *testing.T, root, relative, addition string) {
 
 func TestTask093CommunityImageRepositoriesAreExplicitlyApproved(t *testing.T) {
 	refs := []string{
-		"golang:1.26.5-alpine3.23@sha256:" + testDigestA,
+		"golang:1.26.7-alpine3.23@sha256:" + testDigestA,
+		"node:22.16.0-alpine3.21@sha256:" + testDigestD,
 		"dxflrs/garage:v2.3.0@sha256:" + testDigestB,
 		"quay.io/keycloak/keycloak:26.7.0@sha256:" + testDigestC,
 	}

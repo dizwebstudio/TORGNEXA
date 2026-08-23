@@ -41,7 +41,7 @@ declare module "react-dom/client" {
 declare module "@tanstack/react-query" {
   export class QueryClient { constructor(config?: unknown); invalidateQueries(input?: unknown): Promise<void>; }
   export function QueryClientProvider(props: {client: QueryClient; children?: unknown}): unknown;
-  export function useQuery<T>(options: {queryKey: readonly unknown[]; queryFn: () => Promise<T>; staleTime?: number; enabled?: boolean; retry?: number | boolean; refetchOnWindowFocus?: boolean; refetchInterval?: number}): {isPending: boolean; isError: boolean; isFetching: boolean; data: T; refetch(): Promise<unknown>};
+  export function useQuery<T>(options: {queryKey: readonly unknown[]; queryFn: () => Promise<T>; staleTime?: number; gcTime?: number; enabled?: boolean; retry?: number | boolean; refetchOnWindowFocus?: boolean; refetchInterval?: number}): {isPending: boolean; isError: boolean; isFetching: boolean; data: T; refetch(): Promise<unknown>};
   export function useQueryClient(): QueryClient;
   export function useMutation<TData = unknown, TVariables = void>(options: {mutationFn: (value: TVariables) => Promise<TData>; onSuccess?: (data: TData, variables: TVariables) => unknown; onError?: (error: unknown, variables: TVariables) => unknown; onSettled?: (data: TData | undefined, error: unknown | null, variables: TVariables) => unknown}): {isPending: boolean; isError: boolean; isSuccess: boolean; error: unknown; mutate(value?: TVariables): void; reset(): void};
 }

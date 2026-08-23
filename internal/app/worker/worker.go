@@ -41,6 +41,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/reporting"
 	"github.com/torgnexa/torgnexa/internal/platform/retention"
+	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 	"github.com/torgnexa/torgnexa/internal/platform/uploads"
@@ -101,6 +102,13 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			logger.Error("worker database pool close failed", "event", "worker.database_close_failed")
 		}
 	}()
+	postureInspector, err := runtimeposture.NewInspector(db)
+	if err != nil {
+		return fail("worker_runtime_posture_startup_failed", err)
+	}
+	if _, err := postureInspector.Inspect(ctx); err != nil {
+		return fail("worker_runtime_posture_unsafe", err)
+	}
 
 	secretRepository, err := secretrepo.New(db)
 	if err != nil {

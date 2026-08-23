@@ -51,7 +51,7 @@ Daily workflows are focused rather than nested inline: product, order and invent
 
 The operator shell no longer treats bounded API pages as the complete tenant dataset. Catalog and Orders use `ServerDataGrid`, which sends text/status filters and opaque cursors to the existing PostgreSQL search APIs. Canonical backend order is preserved; the browser does not advertise unsupported arbitrary server sorts.
 
-`GET /api/v1/realtime` is an authenticated SSE **invalidation** channel. Frames contain only liveness/change metadata. The browser uses those hints to invalidate TanStack Query data and reread the same capability-protected APIs used by normal navigation. This avoids duplicating authorization or business state in the streaming layer.
+`GET /api/v1/realtime` is an authenticated SSE **invalidation** channel. Frames contain only liveness/change metadata. The browser invalidates TanStack Query data only for explicit `invalidate` frames and rereads the same capability-protected APIs used by normal navigation. `ready` and `heartbeat` frames report connection health only and never invalidate the query cache. This avoids duplicating authorization or business state in the streaming layer and prevents periodic refetch storms.
 
 `/incidents` composes warehouse incidents, open reconciliation drift, degraded connector accounts and pending approvals into one triage surface. `/catalog/{id}` and `/orders/{id}` are durable route-controlled drawers; incident rows also receive bookmarkable routes. `Ctrl/Cmd+K` sends product/order searches to server endpoints rather than searching a fixed browser sample.
 

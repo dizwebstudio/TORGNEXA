@@ -808,11 +808,15 @@ func inspectZip(readerAt io.ReaderAt, size int64, depth int, policy Policy, budg
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		if int64(f.UncompressedSize64) > policy.MaxArchiveEntryBytes {
+		uncompressed, ok := archiveSizeWithinLimit(f.UncompressedSize64, policy.MaxArchiveEntryBytes)
+		if !ok {
 			return 0, ErrSecurityRejected
 		}
-		compressed := int64(f.CompressedSize64)
-		if compressed < 0 {
+		// A compressed entry cannot be larger than the complete archive view.
+		// Checking in uint64 space before conversion prevents ZIP64 metadata from
+		// wrapping a size above MaxInt64 into a negative int64.
+		compressed, ok := archiveSizeWithinLimit(f.CompressedSize64, size)
+		if !ok {
 			return 0, ErrSecurityRejected
 		}
 		budget.compressed += compressed
@@ -825,15 +829,17 @@ func inspectZip(readerAt io.ReaderAt, size int64, depth int, policy Policy, budg
 		var writer io.Writer = io.Discard
 		captureNested := strings.EqualFold(path.Ext(f.Name), ".zip")
 		if captureNested {
-			if int64(f.UncompressedSize64) > policy.MaxNestedArchiveBytes {
-				rc.Close()
+			if uncompressed > policy.MaxNestedArchiveBytes {
+				if err := rc.Close(); err != nil {
+					return 0, ErrSecurityRejected
+				}
 				return 0, ErrSecurityRejected
 			}
 			writer = &nested
 		}
 		n, copyErr := io.Copy(writer, io.LimitReader(rc, limit))
 		closeErr := rc.Close()
-		if copyErr != nil || closeErr != nil || n > policy.MaxArchiveEntryBytes || uint64(n) != f.UncompressedSize64 {
+		if copyErr != nil || closeErr != nil || n > policy.MaxArchiveEntryBytes || n != uncompressed {
 			return 0, ErrSecurityRejected
 		}
 		budget.expanded += n
@@ -858,6 +864,14 @@ func inspectZip(readerAt io.ReaderAt, size int64, depth int, policy Policy, budg
 		}
 	}
 	return localExpanded, nil
+}
+
+func archiveSizeWithinLimit(value uint64, limit int64) (int64, bool) {
+	if limit < 0 || value > uint64(limit) {
+		return 0, false
+	}
+	// #nosec G115 -- the unsigned value is proven <= the non-negative int64 limit above.
+	return int64(value), true
 }
 
 func expansionRatioExceeded(expanded, compressed, maxRatio int64) bool {
