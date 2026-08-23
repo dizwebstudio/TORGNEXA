@@ -40,6 +40,12 @@ NOCREATEDB NOCREATEROLE`. API, worker, scheduler and MCP use that role. A runtim
 posture inspector fails production startup if these invariants regress and
 exposes only boolean/minimized evidence to tenant administrators.
 
+This decision also supersedes two narrow operational baselines without editing
+their accepted ADRs: ADR 0093's Go 1.26.5 binding moves to the patched 1.26.7
+toolchain, and ADR 0095's heartbeat fallback becomes liveness-only. Realtime
+query invalidation now requires an explicit `invalidate` frame; `ready` and
+`heartbeat` cannot cause periodic whole-screen refetch amplification.
+
 ## Consequences
 
 MCP credentials gain bounded expiry, rotation version, last-used timestamp and
@@ -65,7 +71,8 @@ their append-only design makes rollback a roll-forward or restore operation.
 Public API changes are additive under `/api/v1`. Existing OIDC tokens remain
 cryptographically valid but require an active membership binding. Existing MCP
 tokens remain valid until their migrated expiry and may be rotated. No existing
-event schema or Connector SDK root changes.
+event schema or Connector SDK root changes. Realtime event names and wire shape
+remain compatible; only the browser reaction to liveness frames is narrowed.
 
 ## Migration and data impact
 

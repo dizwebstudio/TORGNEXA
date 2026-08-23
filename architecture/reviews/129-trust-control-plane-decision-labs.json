@@ -3,7 +3,7 @@
   "id": "ARCH-129",
   "task": "129",
   "change_class": "pillar_change",
-  "summary": "Close audited runtime privilege, human authorization, idempotency, credential lifecycle and AI-egress gaps through one tenant-scoped trust control plane, then expose bounded connector replay and deterministic profitability decision labs without introducing a service or privileged bypass.",
+  "summary": "Close audited runtime privilege, human authorization, idempotency, credential lifecycle and AI-egress gaps through one tenant-scoped trust control plane, expose bounded decision labs, and stop realtime liveness frames from amplifying authorized reads without introducing a service or privileged bypass.",
   "scopes": [
     ".dockerignore",
     ".env.example",
@@ -16,8 +16,6 @@
     "HANDOFF.md",
     "PACKAGE_INDEX.md",
     "VALIDATION_REPORT.md",
-    "adr/0093-p4-go-live-evidence-and-publication.md",
-    "adr/0095-enterprise-operations-ux-and-realtime-invalidation.md",
     "adr/0099-trust-control-plane-and-decision-labs.md",
     "architecture/policy.json",
     "architecture/reviews/129-trust-control-plane-decision-labs.json",
