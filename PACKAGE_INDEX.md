@@ -16,7 +16,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 216
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2163
+- total source files (excluding local secrets/build/dependency/cache trees): 2162
 
 
 ## Task 129 additions
@@ -205,7 +205,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `.npmrc`
 - `CONTRIBUTING.md`
 - `Dockerfile`
-- `GAP_AUDIT.md`
 - `LICENSE`
 - `LICENSE-DECISION.md`
 - `Makefile`

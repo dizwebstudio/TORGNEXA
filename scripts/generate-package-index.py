@@ -102,6 +102,7 @@ SKIP_FILE_NAMES = {
     "AGENTS.md",
     "CLAUDE.md",
     "CODEX.md",
+    "GAP_AUDIT.md",
     "GEMINI.md",
     "HANDOFF.md",
     "Thumbs.db",
