@@ -1,1 +1,0 @@
-Implement connector <PROVIDER>. First create/update Connector Spec from current official API docs and distinguish confirmed/planned capabilities. Implement only <TASK_FILE> scope with quotas/timeouts/errors/idempotency/health/reconciliation/fixtures. Never log/store credentials.

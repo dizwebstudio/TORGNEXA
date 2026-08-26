@@ -1,1 +1,0 @@
-Review current diff against AGENTS.md and linked issue. Focus correctness, tenant isolation, events/idempotency, contracts, secret leakage, connector abstraction and tests. Blockers first.

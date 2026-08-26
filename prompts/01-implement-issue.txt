@@ -1,1 +1,0 @@
-Implement <TASK_FILE> completely. Follow AGENTS.md and referenced ADR/contracts. Do not expand scope. Inspect existing patterns first. Run checks, update tests/docs/contracts, report changed files, results, risks and follow-ups.

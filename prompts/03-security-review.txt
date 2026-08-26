@@ -1,1 +1,0 @@
-Review <SCOPE> with `.codex/skills/security-review/SKILL.md` and docs/17-threat-model.md. Return prioritized exact findings and minimal remediation. Do not broad-refactor.

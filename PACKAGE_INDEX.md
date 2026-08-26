@@ -2,7 +2,7 @@
 
 **Tasks 001–129 are repository-implemented.** Task 129 adds the trust control plane and three governed decision capabilities on top of the P4, enterprise UX, compact migration baseline, AI connector and MCP identity work from Tasks 118–128. Architecture policy: **124 modules / 38 providers / 120 reviews**. Active migrations are **16**, latest `000016`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **129 operations / 0.21.0**.
 
-The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `HANDOFF.md` and `VALIDATION_REPORT.md`.
+The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
 ---
 
@@ -10,15 +10,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 383
+- docs: 382
 - adrs: 99
 - tasks: 131
 - milestones: 14
-- codex_skills: 28
 - contracts: 216
-- prompts: 13
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2236
+- total source files (excluding local secrets/build/dependency/cache trees): 2163
 
 
 ## Task 129 additions
@@ -196,34 +194,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Files
 
-- `.codex/skills/ai-agent-governance/SKILL.md`
-- `.codex/skills/cloud-billing/SKILL.md`
-- `.codex/skills/connector-conformance/SKILL.md`
-- `.codex/skills/counterparty-master-data/SKILL.md`
-- `.codex/skills/db-migration/SKILL.md`
-- `.codex/skills/developer-platform/SKILL.md`
-- `.codex/skills/docs-maintenance/SKILL.md`
-- `.codex/skills/edge-security/SKILL.md`
-- `.codex/skills/enterprise-iam/SKILL.md`
-- `.codex/skills/erp-connector/SKILL.md`
-- `.codex/skills/government-connector/SKILL.md`
-- `.codex/skills/growth-engine/SKILL.md`
-- `.codex/skills/implement-module/SKILL.md`
-- `.codex/skills/kafka-event/SKILL.md`
-- `.codex/skills/marketplace-connector/SKILL.md`
-- `.codex/skills/privacy-data-governance/SKILL.md`
-- `.codex/skills/product-compliance/SKILL.md`
-- `.codex/skills/reference-provider-connector/SKILL.md`
-- `.codex/skills/release-security/SKILL.md`
-- `.codex/skills/security-review/SKILL.md`
-- `.codex/skills/settlement-reconciliation/SKILL.md`
-- `.codex/skills/siem-export/SKILL.md`
-- `.codex/skills/social-connector/SKILL.md`
-- `.codex/skills/sre-performance/SKILL.md`
-- `.codex/skills/supply-chain-wms/SKILL.md`
-- `.codex/skills/test-and-pr/SKILL.md`
-- `.codex/skills/upgrade-migration/SKILL.md`
-- `.codex/skills/upload-security/SKILL.md`
 - `.dockerignore`
 - `.env.example`
 - `.github/PULL_REQUEST_TEMPLATE.md`
@@ -233,12 +203,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `.github/workflows/security.yml`
 - `.gitignore`
 - `.npmrc`
-- `AGENTS.md`
-- `CODEX.md`
 - `CONTRIBUTING.md`
 - `Dockerfile`
 - `GAP_AUDIT.md`
-- `HANDOFF.md`
 - `LICENSE`
 - `LICENSE-DECISION.md`
 - `Makefile`
@@ -1104,7 +1071,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/32-fulfillment-pudo.md`
 - `docs/33-import-export.md`
 - `docs/34-frontend.md`
-- `docs/35-codex-operating-model.md`
 - `docs/36-privacy-data-governance.md`
 - `docs/37-growth-advertising-promotions.md`
 - `docs/38-procurement-supply-planning.md`
@@ -2085,19 +2051,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations_legacy_pre_v1/catalog.json`
 - `performance/README.md`
 - `performance/baseline-v1.json`
-- `prompts/00-start-project.txt`
-- `prompts/01-implement-issue.txt`
-- `prompts/02-build-connector.txt`
-- `prompts/03-security-review.txt`
-- `prompts/04-review-pr.txt`
-- `prompts/05-architecture-gap-audit.txt`
-- `prompts/06-regulated-integration.txt`
-- `prompts/07-connector-conformance.txt`
-- `prompts/08-performance-readiness.txt`
-- `prompts/09-release-hardening.txt`
-- `prompts/10-enterprise-security-change.txt`
-- `prompts/11-reference-provider-connector.txt`
-- `prompts/12-cloud-billing-change.txt`
 - `qualification/README.md`
 - `qualification/live-connectors.example.json`
 - `qualification/production-posture.example.json`
@@ -2177,34 +2130,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `sdk/typescript/test/client.test.mjs`
 - `sdk/typescript/test/types.test.ts`
 - `sdk/typescript/tsconfig.json`
-- `skills/ai-agent-governance.md`
-- `skills/cloud-billing.md`
-- `skills/connector-conformance.md`
-- `skills/counterparty-master-data.md`
-- `skills/db-migration.md`
-- `skills/developer-platform.md`
-- `skills/docs-maintenance.md`
-- `skills/edge-security.md`
-- `skills/enterprise-iam.md`
-- `skills/erp-connector.md`
-- `skills/government-connector.md`
-- `skills/growth-engine.md`
-- `skills/implement-module.md`
-- `skills/kafka-event.md`
-- `skills/marketplace-connector.md`
-- `skills/privacy-data-governance.md`
-- `skills/product-compliance.md`
-- `skills/reference-provider-connector.md`
-- `skills/release-security.md`
-- `skills/security-review.md`
-- `skills/settlement-reconciliation.md`
-- `skills/siem-export.md`
-- `skills/social-connector.md`
-- `skills/sre-performance.md`
-- `skills/supply-chain-wms.md`
-- `skills/test-and-pr.md`
-- `skills/upgrade-migration.md`
-- `skills/upload-security.md`
 - `supply-chain/action-pins.json`
 - `supply-chain/js-artifacts.json`
 - `supply-chain/license-policy.json`

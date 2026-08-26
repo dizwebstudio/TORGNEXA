@@ -35,13 +35,5 @@ missing = [number for number in range(1, max(numbers) + 1) if number not in numb
 if missing:
     raise SystemExit(f"missing task numbers: {missing}")
 
-skills = list((root / ".codex" / "skills").glob("*/SKILL.md"))
-if not skills:
-    raise SystemExit("no Codex skills found")
-for path in skills:
-    if not path.read_text(encoding="utf-8").strip().startswith("#"):
-        raise SystemExit(f"invalid skill: {path}")
-
 print(f"Task numbering contiguous: 001-{max(numbers):03d}")
-print("Codex skill layout valid")
 PY

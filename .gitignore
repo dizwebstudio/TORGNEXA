@@ -17,3 +17,92 @@ __pycache__/
 *.py[cod]
 
 qualification/evidence/
+
+# Local AI-assisted development metadata. Product AI/MCP source, contracts,
+# migrations, fixtures, and documentation remain versioned.
+/.codex/
+/.claude/
+/.agents/
+/skills/
+/prompts/
+/AGENTS.md
+/CODEX.md
+/HANDOFF.md
+/docs/35-codex-operating-model.md
+/.cursor/
+/.cursorignore
+/.cursorrules
+/.windsurf/
+/.windsurfrules
+/.continue/
+/.aider*
+/CLAUDE.md
+/GEMINI.md
+/.github/copilot-instructions.md
+
+# Operating-system and editor state.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python environments, packaging output, and tool caches.
+.venv/
+venv/
+.direnv/
+.envrc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+
+# JavaScript bundler caches and test reports.
+.vite/
+*.tsbuildinfo
+coverage/
+test-results/
+playwright-report/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local binaries, profiles, traces, databases, and scratch output.
+/bin/
+/tmp/
+/.tmp/
+/.cache/
+*.exe
+*.log
+*.prof
+*.pprof
+*.trace
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.orig
+*.rej
+
+# Local container overrides and private key containers.
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yml
+compose.override.yaml
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+/credentials/
+/secrets/

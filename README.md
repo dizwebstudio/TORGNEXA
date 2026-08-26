@@ -1,23 +1,19 @@
-# TORGNEXA Codex Kit
+# TORGNEXA
 
-Complete architecture, contracts, Codex instructions, skills and executable backlog for **TORGNEXA** — an open-source/self-hosted commerce & distribution operating platform.
+Architecture, contracts, implementation and executable backlog for **TORGNEXA** — an open-source/self-hosted commerce & distribution operating platform.
 
 TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectional synchronization, reconciliation, reporting/settlements, advertising/promotions, procurement/WMS, logistics/PUDO, Russian compliance, legal-party/product-compliance master data, enterprise IAM/SIEM/Cloud billing/security edge, external automation and agent workflows.
 
 ## Package contents
 
-- `AGENTS.md` — repository-wide Codex rules.
-- `CODEX.md` — operating model and task execution order.
-- `HANDOFF.md` — handoff checklist for a new Codex session/team.
 - `docs/` — architecture v1.0 and domain/platform specifications.
 - `adr/` — architectural decisions.
 - `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
 - `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `.codex/skills/` — repo-local Codex skills (`SKILL.md`).
 - `tasks/issues/` — atomic task cards numbered 001–110; 001–100 form the
   contiguous implemented baseline, with later settings work tracked per card.
 - `tasks/milestones/` — dependency-aware milestones M0-M13.
-- `prompts/` and `templates/` — repeatable implementation/review artifacts.
+- `templates/` — repeatable architecture, implementation and review artifacts.
 - Go scaffold, migrations, Docker Compose and CI baseline.
 
 ## Technology baseline
@@ -56,12 +52,11 @@ This is a local single-host artifact, not a production CDN/web-server topology. 
 
 Architecture v1.0 is frozen in `docs/54-architecture-freeze-v1.md`.
 
-## Start with Codex
+## Development workflow
 
 ```text
-Read AGENTS.md, CODEX.md, HANDOFF.md, docs/00-product-scope.md,
-docs/01-architecture.md, docs/03-module-boundaries.md and
- tasks/issues/001-bootstrap-go-platform.md.
+Read docs/00-product-scope.md, docs/01-architecture.md,
+docs/03-module-boundaries.md and tasks/issues/001-bootstrap-go-platform.md.
 Implement Task 001 only. Do not expand scope. Run repository checks and
 report changed files, validation evidence, risks and follow-ups.
 ```

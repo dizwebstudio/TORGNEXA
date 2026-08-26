@@ -1,1 +1,0 @@
-Read Connector SDK/conformance docs and the provider-reference task. First produce/update a Connector Spec from the current official API and explicitly mark supported/unsupported capabilities. Then implement through generic ports, deterministic fixtures and conformance. No provider-specific Core changes.

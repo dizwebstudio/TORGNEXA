@@ -23,14 +23,99 @@ OUTPUT = ROOT / "PACKAGE_INDEX.md"
 SUMMARY_HEADING = "## Summary"
 FILES_HEADING = "## Files"
 
-# Mirrors .gitignore (root and frontend/.gitignore): build/dependency/cache
-# trees and generated evidence are not part of the package. .git and .claude
-# are not in either .gitignore (git never needs to ignore itself, and
-# .claude is local session tooling) so they are listed explicitly.
-SKIP_DIR_NAMES = {".git", ".claude", "node_modules", "dist", "__pycache__", "reports", ".security-tools", ".repository-test"}
-SKIP_PATH_PREFIXES = ("qualification/evidence/",)
-SKIP_FILE_SUFFIXES = (".pyc", ".pyo", ".pyd", ".test")
-SKIP_FILE_NAMES = {"coverage.out"}
+# Mirrors repository ignore policy: local assistant metadata, build/dependency
+# trees, caches, reports, and generated evidence are not package contents.
+SKIP_DIR_NAMES = {
+    ".agents",
+    ".aider",
+    ".cache",
+    ".claude",
+    ".codex",
+    ".continue",
+    ".cursor",
+    ".direnv",
+    ".git",
+    ".idea",
+    ".mypy_cache",
+    ".nox",
+    ".pytest_cache",
+    ".repository-test",
+    ".ruff_cache",
+    ".security-tools",
+    ".tox",
+    ".venv",
+    ".vite",
+    ".vscode",
+    ".windsurf",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "htmlcov",
+    "node_modules",
+    "playwright-report",
+    "reports",
+    "test-results",
+    "venv",
+}
+SKIP_PATH_PREFIXES = (
+    ".tmp/",
+    "bin/",
+    "credentials/",
+    "prompts/",
+    "qualification/evidence/",
+    "secrets/",
+    "skills/",
+    "tmp/",
+)
+SKIP_FILE_SUFFIXES = (
+    ".bak",
+    ".db",
+    ".egg-info",
+    ".exe",
+    ".jks",
+    ".key",
+    ".keystore",
+    ".log",
+    ".p12",
+    ".pem",
+    ".pfx",
+    ".prof",
+    ".pprof",
+    ".pyc",
+    ".pyd",
+    ".pyo",
+    ".sqlite",
+    ".sqlite3",
+    ".test",
+    ".trace",
+    ".tsbuildinfo",
+    ".swp",
+    ".swo",
+)
+SKIP_FILE_NAMES = {
+    ".coverage",
+    ".cursorrules",
+    ".cursorignore",
+    ".envrc",
+    ".windsurfrules",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CODEX.md",
+    "GEMINI.md",
+    "HANDOFF.md",
+    "Thumbs.db",
+    "coverage.out",
+    "coverage.xml",
+    "compose.override.yaml",
+    "compose.override.yml",
+    "docker-compose.override.yaml",
+    "docker-compose.override.yml",
+}
+SKIP_EXACT_PATHS = {
+    ".github/copilot-instructions.md",
+    "docs/35-codex-operating-model.md",
+}
 
 # Named subsets reported in ## Summary, alongside the repo-wide total.
 CATEGORY_DIRS = {
@@ -39,7 +124,6 @@ CATEGORY_DIRS = {
     "tasks": "tasks/issues",
     "milestones": "tasks/milestones",
     "contracts": "contracts",
-    "prompts": "prompts",
     "templates": "templates",
 }
 
@@ -51,10 +135,16 @@ def is_secret_env_file(name: str) -> bool:
 def should_skip(relative_parts: tuple[str, ...]) -> bool:
     if any(part in SKIP_DIR_NAMES for part in relative_parts[:-1]):
         return True
+    if any(part.endswith(".egg-info") for part in relative_parts[:-1]):
+        return True
     relative_posix = "/".join(relative_parts)
+    if relative_posix in SKIP_EXACT_PATHS:
+        return True
     if relative_posix.startswith(SKIP_PATH_PREFIXES):
         return True
     name = relative_parts[-1]
+    if name.startswith(".aider") or name.endswith("~"):
+        return True
     if is_secret_env_file(name):
         return True
     if name in SKIP_FILE_NAMES:
@@ -85,15 +175,9 @@ def count_dir(relative_dir: str) -> int:
     return count
 
 
-def count_codex_skills() -> int:
-    base = ROOT / ".codex/skills"
-    return sum(1 for entry in base.iterdir() if entry.is_dir())
-
-
 def render_summary(all_files: list[str]) -> str:
     counts = {key: count_dir(path) for key, path in CATEGORY_DIRS.items()}
-    counts["codex_skills"] = count_codex_skills()
-    order = ["docs", "adrs", "tasks", "milestones", "codex_skills", "contracts", "prompts", "templates"]
+    order = ["docs", "adrs", "tasks", "milestones", "contracts", "templates"]
     lines = [SUMMARY_HEADING, ""]
     lines += [f"- {key}: {counts[key]}" for key in order]
     lines.append(f"- total source files (excluding local secrets/build/dependency/cache trees): {len(all_files)}")
@@ -154,3 +238,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    ".rej",
+    ".DS_Store",
