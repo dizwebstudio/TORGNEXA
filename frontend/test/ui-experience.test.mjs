@@ -59,12 +59,13 @@ test("integration catalog distinguishes executable, separate and planned runtime
   const integrations = read("features/settings/IntegrationCatalog.tsx");
   const generated = read("generated/connector-catalog.ts");
   assert.equal([...generated.matchAll(/^      stage: "ready"/gm)].length, 11);
-  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 8);
-  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 19);
+  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 9);
+  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 18);
   assert.match(integrations, /Подключение пока недоступно/);
   assert.match(integrations, /Создать кабинет или включить заявленные возможности нельзя/);
   assert.match(integrations, /Перейти к AI-провайдерам/);
   assert.match(integrations, /Перейти к курсам валют/);
+  assert.match(integrations, /Текстовые публикации работают/);
   assert.match(integrations, /runtime\.operationalCapabilities/);
   assert.match(integrations, /runtimeConfigTemplate/);
 });

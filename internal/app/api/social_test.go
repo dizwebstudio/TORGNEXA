@@ -48,4 +48,7 @@ func TestValidSocialTextAppliesProductionLimit(t *testing.T) {
 			t.Fatalf("invalid social text was accepted: length=%d", len([]rune(value)))
 		}
 	}
+	if validSocialText("text", 0) || validSocialText("text", -1) {
+		t.Fatal("non-executable social text limit was accepted")
+	}
 }

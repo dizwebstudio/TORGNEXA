@@ -46,18 +46,28 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("CBR FX separate-surface support is inaccurate: %+v", cbr)
 	}
 	telegram, ok := SupportFor("telegram")
-	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || SupportsCapability("telegram", "social.post.media") || SupportsSync("telegram", "products", "inbound") {
+	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || SupportsCapability("telegram", "social.post.media") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
 		t.Fatalf("Telegram social runtime support is inaccurate: %+v", telegram)
+	}
+	max, ok := SupportFor("max-messenger")
+	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || SupportsCapability("max-messenger", "social.post.media") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
+		t.Fatalf("MAX social runtime support is inaccurate: %+v", max)
+	}
+	if SocialTextLimit("avito") != 0 {
+		t.Fatal("planned connector gained an executable social text limit")
 	}
 }
 
-func TestTelegramSocialPublisherAdmissionIsExact(t *testing.T) {
+func TestSocialPublisherAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) {
-		return json.RawMessage(`{"chat_id":-1001234567890}`), nil
+		return json.RawMessage(`{"chat_id":-70801090403050}`), nil
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "telegram"), load); err != nil {
 		t.Fatalf("Telegram publisher unavailable: %v", err)
+	}
+	if _, err := registry.SocialPublisher(supportTestAccount(t, "max-messenger"), load); err != nil {
+		t.Fatalf("MAX publisher unavailable: %v", err)
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "avito"), load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted social publisher resolved: %v", err)

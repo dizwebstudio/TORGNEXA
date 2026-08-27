@@ -9,7 +9,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Completed repository implementation: `001`, `024`, `065`, `002`, `027`,
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
-- Contiguous implemented baseline: Tasks `001`–`130`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog. Deployment/hosted evidence remains release-topology specific and cannot be inferred from repository completion.
+- Contiguous implemented baseline: Tasks `001`–`133`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -389,3 +389,25 @@ surface and leased worker delivery. The executable subset is deliberately
   worker lease recovery cannot duplicate an ambiguous remote write;
 - migration 17, OpenAPI/SDK generation, Go test/vet, contracts, architecture,
   frontend build and live Telegram qualification must pass before completion.
+
+## Phase 18 — MAX Social production composition
+
+`133`
+
+Task 133 composes the existing MAX adapter through the same provider-neutral
+Social API, leased worker and append-only receipt recovery introduced by Task
+132. Only `social.post.text` is executable: the provider ceiling is 4000 Unicode
+code points and the host permits only exact account/channel health reads plus
+`POST /messages?chat_id=...`. Runtime inventory becomes 11 generic product
+integrations, nine working separate-surface providers and 18 planned entries.
+
+### Gate RUNTIME-133
+
+- bot tokens remain callback-scoped and `chat_id` is strict non-zero non-secret
+  configuration;
+- API/Core/worker remain provider-neutral and MAX protocol branching stays in
+  built-in composition;
+- uploads, media, status and webhooks fail closed despite their SDK presence;
+- Task-132 ambiguous-write recovery cannot duplicate a remote message;
+- generation, Go test/vet, contracts, architecture, frontend build and live MAX
+  qualification must pass before a deployment claims complete production proof.

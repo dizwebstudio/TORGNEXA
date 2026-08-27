@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64">
+  <title>MAX</title>
+  <defs><linearGradient id="max" x1="0" x2="1"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#A78BFA"/></linearGradient></defs>
+  <rect x="4" y="8" width="48" height="48" rx="16" fill="url(#max)"/>
+  <path fill="#FFFFFF" d="M13 41V23h4.8l6.2 9.6 6.2-9.6H35v18h-5V31l-5.2 8-5.2-8v10Z"/>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="800" letter-spacing="-1">MAX</text>
+</svg>

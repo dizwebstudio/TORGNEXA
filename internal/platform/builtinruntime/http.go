@@ -516,13 +516,20 @@ func (maxHTTP) Upload(context.Context, maxmessenger.UploadRequest) (maxmessenger
 
 func validMAXRuntimeRequest(request maxmessenger.Request) bool {
 	if request.Method == http.MethodPost {
-		return request.Path == "/messages" && len(request.Body) > 0 && len(request.Params) == 1 && request.Params[0].Name == "chat_id"
+		if request.Path != "/messages" || len(request.Body) == 0 || len(request.Params) != 1 || request.Params[0].Name != "chat_id" {
+			return false
+		}
+		chatID, err := strconv.ParseInt(request.Params[0].Value, 10, 64)
+		return err == nil && chatID != 0
 	}
 	if request.Method != http.MethodGet || len(request.Body) != 0 || len(request.Params) != 0 {
 		return false
 	}
 	if request.Path == "/me" {
 		return true
+	}
+	if !strings.HasPrefix(request.Path, "/") {
+		return false
 	}
 	parts := strings.Split(strings.TrimPrefix(request.Path, "/"), "/")
 	if len(parts) != 2 && len(parts) != 4 {
@@ -531,7 +538,8 @@ func validMAXRuntimeRequest(request maxmessenger.Request) bool {
 	if parts[0] != "chats" {
 		return false
 	}
-	if _, err := strconv.ParseInt(parts[1], 10, 64); err != nil {
+	chatID, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || chatID == 0 {
 		return false
 	}
 	return len(parts) == 2 || (parts[2] == "members" && parts[3] == "me")

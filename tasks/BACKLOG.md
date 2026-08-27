@@ -171,3 +171,18 @@ workflows are connected. Final live-provider qualification remains pending
 because the local environment has no Telegram account/bot token; it must use a
 non-production bot and dedicated test channel before a deployment claims the
 RUNTIME-132 live gate.
+
+## Task 133 — MAX Social production runtime
+
+Repository implementation complete: the Task-042 MAX adapter is composed
+through the existing provider-neutral Social API, leased worker and append-only
+receipt recovery. Production admission is deliberately `social.post.text` only
+with the exact 4000-code-point ceiling and fixed `platform-api2.max.ru` egress;
+media, buttons, status reads and webhooks remain SDK ceilings rather than
+application claims. Live-provider qualification remains pending because this
+environment has no MAX bot token or dedicated test channel.
+
+Follow-up discovered during Task 133: OAuth-based connectors such as VK and
+Avito must remain planned until the host refreshes expiring OAuth bundles and
+passes only callback-scoped access tokens into adapters. Without this boundary,
+those providers would force repeated sign-in and fail after token expiry.

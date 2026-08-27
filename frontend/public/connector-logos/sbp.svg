@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64">
+  <title>СБП</title>
+  <defs>
+    <linearGradient id="sbp1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#FF8A3D"/><stop offset="1" stop-color="#F73B7A"/></linearGradient>
+    <linearGradient id="sbp2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2FD3B0"/><stop offset="1" stop-color="#2B8CF0"/></linearGradient>
+    <linearGradient id="sbp3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#6236FF"/><stop offset="1" stop-color="#B23BEE"/></linearGradient>
+  </defs>
+  <rect x="4" y="8" width="48" height="48" rx="14" fill="#F7F6FB" stroke="#E7E4F2"/>
+  <path fill="url(#sbp1)" d="m28 17 8.7 15h-17.4Z"/>
+  <path fill="url(#sbp2)" d="m19 27 8.7 15H10.3Z" opacity=".92"/>
+  <path fill="url(#sbp3)" d="m37 27 8.7 15H28.3Z" opacity=".92"/>
+  <text x="66" y="42" fill="#15121F" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" letter-spacing="-1">СБП</text>
+</svg>

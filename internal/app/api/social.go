@@ -242,7 +242,12 @@ func (api socialAPI) createPublication(w http.ResponseWriter, r *http.Request) {
 	}
 	account, err := api.accounts.AccountByID(r.Context(), tenantScope.OrganizationID().String(), tenantScope.WorkspaceID().String(), channel.ConnectorAccountID)
 	limiter, limitOK := api.runtime.(socialTextRuntime)
-	if err != nil || account.Family != sdk.FamilySocial || !limitOK || !validSocialText(input.Text, limiter.SocialTextLimit(account.ConnectorID)) {
+	if err != nil || account.Family != sdk.FamilySocial || !limitOK {
+		writeProblem(w, http.StatusConflict, "Social channel unavailable")
+		return
+	}
+	textLimit := limiter.SocialTextLimit(account.ConnectorID)
+	if !validSocialText(input.Text, textLimit) {
 		writeProblem(w, http.StatusBadRequest, "Text exceeds the channel runtime limit")
 		return
 	}

@@ -1,6 +1,6 @@
 # MAX Capability Audit
 
-Audited 2026-08-11 against the current official MAX Bot API documentation.
+Audited 2026-08-27 against the current official MAX Bot API documentation.
 
 Primary official surfaces reviewed:
 
@@ -23,6 +23,19 @@ Primary official surfaces reviewed:
 | edit/delete | **not declared** | API support exists but Task-042 does not qualify destructive remote mutation. |
 | comments/analytics/callback actions | **not declared** | No Task-042 qualification. |
 | Long Polling | **not admitted for production** | Official guidance identifies Webhook as the production mechanism. |
+
+## Task-133 application-runtime subset
+
+The manifest table above records the adapter's qualified SDK ceiling. The
+current application runtime grants only `social.post.text`: exact configured
+`chat_id`, maximum 4000 Unicode code points and no uploads. Health may call only
+`GET /me`, `GET /chats/{chatId}` and
+`GET /chats/{chatId}/members/me`; publishing may call only
+`POST /messages?chat_id=...`. This narrower subset is generated from
+`contracts/connectors/builtin-runtime-support-v1.json` and is what the UI/API
+advertise. Official references: [message creation](https://dev.max.ru/docs-api/methods/POST/messages),
+[bot identity](https://dev.max.ru/docs-api/methods/GET/me), and
+[bot membership](https://dev.max.ru/docs-api/methods/GET/chats/-chatId-/members/me).
 
 ## Retry decision
 

@@ -1,6 +1,6 @@
 # Package status — 2026-08-27
 
-**Tasks 001–132 are repository-implemented.** Task 132 composes Telegram text publication through the dedicated Social surface, authenticated API and leased worker while retaining fail-safe ambiguous-write recovery. The catalog therefore contains 11 generic product integrations, eight working separate-surface providers and 19 planned connectors. Architecture policy: **125 modules / 38 providers / 123 reviews**. Active migrations are **17**, latest `000017`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **134 operations / 0.21.1**.
+**Tasks 001–133 are repository-implemented.** Task 133 composes MAX text publication through the same provider-neutral Social surface and receipt-safe worker used by Telegram. The catalog therefore contains 11 generic product integrations, nine working separate-surface providers and 18 planned connectors. Architecture policy: **125 modules / 38 providers / 124 reviews**. Active migrations are **17**, latest `000017`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **134 operations / 0.21.1**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -11,13 +11,25 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 384
-- adrs: 102
-- tasks: 134
+- adrs: 103
+- tasks: 135
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2202
+- total source files (excluding local secrets/build/dependency/cache trees): 2226
 
+
+## Task 133 additions
+
+- MAX `social.post.text` production composition through the existing Social API,
+  leased worker and append-only remote receipts;
+- fixed current MAX API authority and exact health/message transport admission,
+  with uploads and all unconnected SDK capabilities denied;
+- provider-specific 4000/4096 Unicode text limits generated into Go and the
+  frontend from the runtime-support contract;
+- provider-neutral Telegram/MAX Social setup, composer and documentation;
+- no migration or public OpenAPI/SDK operation change; live MAX delivery remains
+  an external credentialed qualification gate.
 
 ## Task 132 additions
 
@@ -244,6 +256,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `Makefile`
 - `PACKAGE_INDEX.md`
 - `README.md`
+- `Readme.ru.md`
 - `VALIDATION_REPORT.md`
 - `adr/0001-modular-monolith.md`
 - `adr/0002-kafka-event-platform.md`
@@ -347,6 +360,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0100-runtime-truthful-integration-catalog.md`
 - `adr/0101-cbr-fx-production-runtime.md`
 - `adr/0102-telegram-social-production-runtime.md`
+- `adr/0103-max-social-production-runtime.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -471,6 +485,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/130-runtime-truthful-integration-catalog.json`
 - `architecture/reviews/131-cbr-fx-production-runtime.json`
 - `architecture/reviews/132-telegram-social-production-runtime.json`
+- `architecture/reviews/133-max-social-production-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -580,6 +595,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/instagram/fixtures/published.json`
 - `connectors/instagram/fixtures/status.json`
 - `connectors/instagram/manifest.json`
+- `connectors/instagram/presentation.json`
 - `connectors/instagram/social.go`
 - `connectors/kimi/conformance.go`
 - `connectors/kimi/connector.go`
@@ -618,6 +634,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/max-messenger/fixtures/upload-init-image.json`
 - `connectors/max-messenger/fixtures/webhook-message-created.json`
 - `connectors/max-messenger/manifest.json`
+- `connectors/max-messenger/presentation.json`
 - `connectors/max-messenger/social.go`
 - `connectors/max-messenger/webhook.go`
 - `connectors/megamarket/config.go`
@@ -659,6 +676,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/odnoklassniki/fixtures/topic.json`
 - `connectors/odnoklassniki/fixtures/video-ticket.json`
 - `connectors/odnoklassniki/manifest.json`
+- `connectors/odnoklassniki/presentation.json`
 - `connectors/odnoklassniki/social.go`
 - `connectors/onec/catalog.go`
 - `connectors/onec/config.go`
@@ -719,6 +737,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/rutube/fixtures/video-processing.json`
 - `connectors/rutube/fixtures/video-published.json`
 - `connectors/rutube/manifest.json`
+- `connectors/rutube/presentation.json`
 - `connectors/rutube/video.go`
 - `connectors/saby-edo/candidate_transport.go`
 - `connectors/saby-edo/conformance.go`
@@ -732,6 +751,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/sbp/connector_test.go`
 - `connectors/sbp/manifest.json`
 - `connectors/sbp/operations.go`
+- `connectors/sbp/presentation.json`
 - `connectors/telegram/config.go`
 - `connectors/telegram/conformance.go`
 - `connectors/telegram/connector.go`
@@ -746,6 +766,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/telegram/fixtures/send-photo.json`
 - `connectors/telegram/fixtures/send-video.json`
 - `connectors/telegram/manifest.json`
+- `connectors/telegram/presentation.json`
 - `connectors/telegram/social.go`
 - `connectors/threads/config.go`
 - `connectors/threads/conformance.go`
@@ -757,6 +778,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/threads/fixtures/status.json`
 - `connectors/threads/fixtures/token.json`
 - `connectors/threads/manifest.json`
+- `connectors/threads/presentation.json`
 - `connectors/threads/social.go`
 - `connectors/threads/token.go`
 - `connectors/vetis-mercury/candidate_transport.go`
@@ -780,6 +802,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/vk/fixtures/wall-post-status.json`
 - `connectors/vk/fixtures/wall-post.json`
 - `connectors/vk/manifest.json`
+- `connectors/vk/presentation.json`
 - `connectors/vk/social.go`
 - `connectors/wildberries/conformance.go`
 - `connectors/wildberries/connector.go`
@@ -840,6 +863,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/yookassa/connector_test.go`
 - `connectors/yookassa/manifest.json`
 - `connectors/yookassa/operations.go`
+- `connectors/yookassa/presentation.json`
 - `connectors/youtube/comments.go`
 - `connectors/youtube/config.go`
 - `connectors/youtube/conformance.go`
@@ -851,6 +875,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/youtube/fixtures/video-processing.json`
 - `connectors/youtube/fixtures/video-published.json`
 - `connectors/youtube/manifest.json`
+- `connectors/youtube/presentation.json`
 - `connectors/youtube/video.go`
 - `contracts/ai/agent-policy-v1.schema.json`
 - `contracts/ai/agent-provenance-v1.schema.json`
@@ -1474,11 +1499,21 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/package.json`
 - `frontend/public/connector-logos/README.md`
 - `frontend/public/connector-logos/aliexpress-ru.svg`
+- `frontend/public/connector-logos/instagram.svg`
 - `frontend/public/connector-logos/magnit-market.svg`
+- `frontend/public/connector-logos/max-messenger.svg`
 - `frontend/public/connector-logos/megamarket.svg`
+- `frontend/public/connector-logos/odnoklassniki.svg`
 - `frontend/public/connector-logos/ozon.svg`
+- `frontend/public/connector-logos/rutube.svg`
+- `frontend/public/connector-logos/sbp.svg`
+- `frontend/public/connector-logos/telegram.svg`
+- `frontend/public/connector-logos/threads.svg`
+- `frontend/public/connector-logos/vk.svg`
 - `frontend/public/connector-logos/wildberries.svg`
 - `frontend/public/connector-logos/yandex-market.svg`
+- `frontend/public/connector-logos/yookassa.svg`
+- `frontend/public/connector-logos/youtube.svg`
 - `frontend/public/docs/documentation.png`
 - `frontend/public/docs/login.png`
 - `frontend/public/oidc/silent-callback.html`
@@ -2343,6 +2378,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/130-runtime-truthful-integration-catalog.md`
 - `tasks/issues/131-cbr-fx-production-runtime.md`
 - `tasks/issues/132-telegram-social-production-runtime.md`
+- `tasks/issues/133-max-social-production-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

@@ -10,7 +10,7 @@ TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectio
 - `adr/` — architectural decisions.
 - `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
 - `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `tasks/issues/` — contiguous atomic task cards numbered 001–130, with
+- `tasks/issues/` — contiguous atomic task cards numbered 001–133, with
   implementation and validation status recorded in each card.
 - `tasks/milestones/` — dependency-aware milestones M0-M13.
 - `templates/` — repeatable architecture, implementation and review artifacts.

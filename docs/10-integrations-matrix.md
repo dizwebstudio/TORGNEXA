@@ -53,8 +53,14 @@ account control plane stores the bot token in SecretProvider and the negative
 currently execute only `social.post.text`; remote receipts make crash recovery
 safe without duplicate-prone automatic resend.
 
-The remaining 19 catalog entries are planned: Auto.ru, Avito, Bitrix24, CDEK,
-Chestny ZNAK, CIAN, Diadoc, EGAIS, Instagram, MAX, Odnoklassniki, Rutube, Saby
+MAX uses the same dedicated Social surface and receipt-safe worker. Its account
+stores the bot token in SecretProvider and a non-zero numeric `chat_id` as
+non-secret runtime configuration. Production admission is text-only with the
+provider's 4000-code-point limit; Task-042 media/webhook SDK capabilities are
+not claimed as connected application workflows.
+
+The remaining 18 catalog entries are planned: Auto.ru, Avito, Bitrix24, CDEK,
+Chestny ZNAK, CIAN, Diadoc, EGAIS, Instagram, Odnoklassniki, Rutube, Saby
 EDO, SBP, Threads, VetIS/Mercury, VK, YooKassa and YouTube. Their SDK
 implementations and manifests remain useful for conformance and future runtime
 work, but the product no longer labels them as connectable.

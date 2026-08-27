@@ -6,9 +6,9 @@
 - family: `social`
 - connector version: `1.0.0`
 - Connector SDK: v1
-- official API audit date: 2026-08-11
+- official API audit date: 2026-08-27
 - API authority: `platform-api2.max.ru`
-- account configuration: one exact numeric channel `ChatID` plus a separate webhook-secret reference
+- production account configuration: one exact non-zero numeric channel `ChatID`; a separate webhook-secret reference is required only when the independently implemented SDK webhook surface is used
 - authentication: bot token behind Task-021 `SecretAccessor`, sent by host transport in the Authorization header
 
 Admitted capabilities:
@@ -18,6 +18,13 @@ Admitted capabilities:
 - `social.post.video` — one released video
 - `social.post.buttons` — HTTPS link buttons only
 - `social.webhooks` — verified/deduplicated `message_created`, `message_edited`, `message_removed`
+
+Task-133 production application admission is intentionally narrower than this
+SDK adapter ceiling: only `social.post.text` is connected through API, worker
+and UI. The exact official message endpoint is
+[`POST /messages`](https://dev.max.ru/docs-api/methods/POST/messages); account
+health uses [`GET /me`](https://dev.max.ru/docs-api/methods/GET/me) and the
+configured chat membership check.
 
 Not admitted: provider scheduling, Long Polling in production, edit/delete, comments, analytics, callback buttons, arbitrary files/audio, user messaging, or provider-native workflow state.
 

@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
 )
 
 func TestHostAndAddressPolicy(t *testing.T) {
@@ -26,6 +28,32 @@ func TestHostAndAddressPolicy(t *testing.T) {
 		}
 		if publicIP(addr) {
 			t.Fatalf("unsafe address accepted: %s", raw)
+		}
+	}
+}
+
+func TestMAXRuntimeRequestAdmissionIsExact(t *testing.T) {
+	allowed := []maxmessenger.Request{
+		{Method: "GET", Path: "/me"},
+		{Method: "GET", Path: "/chats/-70801090403050"},
+		{Method: "GET", Path: "/chats/-70801090403050/members/me"},
+		{Method: "POST", Path: "/messages", Params: []maxmessenger.Param{{Name: "chat_id", Value: "-70801090403050"}}, Body: []byte(`{"text":"test"}`)},
+	}
+	for _, request := range allowed {
+		if !validMAXRuntimeRequest(request) {
+			t.Fatalf("admitted MAX request rejected: %+v", request)
+		}
+	}
+	rejected := []maxmessenger.Request{
+		{Method: "GET", Path: "chats/1"},
+		{Method: "GET", Path: "/messages/1"},
+		{Method: "POST", Path: "/messages", Params: []maxmessenger.Param{{Name: "chat_id", Value: "0"}}, Body: []byte(`{"text":"test"}`)},
+		{Method: "POST", Path: "/messages", Params: []maxmessenger.Param{{Name: "chat_id", Value: "1"}, {Name: "user_id", Value: "2"}}, Body: []byte(`{"text":"test"}`)},
+		{Method: "POST", Path: "/uploads", Body: []byte(`{}`)},
+	}
+	for _, request := range rejected {
+		if validMAXRuntimeRequest(request) {
+			t.Fatalf("unadmitted MAX request accepted: %+v", request)
 		}
 	}
 }

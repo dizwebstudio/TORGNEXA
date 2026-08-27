@@ -1,13 +1,31 @@
-# Repository validation report — Tasks through 132 — 2026-08-27
+# Repository validation report — Tasks through 133 — 2026-08-27
 
 ## Inventory
 
-- repository-implemented tasks: `001`–`132`;
-- architecture: **125 modules / 38 provider modules / 123 reviews**;
+- repository-implemented tasks: `001`–`133`;
+- architecture: **125 modules / 38 provider modules / 124 reviews**;
 - active PostgreSQL baseline: **17 migrations**, latest `000017`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
 - public OpenAPI/generated SDK surface: **134 operations / OpenAPI 0.21.1**;
-- connector catalog: **38 manifests / 11 generic runtime integrations / 8 working providers on separate surfaces / 19 planned**;
+- connector catalog: **38 manifests / 11 generic runtime integrations / 9 working providers on separate surfaces / 18 planned**;
 - repository license: **Apache-2.0**.
+
+## Task 133 repository validation
+
+- `go test ./...` and `go vet ./...` in the pinned Go 1.26.7 validation image: **PASS**;
+- MAX connector, built-in transport/registry, Social API and worker focused tests: **PASS**;
+- contracts and task numbering: **PASS — 134 operations / Tasks 001–133 contiguous**;
+- architecture: **PASS — 125 modules / 38 providers / 124 reviews**;
+- migration catalog and pre-v1 equivalence: **PASS — 17 active / latest 000017; no new migration**;
+- generated runtime catalog: **PASS — exact 38-manifest parity; 11 generic / 9 separate / 18 planned**;
+- frontend logic: **PASS — 30/30 tests**; repository shell/static-policy gate and production Vite build: **PASS**;
+- Community deployment policy: **PASS**;
+- rebuilt API, worker and frontend: **PASS — API/frontend healthy, Social worker component running, `/social` returns 200 and unauthenticated Social API returns 401**.
+
+Task 133 moves MAX from planned to a working separate Social surface and admits
+only `social.post.text` with a 4000-code-point ceiling. Live MAX delivery is
+**not claimed**: this environment contains no MAX connector account, bot token
+or dedicated test channel. The final RUNTIME-133 provider gate requires those
+non-production credentials and retained remote-delivery evidence.
 
 ## Task 132 repository validation
 

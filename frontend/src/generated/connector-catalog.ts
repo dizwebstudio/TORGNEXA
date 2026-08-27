@@ -30,6 +30,7 @@ export interface ConnectorRuntimeSupport {
   readonly operationalCapabilities: readonly string[];
   readonly sync: readonly ConnectorRuntimeSyncSupport[];
   readonly runtimeConfigTemplate?: Readonly<Record<string, unknown>>;
+  readonly socialTextMaxRunes?: number;
 }
 
 export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
@@ -229,6 +230,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Instagram",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/instagram.svg",
+      surface: "#8A3AB9",
+      surfaceAlt: "#FD8D32",
+      foreground: "#FFFFFF",
+      accent: "#C13584",
+    },
     capabilities: ["social.post.media", "social.post.video"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
@@ -284,14 +292,23 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "MAX",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/max-messenger.svg",
+      surface: "#7C3AED",
+      surfaceAlt: "#A78BFA",
+      foreground: "#FFFFFF",
+      accent: "#6D28D9",
+    },
     capabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
     authKinds: ["bearer"],
     runtime: {
-      stage: "planned",
-      surface: "none",
-      operationalCapabilities: [],
+      stage: "separate_surface",
+      surface: "social",
+      operationalCapabilities: ["social.post.text"],
       sync: [
       ],
+      runtimeConfigTemplate: {"chat_id":-70801090403050},
+      socialTextMaxRunes: 4000,
     },
   },
   {
@@ -339,6 +356,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Odnoklassniki",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/odnoklassniki.svg",
+      surface: "#EE8208",
+      surfaceAlt: "#FFB74D",
+      foreground: "#FFFFFF",
+      accent: "#D96C00",
+    },
     capabilities: ["social.analytics.read", "social.post.media", "social.post.text", "social.post.video"],
     authKinds: ["api_key", "oauth2"],
     oauthGrantType: "authorization_code",
@@ -459,6 +483,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "RUTUBE",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/rutube.svg",
+      surface: "#EE3124",
+      surfaceAlt: "#FF6A3D",
+      foreground: "#FFFFFF",
+      accent: "#C81E1E",
+    },
     capabilities: ["social.post.video"],
     authKinds: ["bearer"],
     runtime: {
@@ -489,6 +520,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "SBP",
     family: "payment",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/sbp.svg",
+      surface: "#FFFFFF",
+      surfaceAlt: "#F1F0F6",
+      foreground: "#15121F",
+      accent: "#5B3DF6",
+    },
     capabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
     authKinds: ["certificate"],
     runtime: {
@@ -504,6 +542,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Telegram",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/telegram.svg",
+      surface: "#26A5E4",
+      surfaceAlt: "#61C9F2",
+      foreground: "#FFFFFF",
+      accent: "#229ED9",
+    },
     capabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"],
     authKinds: ["bearer"],
     runtime: {
@@ -513,6 +558,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-1001234567890},
+      socialTextMaxRunes: 4096,
     },
   },
   {
@@ -520,6 +566,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Threads",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/threads.svg",
+      surface: "#000000",
+      surfaceAlt: "#2B2B2B",
+      foreground: "#FFFFFF",
+      accent: "#000000",
+    },
     capabilities: ["social.post.media", "social.post.text", "social.post.video"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
@@ -551,6 +604,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "VK",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/vk.svg",
+      surface: "#0077FF",
+      surfaceAlt: "#489BFF",
+      foreground: "#FFFFFF",
+      accent: "#0059C9",
+    },
     capabilities: ["social.analytics.read", "social.comments.read", "social.comments.reply", "social.post.media", "social.post.text"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
@@ -646,6 +706,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "YooKassa",
     family: "payment",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/yookassa.svg",
+      surface: "#0070F0",
+      surfaceAlt: "#4FA1ED",
+      foreground: "#FFFFFF",
+      accent: "#0A2540",
+    },
     capabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
     authKinds: ["basic"],
     runtime: {
@@ -661,6 +728,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "YouTube",
     family: "social",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/youtube.svg",
+      surface: "#FF0000",
+      surfaceAlt: "#FF5A5F",
+      foreground: "#FFFFFF",
+      accent: "#CC0000",
+    },
     capabilities: ["social.comments.read", "social.post.video"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",

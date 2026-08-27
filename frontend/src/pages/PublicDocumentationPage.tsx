@@ -238,8 +238,8 @@ export function PublicDocumentationPage() {
         </DocSection>
 
         <DocSection id="social" title="Публикации" intro="Social Core хранит контент, канал, расписание и историю статусов независимо от конкретной социальной сети.">
-          <p>В текущей версии production runtime подключён Telegram для текстовых сообщений до 4096 символов. В «Интеграциях» создайте Telegram-кабинет, сохраните bot token, укажите отрицательный <code>chat_id</code>, выполните проверку, включите <code>social.post.text</code> и активируйте кабинет. Затем создайте активный канал и публикацию в разделе «Публикации».</p>
-          <div className="docs-callout warning"><strong>Защита от дублей</strong><span>Если после отправки невозможно подтвердить результат Telegram, worker переводит публикацию в ошибку <code>write_outcome_unknown</code> и не повторяет удалённую запись автоматически.</span></div>
+          <p>В текущей версии production runtime подключены Telegram и MAX для текстовых сообщений. Лимит Telegram — 4096 символов, MAX — 4000. В «Интеграциях» создайте кабинет нужного провайдера, сохраните bot token, заполните <code>chat_id</code> по шаблону, выполните проверку, включите <code>social.post.text</code> и активируйте кабинет. Затем создайте активный канал и публикацию в разделе «Публикации».</p>
+          <div className="docs-callout warning"><strong>Защита от дублей</strong><span>Если после отправки невозможно подтвердить результат провайдера, worker переводит публикацию в ошибку <code>write_outcome_unknown</code> и не повторяет удалённую запись автоматически.</span></div>
         </DocSection>
 
         <DocSection id="sync" title="Синхронизация" intro="Политика задаёт, какие данные движутся, в каком направлении и где находится источник истины.">
