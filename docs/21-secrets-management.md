@@ -29,6 +29,14 @@ Migration `000005_secrets_provider.sql` creates two tenant-scoped tables:
 
 Rotation inserts a new immutable ciphertext row and atomically advances `current_version`. The opaque reference is unchanged, so connector accounts do not need to be recreated. Reference identity/tenant/class are immutable, version movement is monotonic by one, revoked references cannot be reactivated, and ciphertext version rows reject update/delete/truncate. Revocation is idempotent and prevents future `Use`.
 
+Task 134 applies this same rotation mechanism to OAuth refresh bundles. Because
+refresh-token use may itself be a destructive remote transition, PostgreSQL
+serializes it with a transaction-scoped advisory lock derived only from tenant
+IDs and the opaque reference. The bundle is re-read after lock acquisition;
+only the process that still observes an expiring token calls the provider and
+creates the next ciphertext version. Valkey is intentionally not used for this
+correctness lock.
+
 Both tables use forced organization/workspace RLS. The application role requires `SELECT/INSERT/UPDATE` on `secret_references` and only `SELECT/INSERT` on `secret_versions`; it must not receive delete/truncate privileges or `BYPASSRLS`.
 
 ## Rules

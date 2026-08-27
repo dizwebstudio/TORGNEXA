@@ -411,3 +411,28 @@ integrations, nine working separate-surface providers and 18 planned entries.
 - Task-132 ambiguous-write recovery cannot duplicate a remote message;
 - generation, Go test/vet, contracts, architecture, frontend build and live MAX
   qualification must pass before a deployment claims complete production proof.
+
+## Phase 19 — Host-owned OAuth refresh runtime
+
+`134`
+
+Task 134 fixes the generic connector credential boundary before another OAuth
+provider is admitted. The encrypted authorization-code bundle remains host-only;
+provider adapters receive only a current access token through the frozen SDK-v1
+callback. Expiring bundles refresh lazily, rotate under the same opaque reference
+and are serialized across API/worker by a tenant/reference PostgreSQL advisory
+lock with a post-lock reread. Client-credentials grants exchange without browser
+interaction. The catalog remains 11 generic, nine separate and 18 planned.
+
+### Gate RUNTIME-134
+
+- refresh/client material never crosses into provider adapters, logs, events,
+  audit, normal tables or API responses;
+- concurrent expired-token consumers perform one remote refresh and one
+  immutable secret-version rotation;
+- missing/rejected refresh tokens produce bounded reauthorization health while
+  temporary endpoint/rotation failures remain distinguishable;
+- Connector SDK v1, OpenAPI, events, migrations and readiness counts do not
+  change;
+- Go test/vet, contracts, architecture, migration, frontend and rebuilt
+  API/worker health gates must pass before Task 135 begins.

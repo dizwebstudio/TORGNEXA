@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64">
+  <title>1С</title>
+  <rect x="4" y="8" width="48" height="48" rx="10" fill="#D91920"/>
+  <text x="28" y="42" fill="#FFFFFF" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800">1С</text>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing="-1">1C</text>
+</svg>

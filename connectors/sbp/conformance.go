@@ -24,7 +24,13 @@ func NewConformanceCandidate(exe string) (*ConformanceCandidate, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &ConformanceCandidate{SandboxFixture: f, connector: New(candidateTransport{}, func() time.Time { return time.Date(2026, 8, 12, 3, 0, 0, 0, time.UTC) }), idem: map[string]string{}, hooks: map[string]string{}}, nil
+	return &ConformanceCandidate{SandboxFixture: f, connector: New(candidateTransport{}, candidateConfigSource{}, func() time.Time { return time.Date(2026, 8, 12, 3, 0, 0, 0, time.UTC) }), idem: map[string]string{}, hooks: map[string]string{}}, nil
+}
+
+type candidateConfigSource struct{}
+
+func (candidateConfigSource) Resolve(context.Context, sdk.Account) (Configuration, error) {
+	return Configuration{GatewayHost: "sbp-gateway.example.test", MemberID: "100000001"}, nil
 }
 func (c *ConformanceCandidate) Connector() sdk.Connector { return c.connector }
 func (c *ConformanceCandidate) Account(t conformance.Tenant) sdk.Account {

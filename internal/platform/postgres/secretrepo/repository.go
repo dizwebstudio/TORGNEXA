@@ -49,6 +49,10 @@ const revokeStatement = `UPDATE secret_references
 SET status = 'revoked', revoked_at = $3, updated_at = $3
 WHERE reference = $1 AND status = 'active' AND current_version = $2`
 
+const oauthRefreshLockStatement = `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))`
+
+var errOAuthRefreshLockBusy = errors.New("secret repository: oauth refresh lock busy")
+
 // Repository stores only opaque references, metadata, nonces, and ciphertext.
 type Repository struct{ database *sql.DB }
 
@@ -59,6 +63,45 @@ func New(database *sql.DB) (*Repository, error) {
 		return nil, errors.New("secret repository: database is required")
 	}
 	return &Repository{database: database}, nil
+}
+
+// WithRefreshLock serializes one OAuth refresh-token exchange across all API
+// and worker processes sharing PostgreSQL. The transaction-scoped advisory lock
+// is released by PostgreSQL even when the caller context is cancelled. Waiters
+// use try-lock transactions so they cannot exhaust the pool while the winner
+// re-reads and rotates the encrypted secret through a separate transaction.
+func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy.Scope, reference secrets.Reference, operation func(context.Context) error) error {
+	if err := validateCall(ctx, scope, repository); err != nil {
+		return err
+	}
+	if !reference.Valid() || operation == nil {
+		return secrets.ErrInvalidReference
+	}
+	lockKey := "connector-oauth-refresh:" + scope.OrganizationID().String() + ":" + scope.WorkspaceID().String() + ":" + reference.String()
+	for {
+		err := repository.readWrite(ctx, scope, func(tx *sql.Tx) error {
+			var acquired bool
+			if err := tx.QueryRowContext(ctx, oauthRefreshLockStatement, lockKey).Scan(&acquired); err != nil {
+				return fmt.Errorf("lock oauth refresh: %w", err)
+			}
+			if !acquired {
+				return errOAuthRefreshLockBusy
+			}
+			return operation(ctx)
+		})
+		if !errors.Is(err, errOAuthRefreshLockBusy) {
+			return err
+		}
+		timer := time.NewTimer(25 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("wait for oauth refresh lock: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
 }
 
 func (repository *Repository) Create(ctx context.Context, scope tenancy.Scope, metadata secrets.Metadata, version secrets.EncryptedVersion) error {

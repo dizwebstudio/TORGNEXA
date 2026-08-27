@@ -24,7 +24,7 @@ func (testRuntime) Secrets() sdk.SecretAccessor { return testSecrets{} }
 type testSecrets struct{}
 
 func (testSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, cb func([]byte) error) error {
-	v := []byte(`{"access_token":"b24_oauth_123456789012345678901234567890"}`)
+	v := []byte("b24_oauth_123456789012345678901234567890")
 	defer clear(v)
 	return cb(v)
 }

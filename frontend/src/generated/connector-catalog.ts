@@ -62,6 +62,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Auto.ru",
     family: "classified",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/auto-ru.svg",
+      surface: "#E60000",
+      surfaceAlt: "#FF3B3B",
+      foreground: "#FFFFFF",
+      accent: "#B30000",
+    },
     capabilities: ["classified.listings.read", "classified.publications.status.read", "classified.publications.write"],
     authKinds: ["api_key"],
     runtime: {
@@ -77,6 +84,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Avito",
     family: "classified",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/avito.svg",
+      surface: "#00AAFF",
+      surfaceAlt: "#965EEB",
+      foreground: "#FFFFFF",
+      accent: "#FF4053",
+    },
     capabilities: ["classified.leads.read", "classified.listings.read", "classified.messages.read", "classified.messages.reply", "classified.stats.read"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
@@ -93,6 +107,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Bitrix24 CRM",
     family: "crm",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/bitrix24.svg",
+      surface: "#005893",
+      surfaceAlt: "#0BBBEF",
+      foreground: "#FFFFFF",
+      accent: "#003D66",
+    },
     capabilities: ["crm.entities.read", "crm.entities.write", "crm.productrows.read", "crm.productrows.write"],
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
@@ -109,6 +130,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Bank of Russia FX",
     family: "fx",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/cbr-fx.svg",
+      surface: "#C52129",
+      surfaceAlt: "#FCC826",
+      foreground: "#FFFFFF",
+      accent: "#8C171D",
+    },
     capabilities: ["fx.rates.read"],
     authKinds: ["none"],
     runtime: {
@@ -124,6 +152,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "CDEK",
     family: "logistics",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/cdek.svg",
+      surface: "#00B33C",
+      surfaceAlt: "#4DD873",
+      foreground: "#FFFFFF",
+      accent: "#00822B",
+    },
     capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "logistics.webhooks.verify", "pickup.points.read"],
     authKinds: ["oauth2"],
     oauthGrantType: "client_credentials",
@@ -140,6 +175,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Chestny ZNAK",
     family: "government",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/chestny-znak.svg",
+      surface: "#00B140",
+      surfaceAlt: "#4CC96D",
+      foreground: "#FFFFFF",
+      accent: "#00863A",
+    },
     capabilities: ["government.reconciliation.run", "government.references.read", "marking.status.read"],
     authKinds: ["certificate"],
     runtime: {
@@ -155,6 +197,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "CIAN",
     family: "classified",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/cian.svg",
+      surface: "#0054FD",
+      surfaceAlt: "#3D7DFF",
+      foreground: "#FFFFFF",
+      accent: "#212C46",
+    },
     capabilities: ["classified.publications.status.read"],
     authKinds: ["api_key"],
     runtime: {
@@ -170,6 +219,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "DeepSeek",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/deepseek.svg",
+      surface: "#4D6BFE",
+      surfaceAlt: "#7B93FF",
+      foreground: "#FFFFFF",
+      accent: "#2F44CC",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["api_key"],
     runtime: {
@@ -185,6 +241,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Kontur Diadoc",
     family: "edo",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/diadoc.svg",
+      surface: "#015CCB",
+      surfaceAlt: "#4C8EE8",
+      foreground: "#FFFFFF",
+      accent: "#013F8C",
+    },
     capabilities: ["edo.documents.read", "edo.documents.send", "edo.documents.sign_request"],
     authKinds: ["api_key"],
     runtime: {
@@ -200,6 +263,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "EGAIS UTM",
     family: "government",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/egais.svg",
+      surface: "#1F50E8",
+      surfaceAlt: "#4C7CF0",
+      foreground: "#FFFFFF",
+      accent: "#133EBF",
+    },
     capabilities: ["government.documents.read", "government.documents.write", "government.inventory.read", "government.reconciliation.run", "government.references.read"],
     authKinds: ["certificate"],
     runtime: {
@@ -215,6 +285,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "GigaChat (Sber)",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/gigachat.svg",
+      surface: "#21A038",
+      surfaceAlt: "#81C55F",
+      foreground: "#FFFFFF",
+      accent: "#168F2E",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["basic"],
     runtime: {
@@ -253,6 +330,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Kimi (Moonshot AI)",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/kimi.svg",
+      surface: "#007CFF",
+      surfaceAlt: "#00A1FF",
+      foreground: "#FFFFFF",
+      accent: "#002F5B",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["api_key"],
     runtime: {
@@ -340,6 +424,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "MoySklad",
     family: "erp",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/moysklad.svg",
+      surface: "#036CE5",
+      surfaceAlt: "#6E9BFF",
+      foreground: "#FFFFFF",
+      accent: "#2855AF",
+    },
     capabilities: ["erp.catalog.read", "erp.inventory.read", "erp.orders.read"],
     authKinds: ["bearer"],
     runtime: {
@@ -379,6 +470,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "1C",
     family: "erp",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/onec.svg",
+      surface: "#D91920",
+      surfaceAlt: "#F04A50",
+      foreground: "#FFFFFF",
+      accent: "#A81318",
+    },
     capabilities: ["erp.catalog.read", "erp.inventory.read"],
     authKinds: ["basic"],
     runtime: {
@@ -396,6 +494,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "OpenAI-compatible",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/openai-compatible.svg",
+      surface: "#000000",
+      surfaceAlt: "#1A1A1A",
+      foreground: "#FFFFFF",
+      accent: "#10A37F",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["api_key"],
     runtime: {
@@ -411,6 +516,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "OpenCart",
     family: "storefront",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/opencart.svg",
+      surface: "#04B6F0",
+      surfaceAlt: "#3ECAF0",
+      foreground: "#FFFFFF",
+      accent: "#0286B0",
+    },
     capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
     authKinds: ["bearer"],
     runtime: {
@@ -451,6 +563,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "PrestaShop",
     family: "storefront",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/prestashop.svg",
+      surface: "#E2066F",
+      surfaceAlt: "#27245D",
+      foreground: "#FFFFFF",
+      accent: "#9F2255",
+    },
     capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read"],
     authKinds: ["basic"],
     runtime: {
@@ -468,6 +587,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Qwen (Alibaba Cloud)",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/qwen.svg",
+      surface: "#615CED",
+      surfaceAlt: "#8B85F5",
+      foreground: "#FFFFFF",
+      accent: "#4B3FD1",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["api_key"],
     runtime: {
@@ -505,6 +631,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "Saby EDO",
     family: "edo",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/saby-edo.svg",
+      surface: "#0A85E6",
+      surfaceAlt: "#0C94FF",
+      foreground: "#FFFFFF",
+      accent: "#06609E",
+    },
     capabilities: ["edo.documents.read", "edo.documents.send", "edo.documents.sign_request"],
     authKinds: ["bearer"],
     runtime: {
@@ -530,11 +663,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
     authKinds: ["certificate"],
     runtime: {
-      stage: "planned",
-      surface: "none",
-      operationalCapabilities: [],
+      stage: "separate_surface",
+      surface: "finance",
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read"],
       sync: [
       ],
+      runtimeConfigTemplate: {"gateway_host":"sbp-gateway.example.ru","member_id":"100000001"},
     },
   },
   {
@@ -589,6 +723,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "VetIS Mercury",
     family: "government",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/vetis-mercury.svg",
+      surface: "#036033",
+      surfaceAlt: "#1F8A54",
+      foreground: "#FFFFFF",
+      accent: "#024A27",
+    },
     capabilities: ["government.inventory.read", "government.reconciliation.run", "vetis.documents.read", "vetis.documents.write"],
     authKinds: ["api_key"],
     runtime: {
@@ -650,6 +791,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "WooCommerce",
     family: "storefront",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/woocommerce.svg",
+      surface: "#873EFF",
+      surfaceAlt: "#720EEC",
+      foreground: "#FFFFFF",
+      accent: "#5007AA",
+    },
     capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
     authKinds: ["basic"],
     runtime: {
@@ -691,6 +839,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     name: "YandexGPT",
     family: "ai",
     version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/yandexgpt.svg",
+      surface: "#1A1A1A",
+      surfaceAlt: "#333333",
+      foreground: "#FFFFFF",
+      accent: "#FC3F1D",
+    },
     capabilities: ["ai.completion.generate"],
     authKinds: ["api_key"],
     runtime: {
@@ -716,9 +871,9 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
     authKinds: ["basic"],
     runtime: {
-      stage: "planned",
-      surface: "none",
-      operationalCapabilities: [],
+      stage: "separate_surface",
+      surface: "finance",
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read"],
       sync: [
       ],
     },

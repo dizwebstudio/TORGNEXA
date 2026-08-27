@@ -186,3 +186,13 @@ Follow-up discovered during Task 133: OAuth-based connectors such as VK and
 Avito must remain planned until the host refreshes expiring OAuth bundles and
 passes only callback-scoped access tokens into adapters. Without this boundary,
 those providers would force repeated sign-in and fail after token expiry.
+
+## Task 134 — Host-owned OAuth refresh runtime
+
+Repository implementation complete: account-aware Connector SDK runtimes now
+project only current access-token bytes, refresh expiring authorization-code
+bundles through exact manifest endpoints and rotate the same encrypted opaque
+reference. PostgreSQL transaction advisory locks plus a post-lock bundle reread
+prevent API/worker races against rotating refresh tokens. Client-credentials
+grants exchange without a browser. No connector readiness count changes;
+Task 135 may now compose VK on top of this boundary.

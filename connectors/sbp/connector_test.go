@@ -9,21 +9,27 @@ import (
 
 type ft struct{}
 
-func (ft) Ping(context.Context, []byte) error { return nil }
-func (ft) Create(_ context.Context, _ []byte, q sdk.PaymentCreateRequest) (sdk.PaymentCreateResult, error) {
+func (ft) Ping(context.Context, string, []byte) error { return nil }
+func (ft) Create(_ context.Context, _ string, _ []byte, q sdk.PaymentCreateRequest) (sdk.PaymentCreateResult, error) {
 	return sdk.PaymentCreateResult{RemoteID: "qrc:1", Status: "created", PaymentURL: "https://qr.nspk.example/synthetic", ExpiresAt: q.ExpiresAt, ObservedAt: time.Now().UTC()}, nil
 }
-func (ft) Status(context.Context, []byte, sdk.PaymentStatusRequest) (sdk.PaymentStatus, error) {
+func (ft) Status(context.Context, string, []byte, sdk.PaymentStatusRequest) (sdk.PaymentStatus, error) {
 	return sdk.PaymentStatus{RemoteID: "qrc:1", Status: "paid", Amount: sdk.PaymentAmount{MinorUnits: 100, Currency: "RUB"}, ObservedAt: time.Now().UTC()}, nil
 }
-func (ft) Refund(context.Context, []byte, sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
+func (ft) Refund(context.Context, string, []byte, sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
 	return sdk.PaymentRefundResult{RemoteRefundID: "r1", Status: "accepted", ObservedAt: time.Now().UTC()}, nil
 }
-func (ft) Reconcile(context.Context, []byte, sdk.PaymentReconcileRequest) (sdk.PaymentReconcileResult, error) {
+func (ft) Reconcile(context.Context, string, []byte, sdk.PaymentReconcileRequest) (sdk.PaymentReconcileResult, error) {
 	return sdk.PaymentReconcileResult{ObservedAt: time.Now().UTC()}, nil
 }
-func (ft) VerifyWebhook(context.Context, []byte, []byte, []byte) (string, string, string, error) {
+func (ft) VerifyWebhook(context.Context, string, []byte, []byte, []byte) (string, string, string, error) {
 	return "delivery:1", "payment_paid", "qrc:1", nil
+}
+
+type testConfigSource struct{}
+
+func (testConfigSource) Resolve(context.Context, sdk.Account) (Configuration, error) {
+	return Configuration{GatewayHost: "sbp-gateway.example.test", MemberID: "100000001"}, nil
 }
 
 type rt struct{}
@@ -40,7 +46,7 @@ func acc() sdk.Account {
 	return sdk.Account{ID: "s", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "sbp", Family: sdk.FamilyPayment, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: at, UpdatedAt: at}
 }
 func TestIdempotentReferenceAndVerifiedWebhook(t *testing.T) {
-	c := New(ft{}, nil)
+	c := New(ft{}, testConfigSource{}, nil)
 	q := sdk.PaymentCreateRequest{ExternalID: "order:1", IdempotencyKey: "idem:1", Purpose: "order", Amount: sdk.PaymentAmount{MinorUnits: 100, Currency: "RUB"}, ExpiresAt: time.Now().UTC().Add(time.Hour)}
 	if _, e := c.CreatePayment(context.Background(), acc(), rt{}, q); e != nil {
 		t.Fatal(e)

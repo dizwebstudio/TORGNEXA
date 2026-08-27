@@ -9,7 +9,7 @@
 - VK API schema baseline: `5.199`
 - API host: `api.vk.com`
 - account configuration: positive VK community `GroupID`
-- authentication: OAuth2 **user** access token behind Task 021 `SecretAccessor`
+- authentication: OAuth2 **user** access token projected by the Task-134 host refresh runtime behind Task-021 `SecretAccessor`; refresh/client material never enters the provider
 
 Admitted capabilities:
 

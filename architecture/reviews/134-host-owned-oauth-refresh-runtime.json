@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-134",
+  "task": "134",
+  "change_class": "pillar_change",
+  "summary": "Resolve and refresh connector OAuth access tokens at the host runtime boundary with PostgreSQL-serialized immutable secret rotation.",
+  "scopes": [
+    "adr/0104-host-owned-oauth-refresh-runtime.md",
+    "connectors/bitrix24",
+    "docs/21-secrets-management.md",
+    "docs/74-connector-authentication.md",
+    "internal/app/api/connector_accounts.go",
+    "internal/app/worker",
+    "internal/platform/connectorauth",
+    "internal/platform/connectorruntime",
+    "internal/platform/postgres/connectorrepo/health_history.go",
+    "internal/platform/postgres/secretrepo",
+    "tasks/issues/134-host-owned-oauth-refresh-runtime.md"
+  ],
+  "frozen_pillars": ["connector-plugin-runtime-capabilities"],
+  "adr": "adr/0104-host-owned-oauth-refresh-runtime.md",
+  "existing_adrs": ["adr/0036-connector-sdk-v1-runtime-boundary.md", "adr/0090-built-in-provider-runtime-composition-boundary.md", "adr/0100-runtime-truthful-integration-catalog.md"],
+  "gap_audit": {"performed": true, "prompt": "prompts/05-architecture-gap-audit.txt", "decision": "architecture_change"},
+  "impacts": [
+    {"area":"tenancy","status":"affected","evidence":"Refresh locks, secret reads and rotations are keyed by explicit organization/workspace scope plus opaque reference."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"OAuth material remains encrypted and excluded from normal records, events, audit and API views."},
+    {"area":"api_compatibility","status":"not_affected","evidence":"Existing OAuth and account-health operations are reused without schema or operation changes."},
+    {"area":"event_compatibility","status":"not_affected","evidence":"No event names or payloads change and token material remains prohibited from events."},
+    {"area":"plugin_sdk_compatibility","status":"affected","evidence":"SDK v1 signatures stay frozen; OAuth primary-secret behavior is corrected to project only access-token bytes."},
+    {"area":"database_migration","status":"not_affected","evidence":"Existing immutable secret versions and transaction advisory locks require no schema migration."},
+    {"area":"security","status":"affected","evidence":"Refresh/client secrets stay host-only; fixed manifest egress is TLS, DNS-pinned, public-address and redirect-deny."},
+    {"area":"approvals_risk","status":"not_affected","evidence":"Credential maintenance does not broaden connector capabilities or bypass business approval policy."},
+    {"area":"audit_lineage","status":"affected","evidence":"Stable opaque identity and immutable secret version lineage record each successful rotation without secret-bearing audit payloads."},
+    {"area":"reconciliation_idempotency","status":"affected","evidence":"A distributed advisory lock and post-lock reread prevent duplicate use of rotating refresh tokens."},
+    {"area":"webhooks_egress","status":"affected","evidence":"Only exact manifest token endpoint egress is added; webhook behavior is unchanged."},
+    {"area":"slo_observability","status":"affected","evidence":"Bounded refresh-failed and reauthorization-required health reasons distinguish remediation paths without raw errors."},
+    {"area":"operations_rollback","status":"affected","evidence":"Secret versions remain compatible, but rolling back runtime code reintroduces bundle projection and must not accompany OAuth connector admission."},
+    {"area":"testing_conformance","status":"affected","evidence":"Deterministic tests cover freshness, concurrent single refresh, rotation, reauthorization, client credentials and adapter projection."}
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

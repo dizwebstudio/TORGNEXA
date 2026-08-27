@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64">
+  <title>ЕГАИС</title>
+  <rect x="4" y="8" width="48" height="48" rx="14" fill="#1F50E8"/>
+  <path fill="#FFFFFF" d="M18 18h18v5H23v6h11v5H23v6h13v5H18Z"/>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" letter-spacing="-1">ЕГАИС</text>
+</svg>

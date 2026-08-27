@@ -373,6 +373,26 @@
       },
       "backfill": null,
       "sha256": "9902b7c5f3fbe83a3c938b5b7de543ff7be52efc165b233ea49149702b906415"
+    },
+    {
+      "version": 18,
+      "name": "payments_core",
+      "file": "000018_payments_core.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [17],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "e134aecb6552030ea56afd30bd67a38686bfd154bba2eceb950761a93e1dec1c"
     }
   ]
 }

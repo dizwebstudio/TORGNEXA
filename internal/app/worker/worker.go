@@ -15,6 +15,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/eventbus"
@@ -261,7 +262,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		}},
 	}
 	components = append(components, component{name: "social-publications", run: func(componentCtx context.Context) error {
-		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease)
+		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, secretRepository, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease)
 	}})
 
 	fxReferenceResolver, err := newFXReferenceResolver(db, runtimeRegistry.builtins)
@@ -301,7 +302,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_notification_repository_startup_failed", repoErr)
 		}
-		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, approvalRepository, notificationRepository, secretProvider, runtimeRegistry)
+		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, approvalRepository, notificationRepository, secretProvider, secretRepository, runtimeRegistry)
 		if actionErr != nil {
 			return fail("worker_reconciliation_action_startup_failed", actionErr)
 		}
@@ -309,7 +310,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if engineErr != nil {
 			return fail("worker_reconciliation_engine_startup_failed", engineErr)
 		}
-		resolver := &sourceResolver{syncRepo: syncRepository, accounts: accountRepository, secrets: secretProvider, registry: sourceRegistry}
+		resolver := &sourceResolver{syncRepo: syncRepository, accounts: accountRepository, secrets: secretProvider, oauthRefresh: secretRepository, registry: sourceRegistry}
 		components = append(components, component{name: "reconciliation", run: func(componentCtx context.Context) error {
 			return runReconciliation(componentCtx, logger, dispatchRepository, engine, reconciliationRepository, resolver, runtimeRegistry, workerID, cfg.Worker)
 		}})
@@ -487,14 +488,15 @@ func runTenantDispatch(ctx context.Context, logger *slog.Logger, dispatch *worke
 }
 
 type sourceResolver struct {
-	syncRepo *syncrepo.Repository
-	accounts *connectorrepo.Repository
-	secrets  secrets.SecretProvider
-	registry ReconciliationSourceRegistry
+	syncRepo     *syncrepo.Repository
+	accounts     *connectorrepo.Repository
+	secrets      secrets.SecretProvider
+	oauthRefresh connectorauth.RefreshCoordinator
+	registry     ReconciliationSourceRegistry
 }
 
 func (r *sourceResolver) Resolve(ctx context.Context, scope tenancy.Scope, run reconciliation.Run) (reconciliation.Source, syncengine.Policy, sdk.Account, error) {
-	if r == nil || r.syncRepo == nil || r.accounts == nil || r.secrets == nil || r.registry == nil {
+	if r == nil || r.syncRepo == nil || r.accounts == nil || r.secrets == nil || r.oauthRefresh == nil || r.registry == nil {
 		return nil, syncengine.Policy{}, sdk.Account{}, ErrConnectorSourceBridgeUnavailable
 	}
 	policy, err := r.syncRepo.Policy(ctx, scope, run.PolicyID)
@@ -512,7 +514,7 @@ func (r *sourceResolver) Resolve(ctx context.Context, scope tenancy.Scope, run r
 	if err != nil {
 		return nil, syncengine.Policy{}, sdk.Account{}, err
 	}
-	runtime, err := connectorruntime.New(r.secrets, scope)
+	runtime, err := connectorruntime.NewForAccount(r.secrets, r.oauthRefresh, scope, account)
 	if err != nil {
 		return nil, syncengine.Policy{}, sdk.Account{}, err
 	}

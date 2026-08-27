@@ -33,11 +33,12 @@ const (
 )
 
 var (
-	ErrInvalid           = errors.New("connector auth: invalid value")
-	ErrCallbackDenied    = errors.New("connector auth: callback denied")
-	ErrOAuthUnsupported  = errors.New("connector auth: oauth flow unsupported")
-	ErrRemoteUnsafe      = errors.New("connector auth: remote endpoint denied")
-	ErrRemoteUnavailable = errors.New("connector auth: remote endpoint unavailable")
+	ErrInvalid              = errors.New("connector auth: invalid value")
+	ErrCallbackDenied       = errors.New("connector auth: callback denied")
+	ErrOAuthUnsupported     = errors.New("connector auth: oauth flow unsupported")
+	ErrOAuthRefreshRejected = errors.New("connector auth: oauth refresh rejected")
+	ErrRemoteUnsafe         = errors.New("connector auth: remote endpoint denied")
+	ErrRemoteUnavailable    = errors.New("connector auth: remote endpoint unavailable")
 )
 
 // OAuthClient is the encrypted browser-submitted client registration.
@@ -204,6 +205,69 @@ func HTTPExchange(ctx context.Context, configuration sdk.OAuth2Configuration, cl
 		bundle.ExpiresAt = time.Now().UTC().Add(time.Duration(token.ExpiresIn) * time.Second).Format(time.RFC3339)
 	}
 	return json.Marshal(bundle)
+}
+
+// HTTPRefresh exchanges one encrypted authorization-code refresh token and
+// returns a complete replacement bundle. If the provider does not rotate the
+// refresh token, the previous value is retained.
+func HTTPRefresh(ctx context.Context, configuration sdk.OAuth2Configuration, current TokenBundle, timeout time.Duration, now time.Time) ([]byte, error) {
+	if configuration.Validate() != nil || configuration.GrantType != "authorization_code" || !safeSecretPart(current.RefreshToken, 32768) || !safeSecretPart(current.ClientID, 512) || !safeSecretPart(current.ClientSecret, 4096) || timeout < 100*time.Millisecond || timeout > 30*time.Second || now.IsZero() {
+		return nil, ErrInvalid
+	}
+	form := oauthRefreshForm(current)
+	response, err := safeRequest(ctx, http.MethodPost, configuration.TokenURL, map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}, []byte(form.Encode()), timeout)
+	if err != nil {
+		return nil, ErrRemoteUnavailable
+	}
+	if refreshRejectedStatus(response.StatusCode) {
+		return nil, ErrOAuthRefreshRejected
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return nil, ErrRemoteUnavailable
+	}
+	return refreshedTokenBundle(current, response.Body, now)
+}
+
+func refreshRejectedStatus(status int) bool {
+	return status == http.StatusBadRequest || status == http.StatusUnauthorized || status == http.StatusForbidden
+}
+
+func oauthRefreshForm(current TokenBundle) url.Values {
+	return url.Values{
+		"client_id":     {current.ClientID},
+		"client_secret": {current.ClientSecret},
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {current.RefreshToken},
+	}
+}
+
+func refreshedTokenBundle(current TokenBundle, body []byte, now time.Time) ([]byte, error) {
+	var token struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		TokenType    string `json:"token_type"`
+		ExpiresIn    int64  `json:"expires_in"`
+	}
+	if json.Unmarshal(body, &token) != nil || !safeSecretPart(token.AccessToken, 32768) || token.ExpiresIn < 0 || token.ExpiresIn > 10*365*24*60*60 {
+		return nil, ErrRemoteUnavailable
+	}
+	if token.RefreshToken == "" {
+		token.RefreshToken = current.RefreshToken
+	}
+	if !safeSecretPart(token.RefreshToken, 32768) {
+		return nil, ErrRemoteUnavailable
+	}
+	if token.TokenType == "" {
+		token.TokenType = current.TokenType
+	}
+	if token.TokenType == "" {
+		token.TokenType = "Bearer"
+	}
+	updated := TokenBundle{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, TokenType: token.TokenType, ClientID: current.ClientID, ClientSecret: current.ClientSecret}
+	if token.ExpiresIn > 0 {
+		updated.ExpiresAt = now.UTC().Add(time.Duration(token.ExpiresIn) * time.Second).Format(time.RFC3339)
+	}
+	return json.Marshal(updated)
 }
 
 type remoteResponse struct {

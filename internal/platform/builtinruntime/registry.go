@@ -25,11 +25,13 @@ import (
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
 	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
 	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
+	sbp "github.com/torgnexa/torgnexa/connectors/sbp"
 	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
 	yandexgpt "github.com/torgnexa/torgnexa/connectors/yandexgpt"
+	yookassa "github.com/torgnexa/torgnexa/connectors/yookassa"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/fx"
 )
@@ -224,6 +226,57 @@ func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.
 	}
 }
 
+// PaymentGateway resolves an admitted payment connector implementing every
+// payment capability its manifest advertises. Provider-specific
+// construction remains confined to this reviewed composition boundary.
+type PaymentGateway interface {
+	sdk.PaymentCreator
+	sdk.PaymentStatusReader
+	sdk.PaymentRefunder
+	sdk.PaymentReconciler
+	sdk.PaymentWebhookVerifier
+}
+
+// PaymentGateway resolves an admitted payment connector without exposing the
+// provider implementation outside this reviewed composition boundary.
+func (r *Registry) PaymentGateway(account sdk.Account, load ConfigLoader) (PaymentGateway, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || !SupportsCapability(account.ConnectorID, "payments.create") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "yookassa":
+		return yookassa.New(yookassaHTTP{r.http}, nil), nil
+	case "sbp":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return sbp.New(newSBPHTTP(r.http), sbpConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+type sbpConfigSource struct{ load ConfigLoader }
+
+func (source sbpConfigSource) Resolve(ctx context.Context, account sdk.Account) (sbp.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return sbp.Configuration{}, err
+	}
+	var value struct {
+		GatewayHost string `json:"gateway_host"`
+		MemberID    string `json:"member_id"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return sbp.Configuration{}, sbp.ErrInvalidConfiguration
+	}
+	configuration := sbp.Configuration{GatewayHost: value.GatewayHost, MemberID: value.MemberID}
+	if configuration.Validate() != nil {
+		return sbp.Configuration{}, sbp.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
 // SupportsAccountConfiguration reports whether the generic integration
 // surface may create and operate an account through this registry.
 func (r *Registry) SupportsAccountConfiguration(connectorID string) bool {
@@ -282,6 +335,12 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		return ozon.New(ozonHTTP{r.http}, nil), nil
 	case "moysklad":
 		return moysklad.New(msHTTP{r.http}, nil), nil
+	case "yookassa":
+		return yookassa.New(yookassaHTTP{r.http}, nil), nil
+	case "sbp":
+		if load != nil {
+			return sbp.New(newSBPHTTP(r.http), sbpConfigSource{load: load}, nil), nil
+		}
 	case "telegram":
 		if load != nil {
 			return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil

@@ -43,16 +43,17 @@ type auditCapturer interface {
 }
 
 type connectorAccountAPI struct {
-	repository connectorAccountRepository
-	configs    connectorRuntimeConfigRepository
-	audit      auditCapturer
-	secrets    secrets.SecretProvider
-	sync       connectorSyncStarter
-	oauthStore connectorauth.SessionStore
-	callbacks  *connectorauth.CallbackPolicy
-	registry   connectorRuntimeAdmission
-	exchange   connectorOAuthExchange
-	now        func() time.Time
+	repository   connectorAccountRepository
+	configs      connectorRuntimeConfigRepository
+	audit        auditCapturer
+	secrets      secrets.SecretProvider
+	sync         connectorSyncStarter
+	oauthStore   connectorauth.SessionStore
+	oauthRefresh connectorauth.RefreshCoordinator
+	callbacks    *connectorauth.CallbackPolicy
+	registry     connectorRuntimeAdmission
+	exchange     connectorOAuthExchange
+	now          func() time.Time
 }
 
 type connectorRuntimeConfigRepository interface {
@@ -159,12 +160,12 @@ type connectorAccountPage struct {
 	NextCursor string                 `json:"next_cursor,omitempty"`
 }
 
-func newConnectorAccountRoutes(repository *connectorrepo.Repository, configs *runtimeconfigstore.Repository, auditService auditCapturer, secretProvider secrets.SecretProvider, callbackPolicy *connectorauth.CallbackPolicy, registry connectorRuntimeAdmission, syncStarters ...connectorSyncStarter) []ProtectedRoute {
+func newConnectorAccountRoutes(repository *connectorrepo.Repository, configs *runtimeconfigstore.Repository, auditService auditCapturer, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, callbackPolicy *connectorauth.CallbackPolicy, registry connectorRuntimeAdmission, syncStarters ...connectorSyncStarter) []ProtectedRoute {
 	var syncStarter connectorSyncStarter
 	if len(syncStarters) > 0 {
 		syncStarter = syncStarters[0]
 	}
-	api := &connectorAccountAPI{repository: repository, configs: configs, audit: auditService, secrets: secretProvider, sync: syncStarter, oauthStore: repository, callbacks: callbackPolicy, registry: registry, exchange: connectorauth.HTTPExchange, now: func() time.Time { return time.Now().UTC() }}
+	api := &connectorAccountAPI{repository: repository, configs: configs, audit: auditService, secrets: secretProvider, sync: syncStarter, oauthStore: repository, oauthRefresh: refreshCoordinator, callbacks: callbackPolicy, registry: registry, exchange: connectorauth.HTTPExchange, now: func() time.Time { return time.Now().UTC() }}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: ConnectorAccountsPath, Permission: "connectors.accounts.read", Handler: http.HandlerFunc(api.list)},
 		{Method: http.MethodPost, Path: ConnectorAccountsPath, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.create)},
@@ -568,20 +569,27 @@ func (api *connectorAccountAPI) check(w http.ResponseWriter, request *http.Reque
 		health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "credentials_missing", CheckedAt: api.now().UTC()}
 	}
 	if health.Status == "" {
-		runtime, runtimeErr := connectorruntime.New(api.secrets, scope)
+		runtime, runtimeErr := connectorruntime.NewForAccount(api.secrets, api.oauthRefresh, scope, account)
 		if runtimeErr != nil {
 			health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "runtime_unavailable", CheckedAt: api.now().UTC()}
 		} else {
-			var loader func(context.Context, string) (json.RawMessage, error)
-			if api.configs != nil {
-				loader = func(ctx context.Context, accountID string) (json.RawMessage, error) {
-					raw, _, loadErr := api.configs.Config(ctx, scope, accountID)
-					return raw, loadErr
+			switch oauthPreparation(runtime.PrepareOAuth(request.Context())) {
+			case "reauthorization_required":
+				health = sdk.Health{Status: sdk.HealthDegraded, ReasonCode: "oauth_reauthorization_required", CheckedAt: api.now().UTC()}
+			case "refresh_failed":
+				health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "oauth_refresh_failed", CheckedAt: api.now().UTC()}
+			default:
+				var loader func(context.Context, string) (json.RawMessage, error)
+				if api.configs != nil {
+					loader = func(ctx context.Context, accountID string) (json.RawMessage, error) {
+						raw, _, loadErr := api.configs.Config(ctx, scope, accountID)
+						return raw, loadErr
+					}
 				}
-			}
-			health, err = api.registry.Health(request.Context(), account, runtime, loader)
-			if err != nil {
-				health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "runtime_probe_failed", CheckedAt: api.now().UTC()}
+				health, err = api.registry.Health(request.Context(), account, runtime, loader)
+				if err != nil {
+					health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "runtime_probe_failed", CheckedAt: api.now().UTC()}
+				}
 			}
 		}
 	}
@@ -595,6 +603,17 @@ func (api *connectorAccountAPI) check(w http.ResponseWriter, request *http.Reque
 		return
 	}
 	writeJSON(w, 200, accountView(updated))
+}
+
+func oauthPreparation(err error) string {
+	switch {
+	case err == nil:
+		return "ready"
+	case errors.Is(err, connectorauth.ErrOAuthReauthorizationRequired):
+		return "reauthorization_required"
+	default:
+		return "refresh_failed"
+	}
 }
 
 func (api *connectorAccountAPI) oauthStart(w http.ResponseWriter, request *http.Request) {

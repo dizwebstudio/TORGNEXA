@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -55,31 +54,23 @@ func Manifest() sdk.Manifest                { manifest, _ := sdk.CatalogManifest
 func (c *Connector) Manifest() sdk.Manifest { return Manifest() }
 
 type credentials struct {
-	AccessToken string `json:"access_token"`
+	AccessToken string
 }
 
 func parseCredentials(raw []byte) (credentials, error) {
-	if len(raw) < 24 || len(raw) > 8192 || !utf8.Valid(raw) || !bytes.Equal(raw, bytes.TrimSpace(raw)) {
+	if len(raw) < 16 || len(raw) > 4096 || !utf8.Valid(raw) || !bytes.Equal(raw, bytes.TrimSpace(raw)) {
 		return credentials{}, ErrInvalidCredentials
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	var v credentials
-	if dec.Decode(&v) != nil {
+	value := string(raw)
+	if value != strings.TrimSpace(value) {
 		return credentials{}, ErrInvalidCredentials
 	}
-	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		return credentials{}, ErrInvalidCredentials
-	}
-	if len(v.AccessToken) < 16 || len(v.AccessToken) > 4096 || v.AccessToken != strings.TrimSpace(v.AccessToken) {
-		return credentials{}, ErrInvalidCredentials
-	}
-	for _, r := range v.AccessToken {
+	for _, r := range value {
 		if r <= 0x20 || r == 0x7f {
 			return credentials{}, ErrInvalidCredentials
 		}
 	}
-	return v, nil
+	return credentials{AccessToken: value}, nil
 }
 func (c *Connector) withCredentials(ctx context.Context, r sdk.Runtime, ref sdk.SecretReference, cb func(credentials) error) error {
 	if c == nil || r == nil || r.Secrets() == nil || cb == nil {

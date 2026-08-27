@@ -20,6 +20,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
@@ -42,6 +43,7 @@ type productionRouteDependencies struct {
 	auditRepository    auditReader
 	auditService       *audit.Service
 	secretProvider     secrets.SecretProvider
+	oauthRefresh       connectorauth.RefreshCoordinator
 	connectorCallbacks *connectorauth.CallbackPolicy
 	tenancy            *tenancyrepo.Repository
 	search             *searchrepo.Repository
@@ -69,6 +71,7 @@ type productionRouteDependencies struct {
 	identityValidator  securitysettings.ProviderValidator
 	settlements        *settlementrepo.Repository
 	social             *socialrepo.Repository
+	payments           *paymentsrepo.Repository
 	privacy            privacyWorkflow
 	fxRates            *fxrepo.Repository
 	cloudSubscription  *cloudbillingrepo.Repository
@@ -88,7 +91,7 @@ type productionRouteDependencies struct {
 
 func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	capabilityGuard := connectorAccountCapabilityGuard{repository: deps.accounts, runtime: deps.aiRegistry}
-	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
+	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)
@@ -102,6 +105,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
+	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)

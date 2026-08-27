@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "71274324444f99a1f250fcd68a6af8770c8fb49a90a574387414bfe4e49e3a6a",
+    "sha256": "69a9149f114b7a4830e79613c8883b472e055ba89b1bcee21ab48e22ed2361a8",
     "openapi_version": "3.1.0",
     "api_version": "0.21.1",
     "server_path": "/api/v1"
@@ -88,6 +88,11 @@
       "operation_id": "createOfferPrice",
       "method": "POST",
       "path": "/products/{product_id}/prices/{offer_or_price_id}"
+    },
+    {
+      "operation_id": "createPayment",
+      "method": "POST",
+      "path": "/payments"
     },
     {
       "operation_id": "createPrivacyRequest",
@@ -265,6 +270,11 @@
       "path": "/orders/{order_id}"
     },
     {
+      "operation_id": "getPayment",
+      "method": "GET",
+      "path": "/payments/{payment_id}"
+    },
+    {
       "operation_id": "getProduct",
       "method": "GET",
       "path": "/products/{product_id}"
@@ -425,6 +435,11 @@
       "path": "/orders"
     },
     {
+      "operation_id": "listPayments",
+      "method": "GET",
+      "path": "/payments"
+    },
+    {
       "operation_id": "listPlugins",
       "method": "GET",
       "path": "/plugins"
@@ -533,6 +548,11 @@
       "operation_id": "putWarehouseFailoverRoute",
       "method": "PUT",
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
+    },
+    {
+      "operation_id": "refundPayment",
+      "method": "POST",
+      "path": "/payments/{payment_id}/refund"
     },
     {
       "operation_id": "replaceConnectorAccountCapabilities",

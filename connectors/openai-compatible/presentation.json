@@ -1,0 +1,7 @@
+{
+  "logo": "/connector-logos/openai-compatible.svg",
+  "surface": "#000000",
+  "surface_alt": "#1A1A1A",
+  "foreground": "#FFFFFF",
+  "accent": "#10A37F"
+}

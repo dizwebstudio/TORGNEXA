@@ -11,6 +11,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/social"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
@@ -35,7 +36,7 @@ type socialReceiptStore interface {
 	Record(context.Context, tenancy.Scope, socialdispatchrepo.Receipt) (socialdispatchrepo.Receipt, error)
 }
 
-func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *workerrepo.Repository, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, registry *runtimeRegistry, workerID string, poll time.Duration, batch int, lease time.Duration) error {
+func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *workerrepo.Repository, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, workerID string, poll time.Duration, batch int, lease time.Duration) error {
 	return pollLoop(ctx, poll, func() error {
 		jobs, err := dispatch.Claim(ctx, workerrepo.KindSocialPublication, workerID, batch, lease)
 		if errors.Is(err, workerrepo.ErrSchemaUnavailable) {
@@ -45,7 +46,7 @@ func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *w
 			return err
 		}
 		for _, job := range jobs {
-			if err := processSocialPublication(ctx, publications, accounts, receipts, secretProvider, registry, job); err != nil {
+			if err := processSocialPublication(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job); err != nil {
 				if releaseErr := dispatch.Release(ctx, job, retryDelay(job.AttemptCount), "social_publication_failed"); releaseErr != nil {
 					return releaseErr
 				}
@@ -60,8 +61,10 @@ func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *w
 	})
 }
 
-func processSocialPublication(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, registry *runtimeRegistry, job workerrepo.Job) error {
-	if ctx == nil || publications == nil || accounts == nil || receipts == nil || registry == nil || !job.Scope.Valid() {
+func processSocialPublication(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, job workerrepo.Job) error {
+	secretReady := dependencyReady(secretProvider)
+	refreshReady := dependencyReady(refreshCoordinator)
+	if ctx == nil || publications == nil || accounts == nil || receipts == nil || !secretReady || !refreshReady || registry == nil || !job.Scope.Valid() {
 		return errors.New("worker: invalid social publication dependencies")
 	}
 	scope, err := social.ParseScope(job.Scope.OrganizationID().String(), job.Scope.WorkspaceID().String())
@@ -83,7 +86,7 @@ func processSocialPublication(ctx context.Context, publications socialPublicatio
 	case social.PublicationPublishing:
 		return recoverSocialPublication(ctx, publications, receipts, job.Scope, scope, publication)
 	case social.PublicationReady:
-		return publishSocialText(ctx, publications, accounts, receipts, secretProvider, registry, job.Scope, scope, publication)
+		return publishSocialText(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job.Scope, scope, publication)
 	case social.PublicationPublished, social.PublicationFailed, social.PublicationCancelled:
 		return nil
 	default:
@@ -91,7 +94,11 @@ func processSocialPublication(ctx context.Context, publications socialPublicatio
 	}
 }
 
-func publishSocialText(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, registry *runtimeRegistry, tenantScope tenancy.Scope, scope social.Scope, publication social.Publication) error {
+func dependencyReady(value any) bool {
+	return value != nil
+}
+
+func publishSocialText(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, tenantScope tenancy.Scope, scope social.Scope, publication social.Publication) error {
 	variant, err := publications.Variant(ctx, scope, publication.VariantID)
 	if err != nil {
 		return err
@@ -125,7 +132,7 @@ func publishSocialText(ctx context.Context, publications socialPublicationStore,
 	if err != nil {
 		return failSocialPublication(ctx, publications, scope, publication, "runtime_unavailable")
 	}
-	runtime, err := connectorruntime.New(secretProvider, tenantScope)
+	runtime, err := connectorruntime.NewForAccount(secretProvider, refreshCoordinator, tenantScope, account)
 	if err != nil {
 		return err
 	}

@@ -72,7 +72,7 @@ func healthCategory(h sdk.Health) string {
 	switch h.ReasonCode {
 	case "credentials_missing", "credentials_invalid", "credentials_unavailable", "remote_check_not_configured":
 		return "configuration_error"
-	case "auth_rejected", "oauth_exchange_failed":
+	case "auth_rejected", "oauth_exchange_failed", "oauth_refresh_failed", "oauth_reauthorization_required":
 		return "authentication_error"
 	case "rate_limited":
 		return "rate_limited"

@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
@@ -27,6 +28,33 @@ func New(secretSource secrets.SecretProvider, scope tenancy.Scope) (*Runtime, er
 	return &Runtime{secrets: &secretAccessor{source: secretSource, scope: scope}}, nil
 }
 
+// NewForAccount projects an OAuth account's encrypted credential bundle into a
+// callback-scoped current access token. Non-OAuth accounts retain the ordinary
+// opaque secret behavior.
+func NewForAccount(secretSource secrets.SecretProvider, coordinator connectorauth.RefreshCoordinator, scope tenancy.Scope, account sdk.Account) (*Runtime, error) {
+	runtime, err := New(secretSource, scope)
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := sdk.CatalogManifest(account.ConnectorID)
+	if err != nil {
+		return nil, ErrInvalidRuntime
+	}
+	configuration, err := connectorauth.OAuthConfiguration(manifest)
+	if err != nil {
+		return runtime, nil
+	}
+	if account.SecretReference == "" {
+		return nil, ErrInvalidRuntime
+	}
+	manager, err := connectorauth.NewTokenManager(secretSource, coordinator)
+	if err != nil {
+		return nil, ErrInvalidRuntime
+	}
+	runtime.secrets.oauth = &oauthBinding{account: account, manager: manager, prepare: configuration.GrantType == "authorization_code"}
+	return runtime, nil
+}
+
 func (runtime *Runtime) Secrets() sdk.SecretAccessor {
 	if runtime == nil {
 		return nil
@@ -37,6 +65,13 @@ func (runtime *Runtime) Secrets() sdk.SecretAccessor {
 type secretAccessor struct {
 	source secrets.SecretProvider
 	scope  tenancy.Scope
+	oauth  *oauthBinding
+}
+
+type oauthBinding struct {
+	account sdk.Account
+	manager *connectorauth.TokenManager
+	prepare bool
 }
 
 var _ sdk.SecretAccessor = (*secretAccessor)(nil)
@@ -52,5 +87,20 @@ func (accessor *secretAccessor) UseSecret(ctx context.Context, reference sdk.Sec
 	if err != nil {
 		return sdk.ErrSecretReference
 	}
+	if accessor.oauth != nil && reference == accessor.oauth.account.SecretReference {
+		return accessor.oauth.manager.UseAccessToken(ctx, accessor.scope, accessor.oauth.account, consumer)
+	}
 	return accessor.source.Use(ctx, accessor.scope, parsed, consumer)
+}
+
+// PrepareOAuth refreshes an expiring account token before a health probe. It is
+// a no-op for non-OAuth runtimes.
+func (runtime *Runtime) PrepareOAuth(ctx context.Context) error {
+	if runtime == nil || runtime.secrets == nil {
+		return ErrInvalidRuntime
+	}
+	if runtime.secrets.oauth == nil || !runtime.secrets.oauth.prepare {
+		return nil
+	}
+	return runtime.secrets.oauth.manager.Prepare(ctx, runtime.secrets.scope, runtime.secrets.oauth.account)
 }

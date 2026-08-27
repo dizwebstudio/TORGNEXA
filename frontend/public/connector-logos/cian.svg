@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64">
+  <title>ЦИАН</title>
+  <rect x="4" y="8" width="48" height="48" rx="14" fill="#F2F5FF"/>
+  <path fill="#0054FD" d="M28 16 40 27.5 33 34.5 28 30l-5 4.5-7-7Z"/>
+  <path fill="#212C46" d="M15 39 22 32l6 6-7 7Zm26 0-7-7 6-6 7 7Z"/>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="800" letter-spacing="-1">ЦИАН</text>
+</svg>

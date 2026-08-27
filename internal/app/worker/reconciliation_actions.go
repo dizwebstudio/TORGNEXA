@@ -13,6 +13,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	builtins "github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/notifications"
@@ -34,14 +35,15 @@ type reconciliationActionExecutor struct {
 	approvals     *approvalrepo.Repository
 	notifications *notificationrepo.Repository
 	secrets       secrets.SecretProvider
+	oauthRefresh  connectorauth.RefreshCoordinator
 	registry      *runtimeRegistry
 }
 
-func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
-	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || registry == nil {
+func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
+	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || refreshCoordinator == nil || registry == nil {
 		return nil, errors.New("worker: reconciliation action dependencies required")
 	}
-	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, registry: registry}, nil
+	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, oauthRefresh: refreshCoordinator, registry: registry}, nil
 }
 
 type actionContext struct {
@@ -59,7 +61,7 @@ func (e *reconciliationActionExecutor) resolve(ctx context.Context, scope tenanc
 	if err != nil {
 		return actionContext{}, err
 	}
-	runtime, err := connectorruntime.New(e.secrets, scope)
+	runtime, err := connectorruntime.NewForAccount(e.secrets, e.oauthRefresh, scope, a)
 	if err != nil {
 		return actionContext{}, err
 	}

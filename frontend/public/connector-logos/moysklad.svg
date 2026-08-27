@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64">
+  <title>МойСклад</title>
+  <defs><linearGradient id="ms" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#6E9BFF"/><stop offset="1" stop-color="#036CE5"/></linearGradient></defs>
+  <ellipse cx="28" cy="32" rx="22" ry="16" fill="url(#ms)"/>
+  <path fill="#2855AF" d="M28 16a16 22 0 0 1 0 32 22 16 0 0 0 0-32Z"/>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="-1">МойСклад</text>
+</svg>

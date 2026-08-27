@@ -212,3 +212,15 @@ func TestConnectorOAuthStartIsIdempotentAndCallbackIsOneTime(t *testing.T) {
 		t.Fatalf("audit actions=%v", auditor.actions)
 	}
 }
+
+func TestOAuthPreparationClassifiesSafeHealthReasons(t *testing.T) {
+	if got := oauthPreparation(nil); got != "ready" {
+		t.Fatalf("nil preparation classified as %q", got)
+	}
+	if got := oauthPreparation(connectorauth.ErrOAuthReauthorizationRequired); got != "reauthorization_required" {
+		t.Fatalf("reauthorization classified as %q", got)
+	}
+	if got := oauthPreparation(errors.New("temporary endpoint failure")); got != "refresh_failed" {
+		t.Fatalf("temporary failure classified as %q", got)
+	}
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64">
+  <title>Avito</title>
+  <rect x="4" y="8" width="48" height="48" rx="14" fill="#F5F3FA"/>
+  <path fill="#00AAFF" d="M14 40 24 20l4 9-6 11Z"/>
+  <path fill="#965EEB" d="M23 40 30 26l4 8-4 6Z"/>
+  <path fill="#FF4053" d="M31 40 36 30l6 10Z"/>
+  <text x="66" y="42" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing="-1">Avito</text>
+</svg>

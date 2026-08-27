@@ -52,6 +52,44 @@ paths:
       responses:
         '202': {description: Canonical publication accepted for asynchronous delivery, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublication'}}}}
         '409': {description: 'Channel, content or idempotent replay conflict'}
+  /payments:
+    get:
+      operationId: listPayments
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200': {description: Tenant payments, content: {application/json: {schema: {$ref: '#/components/schemas/PaymentPage'}}}}
+        '403': {description: Caller lacks connectors.read}
+    post:
+      operationId: createPayment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PaymentCreate'}}}}
+      responses:
+        '201': {description: Payment created, content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}}
+        '409': {description: Connector account or payment state conflict}
+  /payments/{payment_id}:
+    get:
+      operationId: getPayment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: payment_id, in: path, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      responses:
+        '200': {description: One payment, content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}}
+        '404': {description: Payment not found}
+  /payments/{payment_id}/refund:
+    post:
+      operationId: refundPayment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: payment_id, in: path, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RefundCreate'}}}}
+      responses:
+        '201': {description: Refund created, content: {application/json: {schema: {$ref: '#/components/schemas/Refund'}}}}
+        '409': {description: Payment or refund state conflict}
   /sync/policies:
     post:
       operationId: createSyncPolicy
@@ -1788,6 +1826,67 @@ components:
       required: [items]
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/SocialPublication'}}
+    Money:
+      type: object
+      additionalProperties: false
+      required: [minor_units, currency]
+      properties:
+        minor_units: {type: integer}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+    Payment:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, external_id, amount, commission_minor_units, status, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        external_id: {type: string, minLength: 1, maxLength: 192}
+        remote_id: {type: string, minLength: 1, maxLength: 192}
+        purpose: {type: string, minLength: 1, maxLength: 210}
+        amount: {$ref: '#/components/schemas/Money'}
+        commission_minor_units: {type: integer, minimum: 0}
+        status: {type: string, enum: [pending, created, succeeded, failed, canceled, refunded, partially_refunded]}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        succeeded_at: {type: string, format: date-time}
+    PaymentPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Payment'}}
+    PaymentCreate:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, amount, expires_in_seconds]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        purpose: {type: string, minLength: 1, maxLength: 210}
+        amount: {$ref: '#/components/schemas/Money'}
+        expires_in_seconds: {type: integer, minimum: 60, maximum: 86400}
+    Refund:
+      type: object
+      additionalProperties: false
+      required: [id, payment_id, external_id, amount, status, version, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        payment_id: {$ref: '#/components/schemas/SortableID'}
+        external_id: {type: string, minLength: 1, maxLength: 192}
+        remote_refund_id: {type: string, minLength: 1, maxLength: 192}
+        amount: {$ref: '#/components/schemas/Money'}
+        status: {type: string, enum: [pending, accepted, succeeded, failed]}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+    RefundCreate:
+      type: object
+      additionalProperties: false
+      required: [id, amount]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        amount: {$ref: '#/components/schemas/Money'}
     SocialPublicationCreate:
       type: object
       additionalProperties: false

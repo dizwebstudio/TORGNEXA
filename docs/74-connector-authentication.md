@@ -24,8 +24,25 @@ stores the token bundle encrypted, and revokes both the client-registration and
 temporary state secrets. No client secret, verifier, access token, refresh
 token or provider response body is returned or logged.
 
+Task 134 makes that encrypted bundle executable without exposing its storage
+shape to a connector. An account-aware host runtime supplies only the current
+access token through `SecretAccessor.UseSecret`. One minute before expiry, API
+or worker acquires a tenant/reference-scoped PostgreSQL transaction advisory
+lock, re-reads the bundle and performs at most one refresh against the exact
+manifest token endpoint. The stable secret reference is rotated to one new
+immutable ciphertext version. A returned replacement refresh token is stored;
+if the provider omits it, the prior refresh token is preserved.
+
+If refresh material is absent or revoked, health becomes
+`oauth_reauthorization_required`. Token endpoint or encrypted rotation failure
+becomes `oauth_refresh_failed`. Neither outcome exposes provider error bodies.
+Repeated browser OAuth is therefore a remediation path, not the normal access
+token renewal mechanism.
+
 Client-credentials manifests do not open a browser. Their client registration
-is exchanged transiently during the remote check.
+is exchanged transiently by the host when the connector needs an access token;
+client credentials are never passed into the provider adapter or cached as
+long-lived plaintext.
 
 ## Callback and egress policy
 
@@ -46,7 +63,8 @@ Credential enrollment and OAuth completion always leave the account disabled
 and reset health. `POST /connector-accounts:check` performs the real remote
 request and persists only `healthy`, `auth_rejected`, `rate_limited`,
 `remote_unavailable`, `credentials_*`, `oauth_exchange_failed` or
-`remote_check_not_configured`. Account activation separately requires current
+`remote_check_not_configured`, plus Task-134 `oauth_refresh_failed` and
+`oauth_reauthorization_required`. Account activation separately requires current
 healthy evidence and at least one explicitly enabled capability. Task 109 owns
 bounded history, detailed rate-limit visibility and operational remediation;
 it does not replace this validation gate or authoritative audit evidence.

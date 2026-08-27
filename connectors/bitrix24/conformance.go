@@ -101,7 +101,7 @@ func (candidateSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, cb f
 	if cb == nil {
 		return errors.New("callback missing")
 	}
-	v := []byte(`{"access_token":"b24_oauth_123456789012345678901234567890"}`)
+	v := []byte("b24_oauth_123456789012345678901234567890")
 	defer clear(v)
 	return cb(v)
 }
