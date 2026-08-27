@@ -50,7 +50,8 @@ func New(transport Transport, configs ConfigurationSource, now func() time.Time)
 	return &Connector{transport: transport, configs: configs, now: now}
 }
 func Manifest() sdk.Manifest {
-	return sdk.Manifest{ID: "opencart", Name: "OpenCart", Family: sdk.FamilyMarketplace, Version: "1.0.0", SDKVersion: sdk.SDKMajor, Capabilities: []sdk.Capability{"inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"}, Auth: []sdk.AuthRequirement{{Kind: sdk.AuthBearer, SecretClass: "storefront.bridge-token", Required: true}}, RateLimit: sdk.RateLimitPolicy{MaxConcurrency: 4, MinIntervalMS: 100, RequestTimeoutMS: 30000, Retry: sdk.RetryPolicy{MaxAttempts: 5, BaseBackoffMS: 500, MaxBackoffMS: 30000}}}
+	manifest, _ := sdk.CatalogManifest("opencart")
+	return manifest
 }
 func (c *Connector) Manifest() sdk.Manifest { return Manifest() }
 func (c *Connector) configuration(ctx context.Context, a sdk.Account) (Configuration, error) {

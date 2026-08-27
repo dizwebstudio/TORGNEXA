@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {normalizeSession, publicSession, sessionExpired} from "../.repository-test/auth/session-model.js";
+import {normalizeSession, publicSession, sessionExpired, sessionNeedsRefresh} from "../.repository-test/auth/session-model.js";
 import {accountConsoleURL} from "../.repository-test/auth/oidc-urls.js";
 
 test("session normalization deduplicates capabilities and public projection drops token", () => {
@@ -13,6 +13,12 @@ test("session normalization deduplicates capabilities and public projection drop
 test("expired sessions fail closed", () => {
   const session = normalizeSession({subject: "u", displayName: "U", accessToken: "t", capabilities: [], expiresAt: "2026-08-10T10:00:00Z"});
   assert.equal(sessionExpired(session, Date.parse("2026-08-10T10:00:01Z")), true);
+});
+
+test("sessions are refreshed before the access token expires", () => {
+  const session = normalizeSession({subject: "u", displayName: "U", accessToken: "t", capabilities: [], expiresAt: "2026-08-10T10:05:00Z"});
+  assert.equal(sessionNeedsRefresh(session, Date.parse("2026-08-10T10:03:59Z")), false);
+  assert.equal(sessionNeedsRefresh(session, Date.parse("2026-08-10T10:04:00Z")), true);
 });
 
 test("invalid capability values are rejected", () => {

@@ -1,5 +1,6 @@
 import type {AuthAdapter} from "./auth-adapter";
 import type {AuthSession} from "./session-model";
+import {sessionExpired, sessionNeedsRefresh} from "./session-model";
 import {accountConsoleURL} from "./oidc-urls";
 
 interface TokenClaims {
@@ -12,14 +13,23 @@ interface TokenClaims {
 }
 
 interface TokenResponse {
-  access_token?: string;
-  expires_in?: number;
+  access_token?: unknown;
+  expires_in?: unknown;
+  refresh_token?: unknown;
 }
 
 interface KeycloakConfig {
   issuer: string;
   clientId: string;
 }
+
+class TokenEndpointError extends Error {
+  constructor(readonly terminal: boolean) {
+    super("OIDC token endpoint rejected the request");
+  }
+}
+
+const silentErrors = new Set(["login_required", "interaction_required", "consent_required", "session_expired"]);
 
 const roleCapabilities: Readonly<Record<string, readonly string[]>> = {
   admin: ["operations.realtime.read", "products.read", "products.write", "orders.read", "stock.read", "stock.write", "connectors.read", "connectors.accounts.read", "connectors.accounts.write", "connectors.replay.run", "sync.read", "sync.write", "approvals.read", "approvals.write", "compliance.read", "notifications.read", "reports.read", "audit.read", "settings.read", "settings.members.read", "settings.members.write", "settings.security.read", "settings.security.write", "settings.security.posture.read", "settings.security.evidence.read", "settings.identity_providers.read", "settings.identity_providers.write", "settings.ai_providers.read", "settings.ai_providers.write", "settings.ai_governance.read", "settings.ai_governance.write", "settings.mcp_accounts.read", "settings.mcp_accounts.write", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "webhooks.write", "plugins.read", "settlements.read", "fx.read", "cloud.subscription.read", "privacy.requests.write"],
@@ -85,70 +95,185 @@ async function waitForCallback(popup: Window, origin: string, state: string): Pr
   throw new Error("OIDC login timed out");
 }
 
+async function waitForSilentCallback(frame: HTMLIFrameElement, origin: string, state: string): Promise<string | null> {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    try {
+      const url = new URL(frame.contentWindow?.location.href ?? "about:blank");
+      if (url.origin === origin && url.searchParams.has("code")) {
+        if (url.searchParams.get("state") !== state) throw new Error("OIDC state mismatch");
+        const code = url.searchParams.get("code");
+        if (!code) throw new Error("OIDC code is missing");
+        return code;
+      }
+      if (url.origin === origin && url.searchParams.has("error")) {
+        if (url.searchParams.get("state") !== state) throw new Error("OIDC state mismatch");
+        const error = url.searchParams.get("error") ?? "";
+        if (silentErrors.has(error)) return null;
+        throw new Error("OIDC provider rejected silent login");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("OIDC")) throw error;
+      // Cross-origin frame access is expected until the provider redirects home.
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+  throw new Error("OIDC silent login timed out");
+}
+
 export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
   const issuer = config.issuer.replace(/\/$/, "");
   const manageAccountURL = accountConsoleURL(issuer);
   let session: AuthSession | null = null;
+  let refreshToken: string | null = null;
+  let silentAttempted = false;
+  let silentInFlight: Promise<AuthSession | null> | null = null;
+  let refreshInFlight: Promise<AuthSession | null> | null = null;
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
 
+  const clearSession = () => {
+    session = null;
+    refreshToken = null;
+  };
+
+  const authorizationURL = async (redirectURI: string, state: string, verifier: string, silent: boolean) => {
+    const authorize = new URL(`${issuer}/protocol/openid-connect/auth`);
+    const parameters: Record<string, string> = {
+      client_id: config.clientId,
+      redirect_uri: redirectURI,
+      response_type: "code",
+      scope: "openid profile",
+      code_challenge: await sha256(verifier),
+      code_challenge_method: "S256",
+      state,
+    };
+    if (silent) parameters.prompt = "none";
+    authorize.search = new URLSearchParams(parameters).toString();
+    return authorize;
+  };
+
+  const requestTokens = async (parameters: Record<string, string>): Promise<TokenResponse> => {
+    const response = await fetch(`${issuer}/protocol/openid-connect/token`, {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: new URLSearchParams({client_id: config.clientId, ...parameters}),
+      credentials: "omit",
+      redirect: "error",
+    });
+    if (!response.ok) throw new TokenEndpointError(response.status === 400 || response.status === 401);
+    return await response.json() as TokenResponse;
+  };
+
+  const applyTokens = (tokens: TokenResponse, preserveRefreshToken: boolean): AuthSession => {
+    if (typeof tokens.access_token !== "string" || !tokens.access_token || tokens.access_token.length > 16_384) {
+      throw new Error("OIDC access token is missing");
+    }
+    const claims = decodeClaims(tokens.access_token);
+    if (!claims.sub || claims.iss !== issuer) throw new Error("OIDC claims are invalid");
+    const expiresIn = typeof tokens.expires_in === "number" && Number.isFinite(tokens.expires_in) ? tokens.expires_in : 300;
+    const expiresAt = new Date((claims.exp ?? Math.floor(Date.now() / 1000) + expiresIn) * 1000).toISOString();
+    const nextRefreshToken = typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0 && tokens.refresh_token.length <= 16_384
+      ? tokens.refresh_token
+      : preserveRefreshToken ? refreshToken : null;
+    session = {
+      subject: claims.sub,
+      // Never promote the opaque OIDC subject to presentation data. The
+      // session normalizer also rejects UUID-shaped/equal display claims and
+      // uses a role-derived neutral label when no human name is available.
+      displayName: claims.name || claims.preferred_username || "",
+      accessToken: tokens.access_token,
+      capabilities: capabilitiesFor(claims),
+      roles: [...new Set(claims.realm_access?.roles ?? [])].sort(),
+      expiresAt,
+    };
+    refreshToken = nextRefreshToken;
+    return session;
+  };
+
+  const exchangeAuthorizationCode = async (code: string, verifier: string, redirectURI: string) => applyTokens(await requestTokens({
+    grant_type: "authorization_code",
+    redirect_uri: redirectURI,
+    code,
+    code_verifier: verifier,
+  }), false);
+
+  const silentSignIn = async (): Promise<AuthSession | null> => {
+    silentAttempted = true;
+    const verifier = randomValue(64);
+    const state = randomValue();
+    const redirectURI = new URL("/oidc/silent-callback.html", window.location.origin).toString();
+    const frame = document.createElement("iframe");
+    frame.hidden = true;
+    frame.tabIndex = -1;
+    frame.setAttribute("aria-hidden", "true");
+    frame.title = "Проверка сессии";
+    document.body.appendChild(frame);
+    try {
+      frame.src = (await authorizationURL(redirectURI, state, verifier, true)).toString();
+      const code = await waitForSilentCallback(frame, window.location.origin, state);
+      return code ? await exchangeAuthorizationCode(code, verifier, redirectURI) : null;
+    } finally {
+      frame.remove();
+    }
+  };
+
+  const startSilentSignIn = () => {
+    if (!silentInFlight) {
+      silentInFlight = silentSignIn().finally(() => { silentInFlight = null; });
+    }
+    return silentInFlight;
+  };
+
+  const renewSession = async (): Promise<AuthSession | null> => {
+    if (!refreshToken) return startSilentSignIn();
+    try {
+      return applyTokens(await requestTokens({grant_type: "refresh_token", refresh_token: refreshToken}), true);
+    } catch (error) {
+      if (!(error instanceof TokenEndpointError) || !error.terminal) throw error;
+      clearSession();
+      return startSilentSignIn();
+    }
+  };
+
+  const startRenewal = () => {
+    if (!refreshInFlight) {
+      refreshInFlight = renewSession().finally(() => { refreshInFlight = null; });
+    }
+    return refreshInFlight;
+  };
+
   return {
-    async getSession() {
-      if (session?.expiresAt && Date.parse(session.expiresAt) <= Date.now()) session = null;
-      return session;
+    async getSession(options) {
+      if (!session && !silentAttempted) session = await startSilentSignIn();
+      if (!session) return null;
+      if (!options?.forceRefresh && !sessionNeedsRefresh(session)) return session;
+      try {
+        const renewed = await startRenewal();
+        if (!renewed) clearSession();
+        return renewed;
+      } catch (error) {
+        if (!sessionExpired(session)) return session;
+        clearSession();
+        throw error;
+      }
     },
     async login(returnTo: string) {
+      silentAttempted = true;
       const verifier = randomValue(64);
       const state = randomValue();
       const redirectURI = new URL("/oidc/callback", window.location.origin).toString();
-      const authorize = new URL(`${issuer}/protocol/openid-connect/auth`);
-      authorize.search = new URLSearchParams({
-        client_id: config.clientId,
-        redirect_uri: redirectURI,
-        response_type: "code",
-        scope: "openid profile",
-        code_challenge: await sha256(verifier),
-        code_challenge_method: "S256",
-        state,
-      }).toString();
+      const authorize = await authorizationURL(redirectURI, state, verifier, false);
       const popup = window.open(authorize, "torgnexa-oidc", "popup,width=520,height=720");
       if (!popup) throw new Error("OIDC popup was blocked");
       const code = await waitForCallback(popup, window.location.origin, state);
-      const tokenResponse = await fetch(`${issuer}/protocol/openid-connect/token`, {
-        method: "POST",
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          client_id: config.clientId,
-          redirect_uri: redirectURI,
-          code,
-          code_verifier: verifier,
-        }),
-        credentials: "omit",
-        redirect: "error",
-      });
-      if (!tokenResponse.ok) throw new Error("OIDC token exchange failed");
-      const tokens = await tokenResponse.json() as TokenResponse;
-      if (!tokens.access_token) throw new Error("OIDC access token is missing");
-      const claims = decodeClaims(tokens.access_token);
-      if (!claims.sub || claims.iss !== issuer) throw new Error("OIDC claims are invalid");
-      const expiresAt = new Date((claims.exp ?? Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 300)) * 1000).toISOString();
-      session = {
-        subject: claims.sub,
-        // Never promote the opaque OIDC subject to presentation data. The
-        // session normalizer also rejects UUID-shaped/equal display claims and
-        // uses a role-derived neutral label when no human name is available.
-        displayName: claims.name || claims.preferred_username || "",
-        accessToken: tokens.access_token,
-        capabilities: capabilitiesFor(claims),
-        roles: [...new Set(claims.realm_access?.roles ?? [])].sort(),
-        expiresAt,
-      };
+      session = await exchangeAuthorizationCode(code, verifier, redirectURI);
       window.history.replaceState({}, "", returnTo.startsWith("/") ? returnTo : "/");
       notify();
     },
     async logout() {
-      session = null;
+      silentAttempted = true;
+      clearSession();
       notify();
     },
     async manageAccount() {

@@ -18,6 +18,7 @@ import {AuditPage} from "../pages/AuditPage";
 import {SyncPage} from "../pages/SyncPage";
 import {ApprovalsPage} from "../pages/ApprovalsPage";
 import {IntegrationsPage} from "../pages/IntegrationsPage";
+import {SocialPage} from "../pages/SocialPage";
 import {PlaceholderPage} from "../pages/PlaceholderPage";
 import {IncidentCenterPage} from "../pages/IncidentCenterPage";
 import {useRealtimeInvalidation} from "../app/useRealtime";
@@ -41,6 +42,7 @@ function content(path: string) {
   if (path === "/finance") return <FinancePage />;
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
+  if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
   if (path === "/audit") return <AuditPage />;
   if (path === "/settings") return <SettingsPage />;
@@ -66,7 +68,7 @@ export function AppShell() {
 
   return <div className={`app-shell ${mobileOpen?"nav-open":""}`}>
     <aside className="sidebar">
-      <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Commerce Orchestration</small></span></button>
+      <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Управление торговлей</small></span></button>
       <nav aria-label="Основная навигация">{navigation.map((item) => <button key={item.id} aria-current={path===item.path?"page":undefined} title={item.label} className={`nav-item ${path === item.path ? "active" : ""}`} onClick={() => navigate(item.path)}><span className="nav-icon"><Icon name={item.icon}/></span><span className="nav-label">{item.label}</span></button>)}</nav>
       <div className="sidebar-footer"><div className="profile"><span className="avatar">{auth.session?.displayName.slice(0, 1).toUpperCase()}</span><span className="profile-copy"><strong>{auth.session?.displayName}</strong><small>Защищённая сессия</small></span></div><button className="icon-button" onClick={() => void auth.logout()} title="Выйти" aria-label="Выйти"><Icon name="logout"/></button></div>
     </aside>

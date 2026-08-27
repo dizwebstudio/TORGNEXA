@@ -10,19 +10,28 @@ import (
 	"strings"
 	"time"
 
+	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
+	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
 	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
+	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
+	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
 	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
+	opencart "github.com/torgnexa/torgnexa/connectors/opencart"
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
+	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
 	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
+	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
 	yandexgpt "github.com/torgnexa/torgnexa/connectors/yandexgpt"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/fx"
 )
 
 var (
@@ -55,6 +64,7 @@ type ProductReader interface {
 
 type Registry struct {
 	http *httpTransport
+	cbr  *cbrfx.Connector
 
 	// gigachat is held across calls (unlike the other AI connectors, which
 	// are stateless and constructed per call) because it caches the OAuth
@@ -65,7 +75,51 @@ type Registry struct {
 
 func New() *Registry {
 	transport := newHTTPTransport()
-	return &Registry{http: transport, gigachat: gigachat.New(gigaChatHTTP{transport}, nil)}
+	return &Registry{
+		http:     transport,
+		cbr:      cbrfx.New(newCBRDailyHTTP(transport), nil),
+		gigachat: gigachat.New(gigaChatHTTP{transport}, nil),
+	}
+}
+
+// FXRateReader resolves an admitted reference-rate provider without exposing
+// its concrete transport outside the reviewed built-in composition boundary.
+func (r *Registry) FXRateReader(connectorID string) (sdk.FXRateReader, error) {
+	if r == nil || r.http == nil || r.cbr == nil || connectorID != "cbr-fx" {
+		return nil, ErrUnavailable
+	}
+	return r.cbr, nil
+}
+
+// FXReferenceSources returns the reviewed global reference providers as
+// provider-neutral FX ports. Provider IDs and synthetic no-secret account
+// binding remain confined to this composition package.
+func (r *Registry) FXReferenceSources() ([]fx.Provider, error) {
+	if r == nil || r.cbr == nil {
+		return nil, ErrUnavailable
+	}
+	source, err := fx.NewSourceID("cbr")
+	if err != nil {
+		return nil, err
+	}
+	createdAt := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	account := sdk.Account{
+		ID:             "cbr-reference",
+		OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
+		WorkspaceID:    "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+		ConnectorID:    "cbr-fx",
+		Family:         sdk.FamilyFX,
+		Status:         sdk.AccountActive,
+		Version:        1,
+		Health:         sdk.Health{Status: sdk.HealthUnknown},
+		CreatedAt:      createdAt,
+		UpdatedAt:      createdAt,
+	}
+	provider, err := fx.NewConnectorProvider(source, r.cbr, account, nil)
+	if err != nil {
+		return nil, err
+	}
+	return []fx.Provider{provider}, nil
 }
 
 func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (ProductReader, error) {
@@ -73,6 +127,8 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 		return nil, ErrUnavailable
 	}
 	switch account.ConnectorID {
+	case "aliexpress-ru":
+		return marketplaceReader{value: aliexpressru.New(aliexpressHTTP{r.http}, nil), account: account, runtime: runtime}, nil
 	case "wildberries":
 		return marketplaceReader{value: wildberries.New(wbHTTP{r.http}, nil), account: account, runtime: runtime}, nil
 	case "ozon":
@@ -82,6 +138,16 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 			return nil, ErrConfigurationNeeded
 		}
 		return marketplaceReader{value: yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "magnit-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "megamarket":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: megamarket.New(megamarketHTTP{r.http}, megamarketConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
 	case "onec":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -94,6 +160,16 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 			return nil, ErrConfigurationNeeded
 		}
 		return marketplaceReader{value: woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -109,6 +185,11 @@ func (r *Registry) ProductWriter(account sdk.Account, runtime sdk.Runtime, load 
 			return nil, ErrConfigurationNeeded
 		}
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -118,7 +199,129 @@ func (r *Registry) SupportsProductWrite(account sdk.Account) bool {
 	if r == nil || account.Validate() != nil {
 		return false
 	}
-	return account.ConnectorID == "woocommerce"
+	return SupportsCapability(account.ConnectorID, "products.write")
+}
+
+// SocialPublisher resolves an admitted social publisher without exposing the
+// provider implementation outside this reviewed composition boundary.
+func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.SocialPublisher, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || !SupportsCapability(account.ConnectorID, "social.post.text") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "telegram":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	case "max-messenger":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// SupportsAccountConfiguration reports whether the generic integration
+// surface may create and operate an account through this registry.
+func (r *Registry) SupportsAccountConfiguration(connectorID string) bool {
+	return r != nil && SupportsAccountConfiguration(connectorID)
+}
+
+// SupportsCapability reports whether this registry has an executable route
+// for the exact declared connector capability.
+func (r *Registry) SupportsCapability(connectorID, capability string) bool {
+	return r != nil && SupportsCapability(connectorID, capability)
+}
+
+// SupportsSync reports whether this registry supports the exact canonical
+// entity and direction for a connector.
+func (r *Registry) SupportsSync(connectorID, entityType, direction string) bool {
+	return r != nil && SupportsSync(connectorID, entityType, direction)
+}
+
+// RuntimeConfigRequired reports whether an admitted connector needs host-owned
+// non-secret configuration before it can be enabled.
+func (r *Registry) RuntimeConfigRequired(connectorID string) bool {
+	value, ok := SupportFor(connectorID)
+	return r != nil && ok && value.RuntimeConfigRequired
+}
+
+// SocialTextLimit reports the exact provider ceiling admitted on the shared
+// Social surface. Zero means the text-publish route is unavailable.
+func (r *Registry) SocialTextLimit(connectorID string) int {
+	if r == nil {
+		return 0
+	}
+	return SocialTextLimit(connectorID)
+}
+
+// Health executes the same concrete connector and configuration path used by
+// product reconciliation. Generic manifest pings are insufficient evidence
+// for configuration-bearing providers.
+func (r *Registry) Health(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load func(context.Context, string) (json.RawMessage, error)) (sdk.Health, error) {
+	if r == nil || r.http == nil || ctx == nil || account.Validate() != nil || runtime == nil {
+		return sdk.Health{}, ErrUnavailable
+	}
+	connector, err := r.healthConnector(account, load)
+	if err != nil {
+		return sdk.Health{}, err
+	}
+	return connector.Health(ctx, account, runtime)
+}
+
+func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.Connector, error) {
+	switch account.ConnectorID {
+	case "aliexpress-ru":
+		return aliexpressru.New(aliexpressHTTP{r.http}, nil), nil
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
+	case "moysklad":
+		return moysklad.New(msHTTP{r.http}, nil), nil
+	case "telegram":
+		if load != nil {
+			return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+		}
+	case "max-messenger":
+		if load != nil {
+			return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+		}
+	case "yandex-market":
+		if load != nil {
+			return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
+		}
+	case "magnit-market":
+		if load != nil {
+			return magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil), nil
+		}
+	case "megamarket":
+		if load != nil {
+			return megamarket.New(megamarketHTTP{r.http}, megamarketConfigSource{load: load}, nil), nil
+		}
+	case "onec":
+		if load != nil {
+			return onec.New(onecHTTP{r.http}, onecConfigSource{load: load}, nil), nil
+		}
+	case "woocommerce":
+		if load != nil {
+			return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+		}
+	case "opencart":
+		if load != nil {
+			return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
+		}
+	case "prestashop":
+		if load != nil {
+			return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+		}
+	default:
+		return nil, ErrUnavailable
+	}
+	return nil, ErrConfigurationNeeded
 }
 
 // PriceWriter resolves only first-party connectors that explicitly advertise
@@ -204,6 +407,46 @@ func (r erpReader) Read(ctx context.Context, req sdk.PageRequest) (ProductPage, 
 
 type yandexConfigSource struct{ load ConfigLoader }
 
+type telegramConfigSource struct{ load ConfigLoader }
+
+type maxConfigSource struct{ load ConfigLoader }
+
+func (source maxConfigSource) Resolve(ctx context.Context, account sdk.Account) (maxmessenger.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return maxmessenger.Configuration{}, err
+	}
+	var value struct {
+		ChatID int64 `json:"chat_id"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return maxmessenger.Configuration{}, maxmessenger.ErrInvalidConfiguration
+	}
+	configuration := maxmessenger.Configuration{ChatID: value.ChatID}
+	if configuration.Validate() != nil {
+		return maxmessenger.Configuration{}, maxmessenger.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+func (source telegramConfigSource) Resolve(ctx context.Context, account sdk.Account) (telegram.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return telegram.Configuration{}, err
+	}
+	var value struct {
+		ChatID int64 `json:"chat_id"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return telegram.Configuration{}, telegram.ErrInvalidConfiguration
+	}
+	configuration := telegram.Configuration{ChatID: value.ChatID}
+	if configuration.Validate() != nil {
+		return telegram.Configuration{}, telegram.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
 func (source yandexConfigSource) Resolve(ctx context.Context, account sdk.Account) (yandexmarket.Configuration, error) {
 	raw, err := source.load(ctx, account.ID)
 	if err != nil {
@@ -228,6 +471,56 @@ func (source yandexConfigSource) Resolve(ctx context.Context, account sdk.Accoun
 	}
 	if configuration.Validate() != nil {
 		return yandexmarket.Configuration{}, yandexmarket.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type magnitConfigSource struct{ load ConfigLoader }
+
+func (source magnitConfigSource) Resolve(ctx context.Context, account sdk.Account) (magnitmarket.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return magnitmarket.Configuration{}, err
+	}
+	var value struct {
+		ShopID          int64                  `json:"shop_id"`
+		StockType       magnitmarket.StockType `json:"stock_type"`
+		OrderWindowDays int                    `json:"order_window_days"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return magnitmarket.Configuration{}, magnitmarket.ErrInvalidConfiguration
+	}
+	configuration := magnitmarket.Configuration{ShopID: value.ShopID, StockType: value.StockType, OrderWindowDays: value.OrderWindowDays}
+	if configuration.Validate() != nil {
+		return magnitmarket.Configuration{}, magnitmarket.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type megamarketConfigSource struct{ load ConfigLoader }
+
+func (source megamarketConfigSource) Resolve(ctx context.Context, account sdk.Account) (megamarket.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return megamarket.Configuration{}, err
+	}
+	var value struct {
+		MerchantID int64             `json:"merchant_id"`
+		Scheme     megamarket.Scheme `json:"scheme"`
+		Warehouses []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"warehouses"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return megamarket.Configuration{}, megamarket.ErrInvalidConfiguration
+	}
+	configuration := megamarket.Configuration{MerchantID: value.MerchantID, Scheme: value.Scheme}
+	for _, warehouse := range value.Warehouses {
+		configuration.Warehouses = append(configuration.Warehouses, megamarket.Warehouse{ID: warehouse.ID, Name: warehouse.Name})
+	}
+	if configuration.Validate() != nil {
+		return megamarket.Configuration{}, megamarket.ErrInvalidConfiguration
 	}
 	return configuration, nil
 }
@@ -292,6 +585,52 @@ func (source wooConfigSource) Resolve(ctx context.Context, account sdk.Account) 
 	configuration := woocommerce.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
 	if configuration.Validate() != nil {
 		return woocommerce.Configuration{}, woocommerce.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type openCartConfigSource struct{ load ConfigLoader }
+
+func (source openCartConfigSource) Resolve(ctx context.Context, account sdk.Account) (opencart.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return opencart.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return opencart.Configuration{}, opencart.ErrInvalidConfiguration
+	}
+	configuration := opencart.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return opencart.Configuration{}, opencart.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type prestaShopConfigSource struct{ load ConfigLoader }
+
+func (source prestaShopConfigSource) Resolve(ctx context.Context, account sdk.Account) (prestashop.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return prestashop.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+		LanguageID    int64  `json:"language_id"`
+		ShopID        int64  `json:"shop_id"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return prestashop.Configuration{}, prestashop.ErrInvalidConfiguration
+	}
+	configuration := prestashop.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency, LanguageID: value.LanguageID, ShopID: value.ShopID}
+	if configuration.Validate() != nil {
+		return prestashop.Configuration{}, prestashop.ErrInvalidConfiguration
 	}
 	return configuration, nil
 }

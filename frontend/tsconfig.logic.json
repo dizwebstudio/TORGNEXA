@@ -12,6 +12,7 @@
     "src/shell/navigation.ts",
     "src/auth/session-model.ts",
     "src/auth/oidc-urls.ts",
+    "src/api/client.ts",
     "src/features/settings/settings-tabs.ts",
     "src/generated/connector-catalog.ts",
     "src/api/decoders.ts",

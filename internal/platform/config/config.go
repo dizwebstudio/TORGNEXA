@@ -375,10 +375,10 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 		}
 	}
 
-	if cfg.Notifications.SMTPAddress, _, err = readExternalOptional(lookup, "NOTIFICATION_SMTP_ADDRESS", 255); err != nil {
+	if cfg.Notifications.SMTPAddress, _, err = readExternalOptionalOrEmpty(lookup, "NOTIFICATION_SMTP_ADDRESS", 255); err != nil {
 		return Config{}, err
 	}
-	if cfg.Notifications.SMTPFrom, _, err = readExternalOptional(lookup, "NOTIFICATION_SMTP_FROM", 320); err != nil {
+	if cfg.Notifications.SMTPFrom, _, err = readExternalOptionalOrEmpty(lookup, "NOTIFICATION_SMTP_FROM", 320); err != nil {
 		return Config{}, err
 	}
 	if cfg.Notifications.SMTPUsername, _, err = readRawOptional(lookup, "NOTIFICATION_SMTP_USERNAME", 512); err != nil {
@@ -387,13 +387,13 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 	if cfg.Notifications.SMTPPassword, _, err = readRawOptional(lookup, "NOTIFICATION_SMTP_PASSWORD", 4096); err != nil {
 		return Config{}, err
 	}
-	if cfg.Notifications.SMTPServerName, _, err = readExternalOptional(lookup, "NOTIFICATION_SMTP_SERVER_NAME", 255); err != nil {
+	if cfg.Notifications.SMTPServerName, _, err = readExternalOptionalOrEmpty(lookup, "NOTIFICATION_SMTP_SERVER_NAME", 255); err != nil {
 		return Config{}, err
 	}
 	if cfg.Notifications.SMTPImplicitTLS, err = readBool(lookup, "NOTIFICATION_SMTP_IMPLICIT_TLS", cfg.Notifications.SMTPImplicitTLS); err != nil {
 		return Config{}, err
 	}
-	if cfg.Notifications.ChatEndpoint, _, err = readExternalOptional(lookup, "NOTIFICATION_CHAT_ENDPOINT", 2048); err != nil {
+	if cfg.Notifications.ChatEndpoint, _, err = readExternalOptionalOrEmpty(lookup, "NOTIFICATION_CHAT_ENDPOINT", 2048); err != nil {
 		return Config{}, err
 	}
 	if cfg.Notifications.Timeout, err = readDuration(lookup, "NOTIFICATION_DELIVERY_TIMEOUT", cfg.Notifications.Timeout, time.Second, time.Minute); err != nil {
@@ -560,6 +560,14 @@ func readExternalOptional(lookup func(string) (string, bool), key string, max in
 		return "", false, fmt.Errorf("%s contains invalid characters", key)
 	}
 	return value, true, nil
+}
+
+func readExternalOptionalOrEmpty(lookup func(string) (string, bool), key string, max int) (string, bool, error) {
+	raw, ok := lookup(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return "", false, nil
+	}
+	return readExternalOptional(lookup, key, max)
 }
 
 func readExternalRawOptional(lookup func(string) (string, bool), key string, max int) (string, bool, error) {

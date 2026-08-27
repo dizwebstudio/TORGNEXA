@@ -1,6 +1,6 @@
-# Package status — 2026-08-23
+# Package status — 2026-08-27
 
-**Tasks 001–129 are repository-implemented.** Task 129 adds the trust control plane and three governed decision capabilities on top of the P4, enterprise UX, compact migration baseline, AI connector and MCP identity work from Tasks 118–128. Architecture policy: **124 modules / 38 providers / 120 reviews**. Active migrations are **16**, latest `000016`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **129 operations / 0.21.0**.
+**Tasks 001–132 are repository-implemented.** Task 132 composes Telegram text publication through the dedicated Social surface, authenticated API and leased worker while retaining fail-safe ambiguous-write recovery. The catalog therefore contains 11 generic product integrations, eight working separate-surface providers and 19 planned connectors. Architecture policy: **125 modules / 38 providers / 123 reviews**. Active migrations are **17**, latest `000017`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **134 operations / 0.21.1**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -10,14 +10,48 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 382
-- adrs: 99
-- tasks: 131
+- docs: 384
+- adrs: 102
+- tasks: 134
 - milestones: 14
-- contracts: 216
+- contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2162
+- total source files (excluding local secrets/build/dependency/cache trees): 2202
 
+
+## Task 132 additions
+
+- authenticated channel and publication API backed by canonical Social Core;
+- Telegram `social.post.text` production composition with strict negative
+  `chat_id`, encrypted bot-token references and provider-neutral worker ports;
+- due-publication leasing plus append-only remote receipts and fail-safe
+  `write_outcome_unknown` crash recovery that never auto-repeats an ambiguous
+  remote write;
+- dedicated `/social` channel, composer, scheduling and history interface;
+- migration `000017`, five additive OpenAPI operations and regenerated SDKs;
+- rebuilt local API, worker and frontend with 17/17 migrations applied. Live
+  Telegram delivery remains an external credentialed qualification gate.
+
+## Task 131 additions
+
+- production composition of `cbr-fx` through the existing immutable FX domain,
+  PostgreSQL fact/evidence repository and provider-neutral resolver;
+- official dated Bank of Russia XML transport with host-owned DNS/TLS/SSRF
+  controls, bounded response handling and a short whole-document cache;
+- immediate and six-hourly non-fatal worker refresh for 53 exactly representable
+  currency pairs, with fail-closed freshness and no silent IRR rounding;
+- working Finance-surface catalog classification and `/finance` call to action;
+- lower-MTU Community bridge support for reliable TLS egress on VPN/tunnel hosts;
+- live runtime evidence: 53/53 reviewed rates refreshed and persisted from CBR.
+
+## Task 130 additions
+
+- schema-backed readiness classification for all 38 connector manifests: 11 generic runtime integrations, six AI providers on their dedicated surface and 21 planned entries;
+- generated TypeScript and Go readiness projections with exact inventory, capability-subset and product-direction checks;
+- built-in product readers for AliExpress RU, Magnit Market, Megamarket, OpenCart and PrestaShop, plus OpenCart product writes;
+- fail-closed account, capability, health and synchronization admission for operations absent from the production runtime;
+- marketplace-style catalog cards that distinguish working, separate and planned integrations without presenting manifest-only SDK coverage as production functionality;
+- OpenAPI 0.21.1 and regenerated SDKs documenting the existing HTTP 422 denial class for unsupported runtime operations.
 
 ## Task 129 additions
 
@@ -310,6 +344,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0097-ai-provider-settings-and-openai-compatible-admission.md`
 - `adr/0098-mcp-client-accounts-and-identity-resolver.md`
 - `adr/0099-trust-control-plane-and-decision-labs.md`
+- `adr/0100-runtime-truthful-integration-catalog.md`
+- `adr/0101-cbr-fx-production-runtime.md`
+- `adr/0102-telegram-social-production-runtime.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -431,6 +468,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/127-qwen-connector.json`
 - `architecture/reviews/128-deepseek-connector.json`
 - `architecture/reviews/129-trust-control-plane-decision-labs.json`
+- `architecture/reviews/130-runtime-truthful-integration-catalog.json`
+- `architecture/reviews/131-cbr-fx-production-runtime.json`
+- `architecture/reviews/132-telegram-social-production-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -449,6 +489,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/aliexpress-ru/fixtures/products-page-1.json`
 - `connectors/aliexpress-ru/helpers.go`
 - `connectors/aliexpress-ru/manifest.json`
+- `connectors/aliexpress-ru/presentation.json`
 - `connectors/aliexpress-ru/products.go`
 - `connectors/auto-ru/classified.go`
 - `connectors/auto-ru/config.go`
@@ -562,6 +603,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/magnit-market/inventory.go`
 - `connectors/magnit-market/manifest.json`
 - `connectors/magnit-market/orders.go`
+- `connectors/magnit-market/presentation.json`
 - `connectors/magnit-market/prices.go`
 - `connectors/magnit-market/products.go`
 - `connectors/max-messenger/config.go`
@@ -591,6 +633,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/megamarket/inventory.go`
 - `connectors/megamarket/manifest.json`
 - `connectors/megamarket/orders.go`
+- `connectors/megamarket/presentation.json`
 - `connectors/megamarket/products.go`
 - `connectors/moysklad/catalog.go`
 - `connectors/moysklad/conformance.go`
@@ -651,6 +694,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/ozon/fixtures/warehouses.json`
 - `connectors/ozon/inventory.go`
 - `connectors/ozon/manifest.json`
+- `connectors/ozon/presentation.json`
 - `connectors/ozon/products.go`
 - `connectors/prestashop/config.go`
 - `connectors/prestashop/conformance.go`
@@ -746,6 +790,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/wildberries/fixtures/warehouses.json`
 - `connectors/wildberries/inventory.go`
 - `connectors/wildberries/manifest.json`
+- `connectors/wildberries/presentation.json`
 - `connectors/wildberries/products.go`
 - `connectors/woocommerce/config.go`
 - `connectors/woocommerce/conformance.go`
@@ -781,6 +826,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/yandex-market/manifest.json`
 - `connectors/yandex-market/notifications.go`
 - `connectors/yandex-market/orders.go`
+- `connectors/yandex-market/presentation.json`
 - `connectors/yandex-market/prices.go`
 - `connectors/yandex-market/products.go`
 - `connectors/yandex-market/write.go`
@@ -833,6 +879,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/conformance/connector-conformance.yaml`
 - `contracts/connector-capabilities.yaml`
 - `contracts/connectors/account.schema.json`
+- `contracts/connectors/builtin-runtime-support-v1.json`
+- `contracts/connectors/builtin-runtime-support-v1.schema.json`
 - `contracts/connectors/health.schema.json`
 - `contracts/connectors/remote-error.schema.json`
 - `contracts/domain/address.schema.json`
@@ -1205,6 +1253,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/magnit-market/conformance-report.json`
 - `docs/connectors/magnit-market/reconciliation.md`
 - `docs/connectors/magnit-market/spec.md`
+- `docs/connectors/marketplaces.md`
 - `docs/connectors/max-messenger/README.md`
 - `docs/connectors/max-messenger/capability-audit.md`
 - `docs/connectors/max-messenger/conformance-plan.md`
@@ -1337,6 +1386,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/youtube/reconciliation.md`
 - `docs/connectors/youtube/spec.md`
 - `docs/deployment/093-community-docker-deployment.md`
+- `docs/deployment/environment-variables.md`
 - `docs/diagrams/architecture.mmd`
 - `docs/diagrams/order-flow.mmd`
 - `docs/diagrams/privacy-delete-flow.mmd`
@@ -1422,8 +1472,16 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/index.html`
 - `frontend/package-lock.json`
 - `frontend/package.json`
+- `frontend/public/connector-logos/README.md`
+- `frontend/public/connector-logos/aliexpress-ru.svg`
+- `frontend/public/connector-logos/magnit-market.svg`
+- `frontend/public/connector-logos/megamarket.svg`
+- `frontend/public/connector-logos/ozon.svg`
+- `frontend/public/connector-logos/wildberries.svg`
+- `frontend/public/connector-logos/yandex-market.svg`
 - `frontend/public/docs/documentation.png`
 - `frontend/public/docs/login.png`
+- `frontend/public/oidc/silent-callback.html`
 - `frontend/repository-shims.d.ts`
 - `frontend/src/api/ApiProvider.tsx`
 - `frontend/src/api/client.ts`
@@ -1488,11 +1546,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/PublicDocumentationPage.tsx`
 - `frontend/src/pages/ReportsPage.tsx`
 - `frontend/src/pages/SettingsPage.tsx`
+- `frontend/src/pages/SocialPage.tsx`
 - `frontend/src/pages/SyncPage.tsx`
 - `frontend/src/shell/AppShell.tsx`
 - `frontend/src/shell/navigation.ts`
 - `frontend/src/shell/useLocationPath.ts`
 - `frontend/src/styles.css`
+- `frontend/test/auth-retry.test.mjs`
 - `frontend/test/decoders.test.mjs`
 - `frontend/test/navigation.test.mjs`
 - `frontend/test/realtime.test.mjs`
@@ -1580,6 +1640,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/security_composition_test.go`
 - `internal/app/api/settings_security.go`
 - `internal/app/api/settings_security_test.go`
+- `internal/app/api/social.go`
+- `internal/app/api/social_test.go`
 - `internal/app/api/sync.go`
 - `internal/app/api/sync_test.go`
 - `internal/app/api/trust_control.go`
@@ -1596,9 +1658,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/mcp/server_test.go`
 - `internal/app/mcp/tools.go`
 - `internal/app/worker/connector_registry.go`
+- `internal/app/worker/fx_reference.go`
+- `internal/app/worker/fx_reference_test.go`
 - `internal/app/worker/reconciliation_actions.go`
 - `internal/app/worker/reporting_batch.go`
 - `internal/app/worker/reporting_batch_test.go`
+- `internal/app/worker/social_publication.go`
+- `internal/app/worker/social_publication_test.go`
 - `internal/app/worker/worker.go`
 - `internal/app/worker/worker_test.go`
 - `internal/core/catalog/catalog.go`
@@ -1649,6 +1715,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/builtinruntime/http.go`
 - `internal/platform/builtinruntime/http_test.go`
 - `internal/platform/builtinruntime/registry.go`
+- `internal/platform/builtinruntime/support.go`
+- `internal/platform/builtinruntime/support_generated.go`
+- `internal/platform/builtinruntime/support_test.go`
 - `internal/platform/claims/claims.go`
 - `internal/platform/claims/claims_test.go`
 - `internal/platform/cloudbilling/billing.go`
@@ -1866,6 +1935,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/securitysettingsrepo/migration_test.go`
 - `internal/platform/postgres/securitysettingsrepo/repository.go`
 - `internal/platform/postgres/settlementrepo/repository.go`
+- `internal/platform/postgres/socialdispatchrepo/repository.go`
 - `internal/platform/postgres/socialrepo/capability_test.go`
 - `internal/platform/postgres/socialrepo/migration_test.go`
 - `internal/platform/postgres/socialrepo/repository.go`
@@ -1970,6 +2040,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000014_mcp_client_accounts.sql`
 - `migrations/000015_ai_provider_qwen_deepseek.sql`
 - `migrations/000016_trust_control_plane.sql`
+- `migrations/000017_social_publication_runtime.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2269,6 +2340,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/127-qwen-connector.md`
 - `tasks/issues/128-deepseek-connector.md`
 - `tasks/issues/129-trust-control-plane-decision-labs.md`
+- `tasks/issues/130-runtime-truthful-integration-catalog.md`
+- `tasks/issues/131-cbr-fx-production-runtime.md`
+- `tasks/issues/132-telegram-social-production-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

@@ -1,13 +1,67 @@
-# Repository validation report — Tasks through 129 — 2026-08-24
+# Repository validation report — Tasks through 132 — 2026-08-27
 
 ## Inventory
 
-- repository-implemented tasks: `001`–`129`;
-- architecture: **124 modules / 38 provider modules / 120 reviews**;
-- active PostgreSQL baseline: **16 migrations**, latest `000016`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
-- public OpenAPI/generated SDK surface: **129 operations / OpenAPI 0.21.0**;
-- connector catalog: **38 connectors**;
+- repository-implemented tasks: `001`–`132`;
+- architecture: **125 modules / 38 provider modules / 123 reviews**;
+- active PostgreSQL baseline: **17 migrations**, latest `000017`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
+- public OpenAPI/generated SDK surface: **134 operations / OpenAPI 0.21.1**;
+- connector catalog: **38 manifests / 11 generic runtime integrations / 8 working providers on separate surfaces / 19 planned**;
 - repository license: **Apache-2.0**.
+
+## Task 132 repository validation
+
+- `go test ./...` and `go vet ./...` in the pinned Go 1.26.7 validation image: **PASS**;
+- contracts and task numbering: **PASS — 134 operations / Tasks 001–132 contiguous**;
+- generated Go/Python/TypeScript SDK drift and runtime tests: **PASS**;
+- architecture: **PASS — 125 modules / 38 providers / 123 reviews**;
+- frontend logic/static-policy checks and production Vite build: **PASS**;
+- migration catalog/static baseline: **PASS — 17 active / latest 000017**;
+- live local migration: **PASS — 17/17**, with a pre-migration PostgreSQL backup checkpoint;
+- append-only application-role privileges: **PASS — SELECT/INSERT allowed; UPDATE/DELETE/TRUNCATE denied**;
+- rebuilt API, worker and frontend: **PASS — API/frontend healthy; Social worker component running; `/social` returns 200 and unauthenticated Social API returns 401**.
+
+Task 132 moves Telegram from planned to a working separate Social surface and
+admits only `social.post.text`. Live Telegram delivery is **not claimed**: this
+environment contains no Telegram connector account or bot token. The final
+RUNTIME-132 provider gate requires a non-production bot and dedicated test
+channel, as defined by the connector conformance plan.
+
+## Task 131 validation
+
+- `go test ./...` and `go vet ./...` in the pinned Go 1.26.7 validation image: **PASS**;
+- runtime-support generation and exact 38-manifest parity: **PASS**;
+- contracts, JSON Schema fixtures, architecture and package index: **PASS**;
+- frontend logic tests and production Vite build: **PASS**;
+- Community deployment policy, including configurable bridge MTU: **PASS**;
+- opt-in live transport probe against the official dated Bank of Russia XML
+  endpoint: **PASS**;
+- rebuilt worker live refresh: **PASS — 53/53 reviewed currency pairs**;
+- PostgreSQL runtime evidence: **PASS — 53 distinct base currencies persisted
+  with `source_id = cbr`**;
+- API, frontend and infrastructure health: **PASS**.
+
+Task 131 moves only CBR FX from planned to working. It does not claim runtime
+readiness for the remaining 20 connectors. IRR/RUB is explicitly excluded:
+the source's million-unit nominal exceeds the platform's exact decimal scale,
+and financial observations are never silently rounded.
+
+## Task 130 validation
+
+- `go test ./...` in the digest-pinned Go 1.26.7 build image: **PASS**;
+- `go vet ./...`: **PASS**;
+- runtime support generation: **PASS — exact parity with all 38 manifests**;
+- ready connector registry resolution: **PASS — 11 product readers; outbound product sync limited to OpenCart and WooCommerce**;
+- OpenAPI/contracts and JSON Schema fixtures: **PASS — 129 operations / 0.21.1**;
+- generated Go/Python/TypeScript SDK drift and runtime tests: **PASS**;
+- frontend logic tests, TypeScript checks, static policy and production Vite build: **PASS**;
+- architecture: **PASS — 124 modules / 38 providers / 121 reviews**;
+- API, worker and frontend images rebuilt and containers recreated: **PASS**;
+- live Community state: **API healthy, frontend healthy, worker reconciliation runtime ready; `/api/v1/health` returns `ok`**.
+
+Task 130 does not claim that all 38 SDK connectors are end-to-end production
+integrations. The product now presents that distinction explicitly and rejects
+manifest-only account/capability/synchronization operations before dispatch.
 
 ## Task 129 validation
 
@@ -29,7 +83,7 @@
 
 `scripts/check-supply-chain.sh` now validates the current repository topology rather than a stale smaller inventory. It requires exactly the constrained `go` and `javascript` CI jobs, recognizes six exact Go modules (including one exact local SDK example replacement), accepts only registered npm/Python package files, safely parses bounded Compose anchors while retaining strict contract YAML parsing, admits the digest-pinned Node build image, and accounts for every `cmd/*` as either a release binary or an explicit source-only command. Unknown modules, ecosystems, jobs, images, replacements and commands remain denied.
 
-The sections below retain historical Task 118–121 evidence. Their old host/tool availability notes are superseded by the Task 129 containerized checks above.
+The sections below retain historical Task 118–121 evidence. Their old host/tool availability notes are superseded by the Task 129–130 containerized checks above.
 
 
 ## P4 repository checks

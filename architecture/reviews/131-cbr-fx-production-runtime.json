@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-131",
+  "task": "131",
+  "change_class": "pillar_change",
+  "summary": "Compose the admitted CBR FX adapter, immutable FX repository and Finance surface in the production worker without turning global reference data into a tenant sync account.",
+  "scopes": [
+    ".env.example",
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "adr/0101-cbr-fx-production-runtime.md",
+    "architecture/reviews/131-cbr-fx-production-runtime.json",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "contracts/connectors/builtin-runtime-support-v1.schema.json",
+    "docker-compose.yml",
+    "docs/10-integrations-matrix.md",
+    "docs/63-fx-exchange-rate-provider.md",
+    "docs/69-frontend-shell.md",
+    "docs/connectors/cbr-fx/README.md",
+    "docs/deployment/093-community-docker-deployment.md",
+    "docs/deployment/environment-variables.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/generated/connector-catalog.ts",
+    "frontend/test/ui-experience.test.mjs",
+    "internal/app/worker/fx_reference.go",
+    "internal/app/worker/fx_reference_test.go",
+    "internal/app/worker/worker.go",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/http_test.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "scripts/generate-frontend-connector-catalog.py",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/131-cbr-fx-production-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "legal-party-product-compliance-fx"
+  ],
+  "adr": "adr/0101-cbr-fx-production-runtime.md",
+  "existing_adrs": [
+    "adr/0031-fx-rate-provider.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0065-fx-rate-provider-completion.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "CBR facts are global public reference data as established by ADR 0065; the worker does not create or infer a tenant connector account."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "not_affected",
+      "evidence": "Currency codes, exact rates, public source references and timestamps contain no tenant data or PII and retain the existing finance backup policy."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "The existing authenticated GET /api/v1/fx/rates read contract is unchanged; no path, schema or response meaning changes."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event schema, topic, producer envelope or consumer behavior changes."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "The existing additive FXRateReader interface and cbr-fx manifest are unchanged; only host composition is added."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "The worker uses the existing append-only fx_rate_facts and fx_resolution_evidence repository; no table or stored row is rewritten."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Public read-only CBR egress uses the shared HTTPS-only DNS/public-address/pinned-dial/redirect-deny transport; no secret is accepted or logged."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "The operation reads public reference data and appends immutable facts; it exposes no tenant or remote write and requires no approval bypass."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Every selected observation is persisted with source reference and deterministic resolution evidence before Finance can consume it."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Stable fact IDs and append-only conflict checks make repeated observations idempotent; the process cache is non-authoritative."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "A new fixed official egress destination is admitted through the existing host-owned connector transport; no webhook destination handling changes."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "The worker emits bounded success/deferred events and keeps CBR outages isolated from unrelated supervised components."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Rollback is a worker/frontend binary rollback. Already persisted immutable facts remain valid history and require no destructive cleanup."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Tests cover exact registry admission, generated surface classification, full currency dispatch and fail-closed all-source failure; live qualification verifies persistence."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

@@ -12,9 +12,9 @@ var (
 	ErrInvalidConfiguration = errors.New("max: invalid configuration")
 )
 
-// Configuration binds one connector account to exactly one MAX channel and a
-// separate webhook verification secret. Human-readable links/usernames are not
-// channel identity and are deliberately excluded.
+// Configuration binds one connector account to exactly one MAX channel. The
+// webhook verification reference is optional until the independently admitted
+// webhook surface is configured; when present it must remain a separate secret.
 type Configuration struct {
 	ChatID                 int64
 	WebhookSecretReference sdk.SecretReference
@@ -25,7 +25,14 @@ type ConfigurationSource interface {
 }
 
 func (configuration Configuration) Validate() error {
-	if configuration.ChatID == 0 || !configuration.WebhookSecretReference.Valid() || configuration.WebhookSecretReference == "" {
+	if configuration.ChatID == 0 || (configuration.WebhookSecretReference != "" && !configuration.WebhookSecretReference.Valid()) {
+		return ErrInvalidConfiguration
+	}
+	return nil
+}
+
+func (configuration Configuration) validateWebhook() error {
+	if configuration.Validate() != nil || configuration.WebhookSecretReference == "" {
 		return ErrInvalidConfiguration
 	}
 	return nil

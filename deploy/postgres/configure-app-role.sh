@@ -32,7 +32,8 @@ REVOKE UPDATE ON TABLE
   fx_conversion_records,plugin_marketplace_versions,plugin_private_versions,
   plugin_marketplace_consents,plugin_marketplace_revocations,
   plugin_installation_revocations,security_evidence,ai_egress_policy_revisions,
-  ai_egress_usage,connector_replay_runs,profitability_scenarios
+  ai_egress_usage,connector_replay_runs,profitability_scenarios,
+  social_publication_receipts
 FROM torgnexa_app;
 REVOKE DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM torgnexa_app;
 GRANT DELETE ON TABLE demo_dataset_tombstones TO torgnexa_app;

@@ -19,8 +19,24 @@ grep -q 'USER 10001:10001' Dockerfile || { echo 'application image must run non-
 grep -q 'no-new-privileges:true' docker-compose.yml || { echo 'no-new-privileges is required' >&2; exit 1; }
 grep -q 'read_only: true' docker-compose.yml || { echo 'read-only application filesystems are required' >&2; exit 1; }
 python3 - <<'PY'
-import hashlib,json,pathlib,sys
+import hashlib,json,pathlib,re,sys
 root=pathlib.Path('.')
+compose_text=(root/'docker-compose.yml').read_text()
+example_text=(root/'.env.example').read_text()
+env_doc=(root/'docs/deployment/environment-variables.md').read_text()
+compose_vars=set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', compose_text))
+example_vars=set(re.findall(r'(?m)^([A-Z][A-Z0-9_]*)=', example_text))
+missing_example=sorted(compose_vars-example_vars)
+if missing_example:
+    raise SystemExit(f'Compose variables missing from .env.example: {missing_example}')
+missing_docs=sorted(name for name in example_vars if f'`{name}`' not in env_doc)
+if missing_docs:
+    raise SystemExit(f'.env.example variables missing from environment reference: {missing_docs}')
+initializer_text=(root/'scripts/init-community-env.sh').read_text()
+initializer_vars=set(re.findall(r'(?m)^([A-Z][A-Z0-9_]*)=', initializer_text))
+missing_template=sorted(initializer_vars-example_vars)
+if missing_template:
+    raise SystemExit(f'generated .env variables missing from .env.example: {missing_template}')
 cat=json.loads((root/'migrations/catalog.json').read_text())['migrations']
 lines=(root/'deploy/postgres/catalog.tsv').read_text().splitlines()
 if not lines or lines[0] != 'version\tname\tfile\tphase\trisk\tsha256\thistory_mode':
@@ -53,8 +69,7 @@ roles={r['name'] for r in realm['roles']['realm']}
 if roles != {'admin','manager','operator','viewer'}:
     raise SystemExit('Keycloak role baseline drift')
 
-import re
-compose=(root/'docker-compose.yml').read_text()
+compose=compose_text
 for match in re.finditer(r'(?m)^\s+image:\s+([^#\s]+)', compose):
     ref=match.group(1)
     if not re.search(r'@sha256:[0-9a-f]{64}$', ref):

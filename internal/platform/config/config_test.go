@@ -124,6 +124,23 @@ func TestLoadWithLookupAllowsEmptyManagedIssuerAllowlist(t *testing.T) {
 	}
 }
 
+func TestLoadWithLookupAllowsEmptyOptionalNotificationTransports(t *testing.T) {
+	cfg, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{
+		"NOTIFICATION_SMTP_ADDRESS":     "",
+		"NOTIFICATION_SMTP_FROM":        "",
+		"NOTIFICATION_SMTP_USERNAME":    "",
+		"NOTIFICATION_SMTP_PASSWORD":    "",
+		"NOTIFICATION_SMTP_SERVER_NAME": "",
+		"NOTIFICATION_CHAT_ENDPOINT":    "",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Notifications.SMTPAddress != "" || cfg.Notifications.ChatEndpoint != "" {
+		t.Fatalf("unexpected notification transports: %+v", cfg.Notifications)
+	}
+}
+
 func TestLoadWithLookupRequiresExplicitProductionAPIAddress(t *testing.T) {
 	_, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{
 		"TORGNEXA_ENV": "production",

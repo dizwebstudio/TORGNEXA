@@ -6,7 +6,7 @@
 - family: `social`
 - connector version: `1.0.0`
 - Connector SDK: v1
-- Telegram Bot API baseline: `10.2` (2026-07-14)
+- Telegram Bot API baseline: `10.3` (2026-08-24)
 - API authority: `api.telegram.org`
 - account configuration: one immutable numeric negative channel `ChatID`
 - authentication: bot token behind Task-021 `SecretAccessor`
@@ -19,6 +19,10 @@ Admitted capabilities:
 - `social.post.buttons` — HTTPS URL buttons only
 - `social.post.edit` — one remote message only
 - `social.post.delete` — one message or the 2–10 message set emitted for one album
+
+Production composition in Task 132 intentionally activates only
+`social.post.text`. The remaining entries are qualified SDK capability ceilings,
+not claims about currently reachable application workflows.
 
 Not admitted: provider scheduling, inbound updates/callback queries, comments, analytics, arbitrary files, live/video processing status reads or atomic album edit.
 
@@ -76,3 +80,8 @@ The manifest uses a conservative single concurrent request, 40 ms minimum interv
 ## Reconciliation boundary
 
 The successful Telegram response is the publication receipt. Bot API does not expose a general `getMessage` status operation, so this connector does not implement `SocialPublicationStatusReader` or invent remote status polling. Task 014 owns later reconciliation policy using stored remote receipts/evidence and explicit operator actions where needed.
+
+Task 132 stores that receipt outside canonical Social Core in
+`social_publication_receipts`. A reclaimed `publishing` lease with a receipt is
+finalized without another provider call; a reclaimed lease without a receipt is
+failed as `write_outcome_unknown`. Automatic duplicate-prone resend is forbidden.

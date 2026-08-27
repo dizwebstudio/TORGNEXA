@@ -16,6 +16,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	runtimeconfigstore "github.com/torgnexa/torgnexa/internal/platform/postgres/connectorconfigrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
@@ -49,6 +50,7 @@ type connectorAccountAPI struct {
 	sync       connectorSyncStarter
 	oauthStore connectorauth.SessionStore
 	callbacks  *connectorauth.CallbackPolicy
+	registry   connectorRuntimeAdmission
 	exchange   connectorOAuthExchange
 	now        func() time.Time
 }
@@ -56,6 +58,14 @@ type connectorAccountAPI struct {
 type connectorRuntimeConfigRepository interface {
 	Config(context.Context, tenancy.Scope, string) (json.RawMessage, int64, error)
 	Put(context.Context, tenancy.Scope, string, json.RawMessage, int64) (int64, error)
+}
+
+type connectorRuntimeAdmission interface {
+	SupportsAccountConfiguration(string) bool
+	SupportsCapability(string, string) bool
+	SupportsSync(string, string, string) bool
+	RuntimeConfigRequired(string) bool
+	Health(context.Context, sdk.Account, sdk.Runtime, func(context.Context, string) (json.RawMessage, error)) (sdk.Health, error)
 }
 
 type connectorAccountRepository interface {
@@ -149,12 +159,12 @@ type connectorAccountPage struct {
 	NextCursor string                 `json:"next_cursor,omitempty"`
 }
 
-func newConnectorAccountRoutes(repository *connectorrepo.Repository, configs *runtimeconfigstore.Repository, auditService auditCapturer, secretProvider secrets.SecretProvider, callbackPolicy *connectorauth.CallbackPolicy, syncStarters ...connectorSyncStarter) []ProtectedRoute {
+func newConnectorAccountRoutes(repository *connectorrepo.Repository, configs *runtimeconfigstore.Repository, auditService auditCapturer, secretProvider secrets.SecretProvider, callbackPolicy *connectorauth.CallbackPolicy, registry connectorRuntimeAdmission, syncStarters ...connectorSyncStarter) []ProtectedRoute {
 	var syncStarter connectorSyncStarter
 	if len(syncStarters) > 0 {
 		syncStarter = syncStarters[0]
 	}
-	api := &connectorAccountAPI{repository: repository, configs: configs, audit: auditService, secrets: secretProvider, sync: syncStarter, oauthStore: repository, callbacks: callbackPolicy, exchange: connectorauth.HTTPExchange, now: func() time.Time { return time.Now().UTC() }}
+	api := &connectorAccountAPI{repository: repository, configs: configs, audit: auditService, secrets: secretProvider, sync: syncStarter, oauthStore: repository, callbacks: callbackPolicy, registry: registry, exchange: connectorauth.HTTPExchange, now: func() time.Time { return time.Now().UTC() }}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: ConnectorAccountsPath, Permission: "connectors.accounts.read", Handler: http.HandlerFunc(api.list)},
 		{Method: http.MethodPost, Path: ConnectorAccountsPath, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.create)},
@@ -183,7 +193,8 @@ func (api *connectorAccountAPI) runtimeConfigGet(w http.ResponseWriter, request 
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	if _, err := api.repository.AccountByID(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID); err != nil {
+	_, err := api.repository.AccountByID(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil {
 		writeProblem(w, http.StatusNotFound, "Not Found")
 		return
 	}
@@ -321,7 +332,7 @@ func credentialClass(manifest sdk.Manifest) (secrets.Class, error) {
 
 func (api *connectorAccountAPI) list(w http.ResponseWriter, request *http.Request) {
 	scope, ok := ScopeFromContext(request.Context())
-	if !ok || api == nil || api.repository == nil || api.audit == nil {
+	if !ok || api == nil || api.repository == nil || api.audit == nil || api.registry == nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -393,6 +404,13 @@ func (api *connectorAccountAPI) capabilities(w http.ResponseWriter, request *htt
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	for _, capability := range input.Enabled {
+		executable := api.registry.SupportsCapability(account.ConnectorID, string(capability))
+		if !executable {
+			writeProblem(w, http.StatusUnprocessableEntity, "Capability is not executable by this runtime")
+			return
+		}
+	}
 	updated, settings, err := api.repository.ReplaceAccountCapabilities(request.Context(), scope, account.ID, input.ExpectedVersion, manifest, input.Enabled)
 	if errors.Is(err, sdk.ErrInvalidCapabilitySettings) {
 		writeProblem(w, http.StatusUnprocessableEntity, "Capability is not declared by connector manifest")
@@ -411,7 +429,7 @@ func (api *connectorAccountAPI) capabilities(w http.ResponseWriter, request *htt
 
 func (api *connectorAccountAPI) create(w http.ResponseWriter, request *http.Request) {
 	scope, ok := ScopeFromContext(request.Context())
-	if !ok || api == nil || api.repository == nil {
+	if !ok || api == nil || api.repository == nil || api.registry == nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -423,6 +441,11 @@ func (api *connectorAccountAPI) create(w http.ResponseWriter, request *http.Requ
 	manifest, err := sdk.CatalogManifest(input.ConnectorID)
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	available := api.registry.SupportsAccountConfiguration(input.ConnectorID)
+	if !available {
+		writeProblem(w, http.StatusUnprocessableEntity, "Connector runtime unavailable")
 		return
 	}
 	secretReference, err := sdk.ParseSecretReference(input.SecretReference)
@@ -516,7 +539,7 @@ func (api *connectorAccountAPI) healthHistory(w http.ResponseWriter, request *ht
 
 func (api *connectorAccountAPI) check(w http.ResponseWriter, request *http.Request) {
 	scope, ok := ScopeFromContext(request.Context())
-	if !ok || api == nil || api.repository == nil || api.secrets == nil || api.audit == nil {
+	if !ok || api == nil || api.repository == nil || api.secrets == nil || api.audit == nil || api.registry == nil {
 		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
@@ -530,39 +553,37 @@ func (api *connectorAccountAPI) check(w http.ResponseWriter, request *http.Reque
 		writeProblem(w, 409, "Conflict")
 		return
 	}
+	available := api.registry.SupportsAccountConfiguration(account.ConnectorID)
+	if !available {
+		writeProblem(w, http.StatusUnprocessableEntity, "Connector runtime unavailable")
+		return
+	}
 	manifest, err := sdk.CatalogManifest(account.ConnectorID)
 	if err != nil {
 		writeProblem(w, 400, "Bad Request")
 		return
 	}
-	var material []byte
 	health := sdk.Health{}
 	if manifest.RequiresSecret() && account.SecretReference == "" {
 		health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "credentials_missing", CheckedAt: api.now().UTC()}
-	} else if account.SecretReference != "" {
-		ref, parseErr := secrets.ParseReference(string(account.SecretReference))
-		if parseErr != nil {
-			health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "credentials_invalid", CheckedAt: api.now().UTC()}
-		} else if useErr := api.secrets.Use(request.Context(), scope, ref, func(value []byte) error { material = append([]byte(nil), value...); return nil }); useErr != nil {
-			health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "credentials_unavailable", CheckedAt: api.now().UTC()}
-		}
 	}
-	defer clear(material)
 	if health.Status == "" {
-		if oauth, oauthErr := connectorauth.OAuthConfiguration(manifest); oauthErr == nil && oauth.GrantType == "client_credentials" {
-			client, clientErr := connectorauth.ParseOAuthClient(material)
-			if clientErr != nil {
-				health = sdk.Health{Status: sdk.HealthDegraded, ReasonCode: "credentials_invalid", CheckedAt: api.now().UTC()}
-			} else if exchanged, exchangeErr := api.oauthExchange(request.Context(), oauth, client, "", "", "", min(time.Duration(manifest.RateLimit.RequestTimeoutMS)*time.Millisecond, 15*time.Second)); exchangeErr != nil {
-				health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "oauth_exchange_failed", CheckedAt: api.now().UTC()}
-			} else {
-				clear(material)
-				material = exchanged
+		runtime, runtimeErr := connectorruntime.New(api.secrets, scope)
+		if runtimeErr != nil {
+			health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "runtime_unavailable", CheckedAt: api.now().UTC()}
+		} else {
+			var loader func(context.Context, string) (json.RawMessage, error)
+			if api.configs != nil {
+				loader = func(ctx context.Context, accountID string) (json.RawMessage, error) {
+					raw, _, loadErr := api.configs.Config(ctx, scope, accountID)
+					return raw, loadErr
+				}
+			}
+			health, err = api.registry.Health(request.Context(), account, runtime, loader)
+			if err != nil {
+				health = sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "runtime_probe_failed", CheckedAt: api.now().UTC()}
 			}
 		}
-	}
-	if health.Status == "" {
-		health = connectorauth.Check(request.Context(), manifest, material, api.now())
 	}
 	updated, err := api.repository.RecordAccountHealth(request.Context(), sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, Health: health, ExpectedVersion: account.Version})
 	if err != nil {
@@ -753,7 +774,7 @@ func (api *connectorAccountAPI) readPending(ctx context.Context, scope tenancy.S
 
 func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Request) {
 	scope, ok := ScopeFromContext(request.Context())
-	if !ok || api == nil || api.repository == nil || api.audit == nil {
+	if !ok || api == nil || api.repository == nil || api.audit == nil || api.registry == nil {
 		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
@@ -767,6 +788,11 @@ func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Requ
 		writeProblem(w, 409, "Conflict")
 		return
 	}
+	available := api.registry.SupportsAccountConfiguration(current.ConnectorID)
+	if !available {
+		writeProblem(w, http.StatusUnprocessableEntity, "Connector runtime unavailable")
+		return
+	}
 	if current.Health.Status != sdk.HealthHealthy {
 		writeProblem(w, 422, "Connection check required")
 		return
@@ -775,6 +801,24 @@ func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Requ
 	if err != nil {
 		writeProblem(w, 500, "Internal Server Error")
 		return
+	}
+	for _, setting := range settings {
+		executable := api.registry.SupportsCapability(current.ConnectorID, string(setting.Capability))
+		if setting.Enabled && !executable {
+			writeProblem(w, http.StatusUnprocessableEntity, "Enabled capability is not executable by this runtime")
+			return
+		}
+	}
+	required := api.registry.RuntimeConfigRequired(current.ConnectorID)
+	if required {
+		if api.configs == nil {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
+		if _, _, configErr := api.configs.Config(request.Context(), scope, current.ID); configErr != nil {
+			writeProblem(w, http.StatusUnprocessableEntity, "Runtime configuration required")
+			return
+		}
 	}
 	if !hasEnabledCapability(settings) {
 		writeProblem(w, 422, "At least one account capability must be enabled")
@@ -795,7 +839,7 @@ func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Requ
 func (api *connectorAccountAPI) syncNow(w http.ResponseWriter, request *http.Request) {
 	scope, ok := ScopeFromContext(request.Context())
 	principal, pok := PrincipalFromContext(request.Context())
-	if !ok || !pok || api == nil || api.repository == nil || api.sync == nil {
+	if !ok || !pok || api == nil || api.repository == nil || api.sync == nil || api.registry == nil {
 		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
@@ -807,6 +851,11 @@ func (api *connectorAccountAPI) syncNow(w http.ResponseWriter, request *http.Req
 	account, err := api.repository.AccountByID(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), input.AccountID)
 	if err != nil || account.Version != input.ExpectedVersion {
 		writeProblem(w, 409, "Conflict")
+		return
+	}
+	available := api.registry.SupportsAccountConfiguration(account.ConnectorID)
+	if !available {
+		writeProblem(w, http.StatusUnprocessableEntity, "Connector runtime unavailable")
 		return
 	}
 	if account.Status != sdk.AccountActive || account.Health.Status != sdk.HealthHealthy {

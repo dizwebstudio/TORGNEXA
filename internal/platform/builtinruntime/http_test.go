@@ -1,8 +1,11 @@
 package builtinruntime
 
 import (
+	"context"
 	"net/netip"
+	"os"
 	"testing"
+	"time"
 )
 
 func TestHostAndAddressPolicy(t *testing.T) {
@@ -24,5 +27,18 @@ func TestHostAndAddressPolicy(t *testing.T) {
 		if publicIP(addr) {
 			t.Fatalf("unsafe address accepted: %s", raw)
 		}
+	}
+}
+
+func TestLiveCBRDailyTransport(t *testing.T) {
+	if os.Getenv("TORGNEXA_LIVE_CBR") != "1" {
+		t.Skip("live CBR qualification disabled")
+	}
+	body, err := newCBRDailyHTTP(newHTTPTransport()).Daily(context.Background(), time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(body) < 1024 {
+		t.Fatalf("CBR daily document unexpectedly small: %d", len(body))
 	}
 }

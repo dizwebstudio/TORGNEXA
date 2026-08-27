@@ -72,6 +72,12 @@ Every table is organization/workspace scoped, uses composite tenant foreign keys
 
 Every mutation commits Task-003 Audit and Task-008 Outbox in the same PostgreSQL transaction. Publication mutations additionally append immutable status evidence.
 
+Task 132 adds `social_publication_receipts` as separate append-only operational
+evidence. Remote IDs do not become canonical fields. The production worker
+leases due/ready Telegram text publications, and receipt-aware crash recovery
+prevents duplicate sends when a process stops between provider success and the
+final canonical status transition.
+
 ## Events
 
 Task 020 registers four additive v1 payloads:
@@ -85,4 +91,4 @@ Payloads carry bounded identities/state/version metadata only. Content bodies, p
 
 ## Dependency boundary
 
-Task `020` supplies the model and provider-neutral execution interfaces. Task `019 n8n Node` can now expose these resources/actions without provider branches. Tasks `040 VK`, `041 Telegram`, and `042 MAX` are repository-complete provider adapters against this Core. Later social connectors implement the same capability/conformance boundary rather than adding provider-specific state to Core.
+Task `020` supplies the model and provider-neutral execution interfaces. Task `019 n8n Node` can now expose these resources/actions without provider branches. Tasks `040 VK`, `041 Telegram`, and `042 MAX` are repository-complete provider adapters against this Core. Task 132 composes Telegram text publication end to end through the production API, worker and dedicated `/social` surface. Later social connectors implement the same capability/conformance boundary rather than adding provider-specific state to Core.

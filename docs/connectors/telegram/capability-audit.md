@@ -1,6 +1,6 @@
 # Telegram Capability Audit
 
-Audited 2026-08-11 against the official Telegram Bot API documentation, current Bot API 10.2 baseline.
+Audited 2026-08-27 against the official Telegram Bot API documentation, current Bot API 10.3 baseline released 2026-08-24.
 
 Primary evidence:
 
@@ -21,6 +21,13 @@ Primary evidence:
 | `social.post.delete` | **granted: bounded receipt set** | `deleteMessage` / `deleteMessages`, max 10 IDs because the only multi-message remote receipt produced by this connector is a Telegram album. Provider time/permission restrictions remain authoritative. |
 | comments/analytics | **not declared** | No Task-041 qualification. |
 | inbound callbacks | **not declared** | Requires a separate webhook/update security contract. |
+
+## Production runtime subset
+
+Task 132 composes `social.post.text` only. Media/video need the released-upload
+host bridge; buttons and edit/delete need their own application authorization
+and reconciliation flows. Those SDK-qualified capabilities therefore remain
+disabled in the runtime support contract and UI.
 
 ## Retry decision
 

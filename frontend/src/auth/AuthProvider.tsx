@@ -8,7 +8,7 @@ interface AuthContextValue {
   readonly status: AuthStatus;
   readonly session: AuthSession | null;
   readonly error: string | null;
-  refresh(): Promise<void>;
+  refresh(options?: {forceRefresh?: boolean}): Promise<AuthSession | null>;
   login(): Promise<void>;
   logout(): Promise<void>;
   manageAccount(): Promise<void>;
@@ -21,28 +21,30 @@ export function AuthProvider({adapter, children}: {adapter: AuthAdapter; childre
   const [session, setSession] = useState<AuthSession | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setStatus("loading");
+  const refresh = useCallback(async (options?: {forceRefresh?: boolean}) => {
+    setStatus((current) => current === "authenticated" ? current : "loading");
     setError(null);
     try {
-      const next = await adapter.getSession();
+      const next = await adapter.getSession(options);
       if (!next) {
         setSession(null);
         setStatus("anonymous");
-        return;
+        return null;
       }
       const normalized = normalizeSession(next);
       if (sessionExpired(normalized)) {
         setSession(null);
         setStatus("anonymous");
-        return;
+        return null;
       }
       setSession(normalized);
       setStatus("authenticated");
+      return normalized;
     } catch {
       setSession(null);
       setError("Не удалось проверить сессию. Повторите попытку.");
       setStatus("error");
+      return null;
     }
   }, [adapter]);
 
@@ -50,6 +52,23 @@ export function AuthProvider({adapter, children}: {adapter: AuthAdapter; childre
     void refresh();
     return adapter.subscribe?.(() => { void refresh(); });
   }, [adapter, refresh]);
+
+  useEffect(() => {
+    if (!session?.expiresAt) return;
+    const expires = Date.parse(session.expiresAt);
+    if (!Number.isFinite(expires)) return;
+    const delay = Math.max(15_000, expires - Date.now() - 60_000);
+    const timer = window.setTimeout(() => { void refresh({forceRefresh: true}); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [session, refresh]);
+
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", resume);
+    return () => document.removeEventListener("visibilitychange", resume);
+  }, [refresh]);
 
   const login = useCallback(async () => {
     setError(null);

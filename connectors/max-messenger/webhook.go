@@ -32,7 +32,10 @@ func (connector *Connector) SubscribeSocialWebhook(ctx context.Context, account 
 		return sdk.ErrInvalidSocialWebhook
 	}
 	configuration, err := connector.configuration(ctx, account)
-	if err != nil {
+	if err != nil || configuration.validateWebhook() != nil {
+		if err == nil {
+			err = ErrInvalidConfiguration
+		}
 		return err
 	}
 	return connector.useSecret(ctx, runtime, account.SecretReference, validToken, func(token []byte) error {
@@ -77,7 +80,10 @@ func (connector *Connector) ReceiveSocialWebhook(ctx context.Context, account sd
 		return sdk.SocialWebhookResult{}, sdk.ErrInvalidSocialWebhook
 	}
 	configuration, err := connector.configuration(ctx, account)
-	if err != nil {
+	if err != nil || configuration.validateWebhook() != nil {
+		if err == nil {
+			err = ErrInvalidConfiguration
+		}
 		return sdk.SocialWebhookResult{}, err
 	}
 	var result sdk.SocialWebhookResult

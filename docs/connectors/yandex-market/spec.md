@@ -10,9 +10,12 @@
 
 ## Capabilities
 
-Read/receive only: `products.read`, `prices.read`, `inventory.read`, `orders.read`, `notifications.receive`.
+Read/receive: `products.read`, `prices.read`, `inventory.read`, `orders.read`, `notifications.receive`.
 
-No product, price, stock, order-status, campaign or notification-setting write capability is granted by Task 033.
+Write: `prices.write` for an exact desired price only, admitted by Task 116.
+
+No product, stock, order-status, campaign or notification-setting write
+capability is granted.
 
 ## Configuration and remote identities
 
@@ -33,6 +36,20 @@ Price values are decoded from JSON number lexemes into exact decimal strings; no
 The order projection intentionally excludes buyer contact/address data. It preserves only bounded remote identity, campaign/program/status/substatus, timestamps and line identity/count required by sync/reconciliation.
 
 The notification decoder accepts the documented notification family, validates configured business/campaign scope, derives a deterministic dedupe key, and returns a minimal event projection. Duplicate delivery is expected and is handed to Task-009 Inbox using that key. Network-source authentication/allowlisting remains a host edge responsibility, not parser authority.
+
+## Exact price writes
+
+Task 116 maps the provider-neutral `PriceWriteRequest` to the business-wide or
+campaign-specific exact-price surface selected by account configuration. RUB is
+translated to the provider's RUR currency code, and a crossed-out price is
+accepted only when it satisfies the provider's integer contract.
+
+The request expresses desired state and is safe to retry after transport
+ambiguity. A successful remote acceptance returns `Applied=true` and
+`Reconciled=false`: catalogue propagation is eventual, so a later price read and
+Task-014 reconciliation must confirm the observed remote value. The host still
+owns authorization, policy/risk checks, audit and any required approval before
+dispatch.
 
 ## Limits
 

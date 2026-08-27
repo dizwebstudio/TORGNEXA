@@ -34,6 +34,8 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/uploadrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/webhookrepo"
@@ -189,6 +191,18 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
 	}
+	socialRepository, err := socialrepo.New(db)
+	if err != nil {
+		return fail("worker_social_repository_startup_failed", err)
+	}
+	socialDispatchRepository, err := socialdispatchrepo.New(db)
+	if err != nil {
+		return fail("worker_social_dispatch_repository_startup_failed", err)
+	}
+	socialAccountRepository, err := connectorrepo.New(db)
+	if err != nil {
+		return fail("worker_social_account_repository_startup_failed", err)
+	}
 
 	reportingSink, err := reporting.NewClickHouseSink(reporting.ClickHouseConfig{Endpoint: cfg.ClickHouse.Endpoint, Username: cfg.ClickHouse.Username, Password: cfg.ClickHouse.Password, Timeout: cfg.ClickHouse.QueryTimeout})
 	if err != nil {
@@ -246,6 +260,17 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			})
 		}},
 	}
+	components = append(components, component{name: "social-publications", run: func(componentCtx context.Context) error {
+		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease)
+	}})
+
+	fxReferenceResolver, err := newFXReferenceResolver(db, runtimeRegistry.builtins)
+	if err != nil {
+		return fail("worker_fx_reference_startup_failed", err)
+	}
+	components = append(components, component{name: "fx-reference", run: func(componentCtx context.Context) error {
+		return runFXReferenceRefresh(componentCtx, logger, fxReferenceResolver)
+	}})
 
 	if cfg.Worker.ReconciliationEnabled {
 		syncRepository, repoErr := syncrepo.New(db)

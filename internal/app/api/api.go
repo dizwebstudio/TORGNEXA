@@ -46,6 +46,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/securitysettingsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
@@ -243,6 +244,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("settlement_repository_startup_failed", err)
 	}
+	socialRepository, err := socialrepo.New(db)
+	if err != nil {
+		return newRuntimeError("social_repository_startup_failed", err)
+	}
 	fxRepository, err := fxrepo.New(db)
 	if err != nil {
 		return newRuntimeError("fx_repository_startup_failed", err)
@@ -353,7 +358,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		images: imageRepository, inventory: inventoryRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
-		settlements: settlementRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
+		settlements: settlementRepository, social: socialRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadContent: quarantineStore,
 		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository,
 	})

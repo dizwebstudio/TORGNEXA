@@ -11,9 +11,9 @@ export function AuthBoundary({children}: {children: ReactNode}) {
       <main className="center-screen auth-screen">
         <div className="brand-mark">TN</div>
         <h1>TORGNEXA</h1>
-        <p>Единая консоль торговли и интеграций. Доступ выполняется через корпоративный OIDC.</p>
+        <p>Единая консоль торговли и интеграций. Используйте корпоративную учётную запись.</p>
         {auth.error && <div className="alert error" role="alert">{auth.error}</div>}
-        <button className="button primary" onClick={() => void auth.login()}>Войти через OIDC</button>
+        <button className="button primary" onClick={() => void auth.login()}>Войти</button>
         <a className="button ghost" href="/docs">Открыть документацию</a>
       </main>
     );

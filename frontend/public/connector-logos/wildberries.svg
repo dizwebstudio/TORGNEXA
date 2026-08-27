@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64">
+  <title>Wildberries</title>
+  <defs><linearGradient id="wb" x1="0" x2="1"><stop stop-color="#CB11AB"/><stop offset="1" stop-color="#7F20C6"/></linearGradient></defs>
+  <text x="8" y="43" fill="url(#wb)" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="800" letter-spacing="-2">wildberries</text>
+</svg>

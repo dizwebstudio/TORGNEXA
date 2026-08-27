@@ -18,6 +18,15 @@ The executable backlog is represented by the task cards in `tasks/issues/`. Do n
 
 113 replaces the placeholder worker with the supervised production composition root for PostgreSQL leases, outbox→Kafka publication, Kafka→webhook delivery, reconciliation execution and optional upload-security scanning. Provider-specific reconciliation source bridges remain fail-closed follow-up work.
 
+## Runtime-truthful integration catalog
+
+130 replaces manifest-implied availability with an exact generated runtime
+support contract. Eleven connectors have a generic product bridge, six AI
+connectors belong to their dedicated settings surface, CBR FX runs in Finance,
+and 20 entries remain discoverable but fail closed until an end-to-end
+application bridge is added. Task 131 closes the first planned connector with
+real production composition rather than changing its label alone.
+
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.
 
@@ -150,3 +159,15 @@ Repository-complete: PostgreSQL-backed server DataGrid for Catalog/Orders, authe
 ## Task 121 — Pre-v1 Migration Baseline / Squash
 
 Repository-complete: fresh-install PostgreSQL migration inventory is compacted from the 74-file development chain to 11 active baseline files; the original 74 migrations/catalog are immutable archived evidence; deterministic baseline regeneration/equivalence is gated; existing exact-head development databases have an explicit verified one-time rebaseline that archives all old history before stamping the compact baseline. No business schema/data semantics are changed by the squash.
+
+## Task 132 — Telegram Social production runtime
+
+Repository implementation complete: the Task-041 Telegram adapter is composed
+through Task-020 Social Core, authenticated channel/publication APIs, leased
+worker delivery, append-only remote receipts and a dedicated `/social`
+frontend. Production admission is limited to `social.post.text`; media,
+buttons, edit/delete and inbound updates remain planned until their full host
+workflows are connected. Final live-provider qualification remains pending
+because the local environment has no Telegram account/bot token; it must use a
+non-production bot and dedicated test channel before a deployment claims the
+RUNTIME-132 live gate.

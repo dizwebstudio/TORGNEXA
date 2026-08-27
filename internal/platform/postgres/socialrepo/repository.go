@@ -147,6 +147,54 @@ func (r *Repository) DuePublications(ctx context.Context, scope social.Scope, at
 	return result, err
 }
 
+// ListChannelAccounts returns a bounded stable page for the tenant social UI.
+func (r *Repository) ListChannelAccounts(ctx context.Context, scope social.Scope, limit int) ([]social.ChannelAccount, error) {
+	if err := validate(ctx, r, scope); err != nil || limit < 1 || limit > 100 {
+		return nil, social.ErrInvalidRecord
+	}
+	result := make([]social.ChannelAccount, 0, limit)
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT id,organization_id,workspace_id,connector_account_id,display_name,capabilities,status,version,created_at,updated_at FROM social_channel_accounts WHERE organization_id=$1 AND workspace_id=$2 ORDER BY created_at DESC,id DESC LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), limit)
+		if err != nil {
+			return fmt.Errorf("social repository: list channels: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			value, scanErr := scanChannel(rows)
+			if scanErr != nil {
+				return scanErr
+			}
+			result = append(result, value)
+		}
+		return rows.Err()
+	})
+	return result, err
+}
+
+// ListPublications returns recent canonical publications for the tenant social UI.
+func (r *Repository) ListPublications(ctx context.Context, scope social.Scope, limit int) ([]social.Publication, error) {
+	if err := validate(ctx, r, scope); err != nil || limit < 1 || limit > 100 {
+		return nil, social.ErrInvalidRecord
+	}
+	result := make([]social.Publication, 0, limit)
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT id,organization_id,workspace_id,variant_id,channel_account_id,schedule_mode,scheduled_at,status,attempt,COALESCE(reason_code,''),version,created_at,updated_at,published_at FROM social_publications WHERE organization_id=$1 AND workspace_id=$2 ORDER BY created_at DESC,id DESC LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), limit)
+		if err != nil {
+			return fmt.Errorf("social repository: list publications: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			value, scanErr := scanPublication(rows)
+			if scanErr != nil {
+				return scanErr
+			}
+			result = append(result, value)
+		}
+		return rows.Err()
+	})
+	return result, err
+}
+
 func (r *Repository) CreateContent(ctx context.Context, scope social.Scope, command social.CreateContent, mutation social.Mutation) (social.Content, error) {
 	if err := validateMutation(ctx, r, scope, mutation); err != nil {
 		return social.Content{}, err

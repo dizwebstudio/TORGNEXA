@@ -10,6 +10,11 @@ make community-up
 
 The first invocation creates `.env` with random local credentials and mode `0600`, validates the deployment policy, builds the shared TORGNEXA application image definition, initializes the databases/object store, applies all reviewed migrations, then starts API, worker, scheduler and MCP.
 
+Before changing ports, OIDC, worker, ClamAV or notification settings, see the
+[complete `.env` reference](environment-variables.md). It explains every
+variable, valid formats, safe secret generation and recovery rules for an
+existing installation.
+
 Useful commands:
 
 ```bash
@@ -30,7 +35,7 @@ Local endpoints after startup:
 - ClickHouse HTTP/native: `127.0.0.1:8123` / `127.0.0.1:9000`
 - S3-compatible Garage: `http://127.0.0.1:9002`
 
-All host bindings are loopback-only. Containers use Docker DNS/internal ports (`postgres:5432`, `kafka:29092`, `garage:3900`, etc.).
+All host bindings are loopback-only. Containers use Docker DNS/internal ports (`postgres:5432`, `kafka:29092`, `garage:3900`, etc.). The backend bridge uses `TORGNEXA_DOCKER_NETWORK_MTU` (default `1376`) so HTTPS egress remains reliable on VPN/tunnel hosts whose path MTU is lower than Ethernet's 1500 bytes.
 
 ## Why Garage rather than a legacy MinIO image
 
@@ -39,6 +44,9 @@ The Community deployment needs a maintained, redistributable S3-compatible conta
 ## Secret handling
 
 `.env.example` intentionally contains no usable secrets. `make community-up` calls `scripts/init-community-env.sh` when `.env` is absent. Keep the generated `.env` while persistent volumes exist: rotating database/object-store credentials independently from stored state can make the local deployment inaccessible.
+
+For explicit initialization before startup use `make community-init`. Do not
+create `.env` by copying the example with blank secrets.
 
 For production use an external secret manager/Docker secrets/Kubernetes secrets rather than Compose environment variables.
 

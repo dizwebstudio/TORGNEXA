@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/connectors/builtin-runtime-support-v1.json",
+  "title": "TORGNEXA built-in runtime support v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "connectors"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "connectors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/support"}
+    }
+  },
+  "$defs": {
+    "support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector_id", "stage", "surface", "operational_capabilities", "sync"],
+      "properties": {
+        "connector_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+        "stage": {"enum": ["ready", "separate_surface", "planned"]},
+        "surface": {"enum": ["integrations", "ai_providers", "finance", "social", "none"]},
+        "operational_capabilities": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "sync": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entity_type", "directions"],
+            "properties": {
+              "entity_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+              "directions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "uniqueItems": true,
+                "items": {"enum": ["inbound", "outbound"]}
+              }
+            }
+          }
+        },
+        "social_text_max_runes": {"type": "integer", "minimum": 1, "maximum": 50000},
+        "runtime_config_template": {"type": "object", "maxProperties": 64}
+      }
+    }
+  }
+}

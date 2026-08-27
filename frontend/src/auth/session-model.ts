@@ -83,3 +83,9 @@ export function sessionExpired(session: AuthSession, now = Date.now()): boolean 
   const expires = Date.parse(session.expiresAt);
   return !Number.isFinite(expires) || expires <= now;
 }
+
+export function sessionNeedsRefresh(session: AuthSession, now = Date.now(), minimumValidityMs = 60_000): boolean {
+  if (!session.expiresAt) return false;
+  const expires = Date.parse(session.expiresAt);
+  return !Number.isFinite(expires) || expires <= now + Math.max(0, minimumValidityMs);
+}

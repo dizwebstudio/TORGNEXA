@@ -1,5 +1,6 @@
 declare module "react" {
   export type ReactNode = unknown;
+  export interface CSSProperties { [property: string]: string | number | undefined; }
   export type SetStateAction<T> = T | ((previous: T) => T);
   export type Dispatch<T> = (value: T) => void;
   export interface RefObject<T> { current: T; }

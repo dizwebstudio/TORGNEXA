@@ -1,10 +1,57 @@
 openapi: 3.1.0
 info:
   title: TORGNEXA API
-  version: 0.21.0
+  version: 0.21.1
 servers:
   - url: /api/v1
 paths:
+  /social/channels:
+    get:
+      operationId: listSocialChannels
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Tenant social channels, content: {application/json: {schema: {$ref: '#/components/schemas/SocialChannelPage'}}}}
+        '403': {description: Caller lacks connectors.read}
+    post:
+      operationId: createSocialChannel
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialChannelCreate'}}}}
+      responses:
+        '201': {description: Social channel created, content: {application/json: {schema: {$ref: '#/components/schemas/SocialChannel'}}}}
+        '409': {description: Connector account or text capability is unavailable}
+  /social/channels/{channel_id}:
+    put:
+      operationId: updateSocialChannel
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: channel_id, in: path, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialChannelUpdate'}}}}
+      responses:
+        '200': {description: Social channel updated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialChannel'}}}}
+        '409': {description: Optimistic version or channel state conflict}
+  /social/publications:
+    get:
+      operationId: listSocialPublications
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Recent tenant social publications, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationPage'}}}}
+        '403': {description: Caller lacks connectors.read}
+    post:
+      operationId: createSocialPublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationCreate'}}}}
+      responses:
+        '202': {description: Canonical publication accepted for asynchronous delivery, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublication'}}}}
+        '409': {description: 'Channel, content or idempotent replay conflict'}
   /sync/policies:
     post:
       operationId: createSyncPolicy
@@ -29,6 +76,7 @@ paths:
         '400': {description: Invalid policy or idempotency key}
         '403': {description: Administrator permission required}
         '409': {description: Policy already exists or connector account is unavailable}
+        '422': {description: Connector runtime does not support the requested entity/direction or the account capability is disabled}
   /sync/policies/{policy_id}:
     parameters:
       - name: policy_id
@@ -53,7 +101,7 @@ paths:
       parameters:
         - {name: policy_id, in: path, required: true, schema: {type: string}}
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
-      responses: {'202': {description: On-demand policy run durably queued}, '422': {description: Policy is disabled}}
+      responses: {'202': {description: On-demand policy run durably queued}, '422': {description: Policy is disabled or no longer supported by the connector runtime/account capabilities}}
   /sync/drifts/{drift_id}/actions:
     parameters:
       - name: drift_id
@@ -650,6 +698,7 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Account id already binds different configuration}
+        '422': {description: Connector is not executable through the generic integration runtime}
   /connector-accounts:disable:
     post:
       operationId: disableConnectorAccount
@@ -790,13 +839,13 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Concurrent account update}
-        '422': {description: A selected capability is not declared by the connector manifest}
+        '422': {description: A selected capability is not declared by the manifest or has no executable route in the current runtime}
   /connector-accounts:check:
     post:
       operationId: checkConnectorAccount
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'200': {description: Manifest-declared remote endpoint called with encrypted credentials and normalized health persisted}, '409': {description: Version conflict}}
+      responses: {'200': {description: Concrete runtime adapter called with encrypted credentials and normalized health persisted}, '409': {description: Version conflict}, '422': {description: Connector is not executable through the generic runtime}}
   /connector-accounts:health-history:
     get:
       operationId: listConnectorAccountHealthHistory
@@ -811,13 +860,13 @@ paths:
       operationId: enableConnectorAccount
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'200': {description: Healthy connector account enabled}, '422': {description: Successful connection check required}}
+      responses: {'200': {description: Healthy connector account enabled}, '422': {description: 'Runtime support, valid non-secret configuration, executable capabilities and a successful connection check are required'}}
   /connector-accounts:sync:
     post:
       operationId: syncConnectorAccount
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'202': {description: On-demand reconciliation runs durably started for enabled account policies}, '422': {description: Active healthy account and current preview evidence required before remote writes}}
+      responses: {'202': {description: On-demand reconciliation runs durably started for enabled runtime-supported account policies}, '422': {description: 'Runtime support, active healthy account and current preview evidence are required before execution'}}
   /connector-accounts:bootstrap-preview:
     post:
       operationId: previewConnectorBootstrap
@@ -1680,6 +1729,74 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    SortableID:
+      type: string
+      pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'
+    SocialChannel:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, display_name, capabilities, status, version]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        display_name: {type: string, minLength: 1, maxLength: 300}
+        capabilities: {type: array, items: {type: string, enum: [social.post.text]}, minItems: 1, maxItems: 1}
+        status: {type: string, enum: [disabled, active]}
+        version: {type: integer, minimum: 1}
+    SocialChannelPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SocialChannel'}}
+    SocialChannelCreate:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, display_name, active]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        display_name: {type: string, minLength: 1, maxLength: 300}
+        active: {type: boolean}
+    SocialChannelUpdate:
+      type: object
+      additionalProperties: false
+      required: [display_name, status, expected_version]
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 300}
+        status: {type: string, enum: [disabled, active]}
+        expected_version: {type: integer, minimum: 1}
+    SocialPublication:
+      type: object
+      additionalProperties: false
+      required: [id, channel_account_id, channel_name, text, status, attempt, version, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        channel_account_id: {$ref: '#/components/schemas/SortableID'}
+        channel_name: {type: string, minLength: 1, maxLength: 300}
+        text: {type: string, minLength: 1, maxLength: 4096}
+        status: {type: string, enum: [scheduled, ready, publishing, published, failed, cancelled]}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        attempt: {type: integer, minimum: 0}
+        publish_at: {type: string, format: date-time}
+        published_at: {type: string, format: date-time}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+    SocialPublicationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SocialPublication'}}
+    SocialPublicationCreate:
+      type: object
+      additionalProperties: false
+      required: [id, channel_account_id, text]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        channel_account_id: {$ref: '#/components/schemas/SortableID'}
+        text: {type: string, minLength: 1, maxLength: 4096}
+        publish_at: {type: string, format: date-time}
     WarehouseWrite:
       type: object
       properties:

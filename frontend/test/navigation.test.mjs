@@ -16,6 +16,7 @@ test("generated connector catalog is sorted, unique and contains marketplace man
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(connectorCatalog.filter((entry) => entry.family === "marketplace").length >= 5);
   assert.ok(connectorCatalog.every((entry) => entry.capabilities.length > 0 && entry.authKinds.length > 0));
+  assert.ok(connectorCatalog.filter((entry) => entry.family === "marketplace").every((entry) => entry.presentation?.logo.startsWith("/connector-logos/")));
 });
 
 test("unknown or missing capability fails closed", () => {

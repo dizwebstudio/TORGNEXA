@@ -2,7 +2,7 @@ import type {AuthSession} from "./session-model";
 import {createKeycloakAdapter} from "./keycloak-adapter";
 
 export interface AuthAdapter {
-  getSession(): Promise<AuthSession | null>;
+  getSession(options?: {forceRefresh?: boolean}): Promise<AuthSession | null>;
   login(returnTo: string): Promise<void>;
   logout(): Promise<void>;
   manageAccount?(): Promise<void>;

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,16 +14,25 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
+	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
 	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
+	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
+	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
 	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
+	opencart "github.com/torgnexa/torgnexa/connectors/opencart"
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
+	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
 	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
+	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
@@ -90,41 +100,54 @@ func (h *httpTransport) do(ctx context.Context, method, host, path string, query
 	if err != nil || len(ips) == 0 {
 		return 0, nil, "", 0, nil, errors.New("provider http: host resolution failed")
 	}
-	selected := ""
+	targets := make([]string, 0, len(ips))
 	for _, ip := range ips {
 		addr := ip.Unmap()
 		if !publicIP(addr) {
 			return 0, nil, "", 0, nil, errors.New("provider http: non-public destination denied")
 		}
-		if selected == "" {
-			selected = addr.String()
-		}
+		targets = append(targets, addr.String())
 	}
-	if selected == "" {
+	if len(targets) == 0 {
 		return 0, nil, "", 0, nil, errors.New("provider http: no public destination")
 	}
 
 	target := &url.URL{Scheme: "https", Host: host, Path: path, RawQuery: query.Encode()}
-	req, err := http.NewRequestWithContext(withDialTarget(ctx, selected), method, target.String(), bytes.NewReader(body))
-	if err != nil {
-		return 0, nil, "", 0, nil, errors.New("provider http: request build failed")
+	// Retrying a failed network connection against another already validated
+	// address is safe only for reads. A write may have reached the remote before
+	// the connection error and must retain the existing ambiguous-write policy.
+	if method != http.MethodGet && method != http.MethodHead {
+		targets = targets[:1]
 	}
-	for key, values := range headers {
-		for _, value := range values {
-			req.Header.Add(key, value)
+	var resp *http.Response
+	var transportErr error
+	for _, selected := range targets {
+		req, err := http.NewRequestWithContext(withDialTarget(ctx, selected), method, target.String(), bytes.NewReader(body))
+		if err != nil {
+			return 0, nil, "", 0, nil, errors.New("provider http: request build failed")
+		}
+		for key, values := range headers {
+			for _, value := range values {
+				req.Header.Add(key, value)
+			}
+		}
+		if len(body) > 0 && req.Header.Get("Content-Type") == "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if req.Header.Get("Accept") == "" {
+			req.Header.Set("Accept", "application/json")
+		}
+		if len(basicUser) > 0 || len(basicPass) > 0 {
+			req.SetBasicAuth(string(basicUser), string(basicPass))
+		}
+
+		resp, transportErr = h.client.Do(req)
+		if transportErr == nil {
+			break
 		}
 	}
-	if len(body) > 0 && req.Header.Get("Content-Type") == "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.Header.Set("Accept", "application/json")
-	if len(basicUser) > 0 || len(basicPass) > 0 {
-		req.SetBasicAuth(string(basicUser), string(basicPass))
-	}
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return 0, nil, "", 0, nil, errors.New("provider http: transport failed")
+	if transportErr != nil {
+		return 0, nil, "", 0, nil, fmt.Errorf("provider http: transport failed: %w", transportErr)
 	}
 	defer resp.Body.Close()
 	var responseBody io.Reader = resp.Body
@@ -143,6 +166,59 @@ func (h *httpTransport) do(ctx context.Context, method, host, path string, query
 	requestID := firstHeader(resp.Header, "X-Request-Id", "X-Request-ID", "Request-Id", "X-Trace-Id")
 	return resp.StatusCode, payload, requestID, retryAfterMS(resp.Header.Get("Retry-After")), resp.Header.Clone(), nil
 }
+
+// cbrDailyHTTP keeps one short-lived copy of the explicitly dated public XML
+// document. The FX connector reads one currency at a time, while the official
+// source returns the whole daily table; caching avoids one remote download per
+// currency without making the cache authoritative.
+type cbrDailyHTTP struct {
+	h       *httpTransport
+	mu      sync.Mutex
+	key     string
+	body    []byte
+	expires time.Time
+}
+
+func newCBRDailyHTTP(transport *httpTransport) *cbrDailyHTTP {
+	return &cbrDailyHTTP{h: transport}
+}
+
+func (transport *cbrDailyHTTP) Daily(ctx context.Context, at time.Time) ([]byte, error) {
+	if transport == nil || transport.h == nil || ctx == nil || at.IsZero() {
+		return nil, errors.New("cbr daily transport: invalid request")
+	}
+	moscow := time.FixedZone("MSK", 3*60*60)
+	key := at.In(moscow).Format("02/01/2006")
+	now := time.Now().UTC()
+	transport.mu.Lock()
+	if transport.key == key && now.Before(transport.expires) && len(transport.body) > 0 {
+		body := append([]byte(nil), transport.body...)
+		transport.mu.Unlock()
+		return body, nil
+	}
+	transport.mu.Unlock()
+
+	headers := http.Header{
+		"Accept":     []string{"application/xml, text/xml;q=0.9"},
+		"User-Agent": []string{"TORGNEXA/0.1"},
+	}
+	status, body, _, _, _, err := transport.h.do(ctx, http.MethodGet, "www.cbr.ru", "/scripts/XML_daily.asp", url.Values{"date_req": []string{key}}, nil, headers, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status != http.StatusOK || len(body) == 0 {
+		return nil, fmt.Errorf("cbr daily transport: remote response rejected with status %d", status)
+	}
+	transport.mu.Lock()
+	transport.key = key
+	transport.body = append(transport.body[:0], body...)
+	transport.expires = now.Add(15 * time.Minute)
+	result := append([]byte(nil), transport.body...)
+	transport.mu.Unlock()
+	return result, nil
+}
+
+var _ cbrfx.Transport = (*cbrDailyHTTP)(nil)
 
 func validHost(host string) bool {
 	if host == "" || host != strings.ToLower(strings.TrimSpace(host)) || len(host) > 253 || strings.ContainsAny(host, "/:@?#[]\\") || host == "localhost" || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".localhost") {
@@ -190,6 +266,17 @@ func retryAfterMS(v string) int64 {
 }
 
 // These adapters are intentionally confined to the reviewed built-in provider composition boundary.
+type aliexpressHTTP struct{ h *httpTransport }
+
+func (t aliexpressHTTP) Do(ctx context.Context, r aliexpressru.Request) (aliexpressru.Response, error) {
+	hdr := http.Header{}
+	if len(r.XAuthToken) > 0 {
+		hdr.Set("X-Auth-Token", string(r.XAuthToken))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return aliexpressru.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
 type wbHTTP struct{ h *httpTransport }
 
 func (t wbHTTP) Do(ctx context.Context, r wildberries.Request) (wildberries.Response, error) {
@@ -230,6 +317,28 @@ func (t ymHTTP) Do(ctx context.Context, r yandexmarket.Request) (yandexmarket.Re
 	}
 	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
 	return yandexmarket.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+type magnitHTTP struct{ h *httpTransport }
+
+func (t magnitHTTP) Do(ctx context.Context, r magnitmarket.Request) (magnitmarket.Response, error) {
+	hdr := http.Header{}
+	if len(r.APIKey) > 0 {
+		hdr.Set("X-Api-Key", string(r.APIKey))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return magnitmarket.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+type megamarketHTTP struct{ h *httpTransport }
+
+func (t megamarketHTTP) Do(ctx context.Context, r megamarket.Request) (megamarket.Response, error) {
+	hdr := http.Header{}
+	if len(r.MerchantToken) > 0 {
+		hdr.Set("X-Token", string(r.MerchantToken))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return megamarket.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
 }
 
 type onecHTTP struct{ h *httpTransport }
@@ -274,6 +383,32 @@ func (t wooHTTP) Do(ctx context.Context, r woocommerce.Request) (woocommerce.Res
 		pages, _ = strconv.Atoi(hdr.Get("X-WP-TotalPages"))
 	}
 	return woocommerce.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra, TotalPages: pages}, e
+}
+
+type openCartHTTP struct{ h *httpTransport }
+
+func (t openCartHTTP) Do(ctx context.Context, r opencart.Request) (opencart.Response, error) {
+	query := url.Values{}
+	for _, parameter := range r.Query {
+		query.Add(parameter.Name, parameter.Value)
+	}
+	hdr := http.Header{}
+	if len(r.Token) > 0 {
+		hdr.Set("Authorization", "Bearer "+string(r.Token))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, query, r.Body, hdr, nil, nil)
+	return opencart.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+type prestaShopHTTP struct{ h *httpTransport }
+
+func (t prestaShopHTTP) Do(ctx context.Context, r prestashop.Request) (prestashop.Response, error) {
+	query := url.Values{}
+	for _, parameter := range r.Query {
+		query.Add(parameter.Name, parameter.Value)
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, query, r.Body, http.Header{}, r.Username, r.Password)
+	return prestashop.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
 }
 
 type openAICompatibleHTTP struct{ h *httpTransport }
@@ -340,4 +475,64 @@ func (t yandexGPTHTTP) Do(ctx context.Context, r yandexgpt.Request) (yandexgpt.R
 	}
 	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
 	return yandexgpt.Response{StatusCode: s, Body: b}, e
+}
+
+type telegramHTTP struct{ h *httpTransport }
+
+func (t telegramHTTP) Do(ctx context.Context, request telegram.Request) (telegram.Response, error) {
+	if t.h == nil || request.Host != "api.telegram.org" || request.Method != http.MethodPost || request.APIMethod == "" || len(request.Files) != 0 || len(request.BotToken) == 0 {
+		return telegram.Response{}, errors.New("telegram http: invalid request")
+	}
+	form := url.Values{}
+	for _, parameter := range request.Params {
+		form.Add(parameter.Name, parameter.Value)
+	}
+	headers := http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}}
+	status, body, requestID, _, _, err := t.h.do(ctx, request.Method, request.Host, "/bot"+string(request.BotToken)+"/"+request.APIMethod, url.Values{}, []byte(form.Encode()), headers, nil, nil)
+	return telegram.Response{StatusCode: status, Body: body, RequestID: requestID}, err
+}
+
+type maxHTTP struct{ h *httpTransport }
+
+func (t maxHTTP) Do(ctx context.Context, request maxmessenger.Request) (maxmessenger.Response, error) {
+	if t.h == nil || request.Host != "platform-api2.max.ru" || len(request.AccessToken) == 0 || !validMAXRuntimeRequest(request) {
+		return maxmessenger.Response{}, errors.New("max http: invalid request")
+	}
+	query := url.Values{}
+	for _, parameter := range request.Params {
+		query.Add(parameter.Name, parameter.Value)
+	}
+	headers := http.Header{"Authorization": []string{string(request.AccessToken)}}
+	if len(request.Body) > 0 {
+		headers.Set("Content-Type", "application/json")
+	}
+	status, body, requestID, retryAfter, _, err := t.h.do(ctx, request.Method, request.Host, request.Path, query, request.Body, headers, nil, nil)
+	return maxmessenger.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+func (maxHTTP) Upload(context.Context, maxmessenger.UploadRequest) (maxmessenger.Response, error) {
+	return maxmessenger.Response{}, errors.New("max http: media upload is not admitted")
+}
+
+func validMAXRuntimeRequest(request maxmessenger.Request) bool {
+	if request.Method == http.MethodPost {
+		return request.Path == "/messages" && len(request.Body) > 0 && len(request.Params) == 1 && request.Params[0].Name == "chat_id"
+	}
+	if request.Method != http.MethodGet || len(request.Body) != 0 || len(request.Params) != 0 {
+		return false
+	}
+	if request.Path == "/me" {
+		return true
+	}
+	parts := strings.Split(strings.TrimPrefix(request.Path, "/"), "/")
+	if len(parts) != 2 && len(parts) != 4 {
+		return false
+	}
+	if parts[0] != "chats" {
+		return false
+	}
+	if _, err := strconv.ParseInt(parts[1], 10, 64); err != nil {
+		return false
+	}
+	return len(parts) == 2 || (parts[2] == "members" && parts[3] == "me")
 }

@@ -108,6 +108,17 @@ func (registry *runtimeRegistry) supportsPriceWrite(account sdk.Account) bool {
 	return registry.builtins.SupportsPriceWrite(account)
 }
 
+func (registry *runtimeRegistry) socialPublisher(scope tenancy.Scope, account sdk.Account) (sdk.SocialPublisher, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	publisher, err := registry.builtins.SocialPublisher(account, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return publisher, err
+}
+
 type productReconciliationSource struct {
 	database *sql.DB
 	account  sdk.Account

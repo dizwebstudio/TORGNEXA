@@ -698,6 +698,38 @@
       }
     },
     {
+      "schema": "connectors/builtin-runtime-support-v1.schema.json",
+      "valid": {
+        "schema_version": 1,
+        "connectors": [
+          {
+            "connector_id": "synthetic-market",
+            "stage": "ready",
+            "surface": "integrations",
+            "operational_capabilities": ["products.read"],
+            "sync": [
+              {
+                "entity_type": "products",
+                "directions": ["inbound"]
+              }
+            ]
+          }
+        ]
+      },
+      "invalid": {
+        "schema_version": 1,
+        "connectors": [
+          {
+            "connector_id": "synthetic-market",
+            "stage": "manifest_only",
+            "surface": "integrations",
+            "operational_capabilities": ["products.read"],
+            "sync": []
+          }
+        ]
+      }
+    },
+    {
       "schema": "connectors/health.schema.json",
       "valid": {
         "status": "unavailable",

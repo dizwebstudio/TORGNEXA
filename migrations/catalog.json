@@ -353,6 +353,26 @@
       },
       "backfill": null,
       "sha256": "61ca8edfca7cdf7f16c239135b944cc2f026654a6f9b9fc92e8d7af0cf57f153"
+    },
+    {
+      "version": 17,
+      "name": "social_publication_runtime",
+      "file": "000017_social_publication_runtime.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [16],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "9902b7c5f3fbe83a3c938b5b7de543ff7be52efc165b233ea49149702b906415"
     }
   ]
 }

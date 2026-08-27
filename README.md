@@ -10,8 +10,8 @@ TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectio
 - `adr/` — architectural decisions.
 - `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
 - `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `tasks/issues/` — atomic task cards numbered 001–110; 001–100 form the
-  contiguous implemented baseline, with later settings work tracked per card.
+- `tasks/issues/` — contiguous atomic task cards numbered 001–130, with
+  implementation and validation status recorded in each card.
 - `tasks/milestones/` — dependency-aware milestones M0-M13.
 - `templates/` — repeatable architecture, implementation and review artifacts.
 - Go scaffold, migrations, Docker Compose and CI baseline.
@@ -35,6 +35,12 @@ Kafka, Valkey, ClickHouse, Garage S3, Keycloak, the canonical migration job,
 API, worker, scheduler, MCP and the React frontend. All development host ports
 bind to `127.0.0.1`.
 
+The generated file is self-documented. A complete list of variables, accepted
+formats, examples and safe rotation rules is available in
+[`docs/deployment/environment-variables.md`](docs/deployment/environment-variables.md).
+Do not copy `.env.example` as a ready configuration: generate real secrets with
+`make community-init`.
+
 ```bash
 make community-status
 make community-down
@@ -51,6 +57,12 @@ This is a local single-host artifact, not a production CDN/web-server topology. 
 **Core never knows provider names.** Marketplaces, storefronts (including WooCommerce, PrestaShop and OpenCart), classified/verticals, social channels, ERP, EDO, government, payment, logistics, PUDO and CRM providers are plugins/connectors using capability contracts and the conformance suite.
 
 Architecture v1.0 is frozen in `docs/54-architecture-freeze-v1.md`.
+
+Marketplace coverage, admitted capabilities and qualification evidence are
+summarized in [`docs/connectors/marketplaces.md`](docs/connectors/marketplaces.md).
+Actual production execution is deliberately narrower than manifest coverage;
+the current ready/separate/planned split is documented in
+[`docs/10-integrations-matrix.md`](docs/10-integrations-matrix.md).
 
 ## Development workflow
 

@@ -4,6 +4,14 @@
 
 The sync engine is provider-neutral. Core entities never gain WB/Ozon/ERP identifiers; the existing Connector SDK `EntityMapping` is the only local ↔ remote identity bridge.
 
+Production admission is exact and fail-closed. A manifest capability does not
+make an entity executable: the connector, entity and direction must also be
+declared in `contracts/connectors/builtin-runtime-support-v1.json` and resolved
+by the built-in runtime. The current worker bridge accepts only the canonical
+`products` entity. Unsupported policies are rejected by the API before they can
+be enabled or dispatched, and the worker retains its own entity check as a
+second boundary.
+
 A versioned `SyncPolicy` binds one tenant-scoped connector account and canonical entity type to:
 
 - direction: `inbound`, `outbound`, or `bidirectional`;

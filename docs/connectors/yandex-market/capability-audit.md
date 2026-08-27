@@ -7,8 +7,8 @@
 | `inventory.read` | granted | explicit partner/campaign stock mode |
 | `orders.read` | granted | business orders |
 | `notifications.receive` | granted | bounded inbound notification decoder + deterministic dedupe |
-| `products.write` | denied | Task 033 is read-only |
-| `prices.write` | denied | separate risk-gated task required |
+| `products.write` | denied | no faithful provider-neutral desired-state contract is admitted |
+| `prices.write` | granted | Task 116 exact business-wide/campaign price update with eventual reconciliation |
 | `inventory.write` | denied | separate risk-gated task required |
 | `orders.status.write` | denied | separate approval/idempotency/risk review required |
 

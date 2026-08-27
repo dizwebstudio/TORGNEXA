@@ -14,6 +14,18 @@ Connector SDK v1 has an additive capability-specific `FXRateReader`; the frozen 
 
 `cbr-fx` is the first admitted reference provider. Its host transport binds to the official Bank of Russia daily XML endpoint with an explicit requested date. It emits official foreign-currency/RUB observations and does not synthesize inverses or hidden cross rates.
 
+Task 131 composes that transport in the production worker. The worker refreshes
+the reviewed CBR currency set immediately after startup and every six hours.
+One dated XML document is cached in process for 15 minutes to avoid downloading
+the same table for each pair; only immutable PostgreSQL facts and resolution
+evidence are authoritative. A CBR outage is logged and retried without stopping
+unrelated worker components. The configured freshness ceiling is 14 days, after
+which consumers fail closed rather than treating retained history as current.
+The admitted set currently contains 53 exact pairs. IRR/RUB is deliberately
+excluded because the official `Value / Nominal` result requires decimal scale
+10 while the canonical exact-decimal contract permits at most scale 9; the
+worker does not round a source fact to make it fit.
+
 ## Resolution, precedence and staleness
 
 `Resolver.Resolve` first checks immutable storage, then configured providers in explicit `SourcePrecedence`. Every source has a reviewed `FreshnessPolicy`. Provider results are persisted before they can be selected. Selection evidence records candidate IDs, precedence and the selected fact.
@@ -44,3 +56,4 @@ The settlement ledger remains append-only and preserves original provider amount
 - cache is disposable and can be rebuilt from facts;
 - restoring historical finance requires FX fact/resolution/conversion tables together with the finance records that reference them;
 - adding another source requires Connector SDK conformance and an architecture review, not a provider name in Core.
+- the Integration catalog links CBR FX to Finance rather than offering a fake tenant account or product synchronization policy.

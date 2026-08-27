@@ -169,7 +169,10 @@ func TestConfigurationAndSecretsStrict(t *testing.T) {
 	if config().Validate() != nil || !validToken(runtime().values[account().SecretReference]) || !validWebhookSecret(runtime().values[webhookRef()]) {
 		t.Fatal("valid rejected")
 	}
-	for _, c := range []Configuration{{}, {ChatID: 1}, {ChatID: -2, WebhookSecretReference: "bad"}} {
+	if (Configuration{ChatID: 1}).Validate() != nil || (Configuration{ChatID: 1}).validateWebhook() == nil {
+		t.Fatal("text-only configuration or webhook separation is inaccurate")
+	}
+	for _, c := range []Configuration{{}, {ChatID: -2, WebhookSecretReference: "bad"}} {
 		if c.Validate() == nil {
 			t.Fatalf("bad config accepted %+v", c)
 		}

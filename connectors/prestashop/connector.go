@@ -55,12 +55,8 @@ func New(transport Transport, configs ConfigurationSource, now func() time.Time)
 }
 
 func Manifest() sdk.Manifest {
-	return sdk.Manifest{
-		ID: "prestashop", Name: "PrestaShop", Family: sdk.FamilyMarketplace, Version: "1.0.0", SDKVersion: sdk.SDKMajor,
-		Capabilities: []sdk.Capability{"inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read"},
-		Auth:         []sdk.AuthRequirement{{Kind: sdk.AuthBasic, SecretClass: "storefront.api-key", Required: true}},
-		RateLimit:    sdk.RateLimitPolicy{MaxConcurrency: 4, MinIntervalMS: 100, RequestTimeoutMS: 30000, Retry: sdk.RetryPolicy{MaxAttempts: 5, BaseBackoffMS: 500, MaxBackoffMS: 30000}},
-	}
+	manifest, _ := sdk.CatalogManifest("prestashop")
+	return manifest
 }
 func (c *Connector) Manifest() sdk.Manifest { return Manifest() }
 

@@ -428,6 +428,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/socialdispatchrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/socialrepo",
       "kind": "infrastructure_adapter"
     },

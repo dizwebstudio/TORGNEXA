@@ -9,7 +9,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Completed repository implementation: `001`, `024`, `065`, `002`, `027`,
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
-- Contiguous implemented baseline: Tasks `001`–`108`. Post-baseline Tasks `109`–`118` are repository-implemented. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; deployment/hosted evidence remains release-topology specific and cannot be inferred from repository completion.
+- Contiguous implemented baseline: Tasks `001`–`130`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog. Deployment/hosted evidence remains release-topology specific and cannot be inferred from repository completion.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -320,3 +320,72 @@ Task 121 is repository-complete. Fresh installs execute 11 active migrations (`0
 - an existing 74-row pre-v1 development database must fail closed unless `migration-rebaseline` first verifies all legacy version/name/checksum rows and final-schema sentinels;
 - rebaseline must archive all 74 rows before stamping the 11 active baseline rows;
 - after the first production v1 release this rebaseline path is retired and applied migration history is immutable.
+
+## Phase 15 — Runtime-truthful integration catalog
+
+`130`
+
+Task 130 is repository-complete. Connector manifests remain the SDK inventory,
+while `contracts/connectors/builtin-runtime-support-v1.json` is the exact source
+of truth for production availability. Settings and the API expose only 11
+generic product integrations as executable, direct six AI connectors to their
+dedicated surface and keep 21 manifest-only connectors visibly planned but
+non-connectable. AliExpress RU, Magnit Market, Megamarket, OpenCart and
+PrestaShop join the built-in product runtime without broadening the worker past
+the canonical `products` entity.
+
+### Gate RUNTIME-130
+
+- manifest, runtime contract, generated TypeScript and generated Go inventories
+  must contain the same 38 connector IDs;
+- operational capabilities must be manifest subsets and unsupported
+  connector/entity/direction requests must fail closed at API and worker
+  boundaries;
+- all 11 ready connectors resolve product readers, while only OpenCart and
+  WooCommerce admit outbound product synchronization;
+- full Go test/vet, contracts, architecture, SDK and frontend production-build
+  gates must pass before the runtime images are recreated.
+
+## Phase 16 — Planned connector production composition
+
+`131`
+
+Task 131 activates CBR FX as the first post-Task-130 planned connector. The
+existing FX SDK adapter, immutable PostgreSQL repository and Finance page are
+now composed with an immediate/six-hour worker refresh through the official
+dated Bank of Russia XML endpoint. Runtime inventory becomes 11 generic product
+integrations, seven working separate-surface providers and 20 planned entries.
+
+### Gate RUNTIME-131
+
+- the worker must obtain CBR data only through the common host-owned HTTPS and
+  public-address egress boundary;
+- immutable facts and resolution evidence must remain the only authority;
+- source outage must not terminate unrelated worker components, while stale
+  data still fails closed after the reviewed freshness window;
+- generation, Go test/vet, contracts, architecture, frontend build and live
+  worker persistence checks must pass before Task 131 is complete.
+
+## Phase 17 — Telegram Social production composition
+
+`132`
+
+Task 132 composes the existing Telegram SDK adapter and canonical Social Core
+through authenticated channel/publication APIs, a dedicated `/social` product
+surface and leased worker delivery. The executable subset is deliberately
+`social.post.text` only. Append-only remote receipts allow a crashed
+`publishing` lease to finalize safely; absence of a receipt becomes
+`write_outcome_unknown` and is never auto-sent again. Runtime inventory becomes
+11 generic product integrations, eight working separate-surface providers and
+19 planned entries.
+
+### Gate RUNTIME-132
+
+- bot tokens remain callback-scoped in SecretProvider and `chat_id` is strict
+  negative non-secret configuration;
+- API, Core and worker remain provider-neutral; Telegram branching is confined
+  to built-in composition;
+- scheduled/ready/publishing transitions retain audit/outbox evidence and
+  worker lease recovery cannot duplicate an ambiguous remote write;
+- migration 17, OpenAPI/SDK generation, Go test/vet, contracts, architecture,
+  frontend build and live Telegram qualification must pass before completion.

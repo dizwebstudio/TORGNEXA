@@ -16,14 +16,21 @@ type syncPolicyCapabilityGuard interface {
 	AuthorizePolicy(context.Context, tenancy.Scope, string, string, syncengine.Direction) error
 }
 
-type connectorAccountCapabilityGuard struct{ repository *connectorrepo.Repository }
+type connectorAccountCapabilityGuard struct {
+	repository *connectorrepo.Repository
+	runtime    connectorRuntimeAdmission
+}
 
 func (guard connectorAccountCapabilityGuard) AuthorizePolicy(ctx context.Context, scope tenancy.Scope, accountID, entityType string, direction syncengine.Direction) error {
-	if guard.repository == nil || !scope.Valid() || !direction.Valid() {
+	if guard.repository == nil || guard.runtime == nil || !scope.Valid() || !direction.Valid() {
 		return errSyncCapabilityDenied
 	}
 	account, err := guard.repository.AccountByID(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
 	if err != nil {
+		return errSyncCapabilityDenied
+	}
+	available := guard.runtime.SupportsSync(account.ConnectorID, entityType, string(direction))
+	if !available {
 		return errSyncCapabilityDenied
 	}
 	manifest, err := sdk.CatalogManifest(account.ConnectorID)

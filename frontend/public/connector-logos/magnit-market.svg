@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64">
+  <title>Магнит Маркет</title>
+  <path fill="#E30613" d="M8 13h17l9 15 9-15h17v38H45V35L34 52 23 35v16H8z"/>
+  <text x="70" y="29" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="800">Магнит</text>
+  <text x="70" y="51" fill="#E30613" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="800">Маркет</text>
+</svg>

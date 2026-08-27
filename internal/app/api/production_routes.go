@@ -26,6 +26,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
@@ -67,6 +68,7 @@ type productionRouteDependencies struct {
 	identityPolicy     *securitysettings.ProviderURLPolicy
 	identityValidator  securitysettings.ProviderValidator
 	settlements        *settlementrepo.Repository
+	social             *socialrepo.Repository
 	privacy            privacyWorkflow
 	fxRates            *fxrepo.Repository
 	cloudSubscription  *cloudbillingrepo.Repository
@@ -85,8 +87,8 @@ type productionRouteDependencies struct {
 }
 
 func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
-	capabilityGuard := connectorAccountCapabilityGuard{repository: deps.accounts}
-	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.connectorCallbacks, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
+	capabilityGuard := connectorAccountCapabilityGuard{repository: deps.accounts, runtime: deps.aiRegistry}
+	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)
@@ -99,6 +101,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
+	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)
