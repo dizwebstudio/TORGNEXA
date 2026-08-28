@@ -127,6 +127,11 @@ func (api *aiAdvisoryAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	if baseURL := strings.TrimSpace(input.BaseURL); baseURL != "" && !strings.HasPrefix(baseURL, "https://") && !builtinruntime.IsLocalBaseURL(baseURL) {
+		zero(cmd.Credential)
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
 	credentialDigest := sha256.Sum256(cmd.Credential)
 	_, digest, err := trustcontrol.DigestJSON(map[string]any{"provider": input.Provider, "label": input.Label, "model": input.Model, "base_url": input.BaseURL, "folder_id": input.FolderID, "credential_sha256": hex.EncodeToString(credentialDigest[:])})
 	if err != nil {
@@ -353,18 +358,21 @@ func redactOptionalPrompt(value string, maxBytes int) (string, error) {
 }
 
 // hostFromBaseURL extracts the bare hostname builtinruntime.AICompletion's
-// host override expects. aiadvisory.ValidateCreate already guarantees a
-// stored BaseURL is either empty or an "https://" URL; the connector
-// transport (internal/platform/builtinruntime) rejects anything but a bare
-// hostname, so the scheme/path/port must be stripped at this provider-neutral
-// boundary rather than forwarded as-is.
+// external-provider path expects. Explicitly approved local AI URLs are
+// returned intact so their scheme, port and API path reach the local transport.
 func hostFromBaseURL(baseURL string) (string, error) {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
 		return "", nil
 	}
 	parsed, err := url.Parse(baseURL)
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+	if err != nil || parsed.Hostname() == "" {
+		return "", errors.New("ai advisory: invalid base_url")
+	}
+	if builtinruntime.IsLocalBaseURL(baseURL) {
+		return strings.TrimRight(parsed.String(), "/"), nil
+	}
+	if parsed.Scheme != "https" {
 		return "", errors.New("ai advisory: invalid base_url")
 	}
 	return parsed.Hostname(), nil

@@ -393,6 +393,66 @@
       },
       "backfill": null,
       "sha256": "e134aecb6552030ea56afd30bd67a38686bfd154bba2eceb950761a93e1dec1c"
+    },
+    {
+      "version": 19,
+      "name": "payments_remote_id_lookup",
+      "file": "000019_payments_remote_id_lookup.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [18],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "dd8dd97edf2c5c962ea7a42610514a3868f7727e8afae36b655c139c604c1805"
+    },
+    {
+      "version": 20,
+      "name": "ai_provider_claude",
+      "file": "000020_ai_provider_claude.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [19],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "7d1fe7764f8dd7247a76d9e4338ec676bbdcc49247c7d6b0c3e8515be7adf218"
+    },
+    {
+      "version": 21,
+      "name": "ai_provider_local_runtime",
+      "file": "000021_ai_provider_local_runtime.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [20],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "3aadf8cc27e278ba0ffed782601d61986e1bed6e72d182724c92da7f7b9371f7"
     }
   ]
 }

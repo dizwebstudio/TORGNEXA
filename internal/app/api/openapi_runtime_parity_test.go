@@ -27,6 +27,7 @@ func TestProductionRouteRegistryIsAcceptedBySecurityComposition(t *testing.T) {
 		tenantStub{scope: validTestScope(t)},
 		authzStub{},
 		newProductionRoutes(productionRouteDependencies{}),
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

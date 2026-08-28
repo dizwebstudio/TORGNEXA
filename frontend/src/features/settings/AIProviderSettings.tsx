@@ -7,11 +7,12 @@ import {EmptyState} from "../../components/EmptyState";
 import {StatusBadge} from "../../components/StatusBadge";
 import {useToast} from "../../components/Toast";
 
-type ProviderID="openai-compatible"|"gigachat"|"yandexgpt"|"kimi"|"qwen"|"deepseek";
+type ProviderID="openai-compatible"|"gigachat"|"yandexgpt"|"kimi"|"qwen"|"deepseek"|"claude"|"ollama"|"lm-studio"|"open-webui";
 interface Account{id:string;provider:ProviderID;label:string;model:string;base_url?:string;folder_id?:string;enabled:boolean;version:number;created_at:string;updated_at:string}
-const providerLabels:Readonly<Record<ProviderID,string>>={"openai-compatible":"OpenAI-совместимый","gigachat":"GigaChat (Sber)","yandexgpt":"YandexGPT","kimi":"Kimi (Moonshot AI)","qwen":"Qwen (Alibaba Cloud)","deepseek":"DeepSeek"};
+const providerLabels:Readonly<Record<ProviderID,string>>={"openai-compatible":"OpenAI-совместимый","gigachat":"GigaChat (Sber)","yandexgpt":"YandexGPT","kimi":"Kimi (Moonshot AI)","qwen":"Qwen (Alibaba Cloud)","deepseek":"DeepSeek","claude":"Claude (Anthropic)","ollama":"Ollama","lm-studio":"LM Studio","open-webui":"Open WebUI"};
 const providerKeys=Object.keys(providerLabels) as ProviderID[];
-const hostOverrideProviders:ReadonlySet<ProviderID>=new Set(["openai-compatible","kimi","qwen","deepseek"]);
+const hostOverrideProviders:ReadonlySet<ProviderID>=new Set(["openai-compatible","kimi","qwen","deepseek","claude","ollama","lm-studio","open-webui"]);
+const localBaseURLPlaceholders:Readonly<Record<"ollama"|"lm-studio"|"open-webui",string>>={ollama:"http://ollama:11434/v1","lm-studio":"http://host.docker.internal:1234/v1","open-webui":"http://open-webui:3000/api"};
 function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}
 
 export function AIProviderSettings(){
@@ -34,10 +35,10 @@ export function AIProviderSettings(){
     <div className="settings-grid">
      <label className="field"><span>Провайдер</span><select value={provider} onChange={e=>setProvider(e.target.value as ProviderID)}>{providerKeys.map(key=><option value={key} key={key}>{providerLabels[key]}</option>)}</select></label>
      <label className="field"><span>Название</span><input value={label} maxLength={120} placeholder="Например, «Сводка по продажам»" onChange={e=>setLabel(e.target.value)}/></label>
-     <label className="field"><span>Модель</span><input value={model} maxLength={120} placeholder="gpt-4o-mini" onChange={e=>setModel(e.target.value)}/></label>
-     {hostOverrideProviders.has(provider)?<label className="field"><span>Base URL (необязательно)</span><input value={baseUrl} maxLength={2039} placeholder="https://api.moonshot.ai" onChange={e=>setBaseUrl(e.target.value)}/></label>:null}
+     <label className="field"><span>Модель</span><input value={model} maxLength={120} placeholder={provider==="claude"?"claude-sonnet-4-20250514":"gpt-4o-mini"} onChange={e=>setModel(e.target.value)}/></label>
+     {hostOverrideProviders.has(provider)?<label className="field"><span>Base URL (необязательно)</span><input value={baseUrl} maxLength={2039} placeholder={provider==="ollama"||provider==="lm-studio"||provider==="open-webui"?localBaseURLPlaceholders[provider]:provider==="claude"?"https://api.anthropic.com":"https://api.moonshot.ai"} onChange={e=>setBaseUrl(e.target.value)}/></label>:null}
      {provider==="yandexgpt"?<label className="field"><span>Folder ID</span><input value={folderId} maxLength={120} placeholder="b1gxxxxxxxxxxxxxxxx" onChange={e=>setFolderId(e.target.value)}/></label>:null}
-     <label className="field"><span>API-ключ</span><input type="password" value={credential} maxLength={65536} autoComplete="off" onChange={e=>setCredential(e.target.value)}/></label>
+     <label className="field"><span>API-ключ / токен</span><input type="password" value={credential} maxLength={65536} autoComplete="off" placeholder={provider==="ollama"?"ollama (локальный сервер не проверяет ключ)":provider==="lm-studio"?"lm-studio (если ключ не включён)":"Токен или API-ключ"} onChange={e=>setCredential(e.target.value)}/></label>
     </div>
     <div className="account-actions"><button className="button primary" disabled={create.isPending||!valid} onClick={()=>create.mutate()}>{create.isPending?"Добавляем…":"Добавить аккаунт"}</button></div>
   </section>:null}

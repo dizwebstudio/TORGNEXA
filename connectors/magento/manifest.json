@@ -1,0 +1,15 @@
+{
+  "id": "magento",
+  "name": "Magento (Adobe Commerce)",
+  "family": "storefront",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+  "auth": [{"kind": "bearer", "secret_class": "marketplace.bearer-token", "required": true}],
+  "rate_limit": {
+    "max_concurrency": 4,
+    "min_interval_ms": 100,
+    "request_timeout_ms": 30000,
+    "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}
+  }
+}

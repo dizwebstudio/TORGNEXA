@@ -57,14 +57,17 @@ func SupportFor(connectorID string) (Support, bool) {
 // create and operate a generic connector account for this binary. Payment
 // rails (surface "finance", the same separate_surface shape social channels
 // use) need real per-tenant credentials — unlike cbr-fx, which is the only
-// other "finance" connector and bypasses accounts entirely with one
-// synthetic global reference source — so they reuse this generic
-// create/secret/capability flow exactly as telegram and max-messenger do.
+// other "finance" connector and bypasses accounts entirely with one synthetic
+// global reference source. CRM connectors likewise reuse this generic
+// create/secret/config/capability flow while keeping CRM operations off the
+// product-sync surface.
 func SupportsAccountConfiguration(connectorID string) bool {
 	value, ok := SupportFor(connectorID)
 	return ok && ((value.Stage == SupportReady && value.Surface == "integrations") ||
 		(value.Stage == SupportSeparateSurface && value.Surface == "social") ||
-		(value.Stage == SupportSeparateSurface && value.Surface == "finance" && connectorID != "cbr-fx"))
+		(value.Stage == SupportSeparateSurface && value.Surface == "finance" && connectorID != "cbr-fx") ||
+		(value.Stage == SupportSeparateSurface && value.Surface == "crm") ||
+		(value.Stage == SupportSeparateSurface && value.Surface == "logistics"))
 }
 
 // SupportsCapability reports whether a manifest capability has an executable

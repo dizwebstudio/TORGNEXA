@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-144",
+  "task": "144",
+  "change_class": "mixed",
+  "summary": "Extend the host-owned OAuth runtime with a bounded per-tenant host template (ADR-0108) and admit Shopify as a storefront connector on top of it.",
+  "scopes": [
+    "adr/0108-oauth-per-tenant-host-template.md",
+    "architecture/policy.json",
+    "architecture/reviews/144-shopify-oauth-storefront-connector.json",
+    "connectors/shopify",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/connectors/shopify",
+    "frontend/public/connector-logos/shopify.svg",
+    "frontend/src/generated/connector-catalog.ts",
+    "frontend/test/ui-experience.test.mjs",
+    "internal/app/api/connector_accounts.go",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/connectorauth/connectorauth.go",
+    "internal/platform/connectorauth/connectorauth_test.go",
+    "internal/platform/connectors/commerce_write.go",
+    "internal/platform/connectors/connectors.go",
+    "internal/platform/connectors/sdk_test.go",
+    "tasks/issues/144-shopify-oauth-storefront-connector.md"
+  ],
+  "frozen_pillars": ["connector-plugin-runtime-capabilities", "privacy-secrets-security-governance"],
+  "adr": "adr/0108-oauth-per-tenant-host-template.md",
+  "existing_adrs": [
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0104-host-owned-oauth-refresh-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "The per-tenant OAuth host is resolved from the account's own tenant-scoped non-secret runtime config (connectorconfigrepo), the same store every runtime_config_template connector already uses; no cross-tenant host reuse is possible."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Shop domain is non-secret operational config, not PII; the OAuth access token remains behind the existing opaque SecretAccessor/UseSecret boundary with no new exposure."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "oauth-start/oauth-callback request/response shapes are unchanged for every connector; no existing public HTTP/OpenAPI operation is removed or altered."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No EventBus schema is added or changed."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "sdk.OAuth2Configuration gains four additive, opt-in fields (HostParameter/HostSuffix/ScopeSeparator/ExtraTokenParams); every existing OAuth2 connector's manifest is unchanged and Validate() takes the identical code path it always has when HostParameter is empty."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "No schema change; the resolved host is read from the existing non-secret runtime-config store."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "A resolved host must match a DNS-hostname shape, be strictly longer than HostSuffix, end with that exact literal suffix, and the fully-substituted URL is re-validated through the same validHTTPSURL check every fixed-host connector already passes through -- a tenant's own runtime config cannot redirect the OAuth flow outside the declared provider domain."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "Shopify write capabilities remain gated by the existing payments.create-style capability checks (products.write/prices.write/inventory.write/orders.status.write); product create and webhook receipt are declared unsupported rather than faked."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Account OAuth start/complete audit actions are unchanged and reused verbatim; no new evidence shape is introduced."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Writes follow the existing fetch-compare-write-reconcile pattern (see docs/connectors/shopify/reconciliation.md); ambiguous transport failures reconcile against a re-fetch rather than retrying blindly."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound authority is the resolved shop host and the fixed OAuth token endpoint only, both DNS-pinned through the existing SSRF-safe transport; inbound webhook receipt is explicitly unsupported in this task (see capability-audit.md), not silently unverified."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Non-2xx responses and malformed bodies are normalized to bounded errors; Shopify's leaky-bucket rate limit is respected via a conservative MinIntervalMS."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Shopify can be disabled by removing its connector accounts; the OAuth runtime extension is inert for every other connector, so no coordinated rollback is required."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "New connectorauth/sdk unit tests cover host template resolution, suffix bounding, and scope-separator behavior; provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/shopify/conformance-report.json records this genuine result rather than a fabricated pass."
+    }
+  ],
+  "provider": {
+    "id": "shopify",
+    "route": "connector_sdk",
+    "manifest": "connectors/shopify/manifest.json",
+    "connector_spec": "docs/connectors/shopify/spec.md",
+    "capability_audit": "docs/connectors/shopify/capability-audit.md",
+    "conformance_plan": "docs/connectors/shopify/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

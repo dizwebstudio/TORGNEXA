@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" role="img" aria-labelledby="title">
+  <title>CS-Cart</title>
+  <rect width="160" height="64" rx="12" fill="#202A44"/>
+  <path fill="#fff" d="M25 17h16v6H31v18h10v6H25zM47 17h6v30h-6zM61 17h7l7 11 7-11h7L78 33v14h-6V33zM95 17h6v11l9-11h8L107 31l12 16h-8l-10-13v13h-6zM123 17h6v24h11v6h-17z"/>
+</svg>

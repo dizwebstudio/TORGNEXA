@@ -2288,7 +2288,7 @@ components:
       required: [id, provider, label, model, enabled, version, created_at, updated_at]
       properties:
         id: {type: string, minLength: 1, maxLength: 128}
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
         label: {type: string, minLength: 1, maxLength: 120}
         model: {type: string, minLength: 1, maxLength: 120}
         base_url: {type: string, format: uri, maxLength: 2039}
@@ -2308,7 +2308,7 @@ components:
       additionalProperties: false
       required: [provider, label, model, credential]
       properties:
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
         label: {type: string, minLength: 1, maxLength: 120}
         model: {type: string, minLength: 1, maxLength: 120}
         base_url: {type: string, format: uri, maxLength: 2039}
@@ -2336,7 +2336,7 @@ components:
       required: [text, provider, model]
       properties:
         text: {type: string}
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
         model: {type: string}
     AIEgressPolicy:
       type: object

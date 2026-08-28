@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -141,7 +142,7 @@ func AuthorizationURL(configuration sdk.OAuth2Configuration, clientID, callbackU
 	query.Set("code_challenge", challenge)
 	query.Set("code_challenge_method", "S256")
 	if len(configuration.Scopes) > 0 {
-		query.Set("scope", strings.Join(configuration.Scopes, " "))
+		query.Set("scope", strings.Join(configuration.Scopes, scopeSeparator(configuration)))
 	}
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
@@ -167,6 +168,56 @@ func OAuthConfiguration(manifest sdk.Manifest) (sdk.OAuth2Configuration, error) 
 	return *found, nil
 }
 
+func scopeSeparator(configuration sdk.OAuth2Configuration) string {
+	if configuration.ScopeSeparator != "" {
+		return configuration.ScopeSeparator
+	}
+	return " "
+}
+
+var hostConfigPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+
+// ResolveOAuth2Host substitutes the literal "{host}" template token in
+// AuthorizationURL/TokenURL with a tenant-specific host read from hostConfig,
+// for providers with no fixed OAuth host (e.g. Shopify's
+// https://{shop}.myshopify.com). Configurations without HostParameter set are
+// returned unchanged — every fixed-host provider (VK, Bitrix24, ...) takes
+// this early return and behaves exactly as before this existed. The resolved
+// host must end in HostSuffix, so a tenant's own runtime config can never
+// redirect the flow to an arbitrary host; the substituted URLs are
+// re-validated as ordinary https URLs before being trusted.
+func ResolveOAuth2Host(configuration sdk.OAuth2Configuration, hostConfig json.RawMessage) (sdk.OAuth2Configuration, error) {
+	if configuration.HostParameter == "" {
+		return configuration, nil
+	}
+	if len(hostConfig) == 0 || len(hostConfig) > 4096 {
+		return sdk.OAuth2Configuration{}, ErrInvalid
+	}
+	var values map[string]string
+	if json.Unmarshal(hostConfig, &values) != nil {
+		return sdk.OAuth2Configuration{}, ErrInvalid
+	}
+	host, ok := values[configuration.HostParameter]
+	if !ok {
+		return sdk.OAuth2Configuration{}, ErrInvalid
+	}
+	host = strings.ToLower(strings.TrimSpace(host))
+	if len(host) > 253 || !hostConfigPattern.MatchString(host) || !strings.HasSuffix(host, configuration.HostSuffix) || len(host) <= len(configuration.HostSuffix) {
+		return sdk.OAuth2Configuration{}, ErrInvalid
+	}
+	resolved := configuration
+	resolved.HostParameter = ""
+	resolved.HostSuffix = ""
+	resolved.TokenURL = strings.Replace(configuration.TokenURL, "{host}", host, 1)
+	if configuration.AuthorizationURL != "" {
+		resolved.AuthorizationURL = strings.Replace(configuration.AuthorizationURL, "{host}", host, 1)
+	}
+	if resolved.Validate() != nil {
+		return sdk.OAuth2Configuration{}, ErrInvalid
+	}
+	return resolved, nil
+}
+
 // HTTPExchange performs a redirect-free, DNS-pinned OAuth token exchange.
 func HTTPExchange(ctx context.Context, configuration sdk.OAuth2Configuration, client OAuthClient, code, callbackURL, verifier string, timeout time.Duration) ([]byte, error) {
 	if configuration.Validate() != nil || !safeSecretPart(client.ClientID, 512) || !safeSecretPart(client.ClientSecret, 4096) || timeout < 100*time.Millisecond || timeout > 30*time.Second {
@@ -174,7 +225,10 @@ func HTTPExchange(ctx context.Context, configuration sdk.OAuth2Configuration, cl
 	}
 	form := url.Values{"client_id": {client.ClientID}, "client_secret": {client.ClientSecret}, "grant_type": {configuration.GrantType}}
 	if len(configuration.Scopes) > 0 {
-		form.Set("scope", strings.Join(configuration.Scopes, " "))
+		form.Set("scope", strings.Join(configuration.Scopes, scopeSeparator(configuration)))
+	}
+	for key, value := range configuration.ExtraTokenParams {
+		form.Set(key, value)
 	}
 	if configuration.GrantType == "authorization_code" {
 		if !safeSecretPart(code, 8192) || !safeSecretPart(verifier, 256) {

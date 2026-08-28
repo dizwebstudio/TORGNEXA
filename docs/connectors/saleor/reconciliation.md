@@ -1,0 +1,5 @@
+# Reconciliation
+
+Saleor remote state is authoritative. TORGNEXA stores correlation/evidence and compares local projections with remote observations before accepting a write outcome; ambiguous transport failures (timeout/unavailable) trigger a re-fetch and reconcile rather than a blind retry, matching the same pattern as every other storefront connector in this repository.
+
+One difference from a single-PUT connector like Magento or Shopware: a product update can require up to three separate Saleor mutations (variant SKU, product name, product channel-listing publication), since Saleor has no single combined write for a product row. This connector issues only the mutations needed for fields that actually changed, then performs one final fetch-and-compare across all of them; if any individual mutation's outcome was ambiguous, the write is reported reconciled (not just applied) only once every field is confirmed to match the desired state, and reported as an unknown outcome (not silently retried) otherwise.

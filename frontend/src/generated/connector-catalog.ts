@@ -26,7 +26,7 @@ export interface ConnectorRuntimeSyncSupport {
 
 export interface ConnectorRuntimeSupport {
   readonly stage: "ready" | "separate_surface" | "planned";
-  readonly surface: "integrations" | "ai_providers" | "finance" | "social" | "none";
+  readonly surface: "integrations" | "ai_providers" | "finance" | "social" | "crm" | "logistics" | "none";
   readonly operationalCapabilities: readonly string[];
   readonly sync: readonly ConnectorRuntimeSyncSupport[];
   readonly runtimeConfigTemplate?: Readonly<Record<string, unknown>>;
@@ -103,6 +103,30 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "bitrix",
+    name: "1С-Битрикс",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/bitrix.svg",
+      surface: "#F58220",
+      surfaceAlt: "#D94E0B",
+      foreground: "#FFFFFF",
+      accent: "#9E3107",
+    },
+    capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
+    authKinds: ["bearer"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB"},
+    },
+  },
+  {
     id: "bitrix24",
     name: "Bitrix24 CRM",
     family: "crm",
@@ -118,11 +142,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
-      operationalCapabilities: [],
+      stage: "separate_surface",
+      surface: "crm",
+      operationalCapabilities: ["crm.entities.read", "crm.entities.write", "crm.productrows.read", "crm.productrows.write"],
       sync: [
       ],
+      runtimeConfigTemplate: {"portal_host":"acme.bitrix24.com"},
     },
   },
   {
@@ -149,7 +174,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
   },
   {
     id: "cdek",
-    name: "CDEK",
+    name: "СДЭК",
     family: "logistics",
     version: "1.0.0",
     presentation: {
@@ -163,8 +188,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "client_credentials",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "logistics",
       operationalCapabilities: [],
       sync: [
       ],
@@ -215,6 +240,52 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "claude",
+    name: "Claude (Anthropic)",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/claude.svg",
+      surface: "#D97757",
+      surfaceAlt: "#E9A789",
+      foreground: "#FFFFFF",
+      accent: "#8F3F24",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "cs-cart",
+    name: "CS-Cart",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/cs-cart.svg",
+      surface: "#202A44",
+      surfaceAlt: "#455B91",
+      foreground: "#FFFFFF",
+      accent: "#5E7BC7",
+    },
+    capabilities: ["products.read", "products.write"],
+    authKinds: ["basic"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
+    },
+  },
+  {
     id: "deepseek",
     name: "DeepSeek",
     family: "ai",
@@ -232,6 +303,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       stage: "separate_surface",
       surface: "ai_providers",
       operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "dellin",
+    name: "Деловые Линии",
+    family: "logistics",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/dellin.svg",
+      surface: "#F2F4F7",
+      surfaceAlt: "#DDE3EA",
+      foreground: "#1F2937",
+      accent: "#1D4ED8",
+    },
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "logistics",
+      operationalCapabilities: [],
       sync: [
       ],
     },
@@ -275,6 +368,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "planned",
       surface: "none",
+      operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "fivepost",
+    name: "5Post",
+    family: "logistics",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/fivepost.svg",
+      surface: "#F4511E",
+      surfaceAlt: "#FF8A65",
+      foreground: "#FFFFFF",
+      accent: "#C62828",
+    },
+    capabilities: ["logistics.label.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "logistics",
       operationalCapabilities: [],
       sync: [
       ],
@@ -348,6 +463,52 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "lm-studio",
+    name: "LM Studio",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/lm-studio.svg",
+      surface: "#0F172A",
+      surfaceAlt: "#334155",
+      foreground: "#FFFFFF",
+      accent: "#38BDF8",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "magento",
+    name: "Magento (Adobe Commerce)",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/magento.svg",
+      surface: "#EE672F",
+      surfaceAlt: "#A6421C",
+      foreground: "#FFFFFF",
+      accent: "#F58836",
+    },
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+    authKinds: ["bearer"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
+    },
+  },
+  {
     id: "magnit-market",
     name: "Magnit Market",
     family: "marketplace",
@@ -393,6 +554,30 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       ],
       runtimeConfigTemplate: {"chat_id":-70801090403050},
       socialTextMaxRunes: 4000,
+    },
+  },
+  {
+    id: "medusa",
+    name: "Medusa",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/medusa.svg",
+      surface: "#1A1A1A",
+      surfaceAlt: "#27272A",
+      foreground: "#FFFFFF",
+      accent: "#3B82F6",
+    },
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+    authKinds: ["bearer"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
   },
   {
@@ -466,6 +651,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "ollama",
+    name: "Ollama",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/ollama.svg",
+      surface: "#111827",
+      surfaceAlt: "#374151",
+      foreground: "#FFFFFF",
+      accent: "#10B981",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
     id: "onec",
     name: "1C",
     family: "erp",
@@ -487,6 +694,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
         {entityType: "products", directions: ["inbound"]},
       ],
       runtimeConfigTemplate: {"host":"erp.example.ru","base_path":"/odata/standard.odata","catalog":{"resource":"Catalog_Номенклатура","id_field":"Ref_Key","code_field":"Code","sku_field":"Артикул","title_field":"Description","brand_field":"Бренд","revision_field":"DataVersion","archived_field":"DeletionMark"},"inventory":{"resource":"AccumulationRegister_ТоварыНаСкладах","function":"Balance","product_field":"Номенклатура_Key","location_field":"Склад_Key","quantity_field":"КоличествоBalance"}},
+    },
+  },
+  {
+    id: "open-webui",
+    name: "Open WebUI",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/open-webui.svg",
+      surface: "#1E293B",
+      surfaceAlt: "#475569",
+      foreground: "#FFFFFF",
+      accent: "#A78BFA",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
     },
   },
   {
@@ -559,6 +788,72 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "ozon-delivery",
+    name: "Ozon Доставка",
+    family: "logistics",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/ozon-delivery.svg",
+      surface: "#005BFF",
+      surfaceAlt: "#0B3FB5",
+      foreground: "#FFFFFF",
+      accent: "#005BFF",
+    },
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "logistics",
+      operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "ozon-pay",
+    name: "Ozon Pay",
+    family: "payment",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/ozon-pay.svg",
+      surface: "#005BFF",
+      surfaceAlt: "#0B3FB5",
+      foreground: "#FFFFFF",
+      accent: "#005BFF",
+    },
+    capabilities: ["payments.create", "payments.refund", "payments.status.read", "payments.webhooks"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "finance",
+      operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "pek",
+    name: "ПЭК",
+    family: "logistics",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/pek.svg",
+      surface: "#0B63CE",
+      surfaceAlt: "#49A3FF",
+      foreground: "#FFFFFF",
+      accent: "#06448F",
+    },
+    capabilities: ["logistics.rates.read", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    authKinds: ["basic"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "logistics",
+      operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
     id: "prestashop",
     name: "PrestaShop",
     family: "storefront",
@@ -600,6 +895,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       stage: "separate_surface",
       surface: "ai_providers",
       operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "robokassa",
+    name: "Robokassa",
+    family: "payment",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/robokassa.svg",
+      surface: "#FFFFFF",
+      surfaceAlt: "#F2F2F4",
+      foreground: "#333339",
+      accent: "#333339",
+    },
+    capabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
+    authKinds: ["basic"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "finance",
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.status.read"],
       sync: [
       ],
     },
@@ -649,6 +966,30 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "saleor",
+    name: "Saleor",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/saleor.svg",
+      surface: "#161819",
+      surfaceAlt: "#000000",
+      foreground: "#FFFFFF",
+      accent: "#737373",
+    },
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+    authKinds: ["bearer"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","channel":"default-channel","warehouse":"main-warehouse"},
+    },
+  },
+  {
     id: "sbp",
     name: "SBP",
     family: "payment",
@@ -669,6 +1010,55 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       sync: [
       ],
       runtimeConfigTemplate: {"gateway_host":"sbp-gateway.example.ru","member_id":"100000001"},
+    },
+  },
+  {
+    id: "shopify",
+    name: "Shopify",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/shopify.svg",
+      surface: "#95BF47",
+      surfaceAlt: "#5E8E3E",
+      foreground: "#FFFFFF",
+      accent: "#3D4849",
+    },
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+    authKinds: ["oauth2"],
+    oauthGrantType: "authorization_code",
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"shop_domain":"example.myshopify.com","store_currency":"RUB"},
+    },
+  },
+  {
+    id: "shopware",
+    name: "Shopware 6",
+    family: "storefront",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/shopware.svg",
+      surface: "#0870FF",
+      surfaceAlt: "#00296A",
+      foreground: "#FFFFFF",
+      accent: "#189EFF",
+    },
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+    authKinds: ["basic"],
+    runtime: {
+      stage: "ready",
+      surface: "integrations",
+      operationalCapabilities: ["products.read", "products.write"],
+      sync: [
+        {entityType: "products", directions: ["inbound", "outbound"]},
+      ],
+      runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
   },
   {

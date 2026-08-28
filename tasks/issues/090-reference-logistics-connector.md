@@ -1,7 +1,9 @@
 # Task 090: Reference Logistics Connector
 
 ## Status
-`repository-complete` — 2026-08-12.
+`repository-complete` — 2026-08-12. The SDK reference is complete; the
+application runtime now exposes CDEK credential verification on the separate
+Delivery surface. Shipment operations remain qualification-gated.
 
 ## Implementation evidence
 - CDEK Logistics reference with rates/shipment/track/cancel/label/PVZ/return and conformance.

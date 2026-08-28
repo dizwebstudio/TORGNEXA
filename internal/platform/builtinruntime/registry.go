@@ -11,21 +11,40 @@ import (
 	"time"
 
 	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
+	bitrixstore "github.com/torgnexa/torgnexa/connectors/bitrix"
+	bitrix24 "github.com/torgnexa/torgnexa/connectors/bitrix24"
 	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
+	cdek "github.com/torgnexa/torgnexa/connectors/cdek"
+	claude "github.com/torgnexa/torgnexa/connectors/claude"
+	cscart "github.com/torgnexa/torgnexa/connectors/cs-cart"
 	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
+	dellin "github.com/torgnexa/torgnexa/connectors/dellin"
+	fivepost "github.com/torgnexa/torgnexa/connectors/fivepost"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
+	lmstudio "github.com/torgnexa/torgnexa/connectors/lm-studio"
+	magento "github.com/torgnexa/torgnexa/connectors/magento"
 	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
 	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
+	medusa "github.com/torgnexa/torgnexa/connectors/medusa"
 	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
+	ollama "github.com/torgnexa/torgnexa/connectors/ollama"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
+	openwebui "github.com/torgnexa/torgnexa/connectors/open-webui"
 	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
 	opencart "github.com/torgnexa/torgnexa/connectors/opencart"
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
+	ozondelivery "github.com/torgnexa/torgnexa/connectors/ozon-delivery"
+	ozonpay "github.com/torgnexa/torgnexa/connectors/ozon-pay"
+	pek "github.com/torgnexa/torgnexa/connectors/pek"
 	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
 	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
+	robokassa "github.com/torgnexa/torgnexa/connectors/robokassa"
+	saleor "github.com/torgnexa/torgnexa/connectors/saleor"
 	sbp "github.com/torgnexa/torgnexa/connectors/sbp"
+	shopify "github.com/torgnexa/torgnexa/connectors/shopify"
+	shopware "github.com/torgnexa/torgnexa/connectors/shopware"
 	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
@@ -64,9 +83,26 @@ type ProductReader interface {
 	Read(context.Context, sdk.PageRequest) (ProductPage, error)
 }
 
+// CRMReader is the provider-neutral CRM read surface admitted by the
+// production registry. It intentionally exposes only SDK contracts, not the
+// Bitrix24 implementation or transport.
+type CRMReader interface {
+	sdk.CRMEntityReader
+	sdk.CRMProductRowReader
+}
+
+// CRMWriter is the provider-neutral CRM write surface admitted by the
+// production registry. Remote writes remain capability-gated and require the
+// connector SDK idempotency key.
+type CRMWriter interface {
+	sdk.CRMEntityWriter
+	sdk.CRMProductRowWriter
+}
+
 type Registry struct {
-	http *httpTransport
-	cbr  *cbrfx.Connector
+	http    *httpTransport
+	localAI *localAIHTTP
+	cbr     *cbrfx.Connector
 
 	// gigachat is held across calls (unlike the other AI connectors, which
 	// are stateless and constructed per call) because it caches the OAuth
@@ -79,6 +115,7 @@ func New() *Registry {
 	transport := newHTTPTransport()
 	return &Registry{
 		http:     transport,
+		localAI:  newLocalAIHTTP(),
 		cbr:      cbrfx.New(newCBRDailyHTTP(transport), nil),
 		gigachat: gigachat.New(gigaChatHTTP{transport}, nil),
 	}
@@ -162,6 +199,41 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 			return nil, ErrConfigurationNeeded
 		}
 		return marketplaceReader{value: woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return marketplaceReader{value: shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), account: account, runtime: runtime}, nil
 	case "opencart":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -187,6 +259,41 @@ func (r *Registry) ProductWriter(account sdk.Account, runtime sdk.Runtime, load 
 			return nil, ErrConfigurationNeeded
 		}
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
 	case "opencart":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -195,6 +302,32 @@ func (r *Registry) ProductWriter(account sdk.Account, runtime sdk.Runtime, load 
 	default:
 		return nil, ErrUnavailable
 	}
+}
+
+// CRMReader resolves the admitted CRM connector for tenant-scoped reads.
+// Bitrix24 is deliberately kept on a separate CRM surface; it is not a
+// generic product-sync source.
+func (r *Registry) CRMReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (CRMReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "bitrix24" || !SupportsCapability(account.ConnectorID, "crm.entities.read") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return bitrix24.New(bitrix24HTTP{r.http}, bitrix24ConfigSource{load: load}, nil), nil
+}
+
+// CRMWriter resolves the admitted CRM connector for tenant-scoped writes.
+// The returned adapter performs read-before-write and read-after-write
+// reconciliation as required by the Bitrix24 connector contract.
+func (r *Registry) CRMWriter(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (CRMWriter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "bitrix24" || !SupportsCapability(account.ConnectorID, "crm.entities.write") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return bitrix24.New(bitrix24HTTP{r.http}, bitrix24ConfigSource{load: load}, nil), nil
 }
 
 func (r *Registry) SupportsProductWrite(account sdk.Account) bool {
@@ -246,6 +379,8 @@ func (r *Registry) PaymentGateway(account sdk.Account, load ConfigLoader) (Payme
 	switch account.ConnectorID {
 	case "yookassa":
 		return yookassa.New(yookassaHTTP{r.http}, nil), nil
+	case "robokassa":
+		return robokassa.New(robokassaHTTP{r.http}, nil), nil
 	case "sbp":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -257,6 +392,29 @@ func (r *Registry) PaymentGateway(account sdk.Account, load ConfigLoader) (Payme
 }
 
 type sbpConfigSource struct{ load ConfigLoader }
+
+type bitrix24ConfigSource struct{ load ConfigLoader }
+
+func (source bitrix24ConfigSource) Resolve(ctx context.Context, account sdk.Account) (bitrix24.Configuration, error) {
+	if source.load == nil {
+		return bitrix24.Configuration{}, bitrix24.ErrConfigurationMissing
+	}
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return bitrix24.Configuration{}, err
+	}
+	var value struct {
+		PortalHost string `json:"portal_host"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return bitrix24.Configuration{}, bitrix24.ErrInvalidConfiguration
+	}
+	configuration := bitrix24.Configuration{PortalHost: value.PortalHost}
+	if configuration.Validate() != nil {
+		return bitrix24.Configuration{}, bitrix24.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
 
 func (source sbpConfigSource) Resolve(ctx context.Context, account sdk.Account) (sbp.Configuration, error) {
 	raw, err := source.load(ctx, account.ID)
@@ -333,10 +491,20 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		return wildberries.New(wbHTTP{r.http}, nil), nil
 	case "ozon":
 		return ozon.New(ozonHTTP{r.http}, nil), nil
+	case "ozon-pay":
+		return ozonpay.New(ozonPayHTTP{r.http}, nil), nil
+	case "ozon-delivery":
+		return ozondelivery.New(ozonDeliveryHTTP{r.http}, nil), nil
 	case "moysklad":
 		return moysklad.New(msHTTP{r.http}, nil), nil
+	case "bitrix24":
+		if load != nil {
+			return bitrix24.New(bitrix24HTTP{r.http}, bitrix24ConfigSource{load: load}, nil), nil
+		}
 	case "yookassa":
 		return yookassa.New(yookassaHTTP{r.http}, nil), nil
+	case "robokassa":
+		return robokassa.New(robokassaHTTP{r.http}, nil), nil
 	case "sbp":
 		if load != nil {
 			return sbp.New(newSBPHTTP(r.http), sbpConfigSource{load: load}, nil), nil
@@ -369,6 +537,34 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		if load != nil {
 			return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
 		}
+	case "shopify":
+		if load != nil {
+			return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+		}
+	case "medusa":
+		if load != nil {
+			return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+		}
+	case "shopware":
+		if load != nil {
+			return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+		}
+	case "magento":
+		if load != nil {
+			return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+		}
+	case "saleor":
+		if load != nil {
+			return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+		}
+	case "bitrix":
+		if load != nil {
+			return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+		}
+	case "cs-cart":
+		if load != nil {
+			return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
+		}
 	case "opencart":
 		if load != nil {
 			return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
@@ -377,6 +573,14 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		if load != nil {
 			return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
 		}
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil), nil
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil), nil
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil), nil
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -401,6 +605,31 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -410,7 +639,7 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	if r == nil || account.Validate() != nil {
 		return false
 	}
-	return account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce"
+	return account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor"
 }
 
 type marketplaceReader struct {
@@ -648,6 +877,161 @@ func (source wooConfigSource) Resolve(ctx context.Context, account sdk.Account) 
 	return configuration, nil
 }
 
+type shopwareConfigSource struct{ load ConfigLoader }
+
+func (source shopwareConfigSource) Resolve(ctx context.Context, account sdk.Account) (shopware.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return shopware.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return shopware.Configuration{}, shopware.ErrInvalidConfiguration
+	}
+	configuration := shopware.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return shopware.Configuration{}, shopware.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type magentoConfigSource struct{ load ConfigLoader }
+
+type bitrixStoreConfigSource struct{ load ConfigLoader }
+
+type csCartConfigSource struct{ load ConfigLoader }
+
+func (source csCartConfigSource) Resolve(ctx context.Context, account sdk.Account) (cscart.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return cscart.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return cscart.Configuration{}, cscart.ErrInvalidConfiguration
+	}
+	configuration := cscart.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return cscart.Configuration{}, cscart.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+func (source bitrixStoreConfigSource) Resolve(ctx context.Context, account sdk.Account) (bitrixstore.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return bitrixstore.Configuration{}, err
+	}
+	var value struct {
+		StoreHost       string `json:"store_host"`
+		BasePath        string `json:"base_path"`
+		CatalogIblockID int64  `json:"catalog_iblock_id"`
+		StoreCurrency   string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return bitrixstore.Configuration{}, bitrixstore.ErrInvalidConfiguration
+	}
+	configuration := bitrixstore.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, CatalogIblockID: value.CatalogIblockID, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return bitrixstore.Configuration{}, bitrixstore.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+func (source magentoConfigSource) Resolve(ctx context.Context, account sdk.Account) (magento.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return magento.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return magento.Configuration{}, magento.ErrInvalidConfiguration
+	}
+	configuration := magento.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return magento.Configuration{}, magento.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type saleorConfigSource struct{ load ConfigLoader }
+
+func (source saleorConfigSource) Resolve(ctx context.Context, account sdk.Account) (saleor.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return saleor.Configuration{}, err
+	}
+	var value struct {
+		StoreHost string `json:"store_host"`
+		BasePath  string `json:"base_path"`
+		Channel   string `json:"channel"`
+		Warehouse string `json:"warehouse"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return saleor.Configuration{}, saleor.ErrInvalidConfiguration
+	}
+	configuration := saleor.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, Channel: value.Channel, Warehouse: value.Warehouse}
+	if configuration.Validate() != nil {
+		return saleor.Configuration{}, saleor.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type medusaConfigSource struct{ load ConfigLoader }
+
+func (source medusaConfigSource) Resolve(ctx context.Context, account sdk.Account) (medusa.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return medusa.Configuration{}, err
+	}
+	var value struct {
+		StoreHost     string `json:"store_host"`
+		BasePath      string `json:"base_path"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return medusa.Configuration{}, medusa.ErrInvalidConfiguration
+	}
+	configuration := medusa.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return medusa.Configuration{}, medusa.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
+type shopifyConfigSource struct{ load ConfigLoader }
+
+func (source shopifyConfigSource) Resolve(ctx context.Context, account sdk.Account) (shopify.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return shopify.Configuration{}, err
+	}
+	var value struct {
+		ShopDomain    string `json:"shop_domain"`
+		StoreCurrency string `json:"store_currency"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return shopify.Configuration{}, shopify.ErrInvalidConfiguration
+	}
+	configuration := shopify.Configuration{ShopDomain: value.ShopDomain, StoreCurrency: value.StoreCurrency}
+	if configuration.Validate() != nil {
+		return shopify.Configuration{}, shopify.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
+
 type openCartConfigSource struct{ load ConfigLoader }
 
 func (source openCartConfigSource) Resolve(ctx context.Context, account sdk.Account) (opencart.Configuration, error) {
@@ -696,8 +1080,10 @@ func (source prestaShopConfigSource) Resolve(ctx context.Context, account sdk.Ac
 
 // AIComplete resolves the registered AI connector for account.ConnectorID
 // and sends one bounded completion request through it. host is a bare
-// hostname override (openai-compatible, kimi, qwen and deepseek honor it);
-// folderID is required only by yandexgpt. This is the sole point in the
+// hostname override for cloud providers (openai-compatible, kimi, qwen,
+// deepseek and claude); local Ollama, LM Studio and Open WebUI providers
+// receive the complete explicitly approved local base URL. folderID is
+// required only by yandexgpt. This is the sole point in the
 // repository that branches on an AI provider identity, matching the
 // exemption architecture/policy.json grants provider_composition_module.
 func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtime sdk.Runtime, host, folderID, model, systemPrompt, userPrompt string) (text, resolvedModel string, err error) {
@@ -707,6 +1093,21 @@ func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtim
 	switch account.ConnectorID {
 	case "openai-compatible":
 		return openaicompatible.New(openAICompatibleHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "ollama":
+		if r.localAI == nil {
+			return "", "", ErrUnavailable
+		}
+		return ollama.New(ollamaHTTP{r.localAI}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "lm-studio":
+		if r.localAI == nil {
+			return "", "", ErrUnavailable
+		}
+		return lmstudio.New(lmStudioHTTP{r.localAI}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "open-webui":
+		if r.localAI == nil {
+			return "", "", ErrUnavailable
+		}
+		return openwebui.New(openWebUIHTTP{r.localAI}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "kimi":
 		return kimi.New(kimiHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "gigachat":
@@ -720,6 +1121,8 @@ func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtim
 		return qwen.New(qwenHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "deepseek":
 		return deepseek.New(deepseekHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "claude":
+		return claude.New(claudeHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	default:
 		return "", "", ErrUnavailable
 	}

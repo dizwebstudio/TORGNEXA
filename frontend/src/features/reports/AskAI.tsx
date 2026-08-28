@@ -8,7 +8,7 @@ import {Icon} from "../../components/Icon";
 interface Column{key:string;label:string}
 interface ReportData{generated_at:string;columns:Column[];rows:string[][]}
 interface Account{id:string;label:string;provider:string;model:string;enabled:boolean}
-const providerLabels:Readonly<Record<string,string>>={"openai-compatible":"OpenAI-совместимый",gigachat:"GigaChat (Sber)",yandexgpt:"YandexGPT",kimi:"Kimi (Moonshot AI)",qwen:"Qwen (Alibaba Cloud)",deepseek:"DeepSeek"};
+const providerLabels:Readonly<Record<string,string>>={"openai-compatible":"OpenAI-совместимый",gigachat:"GigaChat (Sber)",yandexgpt:"YandexGPT",kimi:"Kimi (Moonshot AI)",qwen:"Qwen (Alibaba Cloud)",deepseek:"DeepSeek",claude:"Claude (Anthropic)",ollama:"Ollama", "lm-studio":"LM Studio", "open-webui":"Open WebUI"};
 const maxDigestLength=6000,maxDigestRows=150;
 const systemPrompt="Ты аналитик e-commerce платформы TORGNEXA. Отвечай кратко и по-русски, опираясь только на предоставленные данные отчёта. Если данных недостаточно для вывода — так и скажи.";
 function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64">
+  <title>Shopware</title>
+  <rect x="4" y="8" width="48" height="48" rx="14" fill="#0870FF"/>
+  <path d="M18 40V24h6v12h8V24h6v16H18Z" fill="#FFFFFF"/>
+  <text x="66" y="42" fill="#00296A" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="800" letter-spacing="-1">Shopware</text>
+</svg>

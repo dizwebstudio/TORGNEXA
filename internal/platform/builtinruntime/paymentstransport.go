@@ -3,17 +3,23 @@ package builtinruntime
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	robokassa "github.com/torgnexa/torgnexa/connectors/robokassa"
 	sbp "github.com/torgnexa/torgnexa/connectors/sbp"
 	yookassa "github.com/torgnexa/torgnexa/connectors/yookassa"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
@@ -548,3 +554,298 @@ func (t sbpHTTP) VerifyWebhook(ctx context.Context, host string, secret, body, s
 }
 
 var _ sbp.Transport = sbpHTTP{}
+
+// ---- Robokassa: fixed hosts, JWT-signed (HMAC-MD5) CreateInvoice REST API,
+// legacy XML OpStateExt status API, MD5-signed ResultURL webhook. Verified
+// against Robokassa's own PHP SDK (github.com/robokassa/sdk-php) and
+// https://docs.robokassa.ru//ru/xml-interfaces. There is no merchant-level
+// refund API (only a Partner/aggregator RefundOperation, a distinct business
+// relationship), so Refund fails closed rather than faking success. ----
+
+const (
+	robokassaInvoiceHost = "services.robokassa.ru"
+	robokassaAuthHost    = "auth.robokassa.ru"
+)
+
+type robokassaHTTP struct{ h *httpTransport }
+
+// splitRobokassaCredential separates the "login\npassword1\npassword2"
+// three-part secret bundle Robokassa's API requires: Password1 signs
+// CreateInvoice requests, Password2 signs OpStateExt/ResultURL callbacks.
+func splitRobokassaCredential(secret []byte) (login, password1, password2 []byte, err error) {
+	if len(secret) < 5 || len(secret) > 4096 {
+		return nil, nil, nil, errors.New("payment credential: invalid length")
+	}
+	parts := bytes.SplitN(secret, []byte{'\n'}, 3)
+	if len(parts) != 3 || len(parts[0]) == 0 || len(parts[1]) == 0 || len(parts[2]) == 0 {
+		return nil, nil, nil, errors.New("payment credential: expected \"login\\npassword1\\npassword2\"")
+	}
+	return parts[0], parts[1], parts[2], nil
+}
+
+func robokassaMD5Hex(v string) string {
+	sum := md5.Sum([]byte(v))
+	return hex.EncodeToString(sum[:])
+}
+
+// robokassaInvID deterministically derives Robokassa's required positive
+// 31-bit integer InvId from ExternalID: Robokassa's JWT CreateInvoice flow
+// has no auto-assigned invoice id, the merchant must supply one, and this
+// must be stable across create/status idempotent retries for the same
+// ExternalID without a separate counter or DB round-trip.
+func robokassaInvID(externalID string) int64 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(externalID))
+	return int64(h.Sum32() &^ (1 << 31))
+}
+
+type robokassaJWTPayload struct {
+	MerchantLogin string  `json:"MerchantLogin"`
+	InvoiceType   string  `json:"InvoiceType"`
+	Culture       string  `json:"Culture"`
+	InvId         int64   `json:"InvId"`
+	OutSum        float64 `json:"OutSum"`
+	Description   string  `json:"Description,omitempty"`
+}
+
+// robokassaSignJWT mirrors sdk-php's jwtSignMd5: HMAC-MD5 over
+// "base64url(header).base64url(payload)", keyed by "login:password1", with
+// the raw digest itself base64url-encoded as the third JWT segment.
+func robokassaSignJWT(login, password1 string, invID int64, outSum float64, description string) (string, error) {
+	header := []byte(`{"alg":"MD5","typ":"JWT"}`)
+	payload, err := json.Marshal(robokassaJWTPayload{MerchantLogin: login, InvoiceType: "OneTime", Culture: "ru", InvId: invID, OutSum: outSum, Description: description})
+	if err != nil {
+		return "", err
+	}
+	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(payload)
+	mac := hmac.New(md5.New, []byte(login+":"+password1))
+	mac.Write([]byte(signingInput))
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+type robokassaOpState struct {
+	XMLName xml.Name `xml:"OperationStateResponse"`
+	Result  struct {
+		Code int `xml:"Code"`
+	} `xml:"Result"`
+	State struct {
+		Code int `xml:"Code"`
+	} `xml:"State"`
+	Info struct {
+		OutSum string `xml:"OutSum"`
+	} `xml:"Info"`
+}
+
+// robokassaStatusFromCode maps the documented State.Code values
+// (https://docs.robokassa.ru//ru/xml-interfaces) conservatively: only 100
+// ("funds credited") is treated as succeeded and only 10 ("cancelled") as
+// failed. Every transitional/uncertain code (5 initiated, 20 hold, 50
+// crediting-in-progress, 60 refused/returned, 80 suspended) is left
+// "pending" rather than guessed, since paymentsCanonicalStatus treats an
+// unrecognized status as still-pending — the fail-closed choice.
+func robokassaStatusFromCode(code int) string {
+	switch code {
+	case 100:
+		return "succeeded"
+	case 10:
+		return "canceled"
+	default:
+		return "pending"
+	}
+}
+
+func (t robokassaHTTP) fetchState(ctx context.Context, secret []byte, invID string) (robokassaOpState, error) {
+	login, _, password2, err := splitRobokassaCredential(secret)
+	if err != nil {
+		return robokassaOpState{}, err
+	}
+	if invID == "" {
+		return robokassaOpState{}, errors.New("robokassa: remote id required")
+	}
+	sig := robokassaMD5Hex(string(login) + ":" + invID + ":" + string(password2))
+	query := url.Values{"MerchantLogin": []string{string(login)}, "InvoiceID": []string{invID}, "Signature": []string{sig}}
+	status, body, _, _, _, err := t.h.do(ctx, http.MethodGet, robokassaAuthHost, "/Merchant/WebService/Service.asmx/OpStateExt", query, nil, http.Header{}, nil, nil)
+	if err != nil {
+		return robokassaOpState{}, err
+	}
+	if status < 200 || status >= 300 {
+		return robokassaOpState{}, fmt.Errorf("robokassa: status fetch rejected with status %d", status)
+	}
+	var state robokassaOpState
+	if err := xml.Unmarshal(body, &state); err != nil {
+		return robokassaOpState{}, errors.New("robokassa: invalid status response")
+	}
+	if state.Result.Code == 1 {
+		return robokassaOpState{}, errors.New("robokassa: invalid signature rejected by gateway")
+	}
+	return state, nil
+}
+
+func (t robokassaHTTP) Ping(ctx context.Context, secret []byte) error {
+	// OpStateExt against an invoice id that will not exist is the closest
+	// thing to a health probe this API offers without creating a real
+	// invoice: Result.Code=3 ("operation not found") still proves the
+	// credential pair itself was accepted, while Result.Code=1 ("invalid
+	// signature") proves it was not.
+	_, err := t.fetchState(ctx, secret, "1")
+	return err
+}
+
+func (t robokassaHTTP) Create(ctx context.Context, secret []byte, request sdk.PaymentCreateRequest) (sdk.PaymentCreateResult, error) {
+	login, password1, _, err := splitRobokassaCredential(secret)
+	if err != nil {
+		return sdk.PaymentCreateResult{}, err
+	}
+	if request.Amount.Currency != "RUB" {
+		return sdk.PaymentCreateResult{}, errors.New("robokassa: only RUB is supported")
+	}
+	invID := robokassaInvID(request.ExternalID)
+	outSum, err := strconv.ParseFloat(minorUnitsToDecimal(request.Amount.MinorUnits), 64)
+	if err != nil {
+		return sdk.PaymentCreateResult{}, err
+	}
+	token, err := robokassaSignJWT(string(login), string(password1), invID, outSum, request.Purpose)
+	if err != nil {
+		return sdk.PaymentCreateResult{}, err
+	}
+	body, err := json.Marshal(token)
+	if err != nil {
+		return sdk.PaymentCreateResult{}, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json"}}
+	status, respBody, _, _, _, err := t.h.do(ctx, http.MethodPost, robokassaInvoiceHost, "/InvoiceServiceWebApi/api/CreateInvoice", nil, body, headers, nil, nil)
+	if err != nil {
+		return sdk.PaymentCreateResult{}, err
+	}
+	if status < 200 || status >= 300 {
+		return sdk.PaymentCreateResult{}, fmt.Errorf("robokassa: create rejected with status %d", status)
+	}
+	var response struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(respBody, &response); err != nil || response.URL == "" {
+		return sdk.PaymentCreateResult{}, errors.New("robokassa: invalid create response")
+	}
+	return sdk.PaymentCreateResult{RemoteID: strconv.FormatInt(invID, 10), Status: "pending", PaymentURL: response.URL, ExpiresAt: request.ExpiresAt, ObservedAt: time.Now().UTC()}, nil
+}
+
+func (t robokassaHTTP) Status(ctx context.Context, secret []byte, request sdk.PaymentStatusRequest) (sdk.PaymentStatus, error) {
+	state, err := t.fetchState(ctx, secret, request.RemoteID)
+	if err != nil {
+		return sdk.PaymentStatus{}, err
+	}
+	minor, amountErr := decimalToMinorUnits(state.Info.OutSum)
+	if amountErr != nil {
+		minor = 0
+	}
+	return sdk.PaymentStatus{RemoteID: request.RemoteID, Status: robokassaStatusFromCode(state.State.Code), Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: "RUB"}, ObservedAt: time.Now().UTC()}, nil
+}
+
+// Refund: Robokassa exposes no merchant-level refund API — only a
+// Partner/aggregator "RefundOperation" that requires a registered-partner
+// relationship distinct from a regular merchant account. Rather than
+// silently no-op or fabricate a success response, this fails closed with a
+// normalized "unsupported" remote error, no network call made.
+func (t robokassaHTTP) Refund(context.Context, []byte, sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
+	remoteErr, err := sdk.NewRemoteError(sdk.ErrorUnsupported, "refund_not_supported", "", 0)
+	if err != nil {
+		return sdk.PaymentRefundResult{}, err
+	}
+	return sdk.PaymentRefundResult{}, remoteErr
+}
+
+// Reconcile: GetInvoiceInformationList is a date/status filtered list report
+// (CurrentPage/PageSize/InvoiceStatuses/DateFrom/DateTo/InvoiceTypes), not a
+// single-invoice lookup, so it fits this window-based reconciliation shape
+// directly — unlike Status, which needs one specific InvId and uses
+// OpStateExt instead.
+func (t robokassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk.PaymentReconcileRequest) (sdk.PaymentReconcileResult, error) {
+	login, password1, _, err := splitRobokassaCredential(secret)
+	if err != nil {
+		return sdk.PaymentReconcileResult{}, err
+	}
+	filters := map[string]any{
+		"MerchantLogin":   string(login),
+		"CurrentPage":     1,
+		"PageSize":        100,
+		"InvoiceStatuses": []string{"Paid"},
+		"DateFrom":        request.From.UTC().Format(time.RFC3339),
+		"DateTo":          request.To.UTC().Format(time.RFC3339),
+		"InvoiceTypes":    []string{"OneTime"},
+	}
+	payload, err := json.Marshal(filters)
+	if err != nil {
+		return sdk.PaymentReconcileResult{}, err
+	}
+	header := []byte(`{"alg":"MD5","typ":"JWT"}`)
+	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(payload)
+	mac := hmac.New(md5.New, []byte(string(login)+":"+string(password1)))
+	mac.Write([]byte(signingInput))
+	token := signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	body, err := json.Marshal(token)
+	if err != nil {
+		return sdk.PaymentReconcileResult{}, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json"}}
+	status, respBody, _, _, _, err := t.h.do(ctx, http.MethodPost, robokassaInvoiceHost, "/InvoiceServiceWebApi/api/GetInvoiceInformationList", nil, body, headers, nil, nil)
+	if err != nil {
+		return sdk.PaymentReconcileResult{}, err
+	}
+	if status < 200 || status >= 300 {
+		return sdk.PaymentReconcileResult{}, fmt.Errorf("robokassa: reconcile rejected with status %d", status)
+	}
+	var items []struct {
+		InvId     int64   `json:"InvId"`
+		OutSum    float64 `json:"OutSum"`
+		State     string  `json:"State"`
+		StateDate string  `json:"StateDate"`
+	}
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		return sdk.PaymentReconcileResult{}, errors.New("robokassa: invalid reconcile response")
+	}
+	settlements := make([]sdk.PaymentSettlement, 0, len(items))
+	for _, item := range items {
+		occurred, timeErr := time.Parse(time.RFC3339, item.StateDate)
+		if timeErr != nil {
+			occurred = time.Now().UTC()
+		}
+		minor, amountErr := strconv.ParseFloat(fmt.Sprintf("%.2f", item.OutSum), 64)
+		if amountErr != nil {
+			continue
+		}
+		settlements = append(settlements, sdk.PaymentSettlement{RemoteID: strconv.FormatInt(item.InvId, 10), Kind: "sale", Amount: sdk.PaymentAmount{MinorUnits: int64(minor*100 + 0.5), Currency: "RUB"}, OccurredAt: occurred.UTC()})
+	}
+	return sdk.PaymentReconcileResult{Items: settlements, ObservedAt: time.Now().UTC()}, nil
+}
+
+// VerifyWebhook: Robokassa's ResultURL delivery is itself cryptographically
+// signed (unlike YooKassa/SBP), but this still re-fetches the authoritative
+// state via OpStateExt rather than trusting the body's OutSum directly,
+// matching this codebase's uniform "never trust the callback body alone"
+// rule (ADR-0071/ADR-0105) — the signature only proves the delivery is
+// genuinely from Robokassa, the re-fetch proves the state is current.
+func (t robokassaHTTP) VerifyWebhook(ctx context.Context, secret, body, _ []byte) (deliveryID, eventType, remotePaymentID, ack string, err error) {
+	values, parseErr := url.ParseQuery(string(body))
+	if parseErr != nil {
+		return "", "", "", "", errors.New("robokassa: invalid webhook body")
+	}
+	outSum, invID, signature := values.Get("OutSum"), values.Get("InvId"), values.Get("SignatureValue")
+	if outSum == "" || invID == "" || signature == "" {
+		return "", "", "", "", errors.New("robokassa: incomplete webhook body")
+	}
+	_, _, password2, credErr := splitRobokassaCredential(secret)
+	if credErr != nil {
+		return "", "", "", "", credErr
+	}
+	expected := robokassaMD5Hex(outSum + ":" + invID + ":" + string(password2))
+	if !strings.EqualFold(expected, signature) {
+		return "", "", "", "", errors.New("robokassa: signature mismatch")
+	}
+	state, err := t.fetchState(ctx, secret, invID)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	return sha256Hex(body)[:32], "payment_" + robokassaStatusFromCode(state.State.Code), invID, "OK" + invID, nil
+}
+
+var _ robokassa.Transport = robokassaHTTP{}

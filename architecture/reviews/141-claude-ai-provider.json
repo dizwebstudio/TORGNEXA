@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-141",
+  "task": "141",
+  "change_class": "new_provider",
+  "summary": "Admit Claude (Anthropic) on the existing tenant-scoped AI provider surface through the host-owned Messages API transport.",
+  "scopes": [
+    "adr/0107-claude-ai-provider.md",
+    "architecture/policy.json",
+    "architecture/reviews/141-claude-ai-provider.json",
+    "connectors/claude",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "deploy/postgres/catalog.tsv",
+    "docs/10-integrations-matrix.md",
+    "docs/69-frontend-shell.md",
+    "docs/connectors/claude",
+    "frontend/public/connector-logos/claude.svg",
+    "frontend/src/features/reports/AskAI.tsx",
+    "frontend/src/features/settings/AIProviderSettings.tsx",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "migrations/000020_ai_provider_claude.sql",
+    "migrations/catalog.json",
+    "tasks/issues/141-claude-ai-provider.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0097-ai-provider-settings-and-openai-compatible-admission.md",
+    "adr/0100-runtime-truthful-integration-catalog.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {"area":"tenancy","status":"affected","evidence":"Claude reuses the existing tenant/workspace-scoped AI provider account and governance boundary; no provider-owned tenancy data is introduced."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"Only the governed caller-assembled prompt leaves the tenant boundary; keys and responses are not persisted by the connector."},
+    {"area":"api_compatibility","status":"affected","evidence":"Existing AI provider operations are reused and their provider enum is widened additively to include claude."},
+    {"area":"event_compatibility","status":"not_affected","evidence":"No event name or payload is added or changed."},
+    {"area":"plugin_sdk_compatibility","status":"affected","evidence":"Adds one SDK v1 provider manifest with ai.completion.generate; provider dispatch remains isolated in builtinruntime."},
+    {"area":"database_migration","status":"affected","evidence":"Migration 000020 widens the ai_provider_accounts provider CHECK constraint without rewriting rows or secrets."},
+    {"area":"security","status":"affected","evidence":"Anthropic x-api-key bytes are callback-scoped and all egress uses the common DNS-pinned public-HTTPS transport."},
+    {"area":"approvals_risk","status":"affected","evidence":"Existing AI governance, data-class, capability and audit checks remain mandatory before analysis egress."},
+    {"area":"audit_lineage","status":"not_affected","evidence":"Existing AI provider account and analysis audit entries are reused without secret or prompt payloads."},
+    {"area":"reconciliation_idempotency","status":"not_affected","evidence":"AI completion performs no remote commerce synchronization or durable remote write."},
+    {"area":"webhooks_egress","status":"affected","evidence":"Adds outbound Messages API egress only; no inbound webhook surface is admitted."},
+    {"area":"slo_observability","status":"affected","evidence":"Manifest timeout/concurrency/retry metadata and bounded normalized errors cover provider availability."},
+    {"area":"operations_rollback","status":"affected","evidence":"The account can be disabled immediately and the additive provider CHECK migration has no destructive rollback requirement."},
+    {"area":"testing_conformance","status":"affected","evidence":"Claude package tests cover request/auth/response boundaries and the retained Task-064 conformance report validates all required checks."}
+  ],
+  "provider": {
+    "id": "claude",
+    "route": "connector_sdk",
+    "manifest": "connectors/claude/manifest.json",
+    "connector_spec": "docs/connectors/claude/spec.md",
+    "capability_audit": "docs/connectors/claude/capability-audit.md",
+    "conformance_plan": "docs/connectors/claude/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

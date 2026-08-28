@@ -70,6 +70,32 @@ type ProtectedRoute struct {
 	Handler    http.Handler
 }
 
+// PublicWebhookRoute is the only production registration surface for
+// unauthenticated, provider-verified inbound callbacks (ADR-0105). It never
+// passes through Authenticator/TenantResolver/Authorizer and never populates
+// PrincipalFromContext/ScopeFromContext — there is no principal to attach.
+// The registered handler is solely responsible for resolving its own tenant
+// scope from the URL and verifying the caller's authenticity (e.g. by
+// re-fetching the claimed resource from the provider's own API) before
+// trusting anything in the request. Every path must live under
+// webhookPathPrefix, keeping this class of route structurally impossible to
+// collide with or be confused for an authenticated ProtectedRoute.
+type PublicWebhookRoute struct {
+	Method     string
+	Path       string
+	PathPrefix bool
+	Handler    http.Handler
+}
+
+const webhookPathPrefix = "/api/v1/webhooks/"
+
+// webhookRatePerMinute and webhookMaxBodyBytes are fixed, not derived from
+// the tenant-facing securityedge.Config, so one aggressive or misbehaving
+// webhook source can never borrow budget from — or starve — authenticated
+// tenant traffic, and vice versa.
+const webhookRatePerMinute = 240
+const webhookMaxBodyBytes = 1 << 20
+
 type securityDependencies struct {
 	authenticator Authenticator
 	tenant        TenantResolver
@@ -102,8 +128,9 @@ func ClientIPFromContext(ctx context.Context) (netip.Addr, bool) {
 
 // NewProductionHandler creates the mandatory runtime request composition.
 // Startup fails closed when a private route is configured without every
-// security dependency.
-func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter *securityedge.Limiter, authn Authenticator, tenant TenantResolver, authz Authorizer, routes []ProtectedRoute) (http.Handler, error) {
+// security dependency. webhooks registers the separate, unauthenticated
+// PublicWebhookRoute table (ADR-0105); pass nil when a deployment has none.
+func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter *securityedge.Limiter, authn Authenticator, tenant TenantResolver, authz Authorizer, routes []ProtectedRoute, webhooks []PublicWebhookRoute) (http.Handler, error) {
 	if logger == nil || edge.Validate() != nil || limiter == nil {
 		return nil, ErrSecurityCompositionInvalid
 	}
@@ -134,10 +161,42 @@ func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter
 		table[key] = route
 	}
 
+	webhookTable := make(map[string]PublicWebhookRoute, len(webhooks))
+	webhookPrefixes := make([]PublicWebhookRoute, 0)
+	for _, route := range webhooks {
+		if err := validatePublicWebhookRoute(route); err != nil {
+			return nil, err
+		}
+		if route.PathPrefix {
+			for _, existing := range webhookPrefixes {
+				if existing.Method == route.Method && existing.Path == route.Path {
+					return nil, fmt.Errorf("%w: duplicate webhook route", ErrSecurityCompositionInvalid)
+				}
+			}
+			webhookPrefixes = append(webhookPrefixes, route)
+			continue
+		}
+		key := routeKey(route.Method, route.Path)
+		if _, exists := webhookTable[key]; exists {
+			return nil, fmt.Errorf("%w: duplicate webhook route", ErrSecurityCompositionInvalid)
+		}
+		webhookTable[key] = route
+	}
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serveComposedRoute(w, r, edge, limiter, deps, table, prefixes)
+		serveComposedRoute(w, r, edge, limiter, deps, table, prefixes, webhookTable, webhookPrefixes)
 	})
 	return recoverPanics(logger, handler), nil
+}
+
+func validatePublicWebhookRoute(route PublicWebhookRoute) error {
+	if route.Handler == nil || route.Method == "" || route.Method != strings.ToUpper(route.Method) || route.Path == "" || !strings.HasPrefix(route.Path, webhookPathPrefix) || strings.ContainsAny(route.Path, "?#") {
+		return ErrSecurityCompositionInvalid
+	}
+	if route.PathPrefix && !strings.HasSuffix(route.Path, "/") {
+		return ErrSecurityCompositionInvalid
+	}
+	return nil
 }
 
 func validateProtectedRoute(route ProtectedRoute, deps securityDependencies) error {
@@ -158,7 +217,7 @@ func validateProtectedRoute(route ProtectedRoute, deps securityDependencies) err
 
 func routeKey(method, path string) string { return method + " " + path }
 
-func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedge.Config, limiter *securityedge.Limiter, deps securityDependencies, table map[string]ProtectedRoute, prefixes []ProtectedRoute) {
+func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedge.Config, limiter *securityedge.Limiter, deps securityDependencies, table map[string]ProtectedRoute, prefixes []ProtectedRoute, webhookTable map[string]PublicWebhookRoute, webhookPrefixes []PublicWebhookRoute) {
 	for name, value := range securityedge.SecurityHeaders(edge) {
 		w.Header().Set(name, value)
 	}
@@ -169,6 +228,17 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
+
+	// Public webhook routes are checked, and dispatched, before any of the
+	// tenant-authenticated machinery below: they carry their own rate-limit
+	// budget and body bound (ADR-0105) precisely so they never compete with,
+	// or get gated behind, authenticated tenant traffic. They never reach
+	// CORS/Origin handling either — no browser ever calls this path.
+	if strings.HasPrefix(r.URL.Path, webhookPathPrefix) {
+		serveWebhookRoute(w, r, limiter, clientIP, webhookTable, webhookPrefixes)
+		return
+	}
+
 	if err = limiter.Allow(clientIP.String(), edge); err != nil {
 		if errors.Is(err, securityedge.ErrRateLimited) {
 			w.Header().Set("Retry-After", "60")
@@ -249,4 +319,39 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 	}
 	ctx = context.WithValue(ctx, requestScopeKey{}, scope)
 	route.Handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// serveWebhookRoute dispatches a PublicWebhookRoute under its own fixed
+// rate-limit budget and body bound (ADR-0105), independent of the
+// tenant-facing securityedge.Config the rest of this file uses. It never
+// authenticates, resolves a tenant, or authorizes — the dispatched handler
+// owns proving the caller is who it claims to be before trusting anything in
+// the request, and never sees PrincipalFromContext/ScopeFromContext because
+// neither is ever populated on this path.
+func serveWebhookRoute(w http.ResponseWriter, r *http.Request, limiter *securityedge.Limiter, clientIP netip.Addr, table map[string]PublicWebhookRoute, prefixes []PublicWebhookRoute) {
+	if err := limiter.Allow("webhook:"+clientIP.String(), securityedge.Config{RatePerMinute: webhookRatePerMinute}); err != nil {
+		if errors.Is(err, securityedge.ErrRateLimited) {
+			w.Header().Set("Retry-After", "60")
+			writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
+			return
+		}
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	if r.Body != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, webhookMaxBodyBytes)
+	}
+	route, ok := table[routeKey(r.Method, r.URL.Path)]
+	if !ok {
+		for _, candidate := range prefixes {
+			if candidate.Method == r.Method && strings.HasPrefix(r.URL.Path, candidate.Path) && (!ok || len(candidate.Path) > len(route.Path)) {
+				route, ok = candidate, true
+			}
+		}
+	}
+	if !ok {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	route.Handler.ServeHTTP(w, r)
 }

@@ -10,6 +10,8 @@ package aiadvisory
 
 import (
 	"errors"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,8 +86,17 @@ func ValidateCreate(cmd CreateAccount) error {
 		len(cmd.Credential) == 0 || len(cmd.Credential) > maxCredentialLength {
 		return ErrInvalid
 	}
-	if baseURL != "" && !strings.HasPrefix(baseURL, "https://") {
-		return ErrInvalid
+	if baseURL != "" {
+		parsed, err := url.Parse(baseURL)
+		if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return ErrInvalid
+		}
+		if port := parsed.Port(); port != "" {
+			value, parseErr := strconv.Atoi(port)
+			if parseErr != nil || value < 1 || value > 65535 {
+				return ErrInvalid
+			}
+		}
 	}
 	return nil
 }

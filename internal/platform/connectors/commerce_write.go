@@ -36,12 +36,12 @@ func (request ProductWriteRequest) Validate() error {
 	if request.RemoteID != "" && !validRemoteID(request.RemoteID) {
 		return ErrInvalidCommerceWrite
 	}
-	if !validReadText(request.SellerSKU, 200) || !validReadText(request.Title, 500) || !validOptionalWriteText(request.Description, 10000) || !validIdempotencyKey(request.IdempotencyKey) {
-		return ErrInvalidCommerceWrite
-	}
-	switch request.StatusRemoteID {
-	case "draft", "pending", "private", "publish":
-	default:
+	// StatusRemoteID is a bounded remote-native status id, the same shape
+	// OrderStatusWriteRequest.StatusRemoteID already uses: providers define
+	// their own vocabulary (WooCommerce's draft/pending/private/publish,
+	// Shopify's active/archived/draft, ...), so this validates shape, not a
+	// fixed enum of any one provider's terms.
+	if !validReadText(request.SellerSKU, 200) || !validReadText(request.Title, 500) || !validOptionalWriteText(request.Description, 10000) || !validIdempotencyKey(request.IdempotencyKey) || !validReadText(request.StatusRemoteID, 64) {
 		return ErrInvalidCommerceWrite
 	}
 	return nil

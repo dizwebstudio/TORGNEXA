@@ -21,11 +21,91 @@ The executable backlog is represented by the task cards in `tasks/issues/`. Do n
 ## Runtime-truthful integration catalog
 
 130 replaces manifest-implied availability with an exact generated runtime
-support contract. Eleven connectors have a generic product bridge, six AI
+support contract. Eleven connectors have a generic product bridge, seven AI
 connectors belong to their dedicated settings surface, CBR FX runs in Finance,
 and 20 entries remain discoverable but fail closed until an end-to-end
 application bridge is added. Task 131 closes the first planned connector with
 real production composition rather than changing its label alone.
+
+## Bitrix24 CRM runtime closure
+
+Task 139 admits Bitrix24 on a dedicated CRM surface. OAuth/refresh, strict
+portal-host configuration, health and the qualified CRM entity/product-row
+capabilities use the existing connector-account boundary and built-in registry;
+generic product synchronization remains deliberately unavailable. The current
+runtime inventory is 11 generic integrations, 13 separate-surface providers
+and 15 planned entries.
+
+## Claude AI provider runtime closure
+
+Task 141 admits Claude (Anthropic) on the existing AI-provider settings surface.
+The connector uses the host-owned HTTPS boundary and Anthropic Messages API for
+one bounded text completion; credentials remain callback-scoped in
+SecretProvider, and the generic product-sync surface is unchanged. The current
+runtime inventory is 11 generic integrations, 14 separate-surface providers
+and 15 planned entries.
+
+## 5Post logistics connector
+
+Task 142 adds a truthful 5Post SDK adapter and admits its account and
+credential-check path on the separate Delivery surface. Shipment writes remain
+qualification-gated; the current runtime inventory is 12 generic integrations,
+16 separate-surface providers and 15 planned entries.
+
+## ПЭК logistics connector
+
+Task 143 adds the ПЭК SDK adapter, official Basic credential probe and
+deterministic conformance candidate. ПЭК is available in the same Delivery
+surface for tenant account setup and health checks; shipment writes and product
+synchronization remain closed until a non-production API qualification.
+
+## CDEK and Деловые Линии delivery verification
+
+Task 145 admits the existing CDEK SDK on the Delivery surface with an OAuth
+client-credentials probe and adds the Деловые Линии adapter with appkey/PAT
+session verification. Rates, shipment writes, labels and product
+synchronization remain closed until current provider fixtures and an
+idempotent host bridge are qualified. At that point the runtime inventory was
+12 generic integrations, 18 separate-surface providers and 15 planned entries.
+
+## Ozon Pay and Ozon Доставка runtime surfaces
+
+Task 147 adds separate finance and Delivery cards for the Ozon services that
+are commonly used together by internet shops. Both accept encrypted Seller API
+`client_id`/`api_key` credentials and perform a bounded host-mediated health
+probe. Payment mutations and delivery rates/shipments/labels/tracking remain
+qualification-gated; a healthy Seller API key does not imply merchant-service
+activation. The runtime inventory is 13 generic integrations, 20 separate-
+surface providers and 15 planned entries.
+
+## Local AI provider runtime
+
+Tasks 149–150 add Ollama, LM Studio and Open WebUI to the dedicated AI-provider
+surface. Each uses the existing governed non-streaming completion API and a
+host-mediated local transport with private-address pinning, an explicit local
+hostname allowlist, no proxy/redirect handling and bounded bodies. The three
+cards are configurable from Settings → AI providers and Reports → Ask AI;
+model servers remain operator-managed and no generic commerce synchronization
+is claimed. The runtime inventory is 14 generic integrations, 23 separate-
+surface providers and 15 planned entries.
+
+## 1С-Битрикс storefront runtime
+
+Task 152 adds a separate 1С-Битрикс internet-store card and host-mediated
+official REST-module webhook adapter. Product catalog reads and idempotent
+product writes are executable; inventory, prices and orders stay fail-closed
+because the worker has no corresponding entity bridges. The runtime inventory
+is now 16 generic integrations, 23 separate-surface providers and 14 planned
+entries.
+
+## CS-Cart storefront runtime
+
+Task 153 adds CS-Cart as a self-hosted internet-store card using the official
+REST API 2.0 and HTTP Basic Auth (administrator e-mail plus API key). Product
+catalog reads, creates and updates are admitted with cursor pagination,
+idempotent SKU lookup and read-after-write reconciliation; inventory, prices,
+orders and webhooks remain fail-closed. The runtime inventory is now 17
+generic integrations, 23 separate-surface providers and 14 planned entries.
 
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.
@@ -196,3 +276,40 @@ reference. PostgreSQL transaction advisory locks plus a post-lock bundle reread
 prevent API/worker races against rotating refresh tokens. Client-credentials
 grants exchange without a browser. No connector readiness count changes;
 Task 135 may now compose VK on top of this boundary.
+
+## Task 136 — Unauthenticated verified webhook ingress boundary
+
+Repository implementation complete (ADR-0105): a new `PublicWebhookRoute`
+table, registered alongside `ProtectedRoute` in `NewProductionHandler`,
+carries inbound provider callbacks under the fixed `/api/v1/webhooks/` prefix
+with its own rate-limit budget and body bound, entirely independent of
+authenticated tenant traffic. It never runs the OIDC
+Authenticator/TenantResolver/Authorizer chain and never populates
+`PrincipalFromContext`/`ScopeFromContext` — the dispatched handler owns
+resolving its own tenant scope and proving caller authenticity (per ADR-0105,
+by re-verifying against the provider's own API rather than trusting a
+signature header). This makes `sdk.PaymentWebhookVerifier` (implemented for
+`yookassa`/`sbp` while building the payments core, previously unreachable)
+reachable for the first time. No payment-specific handler is wired yet —
+Task 137 does that on top of this boundary.
+
+## Task 137 — Payment provider webhook receivers
+
+Repository implementation complete: `POST
+/api/v1/webhooks/payments/{connector_id}/{organization_id}/{workspace_id}/{account_id}`
+is registered through Task 136's boundary. The handler resolves the account,
+calls `registry.PaymentGateway(...).VerifyPaymentWebhook` inside the
+account's own `UseSecret` scope, records replay-deduped
+`payments.WebhookEvidence` (migration 000018's `payment_webhook_receipts`),
+and applies the transition through the same `ValidatePaymentTransition`/
+`ChangePaymentStatus` path every other payment mutation uses — the target
+status comes only from the verified `EventType`, never from the request
+body. A new `payments_remote_uq` index (migration 000019) and
+`Repository.PaymentByRemoteID` resolve the local payment from the provider's
+own remote id, which a webhook delivery is the first caller to only ever
+have. Every outcome — unknown account, replay, verification failure, or a
+real transition — returns the identical `200 {}` acknowledgement, so no
+response-timing or status-code signal distinguishes them (ADR-0105). SBP
+webhook delivery remains code-complete but unverified for the same reason as
+its other operations: no real acquiring-bank gateway exists in this
+environment.

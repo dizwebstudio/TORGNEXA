@@ -48,6 +48,36 @@ func validMarketplaceManifest() Manifest {
 	}
 }
 
+func TestOAuth2ConfigurationHostTemplateValidation(t *testing.T) {
+	valid := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	cases := []OAuth2Configuration{
+		// HostSuffix without HostParameter is meaningless and rejected.
+		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", HostSuffix: ".myshopify.com"},
+		// A fixed https URL is not a valid template once HostParameter is set.
+		{GrantType: "authorization_code", AuthorizationURL: "https://shop.myshopify.com/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"},
+		// HostSuffix must start with a dot.
+		{GrantType: "authorization_code", AuthorizationURL: "https://{host}/authorize", TokenURL: "https://{host}/token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: "myshopify.com"},
+		// An invalid scope separator is rejected.
+		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ScopeSeparator: ";"},
+	}
+	for index, configuration := range cases {
+		if configuration.Validate() == nil {
+			t.Fatalf("case %d unexpectedly valid: %+v", index, configuration)
+		}
+	}
+	withExtras := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ExtraTokenParams: map[string]string{"expiring": "1"}}
+	if err := withExtras.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	reserved := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ExtraTokenParams: map[string]string{"client_secret": "leak"}}
+	if reserved.Validate() == nil {
+		t.Fatal("extra_token_params must not override reserved OAuth form fields")
+	}
+}
+
 func TestManifestValidatesCapabilityFamilyAndSDK(t *testing.T) {
 	manifest := validMarketplaceManifest()
 	if err := manifest.Validate(); err != nil {

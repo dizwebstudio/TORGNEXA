@@ -1,6 +1,6 @@
 # ADR-0105 — Unauthenticated verified webhook ingress
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

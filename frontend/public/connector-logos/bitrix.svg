@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">1С-Битрикс</title>
+  <desc id="desc">1С-Битрикс storefront connector</desc>
+  <rect width="320" height="96" rx="18" fill="#fff"/>
+  <path fill="#f58220" d="M27 19h22v22H27zM27 55h22v22H27zM55 19h22v22H55zM55 55h22v22H55z"/>
+  <path fill="#e04a16" d="M91 19h14c22 0 36 11 36 29s-14 29-36 29H91zm14 12v34h2c13 0 20-6 20-17s-7-17-20-17z"/>
+  <text x="153" y="59" fill="#202c3c" font-family="Arial, sans-serif" font-size="26" font-weight="700">1С-Битрикс</text>
+</svg>

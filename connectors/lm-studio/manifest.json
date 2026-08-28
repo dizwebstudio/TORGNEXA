@@ -1,0 +1,10 @@
+{
+  "id": "lm-studio",
+  "name": "LM Studio",
+  "family": "ai",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["ai.completion.generate"],
+  "auth": [{"kind": "api_key", "secret_class": "ai_provider_credential", "required": true}],
+  "rate_limit": {"max_concurrency": 2, "min_interval_ms": 200, "request_timeout_ms": 120000, "retry": {"max_attempts": 2, "base_backoff_ms": 500, "max_backoff_ms": 5000}}
+}

@@ -282,6 +282,11 @@ services:
   api:
     <<: *app-common
     entrypoint: [/app/torgnexa-api]
+    # Make the host-gateway name available for an operator-managed LM Studio
+    # daemon on Linux; the application still enforces its local endpoint
+    # allowlist and pinned dialing.
+    extra_hosts:
+      - host.docker.internal:host-gateway
     environment:
       <<: *app-env
       TORGNEXA_HTTP_ADDR: 0.0.0.0:8080

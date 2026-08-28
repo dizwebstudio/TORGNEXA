@@ -640,6 +640,12 @@ func (api *connectorAccountAPI) oauthStart(w http.ResponseWriter, request *http.
 		writeProblem(w, http.StatusUnprocessableEntity, "Browser OAuth is not supported")
 		return
 	}
+	if configuration.HostParameter != "" {
+		if configuration, err = api.resolveOAuthHost(request.Context(), scope, account.ID, configuration); err != nil {
+			writeProblem(w, http.StatusUnprocessableEntity, "Runtime host configuration required")
+			return
+		}
+	}
 	client, err := api.readOAuthClient(request.Context(), scope, account.SecretReference)
 	if err != nil {
 		writeProblem(w, http.StatusUnprocessableEntity, "OAuth client configuration required")
@@ -730,6 +736,12 @@ func (api *connectorAccountAPI) oauthCallback(w http.ResponseWriter, request *ht
 		writeProblem(w, http.StatusUnprocessableEntity, "OAuth configuration is invalid")
 		return
 	}
+	if configuration.HostParameter != "" {
+		if configuration, err = api.resolveOAuthHost(request.Context(), scope, account.ID, configuration); err != nil {
+			writeProblem(w, http.StatusUnprocessableEntity, "Runtime host configuration required")
+			return
+		}
+	}
 	bundle, err := api.oauthExchange(request.Context(), configuration, client, input.Code, input.CallbackURL, pending.CodeVerifier, min(time.Duration(manifest.RateLimit.RequestTimeoutMS)*time.Millisecond, 15*time.Second))
 	if err != nil {
 		_, _ = api.repository.RecordAccountHealth(request.Context(), sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, ExpectedVersion: account.Version, Health: sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "oauth_exchange_failed", CheckedAt: api.now().UTC()}})
@@ -755,6 +767,22 @@ func (api *connectorAccountAPI) oauthCallback(w http.ResponseWriter, request *ht
 		return
 	}
 	writeJSON(w, http.StatusOK, accountView(bound))
+}
+
+// resolveOAuthHost templates a per-tenant OAuth host (e.g. Shopify's
+// {shop}.myshopify.com) into configuration's authorization/token URLs from
+// the account's own non-secret runtime config, so the generic OAuth flow
+// stays provider-agnostic: it never branches on connector identity, only on
+// whether the manifest declares HostParameter.
+func (api *connectorAccountAPI) resolveOAuthHost(ctx context.Context, scope tenancy.Scope, accountID string, configuration sdk.OAuth2Configuration) (sdk.OAuth2Configuration, error) {
+	if api.configs == nil {
+		return sdk.OAuth2Configuration{}, connectorauth.ErrInvalid
+	}
+	raw, _, err := api.configs.Config(ctx, scope, accountID)
+	if err != nil {
+		return sdk.OAuth2Configuration{}, err
+	}
+	return connectorauth.ResolveOAuth2Host(configuration, raw)
 }
 
 func (api *connectorAccountAPI) oauthExchange(ctx context.Context, configuration sdk.OAuth2Configuration, client connectorauth.OAuthClient, code, callbackURL, verifier string, timeout time.Duration) ([]byte, error) {

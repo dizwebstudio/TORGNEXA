@@ -9,7 +9,8 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Completed repository implementation: `001`, `024`, `065`, `002`, `027`,
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
-- Contiguous implemented baseline: Tasks `001`–`133`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
+- Contiguous implemented baseline: Tasks `001`–`134`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces; Task `134` closes the host-owned OAuth access-token projection and refresh boundary. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
+- Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152` and `153` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -436,3 +437,205 @@ interaction. The catalog remains 11 generic, nine separate and 18 planned.
   change;
 - Go test/vet, contracts, architecture, migration, frontend and rebuilt
   API/worker health gates must pass before Task 135 begins.
+
+## Phase 20 — Bitrix24 CRM production composition
+
+`139`
+
+Task 139 admits the already qualified Bitrix24 adapter on a dedicated `crm`
+surface. The host-owned OAuth runtime supplies current access tokens, while a
+strict tenant-scoped `portal_host` config reaches the common pinned HTTPS
+transport. Entity and product-row CRM capabilities are executable through the
+provider-neutral built-in registry; generic product synchronization remains
+unavailable because the worker has no CRM-to-product bridge. Runtime inventory
+is now 11 generic product integrations, 13 working separate-surface providers
+and 15 planned entries.
+
+### Gate RUNTIME-139
+
+- Bitrix24 account creation, OAuth/refresh, portal configuration and health
+  checks must use the normal tenant-scoped connector-account boundary;
+- the four advertised CRM capabilities must resolve through the built-in
+  registry, while generic `products` sync remains fail-closed;
+- access/refresh material stays in SecretProvider and portal hosts use the
+  common public-HTTPS/SSRF policy;
+- runtime-support generation, Go test/vet, contracts, architecture, frontend
+  tests/build and package-index checks must pass before release qualification;
+- live CRM qualification requires a dedicated non-production Bitrix24 portal
+  and OAuth application; repository tests cannot manufacture that external
+  fact.
+
+## Phase 21 — Claude AI provider production composition
+
+`141`
+
+Task 141 admits Claude (Anthropic) on the existing tenant-scoped AI-provider
+settings surface. The connector uses Anthropic's Messages API through the
+host-owned DNS-pinned HTTPS transport, sends one bounded non-streaming text
+completion, and keeps API-key material inside the SecretProvider callback.
+Runtime inventory is now 11 generic product integrations, 14 working
+separate-surface providers and 15 planned entries. The generic product worker
+and its `products` bridge remain unchanged.
+
+### Gate RUNTIME-141
+
+- Claude account creation, credential enrollment, analysis and health checks
+  must reuse the existing AI-provider API, governance and audit boundaries;
+- the provider package must have no direct network or secret-store imports;
+  all egress must use the built-in host transport and only the bounded text
+  capability may be advertised;
+- migration `000020` and the OpenAPI/generated SDK/catalog projections must be
+  synchronized, with no secret or tenant text added to durable records;
+- runtime-support generation, Go test/vet, contracts, migration, architecture,
+  frontend tests/build and package-index checks must pass before release
+  qualification;
+- live Claude qualification requires a dedicated non-production Anthropic API
+  key and retained health/completion evidence; repository fixtures cannot
+  manufacture that external fact.
+
+## Phase 22 — Logistics delivery verification surface
+
+`142`, `143`
+
+Tasks 142 and 143 admit 5Post and ПЭК to the separate «Доставка» surface. The
+catalog now permits tenant account creation, encrypted credential enrollment
+and an authenticated provider health check for both carriers. Their SDK
+adapters include deterministic rates/shipment/tracking/pickup tests and
+conformance candidates, while generic product synchronization and live
+shipment writes stay fail-closed until current carrier fixtures and
+non-production credentials are qualified.
+
+### Gate RUNTIME-142-143
+
+- 5Post uses the partner API-key token probe; ПЭК uses the official personal
+  cabinet Basic login/access-key probe;
+- no carrier credential or recipient data is logged, persisted in plaintext or
+  copied into events;
+- runtime support is `separate_surface/logistics`, never `planned`, while no
+  unqualified write capability is enabled;
+- generated catalogs, architecture reviews, SDK tests, contracts and frontend
+  build remain synchronized before deployment.
+
+## Phase 23 — CDEK and Деловые Линии delivery verification
+
+`145`
+
+Task 145 moves CDEK out of `planned` and adds Деловые Линии to the separate
+«Доставка» surface. Both connectors support encrypted account enrollment and a
+bounded authenticated health probe: CDEK uses OAuth client credentials plus a
+city-directory read, while Деловые Линии uses appkey/PAT session login. No
+shipment, rate, label, return or product-sync route is advertised until the
+current carrier contracts and an idempotent host bridge are qualified. Runtime
+inventory is 12 generic product integrations, 18 separate-surface providers
+and 15 planned entries.
+
+### Gate RUNTIME-145
+
+- CDEK and Деловые Линии credentials remain callback-scoped in SecretProvider;
+  access/session tokens are discarded after the health probe;
+- both providers resolve through the reviewed built-in host transport and are
+  represented as `separate_surface/logistics`, never as generic product sync;
+- generated runtime support/catalog, deterministic connector tests, contracts,
+  architecture review, package index and frontend build must pass;
+- live carrier qualification still requires tenant-scoped non-production
+  credentials and retained provider evidence before any operational write is
+  enabled.
+
+## Phase 24 — Ozon Pay and Ozon Доставка surfaces
+
+`147`
+
+Task 147 adds Ozon Pay to the separate Payments surface and Ozon Доставка to
+the separate Delivery surface. Both use encrypted Seller API credentials and
+bounded host-mediated access probes. The cards are configurable and visible in
+the frontend, but payment mutations and delivery rates/shipments/labels/
+tracking remain closed until current Ozon merchant contracts are qualified.
+The runtime inventory is 13 generic integrations, 20 separate-surface
+providers and 15 planned entries.
+
+### Gate RUNTIME-147
+
+- Seller API keys remain callback-scoped and never appear in logs, events or
+  normalized health evidence;
+- `ozon-pay` and `ozon-delivery` are registered as separate surfaces with zero
+  operational capabilities, so no payment or shipment route can be enabled;
+- generated catalogs, architecture policy/reviews, deterministic transport
+  tests, contracts, docs and frontend build are synchronized;
+- enabling payment/delivery operations still requires a dedicated non-
+  production Ozon qualification and an updated capability audit.
+
+## Phase 25 — Local AI provider runtime
+
+`149–150`
+
+Tasks 149 and 150 admit Ollama, LM Studio and Open WebUI on the dedicated
+AI-provider
+surface. All three use the existing governed `ai.completion.generate` route
+and OpenAI-compatible non-streaming chat shape. The runtime adds a separate
+host-mediated local transport that resolves and pins only approved private or
+loopback destinations, disables proxies and redirects, and bounds request and
+response bodies. The small production Compose profile remains model-service
+agnostic; operators connect an already-running local server.
+
+### Gate RUNTIME-149
+
+- the three manifests, runtime-support contract, OpenAPI enum, migration
+  `000021`, generated catalogs and architecture reviews agree;
+- local HTTP is accepted only for the explicit Ollama/LM Studio/Open WebUI,
+  loopback and Docker host-gateway names; hosted providers remain HTTPS-only;
+- credentials stay callback-scoped, prompts remain governed and audited, and
+  no product/order synchronization, streaming or tool capability is claimed;
+- connector/transport/API/frontend/contract/migration tests and the production
+  Compose rebuild pass before release qualification;
+- live model availability still requires an operator-provided local service and
+  model; TORGNEXA does not download weights or auto-deploy model servers.
+
+## Phase 26 — 1С-Битрикс storefront connector
+
+`152`
+
+Task 152 adds 1С-Битрикс as a distinct self-hosted internet-store connector,
+separate from the existing Bitrix24 CRM surface. The official REST-module
+webhook bridge admits product catalog reads and idempotent product writes;
+inventory, prices and orders remain unavailable until the worker has matching
+entity routes. The card exposes the required information-block ID and keeps
+webhook credentials encrypted.
+
+### Gate RUNTIME-152
+
+- the REST module and webhook prerequisite is explicit in the connector docs
+  and UI setup guidance;
+- `catalog.product.list/get/add/update` calls use the host-mediated transport,
+  bounded responses, exact information-block filtering and read-after-write
+  verification;
+- runtime support, generated catalogs, architecture policy/review, frontend
+  presentation, task docs and conformance evidence are synchronized;
+- products-only admission remains fail-closed for inventory, prices, orders and
+  unsupported Bitrix custom-property/offer mappings;
+- Go test/vet, contracts, architecture, frontend tests/build and package-index
+  checks pass before release qualification;
+- live qualification still requires a dedicated non-production 1С-Битрикс site,
+  enabled REST module and a scoped webhook.
+
+## Phase 27 — CS-Cart storefront connector
+
+`153`
+
+Task 153 adds CS-Cart as a distinct self-hosted internet-store connector. The
+official API 2.0 Basic Auth surface admits product catalog reads and
+idempotent creates/updates with SKU lookup and read-after-write reconciliation;
+unsupported inventory, prices, orders and webhooks remain unavailable.
+
+### Gate RUNTIME-153
+
+- API access activation, administrator e-mail/API key credentials and
+  `store_host`/`base_path`/`store_currency` runtime configuration are explicit;
+- product list/get/create/update calls use the host-mediated HTTPS transport
+  with bounded responses and cursor pagination;
+- runtime support, generated catalogs, architecture policy/review, frontend
+  presentation, task docs and conformance evidence are synchronized;
+- products-only admission remains fail-closed for inventory, prices, orders and
+  webhooks;
+- Go tests/vet, contracts, frontend tests/build and package-index checks pass;
+- live qualification still requires a non-production CS-Cart store with API
+  access enabled for the administrator.

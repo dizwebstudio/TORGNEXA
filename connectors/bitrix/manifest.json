@@ -1,0 +1,15 @@
+{
+  "id": "bitrix",
+  "name": "1С-Битрикс",
+  "family": "storefront",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
+  "auth": [{"kind": "bearer", "secret_class": "storefront.bridge-token", "required": true}],
+  "rate_limit": {
+    "max_concurrency": 4,
+    "min_interval_ms": 150,
+    "request_timeout_ms": 30000,
+    "retry": {"max_attempts": 4, "base_backoff_ms": 500, "max_backoff_ms": 30000}
+  }
+}

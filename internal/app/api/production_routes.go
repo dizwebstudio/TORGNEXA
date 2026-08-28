@@ -120,3 +120,13 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newReservedContractRoutes(deps, capabilityGuard)...)
 	return routes
 }
+
+// newProductionWebhookRoutes registers the unauthenticated PublicWebhookRoute
+// table (ADR-0105/Task 136). Kept separate from newProductionRoutes because
+// the two route types have different security postures and neither may be
+// registered through the other's table.
+func newProductionWebhookRoutes(deps productionRouteDependencies) []PublicWebhookRoute {
+	var routes []PublicWebhookRoute
+	routes = append(routes, newPaymentWebhookRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
+	return routes
+}

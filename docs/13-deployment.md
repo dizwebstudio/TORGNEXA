@@ -2,7 +2,18 @@
 
 Community/dev: Docker Compose with API/worker/scheduler/MCP, PostgreSQL, single Kafka KRaft node, Valkey; optional Keycloak/ClickHouse; external or local S3-compatible storage.
 
-Production: Kubernetes/Helm target, independently scalable stateless processes, PostgreSQL HA, Kafka HA separated roles, ClickHouse cluster, external S3, Keycloak HA or enterprise OIDC.
+Production default: Kubernetes/Helm target, independently scalable stateless
+processes, PostgreSQL HA, Kafka HA separated roles, ClickHouse cluster, external
+S3, Keycloak HA or enterprise OIDC. A constrained single-VPS production profile
+is also supported through the reviewed Docker Compose overlay; it is explicitly
+non-HA and requires the backup, TLS/edge and capacity limitations documented
+below.
+
+For a pre-provisioned single-host production topology, the repository also
+contains a manual, protected SSH workflow. It is deliberately separate from the
+Community Compose quick start and requires a pinned host key plus a reviewed
+production Compose file: see
+[`docs/deployment/production-ssh-deploy.md`](deployment/production-ssh-deploy.md).
 
 Configuration/secrets are external. Upgrades version DB/API/events/plugins independently and use explicit migrations.
 

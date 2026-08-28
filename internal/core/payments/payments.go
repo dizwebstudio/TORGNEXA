@@ -359,6 +359,10 @@ func (m Mutation) Validate() error {
 type Repository interface {
 	Payment(context.Context, Scope, PaymentID) (Payment, error)
 	PaymentByExternalID(context.Context, Scope, string) (Payment, error)
+	// PaymentByRemoteID looks up a payment by (connectorAccountID, remoteID) —
+	// the pair a verified webhook delivery actually carries, since the
+	// provider knows nothing about our ExternalID.
+	PaymentByRemoteID(context.Context, Scope, string, string) (Payment, error)
 	ListPayments(context.Context, Scope, int) ([]Payment, error)
 	CreatePayment(context.Context, Scope, CreatePayment, Mutation) (Payment, error)
 	ChangePaymentStatus(context.Context, Scope, ChangePaymentStatus, Mutation) (Payment, error)

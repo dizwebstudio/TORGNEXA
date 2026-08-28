@@ -1,6 +1,17 @@
-# Package status — 2026-08-27
+# Package status — 2026-08-28
 
-**Tasks 001–133 are repository-implemented.** Task 133 composes MAX text publication through the same provider-neutral Social surface and receipt-safe worker used by Telegram. The catalog therefore contains 11 generic product integrations, nine working separate-surface providers and 18 planned connectors. Architecture policy: **125 modules / 38 providers / 124 reviews**. Active migrations are **17**, latest `000017`, with the original **74-file / legacy head 000074** chain archived as immutable evidence. Public OpenAPI is **134 operations / 0.21.1**.
+**Tasks 001–153 are repository-implemented.** Task 153 adds a separate
+CS-Cart storefront connector; Task 152 adds 1С-Битрикс; Tasks 149–150 add Ollama, LM Studio
+and Open WebUI to the dedicated AI-provider surface through a private-address
+local transport. Task 147 adds separate Ozon Pay
+and Ozon Доставка surfaces with truthful Seller API health probes. Task 145 moves СДЭК out of
+`planned` and adds Деловые Линии to the separate Delivery verification
+surface; both remain qualification-gated for shipment operations. The catalog
+therefore contains 17 generic product integrations, 23 working separate-surface
+providers and 14 planned connectors. Architecture policy: **128 modules / 53
+providers / 141 reviews**. Active migrations are **21**, latest `000021`, with
+the original **74-file / legacy head 000074** chain archived as immutable
+evidence. Public OpenAPI is **138 operations / 0.21.1**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -10,14 +21,87 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 384
-- adrs: 103
-- tasks: 135
+- docs: 474
+- adrs: 108
+- tasks: 155
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2226
+- total source files (excluding local secrets/build/dependency/cache trees): 2606
 
+
+## Task 153 additions
+
+- CS-Cart storefront manifest, branded presentation and official REST API 2.0
+  Basic Auth adapter;
+- host-mediated product catalog read/write with cursor pagination, exact
+  `product_code` reconciliation and read-after-write verification;
+- generated runtime support/catalog, architecture policy/review, frontend
+  guidance, task card and connector documentation;
+- explicit fail-closed boundary for inventory, prices, orders and webhooks.
+
+## Task 152 additions
+
+- separate 1С-Битрикс storefront manifest, branded presentation and official
+  REST-module webhook adapter;
+- host-mediated product catalog read/write with required
+  `catalog_iblock_id`, exact `xmlId` reconciliation and read-after-write
+  verification;
+- generated runtime support/catalog, architecture policy/review, frontend
+  guidance, task card and connector documentation;
+- explicit fail-closed boundary for inventory, prices, orders, offers and
+  webhook receipt until matching worker routes are qualified.
+
+
+## Tasks 149–150 additions
+
+- Ollama, LM Studio and Open WebUI manifests, presentation assets and typed
+  OpenAI-compatible completion adapters;
+- host-mediated local AI transport with private/loopback address pinning,
+  explicit Docker/loopback hostname allowlist, proxy/redirect suppression and
+  bounded request/response bodies;
+- tenant AI settings, Reports → Ask AI labels, OpenAPI enum, migration `000021`,
+  generated runtime/catalog projections and conformance evidence;
+- operator documentation for local endpoint defaults and the deliberate
+  exclusion of automatic model-server deployment.
+
+## Task 147 additions
+
+- Ozon Pay and Ozon Доставка manifests, presentation assets and SDK adapters;
+- encrypted Seller API credential enrollment plus host-mediated bounded health
+  probes for finance and Delivery surfaces;
+- truthful frontend setup guidance: payment and shipment operations stay
+  qualification-gated;
+- runtime support, architecture policy/reviews, docs, task card and generated
+  catalog evidence.
+
+## Task 145 additions
+
+- CDEK is surfaced as «СДЭК» on the separate Delivery catalog with an OAuth
+  client-credentials and bounded city-directory health probe;
+- Деловые Линии is added with encrypted appkey/PAT enrollment and a short-lived
+  v4 login session check;
+- both adapters keep provider credentials callback-scoped and discard access or
+  session tokens; rates, shipments, labels, returns and product sync remain
+  fail-closed until carrier qualification;
+- generated runtime support, deterministic adapter tests, contract checks and
+  the frontend production build are synchronized.
+
+
+## Task 134 additions
+
+- account-aware host OAuth runtime that projects only a current access token
+  through the frozen Connector SDK v1 callback;
+- one-minute pre-expiry authorization-code refresh against the exact manifest
+  endpoint, including refresh-token preservation or atomic rotation;
+- tenant/reference-scoped PostgreSQL advisory try-lock with post-lock reread,
+  preventing duplicate remote refresh while avoiding connection-pool starvation;
+- just-in-time client-credentials exchange without browser interaction or
+  plaintext token caching;
+- bounded `oauth_refresh_failed` and `oauth_reauthorization_required` health
+  outcomes, plus operator-facing «Войти» / «Войти снова» guidance;
+- Bitrix24 aligned to the provider-neutral raw access-token contract; no public
+  API, event, SDK-major, migration or readiness-count change.
 
 ## Task 133 additions
 
@@ -58,7 +142,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Task 130 additions
 
-- schema-backed readiness classification for all 38 connector manifests: 11 generic runtime integrations, six AI providers on their dedicated surface and 21 planned entries;
+- schema-backed readiness classification for all 40 connector manifests: 11 generic runtime integrations, 14 separate-surface connectors (including seven AI providers) and 15 planned entries;
 - generated TypeScript and Go readiness projections with exact inventory, capability-subset and product-direction checks;
 - built-in product readers for AliExpress RU, Magnit Market, Megamarket, OpenCart and PrestaShop, plus OpenCart product writes;
 - fail-closed account, capability, health and synchronization admission for operations absent from the production runtime;
@@ -245,6 +329,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `.github/PULL_REQUEST_TEMPLATE.md`
 - `.github/workflows/architecture-required.yml`
 - `.github/workflows/ci.yml`
+- `.github/workflows/production-deploy.yml`
 - `.github/workflows/release.yml`
 - `.github/workflows/security.yml`
 - `.gitignore`
@@ -361,6 +446,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0101-cbr-fx-production-runtime.md`
 - `adr/0102-telegram-social-production-runtime.md`
 - `adr/0103-max-social-production-runtime.md`
+- `adr/0104-host-owned-oauth-refresh-runtime.md`
+- `adr/0105-unauthenticated-verified-webhook-ingress.md`
+- `adr/0106-bitrix24-crm-production-runtime.md`
+- `adr/0107-claude-ai-provider.md`
+- `adr/0108-oauth-per-tenant-host-template.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -486,6 +576,24 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/131-cbr-fx-production-runtime.json`
 - `architecture/reviews/132-telegram-social-production-runtime.json`
 - `architecture/reviews/133-max-social-production-runtime.json`
+- `architecture/reviews/134-host-owned-oauth-refresh-runtime.json`
+- `architecture/reviews/139-bitrix24-crm-production-runtime.json`
+- `architecture/reviews/140-robokassa-payment-connector.json`
+- `architecture/reviews/141-claude-ai-provider.json`
+- `architecture/reviews/142-fivepost-logistics-connector.json`
+- `architecture/reviews/143-pek-logistics-connector.json`
+- `architecture/reviews/144-shopify-oauth-storefront-connector.json`
+- `architecture/reviews/145-cdek-dellin-delivery-verification.json`
+- `architecture/reviews/146-medusa-storefront-connector.json`
+- `architecture/reviews/147-ozon-pay-runtime.json`
+- `architecture/reviews/147b-ozon-delivery-runtime.json`
+- `architecture/reviews/148-shopware-storefront-connector.json`
+- `architecture/reviews/149a-ollama-local-ai.json`
+- `architecture/reviews/149b-lm-studio-local-ai.json`
+- `architecture/reviews/150-open-webui-local-ai.json`
+- `architecture/reviews/151-magento-storefront-connector.json`
+- `architecture/reviews/152-bitrix-storefront-connector.json`
+- `architecture/reviews/153-cs-cart-storefront-connector.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -516,6 +624,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/auto-ru/fixtures/feed-task.json`
 - `connectors/auto-ru/fixtures/offers.json`
 - `connectors/auto-ru/manifest.json`
+- `connectors/auto-ru/presentation.json`
 - `connectors/auto-ru/vehicle.go`
 - `connectors/avito/classified.go`
 - `connectors/avito/config.go`
@@ -529,12 +638,24 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/avito/fixtures/message-reply.json`
 - `connectors/avito/fixtures/messages.json`
 - `connectors/avito/manifest.json`
+- `connectors/avito/presentation.json`
+- `connectors/bitrix/config.go`
+- `connectors/bitrix/conformance.go`
+- `connectors/bitrix/connector.go`
+- `connectors/bitrix/connector_test.go`
+- `connectors/bitrix/cursor.go`
+- `connectors/bitrix/manifest.json`
+- `connectors/bitrix/presentation.json`
+- `connectors/bitrix/products.go`
+- `connectors/bitrix/remote.go`
+- `connectors/bitrix/write.go`
 - `connectors/bitrix24/config.go`
 - `connectors/bitrix24/conformance.go`
 - `connectors/bitrix24/connector.go`
 - `connectors/bitrix24/connector_test.go`
 - `connectors/bitrix24/cursor.go`
 - `connectors/bitrix24/manifest.json`
+- `connectors/bitrix24/presentation.json`
 - `connectors/bitrix24/read.go`
 - `connectors/bitrix24/remote.go`
 - `connectors/bitrix24/write.go`
@@ -543,6 +664,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/cbr-fx/connector_test.go`
 - `connectors/cbr-fx/fixtures/daily.xml`
 - `connectors/cbr-fx/manifest.json`
+- `connectors/cbr-fx/presentation.json`
 - `connectors/cbr-fx/rates.go`
 - `connectors/cdek/candidate_transport.go`
 - `connectors/cdek/conformance.go`
@@ -550,12 +672,14 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/cdek/connector_test.go`
 - `connectors/cdek/manifest.json`
 - `connectors/cdek/operations.go`
+- `connectors/cdek/presentation.json`
 - `connectors/chestny-znak/candidate_transport.go`
 - `connectors/chestny-znak/conformance.go`
 - `connectors/chestny-znak/connector.go`
 - `connectors/chestny-znak/connector_test.go`
 - `connectors/chestny-znak/manifest.json`
 - `connectors/chestny-znak/operations.go`
+- `connectors/chestny-znak/presentation.json`
 - `connectors/cian/config.go`
 - `connectors/cian/conformance.go`
 - `connectors/cian/connector.go`
@@ -564,28 +688,61 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/cian/fixtures/import-report.json`
 - `connectors/cian/fixtures/import-state.json`
 - `connectors/cian/manifest.json`
+- `connectors/cian/presentation.json`
 - `connectors/cian/property.go`
 - `connectors/cian/status.go`
+- `connectors/claude/conformance.go`
+- `connectors/claude/connector.go`
+- `connectors/claude/connector_test.go`
+- `connectors/claude/manifest.json`
+- `connectors/claude/presentation.json`
+- `connectors/cs-cart/config.go`
+- `connectors/cs-cart/conformance.go`
+- `connectors/cs-cart/connector.go`
+- `connectors/cs-cart/connector_test.go`
+- `connectors/cs-cart/cursor.go`
+- `connectors/cs-cart/manifest.json`
+- `connectors/cs-cart/presentation.json`
+- `connectors/cs-cart/products.go`
+- `connectors/cs-cart/remote.go`
+- `connectors/cs-cart/write.go`
 - `connectors/deepseek/conformance.go`
 - `connectors/deepseek/connector.go`
 - `connectors/deepseek/connector_test.go`
 - `connectors/deepseek/manifest.json`
+- `connectors/deepseek/presentation.json`
+- `connectors/dellin/candidate_transport.go`
+- `connectors/dellin/connector.go`
+- `connectors/dellin/connector_test.go`
+- `connectors/dellin/manifest.json`
+- `connectors/dellin/presentation.json`
+- `connectors/dellin/transport.go`
 - `connectors/diadoc/candidate_transport.go`
 - `connectors/diadoc/conformance.go`
 - `connectors/diadoc/connector.go`
 - `connectors/diadoc/connector_test.go`
 - `connectors/diadoc/manifest.json`
 - `connectors/diadoc/operations.go`
+- `connectors/diadoc/presentation.json`
 - `connectors/egais/candidate_transport.go`
 - `connectors/egais/conformance.go`
 - `connectors/egais/connector.go`
 - `connectors/egais/connector_test.go`
 - `connectors/egais/manifest.json`
 - `connectors/egais/operations.go`
+- `connectors/egais/presentation.json`
+- `connectors/fivepost/candidate_transport.go`
+- `connectors/fivepost/conformance.go`
+- `connectors/fivepost/connector.go`
+- `connectors/fivepost/connector_test.go`
+- `connectors/fivepost/manifest.json`
+- `connectors/fivepost/operations.go`
+- `connectors/fivepost/presentation.json`
 - `connectors/gigachat/conformance.go`
 - `connectors/gigachat/connector.go`
 - `connectors/gigachat/connector_test.go`
 - `connectors/gigachat/manifest.json`
+- `connectors/gigachat/presentation.json`
 - `connectors/instagram/config.go`
 - `connectors/instagram/conformance.go`
 - `connectors/instagram/connector.go`
@@ -601,6 +758,29 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/kimi/connector.go`
 - `connectors/kimi/connector_test.go`
 - `connectors/kimi/manifest.json`
+- `connectors/kimi/presentation.json`
+- `connectors/lm-studio/candidate_transport.go`
+- `connectors/lm-studio/conformance.go`
+- `connectors/lm-studio/connector.go`
+- `connectors/lm-studio/connector_test.go`
+- `connectors/lm-studio/manifest.json`
+- `connectors/lm-studio/presentation.json`
+- `connectors/lm-studio/transport.go`
+- `connectors/magento/config.go`
+- `connectors/magento/conformance.go`
+- `connectors/magento/connector.go`
+- `connectors/magento/connector_test.go`
+- `connectors/magento/cursor.go`
+- `connectors/magento/inventory.go`
+- `connectors/magento/manifest.json`
+- `connectors/magento/orders.go`
+- `connectors/magento/presentation.json`
+- `connectors/magento/prices.go`
+- `connectors/magento/products.go`
+- `connectors/magento/returns.go`
+- `connectors/magento/webhook.go`
+- `connectors/magento/wire.go`
+- `connectors/magento/write.go`
 - `connectors/magnit-market/config.go`
 - `connectors/magnit-market/conformance.go`
 - `connectors/magnit-market/connector.go`
@@ -637,6 +817,21 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/max-messenger/presentation.json`
 - `connectors/max-messenger/social.go`
 - `connectors/max-messenger/webhook.go`
+- `connectors/medusa/config.go`
+- `connectors/medusa/conformance.go`
+- `connectors/medusa/connector.go`
+- `connectors/medusa/connector_test.go`
+- `connectors/medusa/cursor.go`
+- `connectors/medusa/inventory.go`
+- `connectors/medusa/manifest.json`
+- `connectors/medusa/orders.go`
+- `connectors/medusa/presentation.json`
+- `connectors/medusa/prices.go`
+- `connectors/medusa/products.go`
+- `connectors/medusa/returns.go`
+- `connectors/medusa/webhook.go`
+- `connectors/medusa/wire.go`
+- `connectors/medusa/write.go`
 - `connectors/megamarket/config.go`
 - `connectors/megamarket/conformance.go`
 - `connectors/megamarket/connector.go`
@@ -663,6 +858,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/moysklad/json.go`
 - `connectors/moysklad/manifest.json`
 - `connectors/moysklad/orders.go`
+- `connectors/moysklad/presentation.json`
 - `connectors/odnoklassniki/analytics.go`
 - `connectors/odnoklassniki/config.go`
 - `connectors/odnoklassniki/conformance.go`
@@ -678,6 +874,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/odnoklassniki/manifest.json`
 - `connectors/odnoklassniki/presentation.json`
 - `connectors/odnoklassniki/social.go`
+- `connectors/ollama/candidate_transport.go`
+- `connectors/ollama/conformance.go`
+- `connectors/ollama/connector.go`
+- `connectors/ollama/connector_test.go`
+- `connectors/ollama/manifest.json`
+- `connectors/ollama/presentation.json`
+- `connectors/ollama/transport.go`
 - `connectors/onec/catalog.go`
 - `connectors/onec/config.go`
 - `connectors/onec/conformance.go`
@@ -688,19 +891,41 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/onec/inventory.go`
 - `connectors/onec/manifest.json`
 - `connectors/onec/odata.go`
+- `connectors/onec/presentation.json`
+- `connectors/open-webui/candidate_transport.go`
+- `connectors/open-webui/conformance.go`
+- `connectors/open-webui/connector.go`
+- `connectors/open-webui/connector_test.go`
+- `connectors/open-webui/manifest.json`
+- `connectors/open-webui/presentation.json`
+- `connectors/open-webui/transport.go`
 - `connectors/openai-compatible/conformance.go`
 - `connectors/openai-compatible/connector.go`
 - `connectors/openai-compatible/connector_test.go`
 - `connectors/openai-compatible/manifest.json`
+- `connectors/openai-compatible/presentation.json`
 - `connectors/opencart/config.go`
 - `connectors/opencart/conformance.go`
 - `connectors/opencart/connector.go`
 - `connectors/opencart/connector_test.go`
 - `connectors/opencart/cursor.go`
 - `connectors/opencart/manifest.json`
+- `connectors/opencart/presentation.json`
 - `connectors/opencart/read.go`
 - `connectors/opencart/remote.go`
 - `connectors/opencart/write.go`
+- `connectors/ozon-delivery/candidate_transport.go`
+- `connectors/ozon-delivery/connector.go`
+- `connectors/ozon-delivery/connector_test.go`
+- `connectors/ozon-delivery/manifest.json`
+- `connectors/ozon-delivery/presentation.json`
+- `connectors/ozon-delivery/transport.go`
+- `connectors/ozon-pay/candidate_transport.go`
+- `connectors/ozon-pay/connector.go`
+- `connectors/ozon-pay/connector_test.go`
+- `connectors/ozon-pay/manifest.json`
+- `connectors/ozon-pay/presentation.json`
+- `connectors/ozon-pay/transport.go`
 - `connectors/ozon/conformance.go`
 - `connectors/ozon/connector.go`
 - `connectors/ozon/connector_test.go`
@@ -714,6 +939,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/ozon/manifest.json`
 - `connectors/ozon/presentation.json`
 - `connectors/ozon/products.go`
+- `connectors/pek/candidate_transport.go`
+- `connectors/pek/conformance.go`
+- `connectors/pek/connector.go`
+- `connectors/pek/connector_test.go`
+- `connectors/pek/manifest.json`
+- `connectors/pek/operations.go`
+- `connectors/pek/presentation.json`
 - `connectors/prestashop/config.go`
 - `connectors/prestashop/conformance.go`
 - `connectors/prestashop/connector.go`
@@ -721,6 +953,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/prestashop/cursor.go`
 - `connectors/prestashop/manifest.json`
 - `connectors/prestashop/money.go`
+- `connectors/prestashop/presentation.json`
 - `connectors/prestashop/read.go`
 - `connectors/prestashop/remote.go`
 - `connectors/prestashop/write.go`
@@ -728,6 +961,14 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/qwen/connector.go`
 - `connectors/qwen/connector_test.go`
 - `connectors/qwen/manifest.json`
+- `connectors/qwen/presentation.json`
+- `connectors/robokassa/candidate_transport.go`
+- `connectors/robokassa/conformance.go`
+- `connectors/robokassa/connector.go`
+- `connectors/robokassa/connector_test.go`
+- `connectors/robokassa/manifest.json`
+- `connectors/robokassa/operations.go`
+- `connectors/robokassa/presentation.json`
 - `connectors/rutube/config.go`
 - `connectors/rutube/conformance.go`
 - `connectors/rutube/connector.go`
@@ -745,13 +986,60 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/saby-edo/connector_test.go`
 - `connectors/saby-edo/manifest.json`
 - `connectors/saby-edo/operations.go`
+- `connectors/saby-edo/presentation.json`
+- `connectors/saleor/config.go`
+- `connectors/saleor/conformance.go`
+- `connectors/saleor/connector.go`
+- `connectors/saleor/connector_test.go`
+- `connectors/saleor/cursor.go`
+- `connectors/saleor/inventory.go`
+- `connectors/saleor/manifest.json`
+- `connectors/saleor/orders.go`
+- `connectors/saleor/prices.go`
+- `connectors/saleor/products.go`
+- `connectors/saleor/resolve.go`
+- `connectors/saleor/returns.go`
+- `connectors/saleor/variant.go`
+- `connectors/saleor/webhook.go`
+- `connectors/saleor/write.go`
 - `connectors/sbp/candidate_transport.go`
+- `connectors/sbp/config.go`
 - `connectors/sbp/conformance.go`
 - `connectors/sbp/connector.go`
 - `connectors/sbp/connector_test.go`
 - `connectors/sbp/manifest.json`
 - `connectors/sbp/operations.go`
 - `connectors/sbp/presentation.json`
+- `connectors/shopify/config.go`
+- `connectors/shopify/conformance.go`
+- `connectors/shopify/connector.go`
+- `connectors/shopify/connector_test.go`
+- `connectors/shopify/cursor.go`
+- `connectors/shopify/inventory.go`
+- `connectors/shopify/manifest.json`
+- `connectors/shopify/orders.go`
+- `connectors/shopify/presentation.json`
+- `connectors/shopify/prices.go`
+- `connectors/shopify/products.go`
+- `connectors/shopify/returns.go`
+- `connectors/shopify/webhook.go`
+- `connectors/shopify/wire.go`
+- `connectors/shopify/write.go`
+- `connectors/shopware/config.go`
+- `connectors/shopware/conformance.go`
+- `connectors/shopware/connector.go`
+- `connectors/shopware/connector_test.go`
+- `connectors/shopware/cursor.go`
+- `connectors/shopware/inventory.go`
+- `connectors/shopware/manifest.json`
+- `connectors/shopware/orders.go`
+- `connectors/shopware/presentation.json`
+- `connectors/shopware/prices.go`
+- `connectors/shopware/products.go`
+- `connectors/shopware/returns.go`
+- `connectors/shopware/webhook.go`
+- `connectors/shopware/wire.go`
+- `connectors/shopware/write.go`
 - `connectors/telegram/config.go`
 - `connectors/telegram/conformance.go`
 - `connectors/telegram/connector.go`
@@ -787,6 +1075,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/vetis-mercury/connector_test.go`
 - `connectors/vetis-mercury/manifest.json`
 - `connectors/vetis-mercury/operations.go`
+- `connectors/vetis-mercury/presentation.json`
 - `connectors/vk/config.go`
 - `connectors/vk/conformance.go`
 - `connectors/vk/connector.go`
@@ -824,6 +1113,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/woocommerce/manifest.json`
 - `connectors/woocommerce/numbers.go`
 - `connectors/woocommerce/orders.go`
+- `connectors/woocommerce/presentation.json`
 - `connectors/woocommerce/prices.go`
 - `connectors/woocommerce/products.go`
 - `connectors/woocommerce/remote.go`
@@ -857,6 +1147,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/yandexgpt/connector.go`
 - `connectors/yandexgpt/connector_test.go`
 - `connectors/yandexgpt/manifest.json`
+- `connectors/yandexgpt/presentation.json`
 - `connectors/yookassa/candidate_transport.go`
 - `connectors/yookassa/conformance.go`
 - `connectors/yookassa/connector.go`
@@ -1107,6 +1398,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `deploy/postgres/legacy_pre_v1_catalog.tsv`
 - `deploy/postgres/migrate.sh`
 - `deploy/postgres/rebaseline-pre-v1.sh`
+- `docker-compose.production.yml`
 - `docker-compose.yml`
 - `docs/00-product-scope.md`
 - `docs/01-architecture.md`
@@ -1206,6 +1498,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/avito/conformance-report.json`
 - `docs/connectors/avito/reconciliation.md`
 - `docs/connectors/avito/spec.md`
+- `docs/connectors/bitrix/README.md`
+- `docs/connectors/bitrix/capability-audit.md`
+- `docs/connectors/bitrix/conformance-plan.md`
+- `docs/connectors/bitrix/conformance-report.json`
+- `docs/connectors/bitrix/reconciliation.md`
+- `docs/connectors/bitrix/spec.md`
 - `docs/connectors/bitrix24/README.md`
 - `docs/connectors/bitrix24/capability-audit.md`
 - `docs/connectors/bitrix24/conformance-plan.md`
@@ -1236,10 +1534,26 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/cian/property-mapping.md`
 - `docs/connectors/cian/reconciliation.md`
 - `docs/connectors/cian/spec.md`
+- `docs/connectors/claude/capability-audit.md`
+- `docs/connectors/claude/conformance-plan.md`
+- `docs/connectors/claude/conformance-report.json`
+- `docs/connectors/claude/spec.md`
+- `docs/connectors/cs-cart/README.md`
+- `docs/connectors/cs-cart/capability-audit.md`
+- `docs/connectors/cs-cart/conformance-plan.md`
+- `docs/connectors/cs-cart/conformance-report.json`
+- `docs/connectors/cs-cart/reconciliation.md`
+- `docs/connectors/cs-cart/spec.md`
 - `docs/connectors/deepseek/capability-audit.md`
 - `docs/connectors/deepseek/conformance-plan.md`
 - `docs/connectors/deepseek/conformance-report.json`
 - `docs/connectors/deepseek/spec.md`
+- `docs/connectors/dellin/README.md`
+- `docs/connectors/dellin/capability-audit.md`
+- `docs/connectors/dellin/conformance-plan.md`
+- `docs/connectors/dellin/conformance-report.json`
+- `docs/connectors/dellin/reconciliation.md`
+- `docs/connectors/dellin/spec.md`
 - `docs/connectors/diadoc/README.md`
 - `docs/connectors/diadoc/capability-audit.md`
 - `docs/connectors/diadoc/conformance-plan.md`
@@ -1258,6 +1572,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/egais/conformance-report.json`
 - `docs/connectors/egais/reconciliation.md`
 - `docs/connectors/egais/spec.md`
+- `docs/connectors/fivepost/README.md`
+- `docs/connectors/fivepost/capability-audit.md`
+- `docs/connectors/fivepost/conformance-plan.md`
+- `docs/connectors/fivepost/conformance-report.json`
+- `docs/connectors/fivepost/reconciliation.md`
+- `docs/connectors/fivepost/spec.md`
 - `docs/connectors/gigachat/capability-audit.md`
 - `docs/connectors/gigachat/conformance-plan.md`
 - `docs/connectors/gigachat/conformance-report.json`
@@ -1272,6 +1592,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/kimi/conformance-plan.md`
 - `docs/connectors/kimi/conformance-report.json`
 - `docs/connectors/kimi/spec.md`
+- `docs/connectors/lm-studio/README.md`
+- `docs/connectors/lm-studio/capability-audit.md`
+- `docs/connectors/lm-studio/conformance-plan.md`
+- `docs/connectors/lm-studio/conformance-report.json`
+- `docs/connectors/lm-studio/spec.md`
+- `docs/connectors/magento/README.md`
+- `docs/connectors/magento/capability-audit.md`
+- `docs/connectors/magento/conformance-plan.md`
+- `docs/connectors/magento/conformance-report.json`
+- `docs/connectors/magento/reconciliation.md`
+- `docs/connectors/magento/spec.md`
 - `docs/connectors/magnit-market/README.md`
 - `docs/connectors/magnit-market/capability-audit.md`
 - `docs/connectors/magnit-market/conformance-plan.md`
@@ -1285,6 +1616,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/max-messenger/conformance-report.json`
 - `docs/connectors/max-messenger/reconciliation.md`
 - `docs/connectors/max-messenger/spec.md`
+- `docs/connectors/medusa/README.md`
+- `docs/connectors/medusa/capability-audit.md`
+- `docs/connectors/medusa/conformance-plan.md`
+- `docs/connectors/medusa/conformance-report.json`
+- `docs/connectors/medusa/reconciliation.md`
+- `docs/connectors/medusa/spec.md`
 - `docs/connectors/megamarket/README.md`
 - `docs/connectors/megamarket/capability-audit.md`
 - `docs/connectors/megamarket/conformance-plan.md`
@@ -1303,12 +1640,22 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/odnoklassniki/conformance-report.json`
 - `docs/connectors/odnoklassniki/reconciliation.md`
 - `docs/connectors/odnoklassniki/spec.md`
+- `docs/connectors/ollama/README.md`
+- `docs/connectors/ollama/capability-audit.md`
+- `docs/connectors/ollama/conformance-plan.md`
+- `docs/connectors/ollama/conformance-report.json`
+- `docs/connectors/ollama/spec.md`
 - `docs/connectors/onec/README.md`
 - `docs/connectors/onec/capability-audit.md`
 - `docs/connectors/onec/conformance-plan.md`
 - `docs/connectors/onec/conformance-report.json`
 - `docs/connectors/onec/reconciliation.md`
 - `docs/connectors/onec/spec.md`
+- `docs/connectors/open-webui/README.md`
+- `docs/connectors/open-webui/capability-audit.md`
+- `docs/connectors/open-webui/conformance-plan.md`
+- `docs/connectors/open-webui/conformance-report.json`
+- `docs/connectors/open-webui/spec.md`
 - `docs/connectors/openai-compatible/capability-audit.md`
 - `docs/connectors/openai-compatible/conformance-plan.md`
 - `docs/connectors/openai-compatible/conformance-report.json`
@@ -1320,11 +1667,27 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/opencart/conformance-report.json`
 - `docs/connectors/opencart/reconciliation.md`
 - `docs/connectors/opencart/spec.md`
+- `docs/connectors/ozon-delivery/README.md`
+- `docs/connectors/ozon-delivery/capability-audit.md`
+- `docs/connectors/ozon-delivery/conformance-plan.md`
+- `docs/connectors/ozon-delivery/conformance-report.json`
+- `docs/connectors/ozon-delivery/spec.md`
+- `docs/connectors/ozon-pay/README.md`
+- `docs/connectors/ozon-pay/capability-audit.md`
+- `docs/connectors/ozon-pay/conformance-plan.md`
+- `docs/connectors/ozon-pay/conformance-report.json`
+- `docs/connectors/ozon-pay/spec.md`
 - `docs/connectors/ozon/README.md`
 - `docs/connectors/ozon/capability-audit.md`
 - `docs/connectors/ozon/conformance-plan.md`
 - `docs/connectors/ozon/conformance-report.json`
 - `docs/connectors/ozon/spec.md`
+- `docs/connectors/pek/README.md`
+- `docs/connectors/pek/capability-audit.md`
+- `docs/connectors/pek/conformance-plan.md`
+- `docs/connectors/pek/conformance-report.json`
+- `docs/connectors/pek/reconciliation.md`
+- `docs/connectors/pek/spec.md`
 - `docs/connectors/prestashop/README.md`
 - `docs/connectors/prestashop/capability-audit.md`
 - `docs/connectors/prestashop/conformance-plan.md`
@@ -1335,6 +1698,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/qwen/conformance-plan.md`
 - `docs/connectors/qwen/conformance-report.json`
 - `docs/connectors/qwen/spec.md`
+- `docs/connectors/robokassa/README.md`
+- `docs/connectors/robokassa/capability-audit.md`
+- `docs/connectors/robokassa/conformance-plan.md`
+- `docs/connectors/robokassa/conformance-report.json`
+- `docs/connectors/robokassa/reconciliation.md`
+- `docs/connectors/robokassa/spec.md`
 - `docs/connectors/rutube/README.md`
 - `docs/connectors/rutube/capability-audit.md`
 - `docs/connectors/rutube/conformance-plan.md`
@@ -1353,6 +1722,18 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/sbp/conformance-report.json`
 - `docs/connectors/sbp/reconciliation.md`
 - `docs/connectors/sbp/spec.md`
+- `docs/connectors/shopify/README.md`
+- `docs/connectors/shopify/capability-audit.md`
+- `docs/connectors/shopify/conformance-plan.md`
+- `docs/connectors/shopify/conformance-report.json`
+- `docs/connectors/shopify/reconciliation.md`
+- `docs/connectors/shopify/spec.md`
+- `docs/connectors/shopware/README.md`
+- `docs/connectors/shopware/capability-audit.md`
+- `docs/connectors/shopware/conformance-plan.md`
+- `docs/connectors/shopware/conformance-report.json`
+- `docs/connectors/shopware/reconciliation.md`
+- `docs/connectors/shopware/spec.md`
 - `docs/connectors/telegram/README.md`
 - `docs/connectors/telegram/capability-audit.md`
 - `docs/connectors/telegram/conformance-plan.md`
@@ -1412,6 +1793,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/youtube/spec.md`
 - `docs/deployment/093-community-docker-deployment.md`
 - `docs/deployment/environment-variables.md`
+- `docs/deployment/production-ssh-deploy.md`
 - `docs/diagrams/architecture.mmd`
 - `docs/diagrams/order-flow.mmd`
 - `docs/diagrams/privacy-delete-flow.mmd`
@@ -1494,30 +1876,70 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/security/production-api-security-composition.md`
 - `frontend/.gitignore`
 - `frontend/Dockerfile.dev`
+- `frontend/Dockerfile.production`
 - `frontend/index.html`
 - `frontend/package-lock.json`
 - `frontend/package.json`
 - `frontend/public/connector-logos/README.md`
 - `frontend/public/connector-logos/aliexpress-ru.svg`
+- `frontend/public/connector-logos/auto-ru.svg`
+- `frontend/public/connector-logos/avito.svg`
+- `frontend/public/connector-logos/bitrix.svg`
+- `frontend/public/connector-logos/bitrix24.svg`
+- `frontend/public/connector-logos/cbr-fx.svg`
+- `frontend/public/connector-logos/cdek.svg`
+- `frontend/public/connector-logos/chestny-znak.svg`
+- `frontend/public/connector-logos/cian.svg`
+- `frontend/public/connector-logos/claude.svg`
+- `frontend/public/connector-logos/cs-cart.svg`
+- `frontend/public/connector-logos/deepseek.svg`
+- `frontend/public/connector-logos/dellin.svg`
+- `frontend/public/connector-logos/diadoc.svg`
+- `frontend/public/connector-logos/egais.svg`
+- `frontend/public/connector-logos/fivepost.svg`
+- `frontend/public/connector-logos/gigachat.svg`
 - `frontend/public/connector-logos/instagram.svg`
+- `frontend/public/connector-logos/kimi.svg`
+- `frontend/public/connector-logos/lm-studio.svg`
+- `frontend/public/connector-logos/magento.svg`
 - `frontend/public/connector-logos/magnit-market.svg`
 - `frontend/public/connector-logos/max-messenger.svg`
+- `frontend/public/connector-logos/medusa.svg`
 - `frontend/public/connector-logos/megamarket.svg`
+- `frontend/public/connector-logos/moysklad.svg`
 - `frontend/public/connector-logos/odnoklassniki.svg`
+- `frontend/public/connector-logos/ollama.svg`
+- `frontend/public/connector-logos/onec.svg`
+- `frontend/public/connector-logos/open-webui.svg`
+- `frontend/public/connector-logos/openai-compatible.svg`
+- `frontend/public/connector-logos/opencart.svg`
+- `frontend/public/connector-logos/ozon-delivery.svg`
+- `frontend/public/connector-logos/ozon-pay.svg`
 - `frontend/public/connector-logos/ozon.svg`
+- `frontend/public/connector-logos/pek.svg`
+- `frontend/public/connector-logos/prestashop.svg`
+- `frontend/public/connector-logos/qwen.svg`
+- `frontend/public/connector-logos/robokassa.svg`
 - `frontend/public/connector-logos/rutube.svg`
+- `frontend/public/connector-logos/saby-edo.svg`
 - `frontend/public/connector-logos/sbp.svg`
+- `frontend/public/connector-logos/shopify.svg`
+- `frontend/public/connector-logos/shopware.svg`
 - `frontend/public/connector-logos/telegram.svg`
 - `frontend/public/connector-logos/threads.svg`
+- `frontend/public/connector-logos/vetis-mercury.svg`
 - `frontend/public/connector-logos/vk.svg`
 - `frontend/public/connector-logos/wildberries.svg`
+- `frontend/public/connector-logos/woocommerce.svg`
 - `frontend/public/connector-logos/yandex-market.svg`
+- `frontend/public/connector-logos/yandexgpt.svg`
 - `frontend/public/connector-logos/yookassa.svg`
 - `frontend/public/connector-logos/youtube.svg`
 - `frontend/public/docs/documentation.png`
 - `frontend/public/docs/login.png`
 - `frontend/public/oidc/silent-callback.html`
 - `frontend/repository-shims.d.ts`
+- `frontend/serve.mjs`
 - `frontend/src/api/ApiProvider.tsx`
 - `frontend/src/api/client.ts`
 - `frontend/src/api/decoders.ts`
@@ -1662,6 +2084,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/oidc_membership_test.go`
 - `internal/app/api/oidc_security.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
+- `internal/app/api/payment_webhooks.go`
+- `internal/app/api/payment_webhooks_test.go`
+- `internal/app/api/payments.go`
 - `internal/app/api/production_routes.go`
 - `internal/app/api/production_scope.go`
 - `internal/app/api/realtime.go`
@@ -1713,6 +2138,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/core/legalparty/legalparty_test.go`
 - `internal/core/orders/orders.go`
 - `internal/core/orders/orders_test.go`
+- `internal/core/payments/payments.go`
+- `internal/core/payments/payments_test.go`
 - `internal/core/pim/pim.go`
 - `internal/core/pim/pim_test.go`
 - `internal/core/pricing/pricing.go`
@@ -1747,8 +2174,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/backupdr/policy_test.go`
 - `internal/platform/bootstrap/bootstrap.go`
 - `internal/platform/bootstrap/bootstrap_test.go`
+- `internal/platform/builtinruntime/certtransport.go`
+- `internal/platform/builtinruntime/certtransport_test.go`
 - `internal/platform/builtinruntime/http.go`
 - `internal/platform/builtinruntime/http_test.go`
+- `internal/platform/builtinruntime/local_ai_transport.go`
+- `internal/platform/builtinruntime/local_ai_transport_test.go`
+- `internal/platform/builtinruntime/logistics_transport.go`
+- `internal/platform/builtinruntime/logistics_transport_test.go`
+- `internal/platform/builtinruntime/ozon_transport.go`
+- `internal/platform/builtinruntime/paymentstransport.go`
+- `internal/platform/builtinruntime/paymentstransport_test.go`
 - `internal/platform/builtinruntime/registry.go`
 - `internal/platform/builtinruntime/support.go`
 - `internal/platform/builtinruntime/support_generated.go`
@@ -1764,6 +2200,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/connectorauth/connectorauth.go`
 - `internal/platform/connectorauth/connectorauth_test.go`
 - `internal/platform/connectorauth/sessions.go`
+- `internal/platform/connectorauth/token_manager.go`
+- `internal/platform/connectorauth/token_manager_test.go`
 - `internal/platform/connectorruntime/runtime.go`
 - `internal/platform/connectorruntime/runtime_test.go`
 - `internal/platform/connectors/account.go`
@@ -1943,6 +2381,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/outboxrepo/migration_test.go`
 - `internal/platform/postgres/outboxrepo/repository.go`
 - `internal/platform/postgres/outboxrepo/repository_test.go`
+- `internal/platform/postgres/paymentsrepo/migration_test.go`
+- `internal/platform/postgres/paymentsrepo/repository.go`
 - `internal/platform/postgres/pimrepo/catalog_queries.go`
 - `internal/platform/postgres/pimrepo/migration_test.go`
 - `internal/platform/postgres/pimrepo/repository.go`
@@ -2076,6 +2516,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000015_ai_provider_qwen_deepseek.sql`
 - `migrations/000016_trust_control_plane.sql`
 - `migrations/000017_social_publication_runtime.sql`
+- `migrations/000018_payments_core.sql`
+- `migrations/000019_payments_remote_id_lookup.sql`
+- `migrations/000020_ai_provider_claude.sql`
+- `migrations/000021_ai_provider_local_runtime.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2379,6 +2823,26 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/131-cbr-fx-production-runtime.md`
 - `tasks/issues/132-telegram-social-production-runtime.md`
 - `tasks/issues/133-max-social-production-runtime.md`
+- `tasks/issues/134-host-owned-oauth-refresh-runtime.md`
+- `tasks/issues/135-vk-production-runtime.md`
+- `tasks/issues/136-webhook-ingress-boundary.md`
+- `tasks/issues/137-payment-webhook-receivers.md`
+- `tasks/issues/138-payment-reconciliation-worker.md`
+- `tasks/issues/139-bitrix24-crm-production-runtime.md`
+- `tasks/issues/140-robokassa-payment-connector.md`
+- `tasks/issues/141-claude-ai-provider.md`
+- `tasks/issues/142-fivepost-logistics-connector.md`
+- `tasks/issues/143-pek-logistics-connector.md`
+- `tasks/issues/144-shopify-oauth-storefront-connector.md`
+- `tasks/issues/145-cdek-dellin-delivery-verification.md`
+- `tasks/issues/146-medusa-storefront-connector.md`
+- `tasks/issues/147-ozon-pay-delivery-runtime.md`
+- `tasks/issues/148-shopware-storefront-connector.md`
+- `tasks/issues/149-local-ai-providers.md`
+- `tasks/issues/150-open-webui-local-ai.md`
+- `tasks/issues/151-magento-storefront-connector.md`
+- `tasks/issues/152-bitrix-storefront-connector.md`
+- `tasks/issues/153-cs-cart-storefront-connector.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

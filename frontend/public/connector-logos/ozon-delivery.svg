@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" role="img" aria-labelledby="title">
+  <title>Ozon Доставка</title>
+  <rect width="320" height="120" rx="24" fill="#005BFF"/>
+  <circle cx="62" cy="60" r="27" fill="#fff"/>
+  <path d="M62 39a21 21 0 1 0 0 42 21 21 0 0 0 0-42Zm0 10a11 11 0 1 1 0 22 11 11 0 0 1 0-22Z" fill="#005BFF"/>
+  <path d="M89 50h15l11 12v10H89Z" fill="#fff"/>
+  <circle cx="98" cy="74" r="5" fill="#005BFF"/><circle cx="111" cy="74" r="5" fill="#005BFF"/>
+  <text x="132" y="72" fill="#fff" font-family="Arial,sans-serif" font-size="28" font-weight="700">Доставка</text>
+</svg>

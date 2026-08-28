@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" role="img" aria-label="Open WebUI">
+  <rect width="160" height="48" rx="12" fill="#1e293b"/>
+  <circle cx="27" cy="24" r="12" fill="#a78bfa"/>
+  <path d="M21 28c2-6 10-6 12 0m-9-7h.01m6 0h.01" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.5"/>
+  <text x="50" y="30" fill="#fff" font-family="Arial,sans-serif" font-size="14" font-weight="700">Open WebUI</text>
+</svg>

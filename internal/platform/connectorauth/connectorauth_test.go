@@ -75,6 +75,63 @@ func TestCredentialTemplatesDoNotPermitSecretInURL(t *testing.T) {
 	}
 }
 
+func TestResolveOAuth2HostLeavesFixedHostConfigurationsUnchanged(t *testing.T) {
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post"}
+	resolved, err := ResolveOAuth2Host(configuration, []byte(`{"shop_domain":"attacker.test"}`))
+	if err != nil || resolved.AuthorizationURL != configuration.AuthorizationURL || resolved.TokenURL != configuration.TokenURL {
+		t.Fatalf("fixed-host configuration must pass through unchanged: resolved=%+v err=%v", resolved, err)
+	}
+}
+
+func TestResolveOAuth2HostTemplatesTenantHost(t *testing.T) {
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	resolved, err := ResolveOAuth2Host(configuration, []byte(`{"shop_domain":"acme.myshopify.com"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.AuthorizationURL != "https://acme.myshopify.com/admin/oauth/authorize" || resolved.TokenURL != "https://acme.myshopify.com/admin/oauth/access_token" {
+		t.Fatalf("resolved = %+v", resolved)
+	}
+	if resolved.HostParameter != "" || resolved.HostSuffix != "" {
+		t.Fatalf("resolved must clear the template fields: %+v", resolved)
+	}
+	if resolved.Validate() != nil {
+		t.Fatal("resolved configuration must be a valid fixed-host configuration")
+	}
+}
+
+func TestResolveOAuth2HostRejectsHostOutsideSuffix(t *testing.T) {
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	for _, raw := range [][]byte{
+		[]byte(`{"shop_domain":"acme.myshopify.com.attacker.test"}`),
+		[]byte(`{"shop_domain":"attacker.test"}`),
+		[]byte(`{"shop_domain":".myshopify.com"}`),
+		[]byte(`{"other_field":"acme.myshopify.com"}`),
+		[]byte(`{"shop_domain":"acme.myshopify.com/../evil"}`),
+		nil,
+	} {
+		if _, err := ResolveOAuth2Host(configuration, raw); err == nil {
+			t.Fatalf("ResolveOAuth2Host(%s) unexpectedly succeeded", raw)
+		}
+	}
+}
+
+func TestAuthorizationURLScopeSeparatorDefaultsToSpace(t *testing.T) {
+	pending, challenge, err := NewPKCE()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commaConfiguration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", Scopes: []string{"read", "write"}, ClientAuthMethod: "client_secret_post", ScopeSeparator: ","}
+	raw, err := AuthorizationURL(commaConfiguration, "client-id", "https://console.example.test"+CallbackPath, pending.State, challenge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, _ := url.Parse(raw)
+	if parsed.Query().Get("scope") != "read,write" {
+		t.Fatalf("scope = %q", parsed.Query().Get("scope"))
+	}
+}
+
 func TestOAuthClientParserRejectsUnknownAndUnsafeFields(t *testing.T) {
 	client, err := ParseOAuthClient([]byte(`{"client_id":"id","client_secret":"secret"}`))
 	if err != nil || client.ClientID != "id" {

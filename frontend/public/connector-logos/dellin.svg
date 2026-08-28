@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" role="img" aria-label="Деловые Линии">
+  <rect width="220" height="80" rx="16" fill="#fff"/>
+  <rect x="16" y="16" width="48" height="48" rx="14" fill="#1D4ED8"/>
+  <path fill="#fff" d="M28 28h9c8 0 13 4 13 12s-5 12-13 12h-9V28Zm8 6v12h1c4 0 6-2 6-6s-2-6-6-6h-1Zm17-6h7v24h-7V28Z"/>
+  <text x="76" y="36" fill="#1F2937" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800">Деловые</text>
+  <text x="76" y="55" fill="#1D4ED8" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800">Линии</text>
+</svg>

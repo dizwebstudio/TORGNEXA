@@ -18,12 +18,18 @@ import (
 	"time"
 
 	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
+	bitrixstore "github.com/torgnexa/torgnexa/connectors/bitrix"
+	bitrix24 "github.com/torgnexa/torgnexa/connectors/bitrix24"
 	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
+	claude "github.com/torgnexa/torgnexa/connectors/claude"
+	cscart "github.com/torgnexa/torgnexa/connectors/cs-cart"
 	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
 	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
 	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
+	magento "github.com/torgnexa/torgnexa/connectors/magento"
 	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
 	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
+	medusa "github.com/torgnexa/torgnexa/connectors/medusa"
 	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
 	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
 	onec "github.com/torgnexa/torgnexa/connectors/onec"
@@ -32,6 +38,9 @@ import (
 	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
 	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
 	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
+	saleor "github.com/torgnexa/torgnexa/connectors/saleor"
+	shopify "github.com/torgnexa/torgnexa/connectors/shopify"
+	shopware "github.com/torgnexa/torgnexa/connectors/shopware"
 	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
 	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
 	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
@@ -220,6 +229,19 @@ func (transport *cbrDailyHTTP) Daily(ctx context.Context, at time.Time) ([]byte,
 
 var _ cbrfx.Transport = (*cbrDailyHTTP)(nil)
 
+type bitrix24HTTP struct{ h *httpTransport }
+
+func (t bitrix24HTTP) Do(ctx context.Context, r bitrix24.Request) (bitrix24.Response, error) {
+	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("Authorization", "Bearer "+string(r.Bearer))
+	}
+	status, body, requestID, retryAfter, _, err := t.h.do(ctx, r.Method, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return bitrix24.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+var _ bitrix24.Transport = bitrix24HTTP{}
+
 func validHost(host string) bool {
 	if host == "" || host != strings.ToLower(strings.TrimSpace(host)) || len(host) > 253 || strings.ContainsAny(host, "/:@?#[]\\") || host == "localhost" || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".localhost") {
 		return false
@@ -385,6 +407,131 @@ func (t wooHTTP) Do(ctx context.Context, r woocommerce.Request) (woocommerce.Res
 	return woocommerce.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra, TotalPages: pages}, e
 }
 
+type shopifyHTTP struct{ h *httpTransport }
+
+func (t shopifyHTTP) Do(ctx context.Context, r shopify.Request) (shopify.Response, error) {
+	q := url.Values{}
+	for _, p := range r.Query {
+		q.Add(p.Name, p.Value)
+	}
+	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("X-Shopify-Access-Token", string(r.Bearer))
+	}
+	s, b, id, ra, respHeader, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
+	nextPageInfo := ""
+	if respHeader != nil {
+		nextPageInfo = shopifyNextPageInfo(respHeader.Get("Link"))
+	}
+	return shopify.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra, NextPageInfo: nextPageInfo}, e
+}
+
+// shopifyNextPageInfo extracts the page_info query parameter from the
+// rel="next" entry of Shopify's RFC 8288 Link response header
+// (https://shopify.dev/docs/api/usage/pagination-rest), e.g.
+// `<https://shop.myshopify.com/admin/api/2025-01/products.json?limit=50&page_info=abc>; rel="next"`.
+func shopifyNextPageInfo(linkHeader string) string {
+	for _, part := range strings.Split(linkHeader, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.Contains(part, `rel="next"`) {
+			continue
+		}
+		start := strings.Index(part, "<")
+		end := strings.Index(part, ">")
+		if start == -1 || end == -1 || end <= start {
+			continue
+		}
+		parsed, err := url.Parse(part[start+1 : end])
+		if err != nil {
+			continue
+		}
+		return parsed.Query().Get("page_info")
+	}
+	return ""
+}
+
+var _ shopify.Transport = shopifyHTTP{}
+
+type medusaHTTP struct{ h *httpTransport }
+
+// Do sends "Authorization: Basic <token>" verbatim, per Medusa's own
+// published OpenAPI security scheme for its secret admin API key
+// (api_token: {type: http, scheme: basic}) — this is Medusa's own chosen
+// wire format for a single opaque secret, not RFC 7617 user:pass Basic
+// auth, so the raw token is set as the header value rather than passed
+// through httpTransport's real HTTP-Basic (user, pass) encoding.
+func (t medusaHTTP) Do(ctx context.Context, r medusa.Request) (medusa.Response, error) {
+	q := url.Values{}
+	for _, p := range r.Query {
+		q.Add(p.Name, p.Value)
+	}
+	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("Authorization", "Basic "+string(r.Bearer))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
+	return medusa.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+var _ medusa.Transport = medusaHTTP{}
+
+type magentoHTTP struct{ h *httpTransport }
+
+func (t magentoHTTP) Do(ctx context.Context, r magento.Request) (magento.Response, error) {
+	q := url.Values{}
+	for _, p := range r.Query {
+		q.Add(p.Name, p.Value)
+	}
+	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("Authorization", "Bearer "+string(r.Bearer))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
+	return magento.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+var _ magento.Transport = magentoHTTP{}
+
+type saleorHTTP struct{ h *httpTransport }
+
+func (t saleorHTTP) Do(ctx context.Context, r saleor.Request) (saleor.Response, error) {
+	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("Authorization", "Bearer "+string(r.Bearer))
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return saleor.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+var _ saleor.Transport = saleorHTTP{}
+
+type bitrixStoreHTTP struct{ h *httpTransport }
+
+func (t bitrixStoreHTTP) Do(ctx context.Context, r bitrixstore.Request) (bitrixstore.Response, error) {
+	if len(r.UserID) == 0 || len(r.WebhookCode) == 0 || r.APIMethod == "" || strings.ContainsAny(r.APIMethod, "/?#\\\r\n\x00") {
+		return bitrixstore.Response{}, errors.New("bitrix transport: invalid webhook request")
+	}
+	basePath := strings.TrimRight(r.BasePath, "/")
+	path := basePath + "/rest/" + url.PathEscape(string(r.UserID)) + "/" + url.PathEscape(string(r.WebhookCode)) + "/" + r.APIMethod
+	s, b, id, ra, _, err := t.h.do(ctx, http.MethodPost, r.Host, path, nil, r.Body, http.Header{}, nil, nil)
+	return bitrixstore.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, err
+}
+
+var _ bitrixstore.Transport = bitrixStoreHTTP{}
+
+type csCartHTTP struct{ h *httpTransport }
+
+func (t csCartHTTP) Do(ctx context.Context, r cscart.Request) (cscart.Response, error) {
+	query := url.Values{}
+	for _, parameter := range r.Query {
+		query.Add(parameter.Name, parameter.Value)
+	}
+	status, body, requestID, retryAfter, _, err := t.h.do(ctx, r.Method, r.Host, r.Path, query, r.Body, http.Header{}, r.Username, r.Password)
+	return cscart.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+var _ cscart.Transport = csCartHTTP{}
+
 type openCartHTTP struct{ h *httpTransport }
 
 func (t openCartHTTP) Do(ctx context.Context, r opencart.Request) (opencart.Response, error) {
@@ -455,6 +602,17 @@ func (t deepseekHTTP) Do(ctx context.Context, r deepseek.Request) (deepseek.Resp
 	return deepseek.Response{StatusCode: s, Body: b}, e
 }
 
+type claudeHTTP struct{ h *httpTransport }
+
+func (t claudeHTTP) Do(ctx context.Context, r claude.Request) (claude.Response, error) {
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return claude.Response{StatusCode: s, Body: b}, e
+}
+
 type gigaChatHTTP struct{ h *httpTransport }
 
 func (t gigaChatHTTP) Do(ctx context.Context, r gigachat.Request) (gigachat.Response, error) {
@@ -465,6 +623,28 @@ func (t gigaChatHTTP) Do(ctx context.Context, r gigachat.Request) (gigachat.Resp
 	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
 	return gigachat.Response{StatusCode: s, Body: b}, e
 }
+
+type shopwareHTTP struct{ h *httpTransport }
+
+// Do passes headers through verbatim: unlike the other storefront
+// transports, connectors/shopware manages its own OAuth2 client_credentials
+// token lifecycle (Authorization: Bearer <token>, set by the connector
+// itself once it has exchanged/cached one), so this transport never sets an
+// auth header on its own.
+func (t shopwareHTTP) Do(ctx context.Context, r shopware.Request) (shopware.Response, error) {
+	q := url.Values{}
+	for _, p := range r.Query {
+		q.Add(p.Name, p.Value)
+	}
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
+	return shopware.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
+}
+
+var _ shopware.Transport = shopwareHTTP{}
 
 type yandexGPTHTTP struct{ h *httpTransport }
 

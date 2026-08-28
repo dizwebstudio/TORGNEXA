@@ -65,7 +65,7 @@ func testSecurityLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.
 
 func TestProductionCompositionRejectsPrivateRouteWithoutSecurityDependencies(t *testing.T) {
 	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})}
-	if _, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, []ProtectedRoute{route}); !errors.Is(err, ErrSecurityCompositionInvalid) {
+	if _, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, []ProtectedRoute{route}, nil); !errors.Is(err, ErrSecurityCompositionInvalid) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -89,7 +89,7 @@ func TestProductionCompositionAuthenticatesResolvesTenantThenAuthorizes(t *testi
 		called = true
 		w.WriteHeader(http.StatusNoContent)
 	})}
-	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route})
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestProductionCompositionProtectsParameterizedPrefixRoute(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		}),
 	}
-	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route})
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestProductionCompositionFailsClosedAtEachAuthorizationStage(t *testing.T) 
 	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("handler must not run") })}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), tc.authn, tc.tenant, tc.authz, []ProtectedRoute{route})
+			handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), tc.authn, tc.tenant, tc.authz, []ProtectedRoute{route}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -165,7 +165,7 @@ func TestProductionCompositionFailsClosedAtEachAuthorizationStage(t *testing.T) 
 }
 
 func TestProductionCompositionRejectsSpoofedForwardingFromUntrustedPeer(t *testing.T) {
-	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil)
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestProductionCompositionRejectsSpoofedForwardingFromUntrustedPeer(t *testi
 }
 
 func TestProductionCompositionRejectsDisallowedBrowserOrigin(t *testing.T) {
-	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil)
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestProductionCompositionBoundsRequestBodiesBeforePrivateHandler(t *testing
 		}
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
 	})}
-	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route})
+	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,6 +217,144 @@ func TestProductionCompositionBoundsRequestBodiesBeforePrivateHandler(t *testing
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPublicWebhookRouteBypassesAuthAndNeverPopulatesPrincipalOrScope(t *testing.T) {
+	called := false
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/yookassa/acct-1", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := PrincipalFromContext(r.Context()); ok {
+			t.Fatal("PublicWebhookRoute handler must never see a principal")
+		}
+		if _, ok := ScopeFromContext(r.Context()); ok {
+			t.Fatal("PublicWebhookRoute handler must never see a tenant scope")
+		}
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})}
+	// authn/tenant/authz are all nil: a webhook route must not need them at all.
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+webhookPathPrefix+"payments/yookassa/acct-1", strings.NewReader(`{"event":"payment.succeeded"}`))
+	req.RemoteAddr = "198.51.100.9:443"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || !called {
+		t.Fatalf("status=%d called=%v body=%s", rr.Code, called, rr.Body.String())
+	}
+}
+
+func TestPublicWebhookRoutePathMustLiveUnderWebhookPrefix(t *testing.T) {
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: "/api/v1/payments/webhook", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})}
+	if _, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route}); !errors.Is(err, ErrSecurityCompositionInvalid) {
+		t.Fatalf("error = %v, want ErrSecurityCompositionInvalid", err)
+	}
+}
+
+func TestPublicWebhookRouteRejectsDuplicateRegistration(t *testing.T) {
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/yookassa/acct-1", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})}
+	if _, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route, route}); !errors.Is(err, ErrSecurityCompositionInvalid) {
+		t.Fatalf("error = %v, want ErrSecurityCompositionInvalid", err)
+	}
+}
+
+func TestPublicWebhookRouteSupportsParameterizedPrefixDispatch(t *testing.T) {
+	var gotPath string
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/", PathPrefix: true, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	})}
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+webhookPathPrefix+"payments/sbp/acct-2", nil)
+	req.RemoteAddr = "198.51.100.9:443"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || gotPath != webhookPathPrefix+"payments/sbp/acct-2" {
+		t.Fatalf("status=%d gotPath=%q", rr.Code, gotPath)
+	}
+}
+
+func TestPublicWebhookRouteUnmatchedPathReturns404WithoutRunningAnyHandler(t *testing.T) {
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/yookassa/acct-1", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("handler must not run for an unmatched path") })}
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+webhookPathPrefix+"payments/yookassa/other-account", nil)
+	req.RemoteAddr = "198.51.100.9:443"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status=%d", rr.Code)
+	}
+}
+
+func TestPublicWebhookRouteBoundsBodyIndependentlyOfTenantConfig(t *testing.T) {
+	cfg := edgeTestConfig()
+	cfg.MaxRequestBytes = 1 << 30 // deliberately huge, to prove the webhook cap is not derived from this
+	cfg.MaxUploadBytes = 1 << 29
+	route := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/yookassa/acct-1", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := io.ReadAll(r.Body); err == nil {
+			t.Fatal("oversized webhook body read unexpectedly succeeded")
+		}
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+	})}
+	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), nil, nil, nil, nil, []PublicWebhookRoute{route})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversized := strings.Repeat("a", webhookMaxBodyBytes+1)
+	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+webhookPathPrefix+"payments/yookassa/acct-1", strings.NewReader(oversized))
+	req.RemoteAddr = "198.51.100.9:443"
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPublicWebhookRouteRateLimitBudgetIsIndependentOfTenantBudget(t *testing.T) {
+	cfg := edgeTestConfig()
+	cfg.RatePerMinute = 1 // tenant traffic gets exactly one request per minute
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "issuer", Subject: "subject"}
+	tenantRoute := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+	webhookRoute := PublicWebhookRoute{Method: http.MethodPost, Path: webhookPathPrefix + "payments/yookassa/acct-1", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })}
+	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{tenantRoute}, []PublicWebhookRoute{webhookRoute})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tenantReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "https://api.example.test/api/v1/private", nil)
+		req.RemoteAddr = "127.0.0.1:1"
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		return rr
+	}
+	webhookReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+webhookPathPrefix+"payments/yookassa/acct-1", nil)
+		req.RemoteAddr = "127.0.0.1:1"
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		return rr
+	}
+
+	if rr := tenantReq(); rr.Code != http.StatusNoContent {
+		t.Fatalf("first tenant request status=%d", rr.Code)
+	}
+	if rr := tenantReq(); rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("second tenant request should be rate limited: status=%d", rr.Code)
+	}
+	// The tenant budget is exhausted, but the webhook path uses a separate
+	// budget keyed under a different limiter key and must be unaffected.
+	if rr := webhookReq(); rr.Code != http.StatusOK {
+		t.Fatalf("webhook request should not share the exhausted tenant budget: status=%d", rr.Code)
 	}
 }
 

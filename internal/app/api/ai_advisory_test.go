@@ -12,7 +12,8 @@ func TestHostFromBaseURL(t *testing.T) {
 		{name: "empty falls back to connector default", baseURL: "", want: ""},
 		{name: "https URL yields bare hostname", baseURL: "https://gateway.example.com", want: "gateway.example.com"},
 		{name: "https URL with path/port yields only the hostname", baseURL: "https://gateway.example.com:8443/v1", want: "gateway.example.com"},
-		{name: "non-https scheme is rejected", baseURL: "http://gateway.example.com", wantErr: true},
+		{name: "external non-https scheme is rejected", baseURL: "http://gateway.example.com", wantErr: true},
+		{name: "approved local URL keeps scheme port and path", baseURL: "http://ollama:11434/v1", want: "http://ollama:11434/v1"},
 		{name: "bare host without scheme is rejected", baseURL: "gateway.example.com", wantErr: true},
 		{name: "malformed URL is rejected", baseURL: "https://[::1", wantErr: true},
 	}

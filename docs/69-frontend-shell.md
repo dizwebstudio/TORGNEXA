@@ -27,6 +27,13 @@ credential form, and sends the operator to `/finance`, where persisted official
 rates are displayed. Separate-surface copy is selected from generated runtime
 metadata rather than from a provider-ID conditional.
 
+Bitrix24 is now a working `crm` separate surface. Its catalog drawer supports
+the normal tenant-scoped account lifecycle, OAuth sign-in and reauthorization,
+the non-secret `portal_host` runtime configuration, health checks and exact CRM
+capability selection. It deliberately does not appear in generic product
+sync: CRM entity and product-row operations stay behind the provider-neutral
+CRM registry bridge and the four declared CRM capabilities.
+
 Responses remain `unknown` at the generated transport boundary today, so the shell applies small bounded decoders based on public JSON Schema before rendering. Other architecture areas are capability-aware placeholders until their atomic business tasks land.
 
 ## Local validation

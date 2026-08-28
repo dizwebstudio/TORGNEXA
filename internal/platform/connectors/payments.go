@@ -97,10 +97,16 @@ type PaymentWebhook struct {
 	DeliveryID, EventType, RemotePaymentID string
 	BodyDigest                             string
 	OccurredAt                             time.Time
+	// Ack, when non-empty, is the exact response body a provider's own
+	// callback contract requires in place of the generic acknowledgment
+	// (e.g. Robokassa's ResultURL retries indefinitely unless the response
+	// is literally "OK"+InvId). The transport that already knows which
+	// provider it is sets this; callers only need to echo it back.
+	Ack string
 }
 
 func (w PaymentWebhook) Validate() error {
-	if !paymentRefPattern.MatchString(w.DeliveryID) || !safeCodePattern.MatchString(w.EventType) || !paymentRefPattern.MatchString(w.RemotePaymentID) || len(w.BodyDigest) != 64 || w.OccurredAt.IsZero() {
+	if !paymentRefPattern.MatchString(w.DeliveryID) || !safeCodePattern.MatchString(w.EventType) || !paymentRefPattern.MatchString(w.RemotePaymentID) || len(w.BodyDigest) != 64 || w.OccurredAt.IsZero() || len(w.Ack) > 128 {
 		return ErrInvalidPaymentRequest
 	}
 	return nil

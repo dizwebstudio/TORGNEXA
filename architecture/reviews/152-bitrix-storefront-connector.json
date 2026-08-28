@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-152",
+  "task": "152",
+  "change_class": "new_provider",
+  "summary": "Register self-hosted 1С-Битрикс as a storefront provider with an official REST-module webhook bridge and executable product catalog read/write only.",
+  "scopes": [
+    "architecture/policy.json",
+    "architecture/reviews/152-bitrix-storefront-connector.json",
+    "connectors/bitrix",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/connectors/bitrix",
+    "frontend/public/connector-logos/bitrix.svg",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/generated/connector-catalog.ts",
+    "frontend/test/ui-experience.test.mjs",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/registry.go",
+    "tasks/issues/152-bitrix-storefront-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0039-connector-conformance-admission-gate.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "affected",
+      "evidence": "1С-Битрикс uses the existing tenant-scoped storefront Connector SDK account and per-account non-secret runtime configuration."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "affected",
+      "evidence": "Webhook user_id and webhook_code stay behind SecretProvider; product projections retain only bounded remote identifiers and catalog fields."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No public HTTP/OpenAPI operation is added; the connector reuses the existing product reader/writer ports."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "No event schema or EventBus contract changes."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "affected",
+      "evidence": "The provider implements existing SDK ports only and does not add or change a Connector SDK root contract."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "The connector uses the existing encrypted credential and versioned runtime-config stores; no schema migration is required."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "Host-mediated transport validates the administrator-supplied host/path, keeps webhook material callback-scoped, bounds bodies and normalizes remote errors."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "affected",
+      "evidence": "products.write remains governed by the existing capability and write-policy checks; unsupported inventory/order/price routes cannot be enabled."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "affected",
+      "evidence": "Product writes return the existing CommerceWriteReceipt and verify remote state after mutation."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "affected",
+      "evidence": "Exact xmlId lookup, duplicate detection, read-after-write verification and ambiguous-outcome reconciliation are implemented."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "Outbound calls are restricted to the configured store host through the standard SSRF-safe host transport; inbound webhook receipt is not claimed."
+    },
+    {
+      "area": "slo_observability",
+      "status": "affected",
+      "evidence": "Timeouts, non-2xx responses and malformed Bitrix envelopes map to bounded SDK errors without leaking credentials."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "The connector can be disabled per tenant by disabling its account; no migration rollback is needed."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "Provider tests and the conformance candidate pass all executable checks; the report records the shared sandbox_isolation user-namespace limitation as 12/13."
+    }
+  ],
+  "provider": {
+    "id": "bitrix",
+    "route": "connector_sdk",
+    "manifest": "connectors/bitrix/manifest.json",
+    "connector_spec": "docs/connectors/bitrix/spec.md",
+    "capability_audit": "docs/connectors/bitrix/capability-audit.md",
+    "conformance_plan": "docs/connectors/bitrix/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

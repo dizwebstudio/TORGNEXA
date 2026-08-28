@@ -41,6 +41,16 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if SupportsAccountConfiguration("deepseek") || !SupportsCapability("woocommerce", "products.read") || SupportsCapability("woocommerce", "orders.read") {
 		t.Fatal("runtime surface/capability projection is inaccurate")
 	}
+	claude, ok := SupportFor("claude")
+	if !ok || claude.Stage != SupportSeparateSurface || claude.Surface != "ai_providers" || SupportsAccountConfiguration("claude") || SupportsCapability("claude", "ai.completion.generate") || SupportsSync("claude", "products", "inbound") {
+		t.Fatalf("Claude AI provider support is inaccurate: %+v", claude)
+	}
+	for _, connectorID := range []string{"ollama", "lm-studio", "open-webui"} {
+		local, ok := SupportFor(connectorID)
+		if !ok || local.Stage != SupportSeparateSurface || local.Surface != "ai_providers" || SupportsAccountConfiguration(connectorID) || SupportsCapability(connectorID, "ai.completion.generate") || SupportsSync(connectorID, "products", "inbound") {
+			t.Fatalf("%s local AI provider support is inaccurate: %+v", connectorID, local)
+		}
+	}
 	cbr, ok := SupportFor("cbr-fx")
 	if !ok || cbr.Stage != SupportSeparateSurface || cbr.Surface != "finance" || len(cbr.OperationalCapabilities) != 1 || cbr.OperationalCapabilities[0] != "fx.rates.read" {
 		t.Fatalf("CBR FX separate-surface support is inaccurate: %+v", cbr)
@@ -55,6 +65,24 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	}
 	if SocialTextLimit("avito") != 0 {
 		t.Fatal("planned connector gained an executable social text limit")
+	}
+	bitrix, ok := SupportFor("bitrix24")
+	if !ok || bitrix.Stage != SupportSeparateSurface || bitrix.Surface != "crm" || !SupportsAccountConfiguration("bitrix24") || !SupportsCapability("bitrix24", "crm.entities.read") || !SupportsCapability("bitrix24", "crm.productrows.write") || SupportsSync("bitrix24", "products", "inbound") {
+		t.Fatalf("Bitrix24 CRM runtime support is inaccurate: %+v", bitrix)
+	}
+	storefront, ok := SupportFor("bitrix")
+	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsSync("bitrix", "products", "bidirectional") || SupportsCapability("bitrix", "orders.read") {
+		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
+	}
+	csCart, ok := SupportFor("cs-cart")
+	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsSync("cs-cart", "products", "bidirectional") || SupportsCapability("cs-cart", "orders.read") {
+		t.Fatalf("CS-Cart storefront runtime support is inaccurate: %+v", csCart)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek"} {
+		carrier, ok := SupportFor(connectorID)
+		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || len(carrier.OperationalCapabilities) != 0 || SupportsCapability(connectorID, "logistics.shipment.create") || SupportsSync(connectorID, "products", "inbound") {
+			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
+		}
 	}
 }
 
@@ -87,7 +115,7 @@ func TestFXRateReaderAdmissionIsExact(t *testing.T) {
 func TestEveryReadyIntegrationResolvesProductReader(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	ready := []string{"aliexpress-ru", "magnit-market", "megamarket", "moysklad", "onec", "opencart", "ozon", "prestashop", "wildberries", "woocommerce", "yandex-market"}
+	ready := []string{"aliexpress-ru", "bitrix", "cs-cart", "magento", "magnit-market", "medusa", "megamarket", "moysklad", "onec", "opencart", "ozon", "prestashop", "shopify", "shopware", "wildberries", "woocommerce", "yandex-market"}
 	for _, connectorID := range ready {
 		if _, err := registry.ProductReader(supportTestAccount(t, connectorID), supportTestRuntime{}, load); err != nil {
 			t.Fatalf("%s product reader unavailable: %v", connectorID, err)
@@ -95,5 +123,43 @@ func TestEveryReadyIntegrationResolvesProductReader(t *testing.T) {
 	}
 	if _, err := registry.ProductReader(supportTestAccount(t, "avito"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("planned connector resolved: %v", err)
+	}
+}
+
+func TestBitrix24CRMRegistryAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"portal_host":"tenant.bitrix24.com"}`), nil
+	}
+	account := supportTestAccount(t, "bitrix24")
+	if _, err := registry.CRMReader(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("Bitrix24 CRM reader unavailable: %v", err)
+	}
+	if _, err := registry.CRMWriter(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("Bitrix24 CRM writer unavailable: %v", err)
+	}
+	if _, err := registry.CRMReader(supportTestAccount(t, "avito"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted connector resolved as CRM reader: %v", err)
+	}
+}
+
+func TestLogisticsHealthRegistryAdmissionIsExact(t *testing.T) {
+	registry := New()
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek"} {
+		connector, err := registry.healthConnector(supportTestAccount(t, connectorID), nil)
+		if err != nil || connector == nil || connector.Manifest().ID != connectorID {
+			t.Fatalf("%s health connector unavailable: connector=%T err=%v", connectorID, connector, err)
+		}
+	}
+}
+
+func TestOzonPayHealthRegistryAdmissionIsExact(t *testing.T) {
+	registry := New()
+	connector, err := registry.healthConnector(supportTestAccount(t, "ozon-pay"), nil)
+	if err != nil || connector == nil || connector.Manifest().ID != "ozon-pay" {
+		t.Fatalf("ozon-pay health connector unavailable: connector=%T err=%v", connector, err)
+	}
+	if SupportsCapability("ozon-pay", "payments.create") || SupportsCapability("ozon-delivery", "logistics.shipment.create") {
+		t.Fatal("Ozon qualification-gated capabilities became executable")
 	}
 }

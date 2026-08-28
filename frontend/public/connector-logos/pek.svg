@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" role="img" aria-label="ПЭК">
+  <rect width="220" height="80" rx="16" fill="#fff"/>
+  <path fill="#0b63ce" d="M24 18h34c13 0 22 8 22 20s-9 20-22 20H36v10H24V18Zm12 11v18h20c6 0 10-3 10-9s-4-9-10-9H36Z"/>
+  <path fill="#0b63ce" d="M92 18h42v11h-30v8h26v10h-26v10h30v11H92V18Zm56 0h13v15l18-15h17l-23 20 24 25h-17l-19-20v20h-13V18Z"/>
+</svg>

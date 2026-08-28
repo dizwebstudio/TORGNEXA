@@ -53,21 +53,40 @@ test("integration settings use overview cards and a focused drawer", () => {
   assert.match(css, /--connector-surface/);
   assert.match(css, /connector-logo-branded/);
   assert.match(css, /integration-card-hit-target:focus-visible/);
+  assert.match(css, /\.integration-toolbar \{[^}]*display:grid/);
+  assert.match(css, /\.integration-toolbar \{[^}]*grid-template-columns:minmax\(0,420px\)/);
+  assert.match(css, /\.integration-toolbar \.family-tabs \{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.integration-catalog-heading > div:first-child \{[^}]*min-width:0/);
 });
 
 test("integration catalog distinguishes executable, separate and planned runtime stages", () => {
   const integrations = read("features/settings/IntegrationCatalog.tsx");
   const generated = read("generated/connector-catalog.ts");
-  assert.equal([...generated.matchAll(/^      stage: "ready"/gm)].length, 11);
-  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 11);
-  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 16);
+  assert.equal([...generated.matchAll(/^      stage: "ready"/gm)].length, 18);
+  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 23);
+  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 14);
   assert.match(integrations, /Подключение пока недоступно/);
   assert.match(integrations, /Создать кабинет или включить заявленные возможности нельзя/);
   assert.match(integrations, /Перейти к AI-провайдерам/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /Claude \(Anthropic\)/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /Ollama/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /LM Studio/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /Open WebUI/);
+  assert.match(read("features/reports/AskAI.tsx"), /Claude \(Anthropic\)/);
+  assert.match(read("features/reports/AskAI.tsx"), /Ollama/);
+  assert.match(read("features/reports/AskAI.tsx"), /LM Studio/);
+  assert.match(read("features/reports/AskAI.tsx"), /Open WebUI/);
   assert.match(integrations, /Перейти к курсам валют/);
   assert.match(integrations, /Текстовые публикации работают/);
+  assert.match(integrations, /CRM-контур работает/);
   assert.match(integrations, /runtime\.operationalCapabilities/);
   assert.match(integrations, /runtimeConfigTemplate/);
+  assert.match(generated, /name: "1С-Битрикс"/);
+  assert.match(integrations, /официальный REST-модуль/);
+  assert.match(integrations, /JSON вида \{ user_id, webhook_code \}/);
+  assert.match(generated, /name: "CS-Cart"/);
+  assert.match(integrations, /официальный REST API 2\.0/);
+  assert.match(integrations, /JSON вида \{ email, api_key \}/);
 });
 
 test("visual system includes dark mode mobile labels focus and reduced motion", () => {

@@ -1,0 +1,252 @@
+name: production-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact release tag without the v prefix (for example 0.2.0)
+        required: true
+        type: string
+      confirm:
+        description: I confirmed the release and the production rollback plan
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the immutable release over SSH
+    if: ${{ inputs.confirm == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: production
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/torgnexa' }}
+      DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE || 'docker-compose.production.yml' }}
+      DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:8080/api/v1/health' }}
+    steps:
+      - name: Checkout the exact release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate immutable release and deployment inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/check-semver.sh "$VERSION"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/v$VERSION^{commit}")"
+          release_revision=$(git rev-parse HEAD)
+          [[ "$release_revision" =~ ^[0-9a-f]{40}$ ]]
+          printf 'RELEASE_REVISION=%s\n' "$release_revision" >>"$GITHUB_ENV"
+
+          for required in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [[ -z "${!required}" ]]; then
+              echo "missing required production environment secret: $required" >&2
+              exit 1
+            fi
+          done
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] && (( DEPLOY_PORT >= 1 && DEPLOY_PORT <= 65535 ))
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] && [[ "$DEPLOY_PATH" != */../* ]] && [[ "$DEPLOY_PATH" != */.. ]]
+          [[ "$DEPLOY_COMPOSE_FILE" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$DEPLOY_COMPOSE_FILE" != /* ]] && [[ "$DEPLOY_COMPOSE_FILE" != *..* ]]
+          [[ "$DEPLOY_HEALTH_URL" =~ ^https?://[^[:space:]]+$ ]]
+
+          mkdir -m 0700 -p "$RUNNER_TEMP/torgnexa-ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" >"$RUNNER_TEMP/torgnexa-ssh/id_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >"$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/torgnexa-ssh/id_deploy" "$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+          ssh-keygen -y -f "$RUNNER_TEMP/torgnexa-ssh/id_deploy" >/dev/null
+          test -s "$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+
+      - name: Prepare an archive from the checked-out tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/torgnexa-${VERSION}.tar.gz"
+          tar --create --gzip --file "$archive" \
+            --exclude=.git \
+            --exclude=.env \
+            --exclude=.env.* \
+            --exclude=node_modules \
+            --exclude=frontend/dist \
+            --exclude=integrations/n8n-nodes-torgnexa/node_modules \
+            .
+          test -s "$archive"
+          archive_sha256=$(sha256sum -- "$archive" | awk '{print $1}')
+          [[ "$archive_sha256" =~ ^[0-9a-f]{64}$ ]]
+          printf 'ARCHIVE=%s\n' "$archive" >>"$GITHUB_ENV"
+          printf 'ARCHIVE_SHA256=%s\n' "$archive_sha256" >>"$GITHUB_ENV"
+
+      - name: Check the pre-provisioned production host
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_opts=(
+            -i "$RUNNER_TEMP/torgnexa-ssh/id_deploy"
+            -p "$DEPLOY_PORT"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+          )
+          ssh "${ssh_opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- "$DEPLOY_PATH" "$DEPLOY_COMPOSE_FILE" <<'REMOTE'
+          set -eu
+          target=$1
+          compose_file=$2
+          case "$target" in
+            /*) ;;
+            *) echo "DEPLOY_PATH must be absolute" >&2; exit 1 ;;
+          esac
+          case "$compose_file" in
+            /*|*..*) echo "DEPLOY_COMPOSE_FILE must be a safe relative path" >&2; exit 1 ;;
+          esac
+          test "$target" != / || { echo "refusing to use / as deployment path" >&2; exit 1; }
+          test -f "$target/.env"
+          test ! -L "$target/.env"
+          test "$(stat -c '%a' "$target/.env")" = 600
+          command -v docker >/dev/null
+          command -v curl >/dev/null
+          command -v sha256sum >/dev/null
+          docker compose version >/dev/null
+          mkdir -m 0750 -p "$target/incoming" "$target/releases"
+          REMOTE
+
+      - name: Upload the immutable source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_opts=(
+            -i "$RUNNER_TEMP/torgnexa-ssh/id_deploy"
+            -p "$DEPLOY_PORT"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+          )
+          scp "${ssh_opts[@]}" "$ARCHIVE" \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/incoming/torgnexa-$VERSION.tar.gz"
+
+      - name: Activate the release and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_opts=(
+            -i "$RUNNER_TEMP/torgnexa-ssh/id_deploy"
+            -p "$DEPLOY_PORT"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$RUNNER_TEMP/torgnexa-ssh/known_hosts"
+          )
+          ssh "${ssh_opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- \
+            "$DEPLOY_PATH" "$DEPLOY_COMPOSE_FILE" "$DEPLOY_HEALTH_URL" "$VERSION" "$RELEASE_REVISION" "$ARCHIVE_SHA256" <<'REMOTE'
+          set -eu
+          target=$1
+          compose_file=$2
+          health_url=$3
+          version=$4
+          revision=$5
+          expected_sha256=$6
+          archive="$target/incoming/torgnexa-$version.tar.gz"
+          release="$target/releases/$version"
+          base_compose="$release/docker-compose.yml"
+          production_compose="$release/$compose_file"
+          test -f "$archive"
+          actual_sha256=$(sha256sum -- "$archive" | awk '{print $1}')
+          test "$actual_sha256" = "$expected_sha256"
+          test ! -e "$release"
+          mkdir -m 0750 -- "$release"
+          tar --extract --gzip --file "$archive" --directory "$release"
+          printf '%s\n' "$revision" >"$release/.release-revision"
+
+          test -f "$base_compose"
+          test -f "$production_compose"
+          export TORGNEXA_VERSION="$version"
+          export TORGNEXA_RELEASE_REVISION="$revision"
+          rendered=$(mktemp)
+          trap 'rm -f "$rendered"' EXIT HUP INT TERM
+          docker compose --project-directory "$release" --env-file "$target/.env" \
+            -f "$base_compose" -f "$production_compose" config >"$rendered"
+          grep -Eq 'TORGNEXA_ENV:[[:space:]]*production([[:space:]]|$)' "$rendered" || {
+            echo "effective Compose configuration is not production; refusing deployment" >&2
+            exit 1
+          }
+          grep -Eq '^  (api|torgnexa-api):$' "$rendered" || {
+            echo "production Compose configuration has no API service" >&2
+            exit 1
+          }
+          grep -Eq '^  (worker|torgnexa-worker):$' "$rendered" || {
+            echo "production Compose configuration has no worker service" >&2
+            exit 1
+          }
+          rm -f -- "$rendered"
+          trap - EXIT HUP INT TERM
+
+          deploy_compose() {
+            project=$1
+            release_version=$2
+            release_revision=$3
+            TORGNEXA_VERSION="$release_version" TORGNEXA_RELEASE_REVISION="$release_revision" \
+              docker compose --project-directory "$project" --env-file "$target/.env" \
+              -f "$project/docker-compose.yml" -f "$project/$compose_file" \
+              -p torgnexa-production up -d --build
+          }
+
+          previous=''
+          if [ -L "$target/current" ]; then
+            previous=$(readlink -f "$target/current" || true)
+          fi
+          ln -sfn -- "$release" "$target/current"
+
+          if ! deploy_compose "$release" "$version" "$revision"; then
+            failed=1
+          else
+            failed=0
+          fi
+
+          if [ "$failed" -eq 0 ]; then
+            healthy=0
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error --max-time 10 "$health_url" >/dev/null; then
+                healthy=1
+                break
+              fi
+              sleep 5
+            done
+            [ "$healthy" -eq 1 ] || failed=1
+          fi
+
+          if [ "$failed" -ne 0 ]; then
+            echo "release $version failed health check; attempting rollback" >&2
+            if [ -n "$previous" ] && [ -d "$previous" ]; then
+              ln -sfn -- "$previous" "$target/current"
+              previous_version=${previous##*/}
+              previous_revision=$(cat "$previous/.release-revision" 2>/dev/null || true)
+              deploy_compose "$previous" "$previous_version" "$previous_revision" || true
+            else
+              echo "no previous release is available for rollback" >&2
+            fi
+            exit 1
+          fi
+
+          rm -f -- "$archive"
+          echo "production release $version ($revision) is healthy"
+          REMOTE

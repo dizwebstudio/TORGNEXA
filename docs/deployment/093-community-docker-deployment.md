@@ -82,6 +82,10 @@ release policy or change the single-host/non-HA qualification of Task 093.
 
 This Compose file is not an HA topology. Before public production deployment repeat backup/restore and upgrade rehearsals, supply-chain/signing qualification, hosted architecture rules, provider staging qualification, TLS/WAF/DDoS design, secret management and capacity/SLO tests against the actual topology.
 
+For a single small VPS, use the separate production overlay and its protected
+manual rollout workflow: [`production-ssh-deploy.md`](production-ssh-deploy.md).
+Do not change this Community file's development mode to make it production.
+
 ## Image reproducibility
 
 Every external Compose image and the Go builder image is pinned by a human-readable version plus a multi-platform SHA-256 digest. API, worker, scheduler and MCP share the same Dockerfile, build arguments and repository revision; Compose may assign service-local names to the identical build output rather than treating a mutable local tag as an external runtime dependency. This preserves Task-065's distinction between imported images and locally built release artifacts.

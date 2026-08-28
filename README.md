@@ -10,7 +10,7 @@ TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectio
 - `adr/` — architectural decisions.
 - `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
 - `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `tasks/issues/` — contiguous atomic task cards numbered 001–134, with
+- `tasks/issues/` — contiguous atomic task cards numbered 001–153, with
   implementation and validation status recorded in each card.
 - `tasks/milestones/` — dependency-aware milestones M0-M13.
 - `templates/` — repeatable architecture, implementation and review artifacts.
@@ -52,6 +52,9 @@ frontend publication remains disabled by the JavaScript supply-chain policy.
 This is a local single-host artifact, not a production CDN/web-server topology. See
 `docs/deployment/093-community-docker-deployment.md`.
 
+The guarded manual SSH rollout for a pre-provisioned production host is described
+in [`docs/deployment/production-ssh-deploy.md`](docs/deployment/production-ssh-deploy.md).
+
 ## Architecture rule
 
 **Core never knows provider names.** Marketplaces, storefronts (including WooCommerce, PrestaShop and OpenCart), classified/verticals, social channels, ERP, EDO, government, payment, logistics, PUDO and CRM providers are plugins/connectors using capability contracts and the conformance suite.
@@ -63,6 +66,15 @@ summarized in [`docs/connectors/marketplaces.md`](docs/connectors/marketplaces.m
 Actual production execution is deliberately narrower than manifest coverage;
 the current ready/separate/planned split is documented in
 [`docs/10-integrations-matrix.md`](docs/10-integrations-matrix.md).
+
+The AI-provider surface includes hosted providers plus local Ollama, LM Studio
+and Open WebUI adapters. Local model servers remain operator-managed and are
+reached only through the host-mediated allowlisted transport.
+
+The Integrations surface also includes a separate self-hosted 1С-Битрикс
+storefront card. Its current executable scope is product catalog read/write via
+the official REST-module webhook; inventory, prices and orders remain closed
+until matching worker bridges are qualified.
 
 ## Development workflow
 

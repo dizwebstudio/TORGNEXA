@@ -4,17 +4,28 @@
     {"connector_id":"aliexpress-ru","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
     {"connector_id":"auto-ru","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
     {"connector_id":"avito","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
-    {"connector_id":"bitrix24","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
+    {"connector_id":"bitrix","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound","outbound"]}],"runtime_config_template":{"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB"}},
+    {"connector_id":"bitrix24","stage":"separate_surface","surface":"crm","operational_capabilities":["crm.entities.read","crm.entities.write","crm.productrows.read","crm.productrows.write"],"sync":[],"runtime_config_template":{"portal_host":"acme.bitrix24.com"}},
     {"connector_id":"cbr-fx","stage":"separate_surface","surface":"finance","operational_capabilities":["fx.rates.read"],"sync":[]},
-    {"connector_id":"cdek","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
+    {"connector_id":"cdek","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
+    {"connector_id":"cs-cart","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound","outbound"]}],"runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}},
     {"connector_id":"chestny-znak","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
     {"connector_id":"cian","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
+    {"connector_id":"claude","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {"connector_id":"deepseek","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
+    {"connector_id":"dellin","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
     {"connector_id":"diadoc","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
     {"connector_id":"egais","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
+    {"connector_id":"fivepost","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
     {"connector_id":"gigachat","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {"connector_id":"instagram","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
     {"connector_id":"kimi","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
+    {"connector_id":"lm-studio","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
+    {
+      "connector_id":"magento","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
+    },
     {
       "connector_id":"magnit-market","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],
       "sync":[{"entity_type":"products","directions":["inbound"]}],
@@ -26,14 +37,19 @@
       "runtime_config_template":{"chat_id":-70801090403050}
     },
     {
+      "connector_id":"medusa","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
+    },
+    {
       "connector_id":"megamarket","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],
       "sync":[{"entity_type":"products","directions":["inbound"]}],
       "runtime_config_template":{"merchant_id":1,"scheme":"dbs","warehouses":[{"id":"main","name":"Основной склад"}]}
     },
     {"connector_id":"moysklad","stage":"ready","surface":"integrations","operational_capabilities":["erp.catalog.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
     {"connector_id":"odnoklassniki","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
-    {
-      "connector_id":"onec","stage":"ready","surface":"integrations","operational_capabilities":["erp.catalog.read"],
+	    {
+	      "connector_id":"onec","stage":"ready","surface":"integrations","operational_capabilities":["erp.catalog.read"],
       "sync":[{"entity_type":"products","directions":["inbound"]}],
       "runtime_config_template":{
         "host":"erp.example.ru","base_path":"/odata/standard.odata",
@@ -41,6 +57,8 @@
         "inventory":{"resource":"AccumulationRegister_ТоварыНаСкладах","function":"Balance","product_field":"Номенклатура_Key","location_field":"Склад_Key","quantity_field":"КоличествоBalance"}
       }
     },
+    {"connector_id":"ollama","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
+    {"connector_id":"open-webui","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {"connector_id":"openai-compatible","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {
       "connector_id":"opencart","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
@@ -48,15 +66,34 @@
       "runtime_config_template":{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"}
     },
     {"connector_id":"ozon","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
+    {"connector_id":"ozon-delivery","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
+    {"connector_id":"ozon-pay","stage":"separate_surface","surface":"finance","operational_capabilities":[],"sync":[]},
+    {"connector_id":"pek","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
     {
       "connector_id":"prestashop","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],
       "sync":[{"entity_type":"products","directions":["inbound"]}],
       "runtime_config_template":{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB","language_id":1,"shop_id":0}
     },
     {"connector_id":"qwen","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
+    {"connector_id":"robokassa","stage":"separate_surface","surface":"finance","operational_capabilities":["payments.create","payments.reconcile","payments.status.read"],"sync":[]},
     {"connector_id":"rutube","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
     {"connector_id":"saby-edo","stage":"planned","surface":"none","operational_capabilities":[],"sync":[]},
+    {
+      "connector_id":"saleor","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "runtime_config_template":{"store_host":"shop.example.com","base_path":"","channel":"default-channel","warehouse":"main-warehouse"}
+    },
     {"connector_id":"sbp","stage":"separate_surface","surface":"finance","operational_capabilities":["payments.create","payments.reconcile","payments.refund","payments.status.read"],"sync":[],"runtime_config_template":{"gateway_host":"sbp-gateway.example.ru","member_id":"100000001"}},
+    {
+      "connector_id":"shopify","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "runtime_config_template":{"shop_domain":"example.myshopify.com","store_currency":"RUB"}
+    },
+    {
+      "connector_id":"shopware","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
+    },
     {
       "connector_id":"telegram","stage":"separate_surface","surface":"social","operational_capabilities":["social.post.text"],"sync":[],
       "social_text_max_runes":4096,

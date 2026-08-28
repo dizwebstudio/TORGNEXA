@@ -1,0 +1,32 @@
+{
+  "id": "shopify",
+  "name": "Shopify",
+  "family": "storefront",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+  "auth": [
+    {
+      "kind": "oauth2",
+      "secret_class": "marketplace.oauth-token",
+      "required": true,
+      "oauth2": {
+        "grant_type": "authorization_code",
+        "authorization_url": "https://{host}/admin/oauth/authorize",
+        "token_url": "https://{host}/admin/oauth/access_token",
+        "scopes": ["read_products", "write_products", "read_inventory", "write_inventory", "read_orders", "write_orders"],
+        "client_auth_method": "client_secret_post",
+        "scope_separator": ",",
+        "host_parameter": "shop_domain",
+        "host_suffix": ".myshopify.com",
+        "extra_token_params": {"expiring": "1"}
+      }
+    }
+  ],
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 500,
+    "request_timeout_ms": 30000,
+    "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}
+  }
+}

@@ -103,20 +103,79 @@ type OAuth2Configuration struct {
 	TokenURL         string   `json:"token_url"`
 	Scopes           []string `json:"scopes,omitempty"`
 	ClientAuthMethod string   `json:"client_auth_method"`
+	// ScopeSeparator joins Scopes into the authorization request's "scope"
+	// parameter. Empty means the long-standing default of " " (space, RFC
+	// 6749 §3.3); some providers (Shopify) require "," instead.
+	ScopeSeparator string `json:"scope_separator,omitempty"`
+	// HostParameter, when set, names the runtime-config key holding a
+	// tenant-specific host that AuthorizationURL/TokenURL are templated
+	// against: both must then equal exactly "https://{host}" followed by an
+	// optional path, with the literal token "{host}" substituted by the
+	// resolved, HostSuffix-bounded value at request time (see
+	// connectorauth.ResolveOAuth2Host). Empty means both URLs are used
+	// as-is, the long-standing behavior for every fixed-host provider.
+	HostParameter string `json:"host_parameter,omitempty"`
+	// HostSuffix bounds which resolved hosts are acceptable when
+	// HostParameter is set: the substituted value must end with this
+	// literal suffix, so a tenant's runtime config can never redirect the
+	// OAuth flow to an arbitrary host.
+	HostSuffix string `json:"host_suffix,omitempty"`
+	// ExtraTokenParams are static, non-secret additional form fields sent
+	// with the token exchange request (e.g. Shopify's "expiring": "1").
+	ExtraTokenParams map[string]string `json:"extra_token_params,omitempty"`
 }
+
+var (
+	hostTemplatePattern  = regexp.MustCompile(`^https://\{host\}(/[A-Za-z0-9._~\-/]*)?$`)
+	hostParameterPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	hostSuffixPattern    = regexp.MustCompile(`^\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$`)
+)
 
 func (configuration OAuth2Configuration) Validate() error {
 	if (configuration.GrantType != "authorization_code" && configuration.GrantType != "client_credentials") || configuration.ClientAuthMethod != "client_secret_post" {
 		return ErrInvalidManifest
 	}
-	if !validHTTPSURL(configuration.TokenURL) || len(configuration.Scopes) > 32 {
+	if len(configuration.Scopes) > 32 {
 		return ErrInvalidManifest
 	}
-	if configuration.GrantType == "authorization_code" && !validHTTPSURL(configuration.AuthorizationURL) {
+	if configuration.ScopeSeparator != "" && configuration.ScopeSeparator != "," && configuration.ScopeSeparator != " " {
 		return ErrInvalidManifest
 	}
 	if configuration.GrantType == "client_credentials" && configuration.AuthorizationURL != "" {
 		return ErrInvalidManifest
+	}
+	if len(configuration.ExtraTokenParams) > 8 {
+		return ErrInvalidManifest
+	}
+	for key, value := range configuration.ExtraTokenParams {
+		switch key {
+		case "client_id", "client_secret", "grant_type", "code", "redirect_uri", "code_verifier", "scope", "refresh_token":
+			return ErrInvalidManifest
+		}
+		if !safeCodePattern.MatchString(key) || value == "" || len(value) > 128 || strings.ContainsAny(value, "\x00\r\n\t") {
+			return ErrInvalidManifest
+		}
+	}
+	if configuration.HostParameter == "" {
+		if configuration.HostSuffix != "" {
+			return ErrInvalidManifest
+		}
+		if !validHTTPSURL(configuration.TokenURL) {
+			return ErrInvalidManifest
+		}
+		if configuration.GrantType == "authorization_code" && !validHTTPSURL(configuration.AuthorizationURL) {
+			return ErrInvalidManifest
+		}
+	} else {
+		if !hostParameterPattern.MatchString(configuration.HostParameter) || len(configuration.HostSuffix) > 253 || !hostSuffixPattern.MatchString(configuration.HostSuffix) {
+			return ErrInvalidManifest
+		}
+		if !hostTemplatePattern.MatchString(configuration.TokenURL) {
+			return ErrInvalidManifest
+		}
+		if configuration.GrantType == "authorization_code" && !hostTemplatePattern.MatchString(configuration.AuthorizationURL) {
+			return ErrInvalidManifest
+		}
 	}
 	seen := map[string]struct{}{}
 	for _, scope := range configuration.Scopes {

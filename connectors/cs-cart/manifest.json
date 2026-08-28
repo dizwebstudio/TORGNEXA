@@ -1,0 +1,10 @@
+{
+  "id": "cs-cart",
+  "name": "CS-Cart",
+  "family": "storefront",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["products.read", "products.write"],
+  "auth": [{"kind": "basic", "secret_class": "storefront.cs-cart-api", "required": true}],
+  "rate_limit": {"max_concurrency": 4, "min_interval_ms": 100, "request_timeout_ms": 30000, "retry": {"max_attempts": 5, "base_backoff_ms": 500, "max_backoff_ms": 30000}}
+}

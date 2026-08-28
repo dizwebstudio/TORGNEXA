@@ -64,7 +64,7 @@ if support_document.get("schema_version") != 1 or not isinstance(support_documen
     raise SystemExit("invalid built-in runtime support contract")
 support_by_id = {}
 valid_stages = {"ready", "separate_surface", "planned"}
-valid_surfaces = {"integrations", "ai_providers", "finance", "social", "none"}
+valid_surfaces = {"integrations", "ai_providers", "finance", "social", "crm", "logistics", "none"}
 for support in support_document["connectors"]:
     connector_id = support.get("connector_id")
     if connector_id in support_by_id or support.get("stage") not in valid_stages or support.get("surface") not in valid_surfaces:
@@ -127,7 +127,7 @@ lines = [
     "}\n\n",
     "export interface ConnectorRuntimeSupport {\n",
     "  readonly stage: \"ready\" | \"separate_surface\" | \"planned\";\n",
-    "  readonly surface: \"integrations\" | \"ai_providers\" | \"finance\" | \"social\" | \"none\";\n",
+    "  readonly surface: \"integrations\" | \"ai_providers\" | \"finance\" | \"social\" | \"crm\" | \"logistics\" | \"none\";\n",
     "  readonly operationalCapabilities: readonly string[];\n",
     "  readonly sync: readonly ConnectorRuntimeSyncSupport[];\n",
     "  readonly runtimeConfigTemplate?: Readonly<Record<string, unknown>>;\n",

@@ -1,0 +1,39 @@
+{
+  "id": "fivepost",
+  "name": "5Post",
+  "family": "logistics",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": [
+    "logistics.label.read",
+    "logistics.shipment.cancel",
+    "logistics.shipment.create",
+    "logistics.track.read",
+    "pickup.points.read"
+  ],
+  "auth": [
+    {
+      "kind": "api_key",
+      "secret_class": "logistics.api-key",
+      "required": true
+    }
+  ],
+  "connection_test": {
+    "url": "https://api.5post.ru/api/v1/auth/token",
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"apiKey\":\"${secret}\"}"
+  },
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 300,
+    "request_timeout_ms": 30000,
+    "retry": {
+      "max_attempts": 4,
+      "base_backoff_ms": 500,
+      "max_backoff_ms": 30000
+    }
+  }
+}

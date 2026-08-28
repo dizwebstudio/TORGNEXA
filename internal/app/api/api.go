@@ -356,7 +356,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		RatePerMinute:     cfg.Security.RatePerMinute,
 		HSTSSeconds:       cfg.Security.HSTSSeconds,
 	}
-	routes := newProductionRoutes(productionRouteDependencies{
+	routeDeps := productionRouteDependencies{
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
 		tenancy: tenantRepository, search: searchRepository, catalog: catalogRepository, pricing: pricingRepository, pim: pimRepository,
@@ -366,8 +366,9 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadContent: quarantineStore,
 		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository,
-	})
-	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes)
+	}
+	routes := newProductionRoutes(routeDeps)
+	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))
 	if err != nil {
 		_ = listener.Close()
 		return newRuntimeError("http_security_composition_failed", err)

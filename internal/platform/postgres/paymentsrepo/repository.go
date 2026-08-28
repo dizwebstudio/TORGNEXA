@@ -61,6 +61,19 @@ func (r *Repository) PaymentByExternalID(ctx context.Context, scope payments.Sco
 	return result, err
 }
 
+func (r *Repository) PaymentByRemoteID(ctx context.Context, scope payments.Scope, connectorAccountID, remoteID string) (payments.Payment, error) {
+	if err := validate(ctx, r, scope); err != nil {
+		return payments.Payment{}, err
+	}
+	var result payments.Payment
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		var err error
+		result, err = scanPayment(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,connector_account_id,external_id,COALESCE(remote_id,''),COALESCE(purpose,''),amount_minor_units,currency,commission_minor_units,status,COALESCE(remote_status,''),COALESCE(reason_code,''),version,created_at,updated_at,expires_at,succeeded_at FROM payments WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND remote_id=$4`, scope.OrganizationID(), scope.WorkspaceID(), connectorAccountID, remoteID))
+		return err
+	})
+	return result, err
+}
+
 // ListPayments returns recent payments for the tenant finance UI.
 func (r *Repository) ListPayments(ctx context.Context, scope payments.Scope, limit int) ([]payments.Payment, error) {
 	if err := validate(ctx, r, scope); err != nil || limit < 1 || limit > 200 {

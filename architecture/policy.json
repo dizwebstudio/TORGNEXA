@@ -92,6 +92,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/payments",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/pim",
       "kind": "core_domain"
     },
@@ -384,6 +388,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/paymentsrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/pimrepo",
       "kind": "infrastructure_adapter"
     },
@@ -592,6 +600,16 @@
       "allowed_external_imports": []
     },
     {
+      "id": "bitrix",
+      "family": "storefront",
+      "implementation": "connectors/bitrix",
+      "manifest": "connectors/bitrix/manifest.json",
+      "connector_spec": "docs/connectors/bitrix/spec.md",
+      "capability_audit": "docs/connectors/bitrix/capability-audit.md",
+      "conformance_plan": "docs/connectors/bitrix/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "bitrix24",
       "family": "crm",
       "implementation": "connectors/bitrix24",
@@ -642,6 +660,26 @@
       "allowed_external_imports": []
     },
     {
+      "id": "claude",
+      "family": "ai",
+      "implementation": "connectors/claude",
+      "manifest": "connectors/claude/manifest.json",
+      "connector_spec": "docs/connectors/claude/spec.md",
+      "capability_audit": "docs/connectors/claude/capability-audit.md",
+      "conformance_plan": "docs/connectors/claude/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "cs-cart",
+      "family": "storefront",
+      "implementation": "connectors/cs-cart",
+      "manifest": "connectors/cs-cart/manifest.json",
+      "connector_spec": "docs/connectors/cs-cart/spec.md",
+      "capability_audit": "docs/connectors/cs-cart/capability-audit.md",
+      "conformance_plan": "docs/connectors/cs-cart/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "deepseek",
       "family": "ai",
       "implementation": "connectors/deepseek",
@@ -649,6 +687,16 @@
       "connector_spec": "docs/connectors/deepseek/spec.md",
       "capability_audit": "docs/connectors/deepseek/capability-audit.md",
       "conformance_plan": "docs/connectors/deepseek/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "dellin",
+      "family": "logistics",
+      "implementation": "connectors/dellin",
+      "manifest": "connectors/dellin/manifest.json",
+      "connector_spec": "docs/connectors/dellin/spec.md",
+      "capability_audit": "docs/connectors/dellin/capability-audit.md",
+      "conformance_plan": "docs/connectors/dellin/conformance-plan.md",
       "allowed_external_imports": []
     },
     {
@@ -669,6 +717,16 @@
       "connector_spec": "docs/connectors/egais/spec.md",
       "capability_audit": "docs/connectors/egais/capability-audit.md",
       "conformance_plan": "docs/connectors/egais/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "fivepost",
+      "family": "logistics",
+      "implementation": "connectors/fivepost",
+      "manifest": "connectors/fivepost/manifest.json",
+      "connector_spec": "docs/connectors/fivepost/spec.md",
+      "capability_audit": "docs/connectors/fivepost/capability-audit.md",
+      "conformance_plan": "docs/connectors/fivepost/conformance-plan.md",
       "allowed_external_imports": []
     },
     {
@@ -702,6 +760,26 @@
       "allowed_external_imports": []
     },
     {
+      "id": "lm-studio",
+      "family": "ai",
+      "implementation": "connectors/lm-studio",
+      "manifest": "connectors/lm-studio/manifest.json",
+      "connector_spec": "docs/connectors/lm-studio/spec.md",
+      "capability_audit": "docs/connectors/lm-studio/capability-audit.md",
+      "conformance_plan": "docs/connectors/lm-studio/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "magento",
+      "family": "storefront",
+      "implementation": "connectors/magento",
+      "manifest": "connectors/magento/manifest.json",
+      "connector_spec": "docs/connectors/magento/spec.md",
+      "capability_audit": "docs/connectors/magento/capability-audit.md",
+      "conformance_plan": "docs/connectors/magento/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "magnit-market",
       "family": "marketplace",
       "implementation": "connectors/magnit-market",
@@ -719,6 +797,16 @@
       "connector_spec": "docs/connectors/max-messenger/spec.md",
       "capability_audit": "docs/connectors/max-messenger/capability-audit.md",
       "conformance_plan": "docs/connectors/max-messenger/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "medusa",
+      "family": "storefront",
+      "implementation": "connectors/medusa",
+      "manifest": "connectors/medusa/manifest.json",
+      "connector_spec": "docs/connectors/medusa/spec.md",
+      "capability_audit": "docs/connectors/medusa/capability-audit.md",
+      "conformance_plan": "docs/connectors/medusa/conformance-plan.md",
       "allowed_external_imports": []
     },
     {
@@ -752,6 +840,16 @@
       "allowed_external_imports": []
     },
     {
+      "id": "ollama",
+      "family": "ai",
+      "implementation": "connectors/ollama",
+      "manifest": "connectors/ollama/manifest.json",
+      "connector_spec": "docs/connectors/ollama/spec.md",
+      "capability_audit": "docs/connectors/ollama/capability-audit.md",
+      "conformance_plan": "docs/connectors/ollama/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "onec",
       "family": "erp",
       "implementation": "connectors/onec",
@@ -759,6 +857,16 @@
       "connector_spec": "docs/connectors/onec/spec.md",
       "capability_audit": "docs/connectors/onec/capability-audit.md",
       "conformance_plan": "docs/connectors/onec/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "open-webui",
+      "family": "ai",
+      "implementation": "connectors/open-webui",
+      "manifest": "connectors/open-webui/manifest.json",
+      "connector_spec": "docs/connectors/open-webui/spec.md",
+      "capability_audit": "docs/connectors/open-webui/capability-audit.md",
+      "conformance_plan": "docs/connectors/open-webui/conformance-plan.md",
       "allowed_external_imports": []
     },
     {
@@ -792,6 +900,36 @@
       "allowed_external_imports": []
     },
     {
+      "id": "ozon-delivery",
+      "family": "logistics",
+      "implementation": "connectors/ozon-delivery",
+      "manifest": "connectors/ozon-delivery/manifest.json",
+      "connector_spec": "docs/connectors/ozon-delivery/spec.md",
+      "capability_audit": "docs/connectors/ozon-delivery/capability-audit.md",
+      "conformance_plan": "docs/connectors/ozon-delivery/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "ozon-pay",
+      "family": "payment",
+      "implementation": "connectors/ozon-pay",
+      "manifest": "connectors/ozon-pay/manifest.json",
+      "connector_spec": "docs/connectors/ozon-pay/spec.md",
+      "capability_audit": "docs/connectors/ozon-pay/capability-audit.md",
+      "conformance_plan": "docs/connectors/ozon-pay/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "pek",
+      "family": "logistics",
+      "implementation": "connectors/pek",
+      "manifest": "connectors/pek/manifest.json",
+      "connector_spec": "docs/connectors/pek/spec.md",
+      "capability_audit": "docs/connectors/pek/capability-audit.md",
+      "conformance_plan": "docs/connectors/pek/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "prestashop",
       "family": "storefront",
       "implementation": "connectors/prestashop",
@@ -809,6 +947,16 @@
       "connector_spec": "docs/connectors/qwen/spec.md",
       "capability_audit": "docs/connectors/qwen/capability-audit.md",
       "conformance_plan": "docs/connectors/qwen/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "robokassa",
+      "family": "payment",
+      "implementation": "connectors/robokassa",
+      "manifest": "connectors/robokassa/manifest.json",
+      "connector_spec": "docs/connectors/robokassa/spec.md",
+      "capability_audit": "docs/connectors/robokassa/capability-audit.md",
+      "conformance_plan": "docs/connectors/robokassa/conformance-plan.md",
       "allowed_external_imports": []
     },
     {
@@ -832,6 +980,16 @@
       "allowed_external_imports": []
     },
     {
+      "id": "saleor",
+      "family": "storefront",
+      "implementation": "connectors/saleor",
+      "manifest": "connectors/saleor/manifest.json",
+      "connector_spec": "docs/connectors/saleor/spec.md",
+      "capability_audit": "docs/connectors/saleor/capability-audit.md",
+      "conformance_plan": "docs/connectors/saleor/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
       "id": "sbp",
       "family": "payment",
       "implementation": "connectors/sbp",
@@ -839,6 +997,26 @@
       "connector_spec": "docs/connectors/sbp/spec.md",
       "capability_audit": "docs/connectors/sbp/capability-audit.md",
       "conformance_plan": "docs/connectors/sbp/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "shopify",
+      "family": "storefront",
+      "implementation": "connectors/shopify",
+      "manifest": "connectors/shopify/manifest.json",
+      "connector_spec": "docs/connectors/shopify/spec.md",
+      "capability_audit": "docs/connectors/shopify/capability-audit.md",
+      "conformance_plan": "docs/connectors/shopify/conformance-plan.md",
+      "allowed_external_imports": []
+    },
+    {
+      "id": "shopware",
+      "family": "storefront",
+      "implementation": "connectors/shopware",
+      "manifest": "connectors/shopware/manifest.json",
+      "connector_spec": "docs/connectors/shopware/spec.md",
+      "capability_audit": "docs/connectors/shopware/capability-audit.md",
+      "conformance_plan": "docs/connectors/shopware/conformance-plan.md",
       "allowed_external_imports": []
     },
     {

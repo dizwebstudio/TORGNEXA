@@ -1,13 +1,152 @@
-# Repository validation report — Tasks through 133 — 2026-08-27
+# Repository validation report — Tasks through 153 — 2026-08-28
+
+## Task 153 repository validation
+
+- CS-Cart is visible as a separate `storefront` card in «Интернет-магазины»;
+- the official CS-Cart API 2.0 Basic Auth adapter admits bounded product
+  catalog reads, creates/updates and inbound/outbound product sync;
+- administrator e-mail/API key stay callback-scoped and store host settings
+  are non-secret runtime configuration;
+- inventory, prices, orders and webhooks remain fail-closed because no matching
+  worker routes are claimed;
+- focused connector and builtin-runtime tests: **PASS**;
+- live qualification is **not claimed** without a non-production CS-Cart store
+  with API access enabled;
+- CS-Cart generated catalog/runtime rows are synchronized (**54 admitted
+  manifests / 17 generic / 23 separate / 14 planned**). The repository-wide
+  catalog check is currently blocked by the pre-existing unregistered
+  `connectors/saleor` directory in the dirty tree; it is not part of Task 153.
+
+## Task 152 repository validation
+
+- 1С-Битрикс is visible as a separate `storefront` card from Bitrix24 CRM;
+- the official REST-module webhook bridge admits bounded product catalog
+  reads, idempotent product writes and inbound/outbound product sync;
+- webhook credentials remain encrypted and `catalog_iblock_id` is required
+  non-secret runtime configuration;
+- inventory, prices, orders, offers/custom properties and webhook receipt stay
+  fail-closed because no matching worker routes are claimed;
+- focused connector and builtin-runtime tests: **PASS**;
+- live qualification is **not claimed** without a dedicated self-hosted
+  1С-Битрикс site, enabled REST module and non-production webhook.
+- generated catalog/runtime support: **PASS — 53 manifests / 16 generic / 23
+  separate / 14 planned**.
+
+## Tasks 149–150 repository validation
+
+- Ollama, LM Studio and Open WebUI are visible on the dedicated AI-provider
+  surface and selectable in Reports → Ask AI;
+- all three use the governed `ai.completion.generate` route and a typed
+  OpenAI-compatible `/chat/completions` adapter; no product synchronization,
+  streaming or tool capability is advertised;
+- local egress is host-mediated and allowlisted to private/loopback Docker
+  endpoints with pinned dialing, proxy/redirect suppression and bounded bodies;
+- migration `000021`, OpenAPI, runtime support, generated catalogs and
+  architecture reviews are synchronized;
+- generated catalog: **PASS — 52 manifests / 14 generic / 23 separate / 15
+  planned**;
+- live model availability is **not claimed** without operator-provided Ollama,
+  LM Studio or Open WebUI services and a non-production model/account.
+
+## Task 147 repository validation
+
+- Ozon Pay is visible on the separate Payments surface with encrypted
+  `client_id`/`api_key` enrollment and a bounded Seller API access probe;
+- Ozon Доставка is visible on the separate Delivery surface with encrypted
+  Seller API enrollment and a bounded warehouse probe;
+- payment mutations and delivery rates/shipments/labels/tracking remain
+  fail-closed until the current Ozon merchant contracts are qualified;
+- generated catalog/runtime support: **PASS — 48 manifests / 13 generic / 20
+  separate / 15 planned**;
+- full `go test ./...` and `go vet ./...` in the Go 1.26 validation image:
+  **PASS**;
+- focused Ozon transport and connector tests: **PASS** (full repository checks
+  are listed below);
+- Compose `frontend` and `api` images rebuilt and restarted; both containers
+  are healthy, API `/api/v1/health` returns `status: ok`, and the served
+  frontend bundle contains `ozon-pay` and `ozon-delivery`.
+
+The standalone architecture checker retains only pre-existing dirty-tree
+findings (an unregistered Shopware directory and earlier provider conformance
+notes); no Ozon-specific finding is introduced.
+
+## Task 145 repository validation
+
+- CDEK is no longer `planned`: it is shown as «СДЭК» on the separate Delivery
+  surface with an OAuth client-credentials token probe and bounded city read;
+- Деловые Линии is present on the same surface with encrypted appkey/PAT
+  enrollment and an authenticated v4 login probe;
+- `./scripts/check-contracts.sh`, `go test ./...` and `go vet ./...` in the
+  pinned Go 1.26 image: **PASS**;
+- generated catalog/runtime support: **PASS — 45 manifests / 12 generic / 18
+  separate / 15 planned**;
+- frontend logic tests and production Vite build: **PASS**;
+- live carrier qualification is **not claimed** without tenant credentials and
+  retained provider evidence; shipment/rate/label/return routes remain closed.
+
+The standalone architecture checker still reports pre-existing findings in
+other dirty-tree work (Robokassa/Shopify payment branches and an unregistered
+Medusa directory); those findings are outside Task 145 and are not hidden by
+this report.
 
 ## Inventory
 
-- repository-implemented tasks: `001`–`133`;
-- architecture: **125 modules / 38 provider modules / 124 reviews**;
-- active PostgreSQL baseline: **17 migrations**, latest `000017`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
-- public OpenAPI/generated SDK surface: **134 operations / OpenAPI 0.21.1**;
-- connector catalog: **38 manifests / 11 generic runtime integrations / 9 working providers on separate surfaces / 18 planned**;
+- repository-implemented tasks: `001`–`152`; live provider qualification for
+  Bitrix24, 1С-Битрикс and logistics carriers remains an external environment gate;
+- architecture policy: **128 modules / 52 provider modules / 140 reviews**;
+- active PostgreSQL baseline: **21 migrations**, latest `000021`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
+- public OpenAPI/generated SDK surface: **138 operations / OpenAPI 0.21.1**;
+- connector catalog: **53 manifests / 16 generic runtime integrations / 23
+  working providers on separate surfaces / 14 planned**;
+
+## Task 141 repository validation
+
+- Claude is admitted as an AI provider through the existing
+  `/settings/ai-providers:analyze` operation; provider dispatch remains confined
+  to the built-in registry and no generic product synchronization is claimed;
+- the connector sends Anthropic Messages API requests through the common
+  host-owned HTTPS transport, with `x-api-key` and `anthropic-version` headers;
+- migration `000020` widens the tenant AI-provider allow-list without changing
+  existing credential rows;
+- generated runtime support/catalog: **PASS — 40 manifests / 11 generic / 14
+  separate / 15 planned**;
+- focused Claude connector, runtime support and migration tests: **PASS**;
+- live Claude health is **not claimed** without a tenant API key and a
+  non-production account.
 - repository license: **Apache-2.0**.
+
+## Task 139 repository validation
+
+- Bitrix24 is admitted as a dedicated `crm` separate surface through the
+  built-in registry; generic product synchronization remains fail-closed;
+- the common host-owned transport sends only `Authorization: Bearer` and the
+  non-secret lower-case `portal_host` is validated before egress;
+- generated runtime support/catalog: **PASS — 39 manifests / 11 generic / 13
+  separate / 15 planned**;
+- frontend UI logic and package-index generation: **PASS**;
+- live Bitrix24 OAuth/portal health is **not claimed** without a dedicated
+  non-production Bitrix24 tenant and OAuth application.
+
+## Task 134 repository validation
+
+- `go test ./...` and `go vet ./...` in the pinned Go 1.26.7 validation image: **PASS**;
+- focused OAuth manager/runtime/API/worker/Bitrix24 tests: **PASS**, including 12 concurrent expired-token consumers producing exactly one refresh and one immutable rotation;
+- rejected refresh material maps to reauthorization, while temporary endpoint failures remain separately bounded: **PASS**;
+- contracts and task numbering: **PASS — 138 operations / Tasks 001–138 contiguous**; Task 134 itself changes no public API;
+- architecture: **PASS — 125 modules / 38 providers / 125 reviews**;
+- migration catalog and pre-v1 equivalence: **PASS — 19 active / latest 000019**; Task 134 adds no migration;
+- generated runtime catalog: **PASS — exact 38-manifest parity; 11 generic / 9 separate / 18 planned**;
+- frontend logic, typecheck, static policy and production Vite build: **PASS**;
+- Community deployment policy: **PASS**;
+- deployed artifacts: **PASS — API healthy with Task-134 health codes, worker restarted with all eight components, frontend restarted healthy with «Войти снова», `/integrations` returns 200 and unauthenticated `/api/v1/connector-accounts` returns 401**.
+
+Task 134 removes the repeated-login defect at the generic connector boundary:
+authorization-code credentials refresh before expiry, concurrent API/worker
+callers serialize refresh-token use in PostgreSQL, and provider adapters receive
+only a callback-scoped access token. A rejected/revoked refresh token still
+requires an explicit operator login, which is shown as «Войти снова». Live
+provider refresh is not claimed without a non-production OAuth account and
+retained remote evidence.
 
 ## Task 133 repository validation
 

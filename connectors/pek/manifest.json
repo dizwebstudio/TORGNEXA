@@ -1,0 +1,39 @@
+{
+  "id": "pek",
+  "name": "ПЭК",
+  "family": "logistics",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": [
+    "logistics.rates.read",
+    "logistics.shipment.create",
+    "logistics.track.read",
+    "pickup.points.read"
+  ],
+  "auth": [
+    {
+      "kind": "basic",
+      "secret_class": "logistics.basic-credentials",
+      "required": true
+    }
+  ],
+  "connection_test": {
+    "url": "https://kabinet.pecom.ru/api/v1/branches/all/",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Basic ${basic}",
+      "Content-Type": "application/json;charset=utf-8"
+    },
+    "body": "{}"
+  },
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 30000,
+    "retry": {
+      "max_attempts": 4,
+      "base_backoff_ms": 500,
+      "max_backoff_ms": 30000
+    }
+  }
+}
