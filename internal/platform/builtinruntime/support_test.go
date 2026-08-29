@@ -47,7 +47,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			t.Fatalf("%s marketplace health-only support is inaccurate: %+v", connectorID, marketplace)
 		}
 	}
-	if SupportsAccountConfiguration("deepseek") || !SupportsCapability("woocommerce", "products.read") || SupportsCapability("woocommerce", "orders.read") {
+	if SupportsAccountConfiguration("deepseek") || !SupportsCapability("woocommerce", "products.read") || !SupportsCapability("woocommerce", "orders.read") {
 		t.Fatal("runtime surface/capability projection is inaccurate")
 	}
 	claude, ok := SupportFor("claude")
@@ -80,7 +80,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("Bitrix24 CRM runtime support is inaccurate: %+v", bitrix)
 	}
 	storefront, ok := SupportFor("bitrix")
-	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsCapability("bitrix", "prices.write") || !SupportsCapability("bitrix", "inventory.write") || !SupportsCapability("bitrix", "orders.read") || !SupportsCapability("bitrix", "orders.status.write") || !SupportsSync("bitrix", "products", "bidirectional") || !SupportsSync("bitrix", "prices", "outbound") || !SupportsSync("bitrix", "inventory", "outbound") || !SupportsSync("bitrix", "orders", "bidirectional") || SupportsCapability("bitrix", "prices.read") {
+	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsCapability("bitrix", "prices.write") || !SupportsCapability("bitrix", "prices.read") || !SupportsCapability("bitrix", "inventory.write") || !SupportsCapability("bitrix", "inventory.read") || !SupportsCapability("bitrix", "orders.read") || !SupportsCapability("bitrix", "orders.status.write") || !SupportsSync("bitrix", "products", "bidirectional") || !SupportsSync("bitrix", "prices", "outbound") || !SupportsSync("bitrix", "inventory", "outbound") || !SupportsSync("bitrix", "orders", "bidirectional") {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
@@ -299,6 +299,44 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", load); connectorID != "woocommerce" && ok {
 			t.Fatalf("%s exposed an unsupported non-cancel status transition", connectorID)
 		}
+	}
+}
+
+func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+	for _, connectorID := range []string{"bitrix", "magnit-market", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+		account := supportTestAccount(t, connectorID)
+		if !SupportsCapability(connectorID, "prices.read") {
+			t.Fatalf("%s price reader capability is not admitted", connectorID)
+		}
+		if _, err := registry.PriceReader(account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s price reader unavailable: %v", connectorID, err)
+		}
+	}
+	for _, connectorID := range []string{"bitrix", "wildberries", "ozon", "magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+		account := supportTestAccount(t, connectorID)
+		if !SupportsCapability(connectorID, "inventory.read") {
+			t.Fatalf("%s inventory reader capability is not admitted", connectorID)
+		}
+		if _, err := registry.InventoryReader(account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s inventory reader unavailable: %v", connectorID, err)
+		}
+	}
+	for _, connectorID := range []string{"magnit-market", "megamarket", "medusa", "magento", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+		account := supportTestAccount(t, connectorID)
+		if !SupportsCapability(connectorID, "orders.read") {
+			t.Fatalf("%s order reader capability is not admitted", connectorID)
+		}
+		if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s order reader unavailable: %v", connectorID, err)
+		}
+	}
+	if _, err := registry.PriceReader(supportTestAccount(t, "wildberries"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Wildberries price reader unexpectedly resolved: %v", err)
+	}
+	if _, err := registry.OrderReader(context.Background(), supportTestAccount(t, "prestashop"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("PrestaShop order reader unexpectedly resolved: %v", err)
 	}
 }
 

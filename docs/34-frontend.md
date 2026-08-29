@@ -30,3 +30,24 @@ into the canonical metadata, `robots.txt` and `sitemap.xml`. When the content or
 public host changes, rebuild the frontend and run `npm run test:docs` from
 `frontend/`; the check verifies all 18 rendered URLs, unique metadata,
 breadcrumbs, indexing policy and absence of the SPA module from public HTML.
+
+### Public documentation reading quality
+
+Every topical page starts with a compact reader guide: who the page is for,
+what must be ready before starting, what result to expect and where to go next.
+The overview also contains a plain-language glossary for terms such as
+`кабинет`, `возможность`, `ATP`, `сверка` and `idempotency key`. This keeps
+technical constraints understandable without removing the exact API and
+security terminology from the detailed sections.
+
+Screenshots use one `DocsScreenshot` component with explicit dimensions,
+descriptive Russian `alt` text, captions, asynchronous decoding and lazy
+loading. When an interface, connector drawer or smoke-test flow changes, update
+the corresponding image and caption in `PublicDocumentationPage.tsx`; do not
+add an unlabelled image directly to the page.
+
+The troubleshooting page keeps its six questions in one source used both by
+the visible FAQ and by `FAQPage` JSON-LD. The static documentation check
+asserts that topical guides, FAQ markup and screenshot accessibility attributes
+are present, so a content edit cannot silently remove the reader or crawler
+layer.

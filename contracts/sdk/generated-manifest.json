@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "c493445d3af56c384d617dcd674702e3c440ca733aa039f649b34b5e3619138a",
+    "sha256": "770a9f546dd5e8c908711dc7a91ade5fabafd8642583f1505eb99e9eda71bdf7",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,11 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "archiveWorkflow",
+      "method": "POST",
+      "path": "/workflows:archive"
     },
     {
       "operation_id": "assignProductCategory",
@@ -158,6 +163,11 @@
       "operation_id": "createWebhookSubscription",
       "method": "POST",
       "path": "/webhook-subscriptions"
+    },
+    {
+      "operation_id": "createWorkflow",
+      "method": "POST",
+      "path": "/workflows"
     },
     {
       "operation_id": "decideApproval",
@@ -350,6 +360,16 @@
       "path": "/webhook-deliveries/{delivery_id}/history"
     },
     {
+      "operation_id": "getWorkflow",
+      "method": "GET",
+      "path": "/workflows/{workflow_id}"
+    },
+    {
+      "operation_id": "getWorkflowRun",
+      "method": "GET",
+      "path": "/workflow-runs/{run_id}"
+    },
+    {
       "operation_id": "getWorkspaceMemberProfile",
       "method": "GET",
       "path": "/settings/members/{member_id}/profile"
@@ -535,6 +555,16 @@
       "path": "/webhook-subscriptions"
     },
     {
+      "operation_id": "listWorkflowRuns",
+      "method": "GET",
+      "path": "/workflow-runs"
+    },
+    {
+      "operation_id": "listWorkflows",
+      "method": "GET",
+      "path": "/workflows"
+    },
+    {
       "operation_id": "listWorkspaceMembers",
       "method": "GET",
       "path": "/settings/members"
@@ -545,6 +575,11 @@
       "path": "/notifications/{notification_id}/read"
     },
     {
+      "operation_id": "pauseWorkflow",
+      "method": "POST",
+      "path": "/workflows:pause"
+    },
+    {
       "operation_id": "previewAIEgress",
       "method": "POST",
       "path": "/settings/ai-egress-policy:preview"
@@ -553,6 +588,11 @@
       "operation_id": "previewConnectorBootstrap",
       "method": "POST",
       "path": "/connector-accounts:bootstrap-preview"
+    },
+    {
+      "operation_id": "publishWorkflow",
+      "method": "POST",
+      "path": "/workflows:publish"
     },
     {
       "operation_id": "putAIEgressPolicy",
@@ -638,6 +678,11 @@
       "operation_id": "runSyncPolicy",
       "method": "POST",
       "path": "/sync/policies/{policy_id}/run"
+    },
+    {
+      "operation_id": "runWorkflow",
+      "method": "POST",
+      "path": "/workflows:run"
     },
     {
       "operation_id": "saveSettingsIdentityProviderDraft",
@@ -743,6 +788,11 @@
       "operation_id": "validateSettingsIdentityProvider",
       "method": "POST",
       "path": "/settings/identity-providers/{provider_id}:validate"
+    },
+    {
+      "operation_id": "validateWorkflow",
+      "method": "POST",
+      "path": "/workflows:validate"
     }
   ],
   "sdks": [

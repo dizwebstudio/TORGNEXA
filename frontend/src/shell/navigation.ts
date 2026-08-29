@@ -24,6 +24,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "counterparties", label: "Контрагенты", path: "/counterparties", capability: "counterparties.read", risk: "READ", icon: "counterparties", shortcut: "G P"},
   {id: "finance", label: "Финансы", path: "/finance", capability: "settlements.read", risk: "READ", icon: "finance", shortcut: "G F"},
   {id: "approvals", label: "Согласования", path: "/approvals", capability: "approvals.read", risk: "WRITE_SENSITIVE", icon: "approvals", shortcut: "G A"},
+  {id: "workflows", label: "Автоматизации", path: "/workflows", capability: "workflows.read", risk: "WRITE_SAFE", icon: "sync", shortcut: "G W"},
   {id: "compliance", label: "Сертификаты и документы", path: "/compliance", capability: "compliance.read", risk: "WRITE_SENSITIVE", icon: "compliance", shortcut: "G L"},
   {id: "notifications", label: "Уведомления", path: "/notifications", capability: "notifications.read", risk: "READ", icon: "notifications", shortcut: "G N"},
   {id: "reports", label: "Отчёты", path: "/reports", capability: "reports.read", risk: "READ", icon: "reports", shortcut: "G R"},

@@ -423,28 +423,103 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "orders.read") {
 		return nil, ErrUnavailable
 	}
-	if account.ConnectorID != "bitrix" {
-		return nil, ErrUnavailable
-	}
 	if load == nil {
 		return nil, ErrConfigurationNeeded
 	}
-	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
-	if err != nil {
-		return nil, err
-	}
-	canonical, err := configuration.OrderStatuses()
-	if err != nil {
-		return nil, ErrConfigurationNeeded
-	}
-	remoteToCanonical := make(map[string]string, len(canonical))
-	for local, remote := range canonical {
-		if _, exists := remoteToCanonical[remote]; exists {
+	var value sdk.OrderReader
+	var remoteToCanonical map[string]string
+	unknownStatusError := error(sdk.ErrInvalidCommerceRead)
+	switch account.ConnectorID {
+	case "bitrix":
+		configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		canonical, err := configuration.OrderStatuses()
+		if err != nil {
 			return nil, ErrConfigurationNeeded
 		}
-		remoteToCanonical[remote] = local
+		remoteToCanonical = make(map[string]string, len(canonical))
+		for local, remote := range canonical {
+			if _, exists := remoteToCanonical[remote]; exists {
+				return nil, ErrConfigurationNeeded
+			}
+			remoteToCanonical[remote] = local
+		}
+		unknownStatusError = ErrConfigurationNeeded
+		value = bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil)
+	case "magnit-market":
+		value = magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil)
+		remoteToCanonical = magnitOrderStatuses
+	case "megamarket":
+		value = megamarket.New(megamarketHTTP{r.http}, megamarketConfigSource{load: load}, nil)
+		remoteToCanonical = megamarketOrderStatuses
+	case "yandex-market":
+		value = yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil)
+		remoteToCanonical = yandexOrderStatuses
+	case "magento":
+		value = magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil)
+		remoteToCanonical = magentoOrderStatuses
+	case "medusa":
+		value = medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil)
+		remoteToCanonical = medusaOrderStatuses
+	case "saleor":
+		value = saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil)
+		remoteToCanonical = saleorOrderStatuses
+	case "shopify":
+		value = shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil)
+		remoteToCanonical = shopifyOrderStatuses
+	case "shopware":
+		value = shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil)
+		remoteToCanonical = shopwareOrderStatuses
+	case "woocommerce":
+		value = woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil)
+		remoteToCanonical = woocommerceOrderStatuses
+	default:
+		return nil, ErrUnavailable
 	}
-	return mappedOrderReader{value: bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), account: account, runtime: runtime, remoteToCanonical: remoteToCanonical}, nil
+	return mappedOrderReader{value: value, account: account, runtime: runtime, remoteToCanonical: remoteToCanonical, unknownStatusError: unknownStatusError}, nil
+}
+
+var magnitOrderStatuses = map[string]string{
+	"NEW": "pending", "IN_ASSEMBLY": "processing", "READY_FOR_SHIPMENT": "processing",
+	"SHIPPED": "processing", "DELIVERED": "fulfilled", "CANCELLED": "cancelled",
+}
+
+var megamarketOrderStatuses = map[string]string{
+	"CREATED": "pending", "CONFIRMED": "confirmed", "ASSEMBLING": "processing",
+	"ASSEMBLED": "processing", "SHIPPED": "processing", "DELIVERED": "fulfilled", "CANCELLED": "cancelled",
+}
+
+var yandexOrderStatuses = map[string]string{
+	"PLACING": "pending", "RESERVATION": "confirmed", "PROCESSING": "processing",
+	"DELIVERY": "processing", "DELIVERED": "fulfilled", "CANCELLED": "cancelled", "RETURNED": "cancelled",
+}
+
+var magentoOrderStatuses = map[string]string{
+	"pending": "pending", "processing": "processing", "complete": "fulfilled", "closed": "fulfilled", "canceled": "cancelled",
+}
+
+var medusaOrderStatuses = map[string]string{
+	"pending": "pending", "completed": "fulfilled", "canceled": "cancelled", "cancelled": "cancelled",
+}
+
+var saleorOrderStatuses = map[string]string{
+	"UNCONFIRMED": "pending", "UNFULFILLED": "pending", "PARTIALLY_FULFILLED": "processing",
+	"FULFILLED": "fulfilled", "CANCELED": "cancelled", "REFUNDED": "cancelled",
+}
+
+var shopifyOrderStatuses = map[string]string{
+	"open": "pending", "closed": "fulfilled", "cancelled": "cancelled",
+}
+
+var shopwareOrderStatuses = map[string]string{
+	"open": "pending", "in_progress": "processing", "completed": "fulfilled", "cancelled": "cancelled",
+}
+
+var woocommerceOrderStatuses = map[string]string{
+	"pending": "pending", "on-hold": "confirmed", "processing": "processing",
+	"completed": "fulfilled", "cancelled": "cancelled",
 }
 
 // OrderStatusWriter resolves the provider-native order status writer for an
@@ -1124,10 +1199,11 @@ type marketplaceReader struct {
 }
 
 type mappedOrderReader struct {
-	value             sdk.OrderReader
-	account           sdk.Account
-	runtime           sdk.Runtime
-	remoteToCanonical map[string]string
+	value              sdk.OrderReader
+	account            sdk.Account
+	runtime            sdk.Runtime
+	remoteToCanonical  map[string]string
+	unknownStatusError error
 }
 
 func (r mappedOrderReader) Read(ctx context.Context, request sdk.PageRequest) (sdk.OrderPage, error) {
@@ -1145,7 +1221,10 @@ func (r mappedOrderReader) Read(ctx context.Context, request sdk.PageRequest) (s
 	for index := range page.Items {
 		canonical, ok := r.remoteToCanonical[page.Items[index].StatusRemoteID]
 		if !ok {
-			return sdk.OrderPage{}, ErrConfigurationNeeded
+			if r.unknownStatusError != nil {
+				return sdk.OrderPage{}, r.unknownStatusError
+			}
+			return sdk.OrderPage{}, sdk.ErrInvalidCommerceRead
 		}
 		page.Items[index].StatusRemoteID = canonical
 		if page.Items[index].Validate() != nil {

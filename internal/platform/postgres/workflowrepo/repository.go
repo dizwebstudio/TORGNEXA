@@ -68,7 +68,8 @@ func (r *Repository) List(ctx context.Context, scope workflow.Scope, limit int) 
 		}
 		defer rows.Close()
 		for rows.Next() {
-			item, err := scanWorkflow(rows)
+			var item workflow.Workflow
+			err := scanWorkflow(rows, &item)
 			if err != nil {
 				return err
 			}
@@ -225,8 +226,6 @@ func (r *Repository) UpdateRun(ctx context.Context, scope workflow.Scope, item w
 	}
 	var out workflow.Run
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		if err := workflow.ValidateRunTransition(item.Status, item.Status); err != nil && expectedVersion > 0 { /* state is checked by the caller; the DB guard remains authoritative */
-		}
 		return scanRun(tx.QueryRowContext(ctx, `UPDATE workflow_runs SET status=$4,attempt_count=$5,available_at=$6,started_at=$7,completed_at=$8,last_error_code=$9,version=version+1 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$10 RETURNING id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version`, scope.OrganizationID(), scope.WorkspaceID(), item.ID, string(item.Status), item.AttemptCount, item.AvailableAt, item.StartedAt, item.CompletedAt, item.LastErrorCode, expectedVersion), &out)
 	})
 	if errors.Is(err, workflow.ErrNotFound) {

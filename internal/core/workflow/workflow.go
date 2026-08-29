@@ -276,13 +276,16 @@ func Compile(definition Definition) (Plan, error) {
 	}
 	nodes := make(map[string]Node, len(definition.Nodes))
 	indegree := make(map[string]int, len(definition.Nodes))
+	originalIndegree := make(map[string]int, len(definition.Nodes))
 	adjacency := make(map[string][]string, len(definition.Nodes))
 	for _, node := range definition.Nodes {
 		nodes[node.ID] = node
 		indegree[node.ID] = 0
+		originalIndegree[node.ID] = 0
 	}
 	for _, edge := range definition.Edges {
 		indegree[edge.To]++
+		originalIndegree[edge.To]++
 		adjacency[edge.From] = append(adjacency[edge.From], edge.To)
 	}
 	for key := range adjacency {
@@ -315,7 +318,7 @@ func Compile(definition Definition) (Plan, error) {
 	// silently skipped by an executor, so reject them instead of inventing
 	// implicit trigger semantics.
 	roots := make([]string, 0, len(nodes))
-	for id, degree := range indegree {
+	for id, degree := range originalIndegree {
 		if degree == 0 {
 			roots = append(roots, id)
 		}
@@ -611,4 +614,12 @@ func hexDigest(value string) bool {
 	}
 	_, err := hex.DecodeString(value)
 	return err == nil
+}
+
+func validKey(value string, max int) bool {
+	return len(value) >= 1 && len(value) <= max && idPattern.MatchString(value)
+}
+
+func validErrorCode(value string) bool {
+	return len(value) >= 1 && len(value) <= 64 && regexp.MustCompile(`^[a-z][a-z0-9._-]*$`).MatchString(value)
 }

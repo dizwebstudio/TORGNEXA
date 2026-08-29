@@ -122,7 +122,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.read", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -607,7 +607,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -634,7 +634,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read"],
+      operationalCapabilities: ["inventory.read", "orders.read", "prices.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
       ],
@@ -682,7 +682,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -709,7 +709,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read"],
+      operationalCapabilities: ["inventory.read", "orders.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
       ],
@@ -894,7 +894,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -920,7 +920,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read"],
+      operationalCapabilities: ["inventory.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
       ],
@@ -1031,7 +1031,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "prices.write", "products.read"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "prices.read", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -1149,7 +1149,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -1200,7 +1200,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -1227,7 +1227,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -1350,7 +1350,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read"],
+      operationalCapabilities: ["inventory.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
       ],
@@ -1373,7 +1373,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.write", "orders.status.write", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
@@ -1400,7 +1400,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read"],
+      operationalCapabilities: ["inventory.read", "orders.read", "prices.read", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "prices", directions: ["outbound"]},
