@@ -288,8 +288,8 @@ func seedWarehouseFixture(ctx context.Context, db *sql.DB, scope tenancy.Scope) 
 			query string
 			args  []any
 		}{
-			{`INSERT INTO products(id,organization_id,workspace_id,code,title,description,status,version,created_at,updated_at) VALUES($1,$2,$3,'P2QUAL','P3 qualification product','','active',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualProduct, org, workspace}},
-			{`INSERT INTO offers(id,organization_id,workspace_id,product_id,sku,status,version,created_at,updated_at) VALUES($1,$2,$3,$4,'P2QUAL-SKU','active',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualOffer, org, workspace, qualProduct}},
+			{`INSERT INTO products(id,organization_id,workspace_id,code,title,description,status,version,created_at,updated_at) VALUES($1,$2,$3,'P2QUAL','P3 qualification product','','draft',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualProduct, org, workspace}},
+			{`INSERT INTO offers(id,organization_id,workspace_id,product_id,sku,status,version,created_at,updated_at) VALUES($1,$2,$3,$4,'P2QUAL-SKU','draft',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualOffer, org, workspace, qualProduct}},
 			{`INSERT INTO warehouses(id,organization_id,workspace_id,code,name,status,version,created_at,updated_at) VALUES($1,$2,$3,'P2-WH-A','P3 source warehouse','active',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualWarehouseA, org, workspace}},
 			{`INSERT INTO warehouses(id,organization_id,workspace_id,code,name,status,version,created_at,updated_at) VALUES($1,$2,$3,'P2-WH-B','P3 backup warehouse','active',1,clock_timestamp(),clock_timestamp()) ON CONFLICT(id) DO NOTHING`, []any{qualWarehouseB, org, workspace}},
 			{`INSERT INTO warehouse_failover_routes(organization_id,workspace_id,source_warehouse_id,destination_warehouse_id,priority,enabled,version,updated_at) VALUES($1,$2,$3,$4,1,true,1,clock_timestamp()) ON CONFLICT(organization_id,workspace_id,source_warehouse_id,destination_warehouse_id) DO NOTHING`, []any{org, workspace, qualWarehouseA, qualWarehouseB}},
@@ -298,6 +298,15 @@ func seedWarehouseFixture(ctx context.Context, db *sql.DB, scope tenancy.Scope) 
 			if _, err := tx.ExecContext(ctx, statement.query, statement.args...); err != nil {
 				return err
 			}
+		}
+		// The commerce lifecycle requires new masters to start as draft@v1;
+		// promote the synthetic fixture through the same guarded transition
+		// before using its offer in the qualification order.
+		if _, err := tx.ExecContext(ctx, `UPDATE products SET status='active',version=2,updated_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND status='draft' AND version=1`, org, workspace, qualProduct); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE offers SET status='active',version=2,updated_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND status='draft' AND version=1`, org, workspace, qualOffer); err != nil {
+			return err
 		}
 		for _, fixture := range []struct {
 			id, warehouse string

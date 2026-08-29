@@ -3,7 +3,7 @@ SHELL := /bin/bash
 export GOTOOLCHAIN := local
 export GOWORK := off
 
-.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance performance production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-down community-status package-index package-index-check check build
+.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance performance production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-demo-user community-down community-status package-index package-index-check check build
 fmt:
 	find . -type f -name '*.go' -not -path './vendor/*' -print0 | xargs -0 -r gofmt -w
 fmt-check:
@@ -66,7 +66,10 @@ community-init:
 	./scripts/init-community-env.sh
 community-up: community-check
 	@if [[ ! -f .env ]]; then ./scripts/init-community-env.sh; fi
-	docker compose --env-file .env up -d --build
+	TORGNEXA_WORKER_UPLOADS_ENABLED=$${TORGNEXA_WORKER_UPLOADS_ENABLED:-true} TORGNEXA_CLAMAV_ADDRESS=$${TORGNEXA_CLAMAV_ADDRESS:-clamav:3310} docker compose --env-file .env up -d --build
+	./scripts/ensure-community-demo-user.sh
+community-demo-user:
+	./scripts/ensure-community-demo-user.sh
 community-down:
 	docker compose --env-file .env down
 community-status:

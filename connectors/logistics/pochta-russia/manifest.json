@@ -1,0 +1,42 @@
+{
+  "id": "pochta-russia",
+  "name": "Почта России",
+  "family": "logistics",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": [
+    "logistics.label.read",
+    "logistics.rates.read",
+    "logistics.return.create",
+    "logistics.shipment.cancel",
+    "logistics.shipment.create",
+    "logistics.track.read",
+    "pickup.points.read"
+  ],
+  "auth": [
+    {
+      "kind": "api_key",
+      "secret_class": "logistics.api-credentials",
+      "required": true
+    }
+  ],
+  "connection_test": {
+    "url": "https://otpravka-api.pochta.ru/1.0/settings",
+    "method": "GET",
+    "headers": {
+      "Authorization": "AccessToken ${token}",
+      "X-User-Authorization": "Basic ${key}",
+      "Accept": "application/json"
+    }
+  },
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 30000,
+    "retry": {
+      "max_attempts": 4,
+      "base_backoff_ms": 500,
+      "max_backoff_ms": 30000
+    }
+  }
+}

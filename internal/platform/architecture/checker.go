@@ -265,9 +265,10 @@ func (r *repository) validatePolicy(ctx context.Context, configuration *policy, 
 		default:
 			found.add(policyPath, "provider %q has invalid family %q", item.ID, item.Family)
 		}
-		expectedRoots := []string{"connectors/" + item.ID, "plugins/" + item.ID}
-		if item.Implementation != expectedRoots[0] && item.Implementation != expectedRoots[1] {
-			found.add(policyPath, "provider %q implementation must use a canonical provider root", item.ID)
+		if !canonicalProviderImplementation(item.Implementation, item.ID) {
+			found.add(policyPath, "provider %q implementation must use a canonical provider path", item.ID)
+		} else if !providerImplementationMatchesFamily(item.Implementation, item.Family) {
+			found.add(policyPath, "provider %q implementation category does not match family %q", item.ID, item.Family)
 		}
 		evidence := []struct {
 			label     string
@@ -334,9 +335,8 @@ func (r *repository) validatePolicy(ctx context.Context, configuration *policy, 
 		}
 		seen[item.ID] = struct{}{}
 
-		expectedImplementations := []string{"connectors/" + item.ID, "plugins/" + item.ID}
-		if item.Implementation != expectedImplementations[0] && item.Implementation != expectedImplementations[1] {
-			found.add(policyPath, "retired provider %q implementation must use a canonical provider root", item.ID)
+		if !canonicalProviderImplementation(item.Implementation, item.ID) {
+			found.add(policyPath, "retired provider %q implementation must use a canonical provider path", item.ID)
 		}
 		evidence := []struct {
 			label     string
@@ -422,6 +422,19 @@ func validateImportAllowlist(configuration *policy, found *problems) {
 		}
 		if _, duplicate := seen[imported]; duplicate {
 			found.add(policyPath, "duplicate Core external import %q", imported)
+		}
+		seen[imported] = struct{}{}
+	}
+	if !sort.StringsAreSorted(configuration.CoreSharedImports) {
+		found.add(policyPath, "core_shared_imports must be sorted")
+	}
+	seen = make(map[string]struct{}, len(configuration.CoreSharedImports))
+	for _, imported := range configuration.CoreSharedImports {
+		if path.Clean(imported) != imported || !strings.HasPrefix(imported, "internal/platform/") || strings.HasPrefix(imported, "internal/platform/postgres/") {
+			found.add(policyPath, "invalid Core shared import %q", imported)
+		}
+		if _, duplicate := seen[imported]; duplicate {
+			found.add(policyPath, "duplicate Core shared import %q", imported)
 		}
 		seen[imported] = struct{}{}
 	}
@@ -810,7 +823,7 @@ func (r *repository) validateProviderReview(file string, item *providerReview, c
 	if item.Route != "connector_sdk" {
 		found.add(file, "provider.route must be connector_sdk")
 	}
-	manifestValid := item.Manifest == "connectors/"+item.ID+"/manifest.json" || item.Manifest == "plugins/"+item.ID+"/manifest.json"
+	manifestValid := canonicalProviderManifest(item.Manifest, item.ID)
 	if !manifestValid {
 		found.add(file, "provider manifest must use its canonical connector/plugin evidence path")
 	}
@@ -885,26 +898,8 @@ func (r *repository) checkProviderLifecycleInventory(ctx context.Context, config
 	discoveredRetired := make(map[string]struct{}, len(retired))
 
 	for _, root := range canonicalProviderRoots {
-		entries, exceeded, err := readBoundedDirectory(filepath.Join(r.root, root), maxReviews)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			found.add(root, "read provider root for lifecycle validation: %v", err)
-			continue
-		}
-		if exceeded {
-			found.add(root, "provider directory count exceeds %d", maxReviews)
-			continue
-		}
-		for _, entry := range entries {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-			if entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() {
-				continue
-			}
-			implementation := root + "/" + entry.Name()
+		for _, discovered := range r.discoverProviderImplementations(ctx, root, found) {
+			implementation := discovered.Path
 			if _, exists := current[implementation]; exists {
 				continue
 			}

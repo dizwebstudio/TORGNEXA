@@ -10,7 +10,7 @@ self-hosted headless commerce engine.
 
 ## Scope
 
-- New `connectors/medusa` package: products/inventory/prices/orders/returns
+- New `connectors/storefronts/medusa` package: products/inventory/prices/orders/returns
   read, prices/inventory write, order cancellation write, and product update
   (not create — see Explicit exclusions). Host-injected transport
   (`store_host`/`base_path`/`store_currency` runtime config), the same

@@ -1,6 +1,6 @@
 # План conformance для «Деловых Линий»
 
-`connectors/dellin` содержит sandbox-кандидат и детерминированную проверку
+`connectors/logistics/dellin` содержит sandbox-кандидат и детерминированную проверку
 здоровья без сети и боевых credentials. Общий harness проверяет SDK v1,
 границу секретов, нормализацию ошибок, tenant isolation, egress и sandbox.
 

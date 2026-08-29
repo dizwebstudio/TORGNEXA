@@ -10,6 +10,7 @@ declare module "react" {
   export function useContext<T>(context: Context<T>): T;
   export function useCallback<T extends (...args: any[]) => unknown>(callback: T, deps: readonly unknown[]): T;
   export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void;
+  export function useId(): string;
   export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T;
   export function useRef<T>(initial: T | null): RefObject<T | null>;
   export function useRef<T>(initial: T): RefObject<T>;

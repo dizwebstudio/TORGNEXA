@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	lmstudio "github.com/torgnexa/torgnexa/connectors/lm-studio"
-	ollama "github.com/torgnexa/torgnexa/connectors/ollama"
-	openwebui "github.com/torgnexa/torgnexa/connectors/open-webui"
+	lmstudio "github.com/torgnexa/torgnexa/connectors/ai/lm-studio"
+	ollama "github.com/torgnexa/torgnexa/connectors/ai/ollama"
+	openwebui "github.com/torgnexa/torgnexa/connectors/ai/open-webui"
 )
 
 const maxLocalAIResponseBody = 16 << 20

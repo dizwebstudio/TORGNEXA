@@ -1,0 +1,24 @@
+# Canonical base topics from internal/platform/config and contracts/events/event-catalog.json.
+# Retry and DLQ variants are created by bootstrap-topics.sh for every base topic.
+billing.subscription.events.v1
+commerce.catalog.events.v1
+commerce.claim.events.v1
+commerce.fulfillment.events.v1
+commerce.inventory.events.v1
+commerce.orders.events.v1
+commerce.pim.events.v1
+commerce.pricing.events.v1
+commerce.social.events.v1
+compliance.document.events.v1
+compliance.product.events.v1
+enterprise.legal_party.events.v1
+finance.fx_rate.events.v1
+finance.fx_rate.events.v2
+finance.settlement_entry.events.v1
+governance.approval.events.v1
+governance.entitlement.events.v1
+party.counterparty.events.v1
+platform.notifications.events.v1
+privacy.request.events.v1
+security.upload.events.v1
+warehouse.stock.events.v1

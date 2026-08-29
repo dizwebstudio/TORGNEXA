@@ -11,7 +11,7 @@
     "adr/0071-payment-sbp-provider-boundary.md",
     "architecture/policy.json",
     "architecture/reviews/073-payments-sbp-provider-sdk.json",
-    "connectors/sbp",
+    "connectors/payments/sbp",
     "contracts/operations/073-payments-sbp-v1.md",
     "docs/connectors/sbp",
     "docs/operations/073-payments-sbp-provider-sdk.md",
@@ -114,7 +114,7 @@
   "provider": {
     "id": "sbp",
     "route": "connector_sdk",
-    "manifest": "connectors/sbp/manifest.json",
+    "manifest": "connectors/payments/sbp/manifest.json",
     "connector_spec": "docs/connectors/sbp/spec.md",
     "capability_audit": "docs/connectors/sbp/capability-audit.md",
     "conformance_plan": "docs/connectors/sbp/conformance-plan.md"

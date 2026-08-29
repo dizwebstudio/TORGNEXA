@@ -1,7 +1,7 @@
 # Ollama conformance plan
 
 The connector uses the canonical Task-064 conformance candidate with a
-synthetic transport (`connectors/ollama/conformance.go`); the suite performs no
+synthetic transport (`connectors/ai/ollama/conformance.go`); the suite performs no
 network calls to an Ollama daemon. The retained report records all thirteen SDK
 admission checks, including sandbox isolation.
 

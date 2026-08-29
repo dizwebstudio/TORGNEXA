@@ -29,7 +29,7 @@ is per-merchant (`{shop}.myshopify.com`), which the host-owned OAuth runtime
   call it only when `configuration.HostParameter != ""`, so the generic
   HTTP layer never branches on connector identity — it stays exactly as
   provider-agnostic as it was before this task.
-- New `connectors/shopify` package: products/inventory/prices/orders/returns
+- New `connectors/storefronts/shopify` package: products/inventory/prices/orders/returns
   read, prices/inventory/order-status write, and product update (not
   create — see Explicit exclusions). Real HTTP transport
   (`shopifyHTTP` in `internal/platform/builtinruntime/http.go`) using

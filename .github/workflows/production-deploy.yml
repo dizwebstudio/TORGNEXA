@@ -123,7 +123,6 @@ jobs:
           test ! -L "$target/.env"
           test "$(stat -c '%a' "$target/.env")" = 600
           command -v docker >/dev/null
-          command -v curl >/dev/null
           command -v sha256sum >/dev/null
           docker compose version >/dev/null
           mkdir -m 0750 -p "$target/incoming" "$target/releases"
@@ -225,7 +224,7 @@ jobs:
           if [ "$failed" -eq 0 ]; then
             healthy=0
             for attempt in $(seq 1 30); do
-              if curl --fail --silent --show-error --max-time 10 "$health_url" >/dev/null; then
+              if bash "$release/scripts/check-production-health.sh" "$health_url"; then
                 healthy=1
                 break
               fi

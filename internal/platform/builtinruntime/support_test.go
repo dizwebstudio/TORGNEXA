@@ -35,8 +35,17 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if !SupportsSync("woocommerce", "products", "bidirectional") || !SupportsSync("opencart", "products", "outbound") {
 		t.Fatal("qualified storefront writes are not exposed")
 	}
-	if SupportsAccountConfiguration("avito") || SupportsCapability("avito", "classified.listings.read") || SupportsSync("avito", "products", "inbound") {
-		t.Fatal("catalog-only connector gained executable authority")
+	if !SupportsSync("prestashop", "prices", "outbound") || !SupportsSync("prestashop", "inventory", "outbound") || SupportsSync("prestashop", "prices", "inbound") {
+		t.Fatal("PrestaShop commerce write directions are not exact")
+	}
+	if !SupportsAccountConfiguration("avito") || !HealthOnly("avito") || SupportsCapability("avito", "classified.listings.read") || SupportsSync("avito", "products", "inbound") {
+		t.Fatal("classified health-only surface projection is inaccurate")
+	}
+	for _, connectorID := range []string{"lamoda", "mvideo"} {
+		marketplace, ok := SupportFor(connectorID)
+		if !ok || marketplace.Stage != SupportSeparateSurface || marketplace.Surface != "marketplace" || !marketplace.HealthOnly || !SupportsAccountConfiguration(connectorID) || SupportsCapability(connectorID, "products.read") || SupportsSync(connectorID, "products", "inbound") {
+			t.Fatalf("%s marketplace health-only support is inaccurate: %+v", connectorID, marketplace)
+		}
 	}
 	if SupportsAccountConfiguration("deepseek") || !SupportsCapability("woocommerce", "products.read") || SupportsCapability("woocommerce", "orders.read") {
 		t.Fatal("runtime surface/capability projection is inaccurate")
@@ -64,7 +73,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("MAX social runtime support is inaccurate: %+v", max)
 	}
 	if SocialTextLimit("avito") != 0 {
-		t.Fatal("planned connector gained an executable social text limit")
+		t.Fatal("health-only connector gained an executable social text limit")
 	}
 	bitrix, ok := SupportFor("bitrix24")
 	if !ok || bitrix.Stage != SupportSeparateSurface || bitrix.Surface != "crm" || !SupportsAccountConfiguration("bitrix24") || !SupportsCapability("bitrix24", "crm.entities.read") || !SupportsCapability("bitrix24", "crm.productrows.write") || SupportsSync("bitrix24", "products", "inbound") {
@@ -78,11 +87,40 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsSync("cs-cart", "products", "bidirectional") || SupportsCapability("cs-cart", "orders.read") {
 		t.Fatalf("CS-Cart storefront runtime support is inaccurate: %+v", csCart)
 	}
-	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek"} {
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		carrier, ok := SupportFor(connectorID)
 		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || len(carrier.OperationalCapabilities) != 0 || SupportsCapability(connectorID, "logistics.shipment.create") || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
+	}
+	dolyami, ok := SupportFor("dolyami")
+	if !ok || dolyami.Stage != SupportSeparateSurface || dolyami.Surface != "finance" || !dolyami.HealthOnly || !SupportsAccountConfiguration("dolyami") || SupportsCapability("dolyami", "payments.create") || SupportsSync("dolyami", "products", "inbound") {
+		t.Fatalf("Dolyami health-only payment support is inaccurate: %+v", dolyami)
+	}
+}
+
+func TestProductStatusTranslationMatchesWriterContracts(t *testing.T) {
+	registry := New()
+	cases := map[string]map[string]string{
+		"bitrix":      {"draft": "N", "active": "Y", "archived": "N"},
+		"cs-cart":     {"draft": "D", "active": "A", "archived": "H"},
+		"magento":     {"draft": "disabled", "active": "enabled", "archived": "disabled"},
+		"medusa":      {"draft": "draft", "active": "published", "archived": "rejected"},
+		"opencart":    {"draft": "draft", "active": "publish", "archived": "draft"},
+		"saleor":      {"draft": "unpublished", "active": "published", "archived": "unpublished"},
+		"shopify":     {"draft": "draft", "active": "active", "archived": "archived"},
+		"shopware":    {"draft": "inactive", "active": "active", "archived": "inactive"},
+		"woocommerce": {"draft": "draft", "active": "publish", "archived": "private"},
+	}
+	for connectorID, statuses := range cases {
+		for canonical, expected := range statuses {
+			if got, ok := registry.ProductStatus(connectorID, canonical); !ok || got != expected {
+				t.Fatalf("ProductStatus(%q, %q) = %q, %v; want %q, true", connectorID, canonical, got, ok, expected)
+			}
+		}
+	}
+	if _, ok := registry.ProductStatus("prestashop", "active"); ok {
+		t.Fatal("product status must remain unavailable for a read-only product runtime")
 	}
 }
 
@@ -122,7 +160,39 @@ func TestEveryReadyIntegrationResolvesProductReader(t *testing.T) {
 		}
 	}
 	if _, err := registry.ProductReader(supportTestAccount(t, "avito"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("planned connector resolved: %v", err)
+		t.Fatalf("health-only connector resolved as product reader: %v", err)
+	}
+}
+
+func TestPrestaShopCommerceWriteAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "prestashop")
+	if !registry.SupportsPriceWrite(account) || !registry.SupportsInventoryWrite(account) {
+		t.Fatal("PrestaShop commerce write capabilities are not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB","language_id":1,"shop_id":0}`), nil
+	}
+	if _, err := registry.PriceWriter(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("PrestaShop price writer unavailable: %v", err)
+	}
+	if _, err := registry.InventoryWriter(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("PrestaShop inventory writer unavailable: %v", err)
+	}
+	if _, err := registry.PriceWriter(supportTestAccount(t, "wildberries"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted price writer resolved: %v", err)
+	}
+}
+
+func TestHealthOnlyCatalogProvidersResolveProbeConnector(t *testing.T) {
+	registry := New()
+	for _, connectorID := range []string{"auto-ru", "avito", "chestny-znak", "cian", "diadoc", "egais", "instagram", "lamoda", "mvideo", "odnoklassniki", "rutube", "saby-edo", "threads", "vetis-mercury", "vk", "youtube"} {
+		connector, err := registry.healthConnector(supportTestAccount(t, connectorID), func(context.Context, string) (json.RawMessage, error) {
+			return json.RawMessage(`{"probe_url":"https://example.com/health"}`), nil
+		})
+		if err != nil || connector == nil || connector.Manifest().ID != connectorID {
+			t.Fatalf("%s health-only connector unavailable: connector=%T err=%v", connectorID, connector, err)
+		}
 	}
 }
 
@@ -145,7 +215,7 @@ func TestBitrix24CRMRegistryAdmissionIsExact(t *testing.T) {
 
 func TestLogisticsHealthRegistryAdmissionIsExact(t *testing.T) {
 	registry := New()
-	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek"} {
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		connector, err := registry.healthConnector(supportTestAccount(t, connectorID), nil)
 		if err != nil || connector == nil || connector.Manifest().ID != connectorID {
 			t.Fatalf("%s health connector unavailable: connector=%T err=%v", connectorID, connector, err)
@@ -161,5 +231,18 @@ func TestOzonPayHealthRegistryAdmissionIsExact(t *testing.T) {
 	}
 	if SupportsCapability("ozon-pay", "payments.create") || SupportsCapability("ozon-delivery", "logistics.shipment.create") {
 		t.Fatal("Ozon qualification-gated capabilities became executable")
+	}
+}
+
+func TestDolyamiHealthRegistryAdmissionIsExact(t *testing.T) {
+	registry := New()
+	connector, err := registry.healthConnector(supportTestAccount(t, "dolyami"), func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"probe_url":"https://api.example.test/health"}`), nil
+	})
+	if err != nil || connector == nil || connector.Manifest().ID != "dolyami" {
+		t.Fatalf("dolyami health connector unavailable: connector=%T err=%v", connector, err)
+	}
+	if SupportsCapability("dolyami", "payments.create") {
+		t.Fatal("Dolyami payment mutation became executable")
 	}
 }

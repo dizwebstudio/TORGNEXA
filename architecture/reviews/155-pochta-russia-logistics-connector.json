@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-155",
+  "task": "155",
+  "change_class": "new_provider",
+  "summary": "Add the Russian Post Otpravka connector as a separate Delivery surface with encrypted application-token/user-key enrollment and a bounded official settings health probe; shipment operations remain qualification-gated.",
+  "scopes": [
+    "PACKAGE_INDEX.md",
+    "VALIDATION_REPORT.md",
+    "architecture/policy.json",
+    "architecture/reviews/155-pochta-russia-logistics-connector.json",
+    "connectors/logistics/pochta-russia",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/pochta-russia",
+    "frontend/public/connector-logos/pochta-russia.svg",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/generated/connector-catalog.ts",
+    "frontend/test/ui-experience.test.mjs",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/logistics_transport_test.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "internal/platform/connectors/catalog_generated.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/155-pochta-russia-logistics-connector.md"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0072-logistics-carrier-sdk.md",
+    "adr/0080-final-cdek-as-production-reference-logistics-provider.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "route_to_connector_sdk"
+  },
+  "impacts": [
+    {"area":"tenancy","status":"affected","evidence":"Russian Post credentials are bound to one tenant-scoped Connector SDK account; no caller-supplied tenant override is accepted."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"The application token and generated user authorization key stay behind SecretProvider; the bounded health probe does not persist provider payloads or recipient data."},
+    {"area":"api_compatibility","status":"not_affected","evidence":"No public REST/OpenAPI operation is added; the existing connector-account control plane is reused for setup and health checks."},
+    {"area":"event_compatibility","status":"not_affected","evidence":"No event or canonical envelope is added."},
+    {"area":"plugin_sdk_compatibility","status":"affected","evidence":"The adapter uses the frozen Connector SDK v1 and existing logistics capability declarations without changing SDK ports."},
+    {"area":"database_migration","status":"not_affected","evidence":"No provider-specific table or migration is introduced; generic connector account, secret and health history storage is reused."},
+    {"area":"security","status":"affected","evidence":"The host performs TLS-verified requests only to the fixed public Otpravka API host and keeps both credential values callback-scoped; strict JSON decoding rejects malformed or unknown credential fields."},
+    {"area":"approvals_risk","status":"affected","evidence":"Shipment creation and other write-sensitive logistics capabilities are not admitted to application callers; future admission must pass capability and approval policy."},
+    {"area":"audit_lineage","status":"affected","evidence":"Credential health checks use the existing connector.account.connection_checked audit event and retain only safe health metadata."},
+    {"area":"reconciliation_idempotency","status":"affected","evidence":"The manifest and SDK boundary retain canonical logistics idempotency fields, while no scheduler or remote write retry is enabled before carrier qualification."},
+    {"area":"webhooks_egress","status":"affected","evidence":"The current surface performs one fixed outbound settings probe; no arbitrary callback URL or webhook ingress is added."},
+    {"area":"slo_observability","status":"affected","evidence":"Manifest timeout/retry metadata, bounded responses and normalized provider-unavailable health state constrain the remote probe."},
+    {"area":"operations_rollback","status":"affected","evidence":"The separate-surface entry can be disabled through existing account/runtime support controls without a schema rollback."},
+    {"area":"testing_conformance","status":"affected","evidence":"Deterministic provider, host transport and SDK conformance tests cover the secret boundary, malformed credentials, tenant isolation, idempotency, egress and sandbox behavior without production credentials."}
+  ],
+  "provider": {
+    "id": "pochta-russia",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/pochta-russia/manifest.json",
+    "connector_spec": "docs/connectors/pochta-russia/spec.md",
+    "capability_audit": "docs/connectors/pochta-russia/capability-audit.md",
+    "conformance_plan": "docs/connectors/pochta-russia/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

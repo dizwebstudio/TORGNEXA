@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
 )
 
 func TestHostAndAddressPolicy(t *testing.T) {

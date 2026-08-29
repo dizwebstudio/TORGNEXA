@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/152-bitrix-storefront-connector.json",
-    "connectors/bitrix",
+    "connectors/storefronts/bitrix",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/bitrix",
     "frontend/public/connector-logos/bitrix.svg",
@@ -99,13 +99,13 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "Provider tests and the conformance candidate pass all executable checks; the report records the shared sandbox_isolation user-namespace limitation as 12/13."
+      "evidence": "Provider tests and the conformance candidate pass all 13 required checks, including sandbox_isolation with Linux user namespaces enabled; the report is release evidence."
     }
   ],
   "provider": {
     "id": "bitrix",
     "route": "connector_sdk",
-    "manifest": "connectors/bitrix/manifest.json",
+    "manifest": "connectors/storefronts/bitrix/manifest.json",
     "connector_spec": "docs/connectors/bitrix/spec.md",
     "capability_audit": "docs/connectors/bitrix/capability-audit.md",
     "conformance_plan": "docs/connectors/bitrix/conformance-plan.md"

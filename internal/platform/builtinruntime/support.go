@@ -27,6 +27,10 @@ type Support struct {
 	Sync                    []SyncSupport
 	RuntimeConfigRequired   bool
 	SocialTextMaxRunes      int
+	// HealthOnly marks a separate-surface connector that is admitted for
+	// account/credential lifecycle and an authenticated health probe only.
+	// It deliberately has no executable domain capability or sync route.
+	HealthOnly bool
 }
 
 // SocialTextLimit reports the exact text ceiling admitted by the current
@@ -67,7 +71,16 @@ func SupportsAccountConfiguration(connectorID string) bool {
 		(value.Stage == SupportSeparateSurface && value.Surface == "social") ||
 		(value.Stage == SupportSeparateSurface && value.Surface == "finance" && connectorID != "cbr-fx") ||
 		(value.Stage == SupportSeparateSurface && value.Surface == "crm") ||
-		(value.Stage == SupportSeparateSurface && value.Surface == "logistics"))
+		(value.Stage == SupportSeparateSurface && value.Surface == "logistics") ||
+		(value.Stage == SupportSeparateSurface && value.HealthOnly &&
+			(value.Surface == "marketplace" || value.Surface == "classified" || value.Surface == "edo" || value.Surface == "government" || value.Surface == "social" || value.Surface == "finance")))
+}
+
+// HealthOnly reports whether the connector has only a separately surfaced
+// account/health lifecycle and intentionally no domain operation route.
+func HealthOnly(connectorID string) bool {
+	value, ok := SupportFor(connectorID)
+	return ok && value.HealthOnly
 }
 
 // SupportsCapability reports whether a manifest capability has an executable

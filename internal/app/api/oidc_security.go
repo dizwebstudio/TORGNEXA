@@ -245,7 +245,7 @@ func (authorizer roleAuthorizer) Authorize(ctx context.Context, principal Princi
 	}
 	role := member.Role
 	readPermission := permission == "connectors.accounts.read" || permission == "products.read" || permission == "orders.read" || permission == "stock.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "settings.workspace.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read" || permission == "settings.ai_governance.read"
-	operatorPermission := permission == "orders.demo.write" || permission == "ai.analyze" || permission == "connectors.replay.run" || permission == "profitability.scenarios.write"
+	operatorPermission := permission == "orders.demo.write" || permission == "orders.status.write" || permission == "ai.analyze" || permission == "connectors.replay.run" || permission == "profitability.scenarios.write"
 	if role == "admin" || (operatorPermission && (role == "manager" || role == "operator")) || (readPermission && (role == "manager" || role == "operator" || role == "viewer")) {
 		return nil
 	}

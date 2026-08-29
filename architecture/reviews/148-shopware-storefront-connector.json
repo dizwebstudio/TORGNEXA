@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/148-shopware-storefront-connector.json",
-    "connectors/shopware",
+    "connectors/storefronts/shopware",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/shopware",
     "frontend/public/connector-logos/shopware.svg",
@@ -53,7 +53,7 @@
     {
       "area": "plugin_sdk_compatibility",
       "status": "affected",
-      "evidence": "Connector SDK root Connector/Runtime remain frozen; Shopware implements only existing capability-specific ports, no port is added or changed. The connector manages its own OAuth2 client_credentials token, the same self-contained pattern already established by connectors/gigachat -- no change to the host-owned OAuth runtime (ADR-0104/ADR-0108) was needed or made."
+      "evidence": "Connector SDK root Connector/Runtime remain frozen; Shopware implements only existing capability-specific ports, no port is added or changed. The connector manages its own OAuth2 client_credentials token, the same self-contained pattern already established by connectors/ai/gigachat -- no change to the host-owned OAuth runtime (ADR-0104/ADR-0108) was needed or made."
     },
     {
       "area": "database_migration",
@@ -104,7 +104,7 @@
   "provider": {
     "id": "shopware",
     "route": "connector_sdk",
-    "manifest": "connectors/shopware/manifest.json",
+    "manifest": "connectors/storefronts/shopware/manifest.json",
     "connector_spec": "docs/connectors/shopware/spec.md",
     "capability_audit": "docs/connectors/shopware/capability-audit.md",
     "conformance_plan": "docs/connectors/shopware/conformance-plan.md"

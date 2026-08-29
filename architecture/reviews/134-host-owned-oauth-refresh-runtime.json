@@ -6,7 +6,7 @@
   "summary": "Resolve and refresh connector OAuth access tokens at the host runtime boundary with PostgreSQL-serialized immutable secret rotation.",
   "scopes": [
     "adr/0104-host-owned-oauth-refresh-runtime.md",
-    "connectors/bitrix24",
+    "connectors/crm/bitrix24",
     "docs/21-secrets-management.md",
     "docs/74-connector-authentication.md",
     "internal/app/api/connector_accounts.go",

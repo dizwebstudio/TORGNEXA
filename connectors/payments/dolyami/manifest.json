@@ -1,0 +1,35 @@
+{
+  "id": "dolyami",
+  "name": "Долями",
+  "family": "payment",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": [
+    "payments.create",
+    "payments.refund",
+    "payments.status.read",
+    "payments.webhooks"
+  ],
+  "auth": [
+    {
+      "kind": "basic",
+      "secret_class": "payment.dolyami-credentials",
+      "required": true
+    },
+    {
+      "kind": "certificate",
+      "secret_class": "payment.dolyami-certificate",
+      "required": true
+    }
+  ],
+  "rate_limit": {
+    "max_concurrency": 2,
+    "min_interval_ms": 250,
+    "request_timeout_ms": 30000,
+    "retry": {
+      "max_attempts": 4,
+      "base_backoff_ms": 500,
+      "max_backoff_ms": 30000
+    }
+  }
+}

@@ -6,7 +6,7 @@ Task 011 is the first admitted marketplace provider after Tasks 010, 025, 029 an
 
 Canonical report: `docs/connectors/wildberries/conformance-report.json`.
 
-The provider adapter runs all thirteen Task-064 checks. Its sandbox portion uses the provider-neutral `conformance.SandboxFixture`, while WB-specific probes remain in `connectors/wildberries` and the functional API tests use deterministic fixtures. The machine report must match manifest ID/version/SDK major and pass every required check.
+The provider adapter runs all thirteen Task-064 checks. Its sandbox portion uses the provider-neutral `conformance.SandboxFixture`, while WB-specific probes remain in `connectors/marketplaces/wildberries` and the functional API tests use deterministic fixtures. The machine report must match manifest ID/version/SDK major and pass every required check.
 
 ## Semantic fixture coverage
 

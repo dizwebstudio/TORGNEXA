@@ -1,0 +1,71 @@
+name: torgnexa-prestashop-test
+
+services:
+  db:
+    image: mariadb:11.4@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430
+    environment:
+      MARIADB_ROOT_PASSWORD: prestashop-root-demo
+      MARIADB_DATABASE: prestashop
+      MARIADB_USER: prestashop
+      MARIADB_PASSWORD: prestashop-demo
+    volumes:
+      - prestashop-demo-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root -p\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+
+  prestashop:
+    build:
+      context: .
+      dockerfile: docker/prestashop-test/Dockerfile
+      args:
+        PRESTASHOP_IMAGE: "prestashop/prestashop:8.1-apache@sha256:10a0fe50c46315b32cc4be0a66c06f0fbe85bbfeb048fa71d91b89295d536220"
+    environment:
+      DB_SERVER: db
+      DB_PORT: "3306"
+      DB_NAME: prestashop
+      DB_USER: prestashop
+      DB_PASSWD: prestashop-demo
+      DB_PREFIX: ps_
+      PS_DOMAIN: 127.0.0.1:${PRESTASHOP_HTTP_PORT:-8097}
+      PS_INSTALL_AUTO: "1"
+      PS_INSTALL_DB: "0"
+      PS_ERASE_DB: "0"
+      PS_LANGUAGE: ru
+      PS_COUNTRY: RU
+      PS_ALL_LANGUAGES: "0"
+      PS_DEV_MODE: "0"
+      PS_FOLDER_ADMIN: admin-demo
+      ADMIN_MAIL: demo@torgnexa.local
+      ADMIN_PASSWD: admin-demo-123
+      PS_ENABLE_SSL: "0"
+      PS_HANDLE_DYNAMIC_DOMAIN: "0"
+      TORGNEXA_PRESTASHOP_API_KEY: 0123456789abcdef0123456789abcdef
+      TORGNEXA_PRESTASHOP_CURRENCY: EUR
+    ports:
+      - "${PRESTASHOP_HTTP_PORT:-8097}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --globoff -fsS -u \"$${TORGNEXA_PRESTASHOP_API_KEY}:\" -H 'Host: 127.0.0.1:${PRESTASHOP_HTTP_PORT:-8097}' 'http://127.0.0.1/api/products?output_format=JSON&display=[id]&limit=1' | grep -q 'products'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+
+volumes:
+  prestashop-demo-db:

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TORGNEXA API
-  version: 0.21.1
+  version: 0.21.2
 servers:
   - url: /api/v1
 paths:
@@ -1054,7 +1054,7 @@ paths:
   /orders/demo:
     post:
       operationId: createDemoOrders
-      description: Idempotently creates a synthetic tenant-scoped dataset with five orders, product, offer, warehouse, stock position, verified compliance declaration and personal demo notifications for the authenticated actor, then appends audit evidence.
+      description: Idempotently creates a synthetic tenant-scoped dataset with 26 products (each with a public demo image and description), demo prices and categories, five orders, fulfillment allocations, a primary offer, warehouse, stock positions, a verified compliance declaration and personal demo notifications for the authenticated actor, then appends audit evidence.
 
       parameters:
         - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}
@@ -1067,7 +1067,7 @@ paths:
                 type: object
                 required: [created]
                 properties:
-                  created: {type: integer, minimum: 0, maximum: 5}
+                  created: {type: integer, minimum: 0, maximum: 5, description: Number of newly created demo orders; the catalog is created or restored idempotently alongside them.}
         '401': {description: Authenticated tenant scope missing}
         '403': {description: User cannot create demo data}
     delete:
@@ -1101,7 +1101,7 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [id, order_number, status, currency, subtotal_minor_units, discount_minor_units, tax_minor_units, shipping_minor_units, grand_minor_units, placed_at, updated_at, items, sources]
+                required: [id, order_number, status, currency, subtotal_minor_units, discount_minor_units, tax_minor_units, shipping_minor_units, grand_minor_units, placed_at, version, updated_at, items, sources]
                 properties:
                   id: {type: string}
                   order_number: {type: string}
@@ -1113,6 +1113,7 @@ paths:
                   shipping_minor_units: {type: integer, minimum: 0}
                   grand_minor_units: {type: integer, minimum: 0}
                   placed_at: {type: string, format: date-time}
+                  version: {type: integer, minimum: 1}
                   updated_at: {type: string, format: date-time}
                   items:
                     type: array
@@ -1122,6 +1123,8 @@ paths:
                       required: [sku, quantity_coefficient, quantity_scale, unit, unit_price_minor_units, line_total_minor_units]
                       properties:
                         sku: {type: string}
+                        product_title: {type: string, maxLength: 300}
+                        product_image_url: {type: string, format: uri, pattern: '^https://', maxLength: 2048}
                         quantity_coefficient: {type: integer, minimum: 1}
                         quantity_scale: {type: integer, minimum: 0, maximum: 9}
                         unit: {type: string}
@@ -1137,6 +1140,20 @@ paths:
                         provider: {type: string}
                         remote_id: {type: string}
         '404': {description: Order not found in authenticated workspace}
+  /orders/{order_id}/status:
+    parameters:
+      - {name: order_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+    patch:
+      operationId: changeOrderStatus
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OrderStatusWrite'}}}}
+      responses:
+        '200': {description: Order status changed with optimistic concurrency}
+        '400': {description: Invalid status or version}
+        '404': {description: Order not found in authenticated workspace}
+        '409': {description: Invalid lifecycle transition or version conflict}
   /inventory/positions:
     get:
       operationId: listInventoryPositions
@@ -1943,6 +1960,13 @@ components:
         version: {type: integer, minimum: 1}
         status: {type: string, enum: [draft, active, archived]}
         category_id: {type: string}
+    OrderStatusWrite:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status: {type: string, enum: [pending, confirmed, processing, fulfilled, cancelled]}
+        version: {type: integer, minimum: 1}
     OfferWrite:
       type: object
       properties:
@@ -2288,7 +2312,7 @@ components:
       required: [id, provider, label, model, enabled, version, created_at, updated_at]
       properties:
         id: {type: string, minLength: 1, maxLength: 128}
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, gemini, grok, ollama, lm-studio, open-webui]}
         label: {type: string, minLength: 1, maxLength: 120}
         model: {type: string, minLength: 1, maxLength: 120}
         base_url: {type: string, format: uri, maxLength: 2039}
@@ -2308,7 +2332,7 @@ components:
       additionalProperties: false
       required: [provider, label, model, credential]
       properties:
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, gemini, grok, ollama, lm-studio, open-webui]}
         label: {type: string, minLength: 1, maxLength: 120}
         model: {type: string, minLength: 1, maxLength: 120}
         base_url: {type: string, format: uri, maxLength: 2039}
@@ -2336,7 +2360,7 @@ components:
       required: [text, provider, model]
       properties:
         text: {type: string}
-        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, ollama, lm-studio, open-webui]}
+        provider: {type: string, enum: [openai-compatible, gigachat, yandexgpt, kimi, qwen, deepseek, claude, gemini, grok, ollama, lm-studio, open-webui]}
         model: {type: string}
     AIEgressPolicy:
       type: object
@@ -3965,6 +3989,17 @@ components:
               type: string
               format: date-time
               pattern: Z$
+            product_title:
+              type: string
+              maxLength: 300
+            product_sku:
+              type: string
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$
+            product_image_url:
+              type: string
+              format: uri
+              pattern: ^https://
+              maxLength: 2048
     ExternalSearchProductSearchPageV1:
       title: Product search page v1
       type: object
@@ -4004,6 +4039,32 @@ components:
               type: string
               minLength: 1
               maxLength: 300
+            description:
+              type: string
+              maxLength: 20000
+            price:
+              type: object
+              additionalProperties: false
+              required:
+              - minor_units
+              - currency
+              properties:
+                minor_units:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                currency:
+                  type: string
+                  pattern: ^[A-Z]{3}$
+            image_url:
+              oneOf:
+              - type: string
+                format: uri
+                pattern: ^https://
+                maxLength: 2048
+              - type: string
+                pattern: '^/api/v1/uploads/upl_[0-9a-f]{32}/content$'
+                maxLength: 2048
             status:
               type: string
               enum:

@@ -5,9 +5,7 @@ credentials only. The candidate covers authentication boundaries, normalized
 errors, retry/rate-limit semantics, idempotency/replay, tenant isolation,
 resource limits and production-credential rejection.
 
-The current report records 12 of 13 checks passing. `sandbox_isolation` is
-environment-gated: this execution environment cannot create unprivileged
-Linux user namespaces (`unshare --user` returns `Operation not permitted`).
-That shared harness limitation is not a Bitrix connector failure; rerun the
-suite on a host with user namespaces enabled before a release qualification.
-
+The current report records all 13 of 13 checks passing, including
+`sandbox_isolation`. The suite was run with the static connector emulator and
+Linux user namespaces enabled; the resulting report is the release evidence
+for this connector.

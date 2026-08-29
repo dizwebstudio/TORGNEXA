@@ -7,10 +7,16 @@ The sync engine is provider-neutral. Core entities never gain WB/Ozon/ERP identi
 Production admission is exact and fail-closed. A manifest capability does not
 make an entity executable: the connector, entity and direction must also be
 declared in `contracts/connectors/builtin-runtime-support-v1.json` and resolved
-by the built-in runtime. The current worker bridge accepts only the canonical
-`products` entity. Unsupported policies are rejected by the API before they can
-be enabled or dispatched, and the worker retains its own entity check as a
-second boundary.
+by the built-in runtime. The reconciliation scan bridge accepts the canonical
+`products` entity. A dedicated commerce-sync consumer additionally routes
+canonical outbound `products` events for every connector admitted with
+`products.write`, and PrestaShop outbound `prices` and `inventory` domain
+events, after policy, capability and mapping checks. Product events load the
+current canonical snapshot, translate lifecycle status at the built-in
+provider boundary, and create a `product` mapping after a confirmed create
+when one does not exist. Unsupported policies are rejected by the API before
+they can be enabled or dispatched, and both worker paths retain their own
+entity check as a second boundary.
 
 A versioned `SyncPolicy` binds one tenant-scoped connector account and canonical entity type to:
 
@@ -25,6 +31,18 @@ Source-of-truth is **not** an unconditional write bypass. Ordinary propagation f
 Inbound pull uses a persistent cursor. The cursor advances only after every change in a page resolves. A crash before cursor commit replays the page; append-only remote receipts and stable local idempotency keys prevent duplicate business effects.
 
 Outbound local changes use the immutable domain event id to derive a stable remote idempotency key. A crash after the provider accepted the write but before local state/receipt commit retries the same key. Connector implementations are therefore required to provide the same idempotency semantics already exercised by Task `064` conformance.
+
+For commerce-sync routes, the event consumer records an applied or duplicate
+result in `sync_local_receipts` only after the connector's
+read-before/write/read-after receipt validates. Rate limits, timeouts and
+unavailable providers stay on Kafka retry topics; malformed events, missing
+offer mappings, failed product reads and non-retryable provider responses are
+dead-lettered. A product create that succeeds remotely but loses its mapping
+commit is retried with the same deterministic key and reconciled by the
+connector's SKU/idempotency path before a receipt is recorded.
+The regular reconciliation scanner treats `prices` and `inventory` policies as
+event-only: a manually queued scan completes with an empty page, while actual
+state propagation is driven by the durable domain events.
 
 Task 013 does not claim distributed exactly-once transactions.
 

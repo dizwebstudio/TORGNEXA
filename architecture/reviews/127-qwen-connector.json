@@ -3,14 +3,14 @@
   "id": "ARCH-127",
   "task": "127",
   "change_class": "new_provider",
-  "summary": "Register Qwen (Alibaba Cloud) as a further ai-family provider for the Task-122 AI provider account capability, reusing DashScope's OpenAI-compatible mode wire format without importing connectors/openai-compatible or connectors/kimi (provider packages may not import each other).",
+  "summary": "Register Qwen (Alibaba Cloud) as a further ai-family provider for the Task-122 AI provider account capability, reusing DashScope's OpenAI-compatible mode wire format without importing connectors/ai/openai-compatible or connectors/ai/kimi (provider packages may not import each other).",
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/127-qwen-connector.json",
-    "connectors/qwen/conformance.go",
-    "connectors/qwen/connector.go",
-    "connectors/qwen/connector_test.go",
-    "connectors/qwen/manifest.json",
+    "connectors/ai/qwen/conformance.go",
+    "connectors/ai/qwen/connector.go",
+    "connectors/ai/qwen/connector_test.go",
+    "connectors/ai/qwen/manifest.json",
     "contracts/openapi/torgnexa-v1.yaml",
     "deploy/postgres/catalog.tsv",
     "docs/connectors/qwen/capability-audit.md",
@@ -117,7 +117,7 @@
   "provider": {
     "id": "qwen",
     "route": "connector_sdk",
-    "manifest": "connectors/qwen/manifest.json",
+    "manifest": "connectors/ai/qwen/manifest.json",
     "connector_spec": "docs/connectors/qwen/spec.md",
     "capability_audit": "docs/connectors/qwen/capability-audit.md",
     "conformance_plan": "docs/connectors/qwen/conformance-plan.md"

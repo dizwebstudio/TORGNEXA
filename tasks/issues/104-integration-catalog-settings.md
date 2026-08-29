@@ -10,7 +10,7 @@ Expose the canonical connector catalog in Settings from a deterministic projecti
 098, 010, 064
 
 ## Acceptance
-- generated catalog is derived only from validated `connectors/*/manifest.json` metadata;
+- generated catalog is derived only from validated `connectors/*/*/manifest.json` metadata;
 - marketplace and other connector families are grouped generically;
 - no credentials, secret values, tenant identifiers or remote account data enter the projection;
 - catalog drift fails repository validation;

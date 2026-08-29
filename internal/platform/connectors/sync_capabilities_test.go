@@ -11,4 +11,8 @@ func TestRequiredSyncCapabilitiesRemainProviderNeutral(t *testing.T) {
 	if _, _, ok = RequiredSyncCapabilities(FamilySocial, "orders"); ok {
 		t.Fatal("unsupported social order sync admitted")
 	}
+	read, write, ok = RequiredSyncCapabilities(FamilyStorefront, "prices")
+	if !ok || read != "prices.read" || write != "prices.write" {
+		t.Fatalf("price capabilities = %q %q %v", read, write, ok)
+	}
 }

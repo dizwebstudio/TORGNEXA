@@ -10,7 +10,7 @@ self-hosted (and cloud) e-commerce platform, especially in the EU market.
 
 ## Scope
 
-- New `connectors/shopware` package: products/inventory/prices/orders/returns
+- New `connectors/storefronts/shopware` package: products/inventory/prices/orders/returns
   read, prices/inventory write, order cancellation write, and full product
   update including SKU changes (Shopware's `productNumber` is a single
   top-level field, unlike Shopify/Medusa's variant-nested SKU — see
@@ -21,7 +21,7 @@ self-hosted (and cloud) e-commerce platform, especially in the EU market.
 - Authentication: Shopware's own "Integration" client id/secret, exchanged
   for a short-lived OAuth2 client_credentials bearer token by the connector
   itself (`POST /api/oauth/token`) — the same self-contained pattern already
-  established by `connectors/gigachat`, not the host-owned browser OAuth
+  established by `connectors/ai/gigachat`, not the host-owned browser OAuth
   runtime built for Shopify (Task 144/ADR-0108), since Shopware's grant is
   client_credentials against a per-merchant host, with no browser
   redirect involved. The access token and the resolved currency entity id

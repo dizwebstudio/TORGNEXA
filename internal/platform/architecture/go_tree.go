@@ -278,8 +278,10 @@ func checkImportDirection(relative string, source module, registered bool, impor
 		}
 		switch source.Kind {
 		case "core_domain", "shared_types":
-			if strings.HasPrefix(imported, root+"/") && !strings.HasPrefix(imported, root+"/internal/core/") {
-				found.add(relative, "Core may import only standard/external packages or other Core packages")
+			if strings.HasPrefix(imported, root+"/") {
+				if !strings.HasPrefix(imported, root+"/internal/core/") && !coreSharedImportAllowed(configuration, imported) {
+					found.add(relative, "Core may import only standard/external packages or other Core packages")
+				}
 			} else if isExternalImport(imported) && !containsString(configuration.CoreExternalImports, imported) {
 				found.add(relative, "Core external import is not explicitly approved by architecture policy")
 			}
@@ -331,6 +333,20 @@ func checkImportDirection(relative string, source module, registered bool, impor
 			found.add(relative, "provider implementation bypasses the Connector SDK boundary")
 		}
 	}
+}
+
+func coreSharedImportAllowed(configuration *policy, imported string) bool {
+	if configuration == nil {
+		return false
+	}
+	root := configuration.ModulePath + "/"
+	for _, allowed := range configuration.CoreSharedImports {
+		full := root + allowed
+		if imported == full || strings.HasPrefix(imported, full+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func registeredProviderImport(configuration *policy, imported string) bool {
@@ -514,41 +530,11 @@ func providerConditionFlags(expression ast.Node) (strict, channel, nonEmpty, kno
 func (r *repository) checkProviderInventory(ctx context.Context, configuration *policy, reviews map[string]review, found *problems) {
 	discovered := make(map[string]string)
 	for _, root := range canonicalProviderRoots {
-		absolute := filepath.Join(r.root, root)
-		entries, exceeded, err := readBoundedDirectory(absolute, maxReviews)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if exceeded {
-			found.add(root, "provider directory count exceeds %d", maxReviews)
-		}
-		if err != nil {
-			found.add(root, "read provider root: %v", err)
-			continue
-		}
-		for _, entry := range entries {
-			if err := ctx.Err(); err != nil {
-				return
+		for _, item := range r.discoverProviderImplementations(ctx, root, found) {
+			if previous, duplicate := discovered[item.ID]; duplicate {
+				found.add(item.Path, "provider id is also implemented at %s", previous)
 			}
-			relative := root + "/" + entry.Name()
-			if entry.Type()&os.ModeSymlink != 0 {
-				found.add(relative, "provider symlinks are forbidden")
-				continue
-			}
-			if !entry.IsDir() {
-				if entry.Name() != "README.md" {
-					found.add(relative, "provider roots may contain only provider directories")
-				}
-				continue
-			}
-			if !providerIDPattern.MatchString(entry.Name()) {
-				found.add(relative, "invalid provider directory name")
-				continue
-			}
-			if previous, duplicate := discovered[entry.Name()]; duplicate {
-				found.add(relative, "provider id is also implemented at %s", previous)
-			}
-			discovered[entry.Name()] = relative
+			discovered[item.ID] = item.Path
 		}
 	}
 	for _, item := range configuration.Providers {

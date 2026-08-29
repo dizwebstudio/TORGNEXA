@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/153-cs-cart-storefront-connector.json",
-    "connectors/cs-cart",
+    "connectors/storefronts/cs-cart",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/cs-cart",
     "frontend/public/connector-logos/cs-cart.svg",
@@ -36,8 +36,8 @@
     {"area":"webhooks_egress","status":"affected","evidence":"Only outbound product calls are admitted; no inbound webhooks claimed."},
     {"area":"slo_observability","status":"affected","evidence":"Timeouts, status codes and malformed responses normalize to SDK errors."},
     {"area":"operations_rollback","status":"affected","evidence":"Account can be disabled without migration rollback."},
-    {"area":"testing_conformance","status":"affected","evidence":"Provider tests and candidate are present; report records sandbox limitation."}
+    {"area":"testing_conformance","status":"affected","evidence":"Provider tests and the conformance candidate pass all 13 required checks, including sandbox_isolation with Linux user namespaces enabled; the report is release evidence."}
   ],
-  "provider": {"id":"cs-cart","route":"connector_sdk","manifest":"connectors/cs-cart/manifest.json","connector_spec":"docs/connectors/cs-cart/spec.md","capability_audit":"docs/connectors/cs-cart/capability-audit.md","conformance_plan":"docs/connectors/cs-cart/conformance-plan.md"},
+  "provider": {"id":"cs-cart","route":"connector_sdk","manifest":"connectors/storefronts/cs-cart/manifest.json","connector_spec":"docs/connectors/cs-cart/spec.md","capability_audit":"docs/connectors/cs-cart/capability-audit.md","conformance_plan":"docs/connectors/cs-cart/conformance-plan.md"},
   "follow_up_tasks": []
 }

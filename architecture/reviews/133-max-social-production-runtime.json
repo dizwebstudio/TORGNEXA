@@ -6,7 +6,7 @@
   "summary": "Compose MAX text publishing through the provider-neutral Social Core API and crash-safe worker runtime.",
   "scopes": [
     "adr/0103-max-social-production-runtime.md",
-    "connectors/max-messenger",
+    "connectors/social/max-messenger",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "frontend/src/pages/SocialPage.tsx",
     "internal/app/api/social.go",

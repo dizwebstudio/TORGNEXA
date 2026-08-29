@@ -8,7 +8,7 @@ import {Icon} from "../../components/Icon";
 interface Column{key:string;label:string}
 interface ReportData{generated_at:string;columns:Column[];rows:string[][]}
 interface Account{id:string;label:string;provider:string;model:string;enabled:boolean}
-const providerLabels:Readonly<Record<string,string>>={"openai-compatible":"OpenAI-совместимый",gigachat:"GigaChat (Sber)",yandexgpt:"YandexGPT",kimi:"Kimi (Moonshot AI)",qwen:"Qwen (Alibaba Cloud)",deepseek:"DeepSeek",claude:"Claude (Anthropic)",ollama:"Ollama", "lm-studio":"LM Studio", "open-webui":"Open WebUI"};
+const providerLabels:Readonly<Record<string,string>>={"openai-compatible":"OpenAI-совместимый",gigachat:"GigaChat (Sber)",yandexgpt:"YandexGPT",kimi:"Kimi (Moonshot AI)",qwen:"Qwen (Alibaba Cloud)",deepseek:"DeepSeek",claude:"Claude (Anthropic)",gemini:"Google Gemini",grok:"Grok (xAI)",ollama:"Ollama", "lm-studio":"LM Studio", "open-webui":"Open WebUI"};
 const maxDigestLength=6000,maxDigestRows=150;
 const systemPrompt="Ты аналитик e-commerce платформы TORGNEXA. Отвечай кратко и по-русски, опираясь только на предоставленные данные отчёта. Если данных недостаточно для вывода — так и скажи.";
 function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}
@@ -30,13 +30,13 @@ export function AskAIPanel({reportTitle,report}:{reportTitle:string;report:Repor
  if(!canAnalyze)return null;
  return <section className="drawer-section ask-ai-panel">
   <h3><Icon name="activity"/> Спросить ИИ об этом отчёте</h3>
-  {!canListAccounts||accounts.isError?<p className="settings-note">Не удалось загрузить список AI-провайдеров.</p>:enabled.length===0?<p className="settings-note">Нет включённых AI-провайдеров. Добавьте аккаунт в разделе «Настройки → Провайдеры аналитики».</p>:<>
+  {!canListAccounts||accounts.isError?<p className="settings-note">Не удалось загрузить список провайдеров ИИ.</p>:enabled.length===0?<p className="settings-note">Нет включённых провайдеров ИИ. Добавьте аккаунт в разделе «Настройки → Провайдеры ИИ».</p>:<>
    <div className="settings-grid">
-    <label className="field"><span>AI-провайдер</span><select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Выберите аккаунт…</option>{enabled.map(account=><option value={account.id} key={account.id}>{account.label} · {providerLabels[account.provider]??account.provider}</option>)}</select></label>
+    <label className="field"><span>Провайдер ИИ</span><select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Выберите аккаунт…</option>{enabled.map(account=><option value={account.id} key={account.id}>{account.label} · {providerLabels[account.provider]??account.provider}</option>)}</select></label>
     <label className="field"><span>Вопрос (необязательно)</span><input value={question} maxLength={2000} placeholder="Что выросло сильнее всего за период?" onChange={e=>setQuestion(e.target.value)}/></label>
    </div>
    <div className="account-actions"><button className="button primary" disabled={!accountId||ask.isPending} onClick={()=>ask.mutate()}>{ask.isPending?"Спрашиваем…":"Спросить"}</button></div>
-   {ask.isError?<ErrorBlock>Не удалось получить ответ от AI-провайдера. Проверьте ключ и доступность сервиса.</ErrorBlock>:null}
+   {ask.isError?<ErrorBlock>Не удалось получить ответ от провайдера ИИ. Проверьте ключ и доступность сервиса.</ErrorBlock>:null}
    {answer?<div className="panel ask-ai-answer"><p className="settings-note">Ответ провайдера {providerLabels[answer.provider]??answer.provider} · модель {answer.model}</p><p>{answer.text}</p></div>:null}
   </>}
  </section>

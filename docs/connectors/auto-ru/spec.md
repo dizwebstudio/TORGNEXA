@@ -11,4 +11,4 @@ Baseline remote operations:
 
 `classified.listings.read` and `classified.publications.status.read` are read risk. `classified.publications.write` is `write_sensitive`. Auto.ru feed submission has no qualified TORGNEXA-controlled remote idempotency key in this baseline; therefore a transport failure or write-side 5xx after dispatch becomes non-retryable `write_outcome_unknown`.
 
-The Connector SDK request is provider-neutral: publication kind, section and source URL. Auto.ru-specific XML construction lives under `connectors/auto-ru` rather than Core.
+The Connector SDK request is provider-neutral: publication kind, section and source URL. Auto.ru-specific XML construction lives under `connectors/classified/auto-ru` rather than Core.

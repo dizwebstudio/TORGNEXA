@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/catalog"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	builtins "github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
@@ -83,6 +84,13 @@ func (registry *runtimeRegistry) productWriter(scope tenancy.Scope, account sdk.
 	return writer, err
 }
 
+func (registry *runtimeRegistry) productStatus(account sdk.Account, status catalog.Status) (string, bool) {
+	if registry == nil || registry.builtins == nil {
+		return "", false
+	}
+	return registry.builtins.ProductStatus(account.ConnectorID, string(status))
+}
+
 func (registry *runtimeRegistry) supportsProductWrite(account sdk.Account) bool {
 	if registry == nil || registry.builtins == nil {
 		return false
@@ -106,6 +114,31 @@ func (registry *runtimeRegistry) supportsPriceWrite(account sdk.Account) bool {
 		return false
 	}
 	return registry.builtins.SupportsPriceWrite(account)
+}
+
+func (registry *runtimeRegistry) inventoryWriter(scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.InventoryWriter, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, reconciliation.ErrActionUnavailable
+	}
+	writer, err := registry.builtins.InventoryWriter(account, runtime, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, reconciliation.ErrActionUnavailable
+	}
+	return writer, err
+}
+
+func (registry *runtimeRegistry) supportsInventoryWrite(account sdk.Account) bool {
+	if registry == nil || registry.builtins == nil {
+		return false
+	}
+	return registry.builtins.SupportsInventoryWrite(account)
+}
+
+func (registry *runtimeRegistry) supportsSync(account sdk.Account, entityType, direction string) bool {
+	if registry == nil || registry.builtins == nil {
+		return false
+	}
+	return registry.builtins.SupportsSync(account.ConnectorID, entityType, direction)
 }
 
 func (registry *runtimeRegistry) socialPublisher(scope tenancy.Scope, account sdk.Account) (sdk.SocialPublisher, error) {

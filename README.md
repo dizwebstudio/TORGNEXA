@@ -10,7 +10,7 @@ TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectio
 - `adr/` — architectural decisions.
 - `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
 - `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `tasks/issues/` — contiguous atomic task cards numbered 001–153, with
+- `tasks/issues/` — contiguous atomic task cards numbered 001–159, with
   implementation and validation status recorded in each card.
 - `tasks/milestones/` — dependency-aware milestones M0-M13.
 - `templates/` — repeatable architecture, implementation and review artifacts.
@@ -31,9 +31,14 @@ make community-up
 
 The command creates a private local `.env` if needed, validates deployment
 policy, builds TORGNEXA application/frontend images and starts PostgreSQL,
-Kafka, Valkey, ClickHouse, Garage S3, Keycloak, the canonical migration job,
-API, worker, scheduler, MCP and the React frontend. All development host ports
-bind to `127.0.0.1`.
+Kafka, Valkey, ClickHouse, Garage S3, ClamAV, Keycloak, the canonical migration
+job, API, worker, scheduler, MCP and the React frontend. All development host
+ports bind to `127.0.0.1`.
+
+Для проверки фронта используйте локальную учётную запись Keycloak `demo` /
+`demo-local-only`. Она синтетическая и предназначена только для Community;
+при первом запросе API её членство в development workspace создаётся
+автоматически.
 
 The generated file is self-documented. A complete list of variables, accepted
 formats, examples and safe rotation rules is available in
@@ -64,12 +69,14 @@ Architecture v1.0 is frozen in `docs/54-architecture-freeze-v1.md`.
 Marketplace coverage, admitted capabilities and qualification evidence are
 summarized in [`docs/connectors/marketplaces.md`](docs/connectors/marketplaces.md).
 Actual production execution is deliberately narrower than manifest coverage;
-the current ready/separate/planned split is documented in
+the current **18 generic / 43 separate-surface / 0 planned** split is documented in
 [`docs/10-integrations-matrix.md`](docs/10-integrations-matrix.md).
 
-The AI-provider surface includes hosted providers plus local Ollama, LM Studio
-and Open WebUI adapters. Local model servers remain operator-managed and are
-reached only through the host-mediated allowlisted transport.
+The AI-provider surface includes hosted providers (including Google Gemini and
+Grok) plus local Ollama, LM Studio and Open WebUI adapters. Local model servers
+remain operator-managed and are reached only through the host-mediated
+allowlisted transport. Midjourney is not connectable because its official
+policy prohibits third-party automation and does not offer a general API.
 
 The Integrations surface also includes a separate self-hosted 1С-Битрикс
 storefront card. Its current executable scope is product catalog read/write via

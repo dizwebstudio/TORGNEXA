@@ -18,7 +18,7 @@ choice message.
 
 ## Transport boundary
 
-`connectors/ollama` owns only typed request/response mapping. DNS, private-IP
+`connectors/ai/ollama` owns only typed request/response mapping. DNS, private-IP
 resolution, pinned dialing, timeouts, redirects, proxy suppression and response
 limits are enforced by `internal/platform/builtinruntime/local_ai_transport.go`.
 Only the explicit local host allowlist is admitted; external providers remain

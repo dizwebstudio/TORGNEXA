@@ -30,8 +30,14 @@ func TestClickHouseQueryPortBindsTenantAndDecodesReports(t *testing.T) {
 		case strings.Contains(string(body), "sales_daily_v1"):
 			_, _ = w.Write([]byte(`{"day":"2026-08-10","currency":"RUB","orders":2,"fulfilled_orders":1,"cancelled_orders":1,"gross_minor_units":1000}` + "\n"))
 		case strings.Contains(string(body), "inventory_current_v1"):
+			if strings.Contains(string(body), "%6f") || !strings.Contains(string(body), ".%fZ") {
+				t.Fatalf("inventory timestamp format is not ClickHouse-compatible: %s", body)
+			}
 			_, _ = w.Write([]byte(`{"offer_id":"offer-1","warehouse_id":"warehouse-1","quantity":"2.50","changed_at":"2026-08-10T12:00:00.000000Z","event_id":"event-1"}` + "\n"))
 		case strings.Contains(string(body), "freshness_v1"):
+			if strings.Contains(string(body), "%6f") || !strings.Contains(string(body), ".%fZ") {
+				t.Fatalf("freshness timestamp format is not ClickHouse-compatible: %s", body)
+			}
 			_, _ = w.Write([]byte(`{"event_family":"commerce.orders","last_occurred_at":"2026-08-10T12:00:00.000000Z","last_ingested_at":"2026-08-10T12:00:02.000000Z","observed_at":"2026-08-10T12:00:03.000000Z","source_lag_seconds":2,"event_count":4}` + "\n"))
 		default:
 			http.Error(w, "unexpected query", http.StatusBadRequest)

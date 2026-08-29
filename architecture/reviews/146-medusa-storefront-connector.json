@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/146-medusa-storefront-connector.json",
-    "connectors/medusa",
+    "connectors/storefronts/medusa",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/medusa",
     "frontend/public/connector-logos/medusa.svg",
@@ -104,7 +104,7 @@
   "provider": {
     "id": "medusa",
     "route": "connector_sdk",
-    "manifest": "connectors/medusa/manifest.json",
+    "manifest": "connectors/storefronts/medusa/manifest.json",
     "connector_spec": "docs/connectors/medusa/spec.md",
     "capability_audit": "docs/connectors/medusa/capability-audit.md",
     "conformance_plan": "docs/connectors/medusa/conformance-plan.md"

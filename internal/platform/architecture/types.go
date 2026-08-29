@@ -82,6 +82,7 @@ type policy struct {
 	ProviderAdmission           admission         `json:"provider_admission"`
 	ProviderCompositionModule   string            `json:"provider_composition_module"`
 	CoreExternalImports         []string          `json:"core_external_imports"`
+	CoreSharedImports           []string          `json:"core_shared_imports"`
 	ProviderAllowedImports      []string          `json:"provider_allowed_internal_imports"`
 	SensitivePaths              []string          `json:"sensitive_paths"`
 	Modules                     []module          `json:"modules"`

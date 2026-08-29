@@ -8,7 +8,7 @@
     "adr/0107-claude-ai-provider.md",
     "architecture/policy.json",
     "architecture/reviews/141-claude-ai-provider.json",
-    "connectors/claude",
+    "connectors/ai/claude",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "contracts/openapi/torgnexa-v1.yaml",
     "deploy/postgres/catalog.tsv",
@@ -57,7 +57,7 @@
   "provider": {
     "id": "claude",
     "route": "connector_sdk",
-    "manifest": "connectors/claude/manifest.json",
+    "manifest": "connectors/ai/claude/manifest.json",
     "connector_spec": "docs/connectors/claude/spec.md",
     "capability_audit": "docs/connectors/claude/capability-audit.md",
     "conformance_plan": "docs/connectors/claude/conformance-plan.md"

@@ -101,7 +101,7 @@ func TestCursorRejectsTrailingJSON(t *testing.T) {
 
 func TestSearchPagesRejectInvalidProjectionValues(t *testing.T) {
 	updatedAt := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
-	goodProduct := ProductHit{ID: testProductID, Code: "SKU-42", Title: "Cordless drill", Status: "active", UpdatedAt: updatedAt}
+	goodProduct := ProductHit{ID: testProductID, Code: "SKU-42", Title: "Cordless drill", Description: "A compact cordless drill", Status: "active", UpdatedAt: updatedAt, Price: &ProductPrice{MinorUnits: 129900, Currency: "RUB"}}
 	if err := (ProductPage{Items: []ProductHit{goodProduct}}).Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +109,16 @@ func TestSearchPagesRejectInvalidProjectionValues(t *testing.T) {
 	badProduct.Title = " secret\n"
 	if err := (ProductPage{Items: []ProductHit{badProduct}}).Validate(); err == nil {
 		t.Fatal("invalid product projection accepted")
+	}
+	badProduct = goodProduct
+	badProduct.Price = &ProductPrice{MinorUnits: -1, Currency: "RUB"}
+	if err := (ProductPage{Items: []ProductHit{badProduct}}).Validate(); err == nil {
+		t.Fatal("invalid product price projection accepted")
+	}
+	badProduct = goodProduct
+	badProduct.Description = " trailing "
+	if err := (ProductPage{Items: []ProductHit{badProduct}}).Validate(); err == nil {
+		t.Fatal("invalid product description projection accepted")
 	}
 
 	goodOrder := OrderHit{ID: testOrderID, OrderNumber: "ORD-42", Status: "confirmed", Currency: "RUB", GrandMinorUnits: 125000, PlacedAt: updatedAt.Add(-time.Hour), UpdatedAt: updatedAt}

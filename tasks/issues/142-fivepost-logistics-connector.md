@@ -30,7 +30,7 @@ unqualified shipment writes.
 
 ## Implementation evidence
 
-- `connectors/fivepost` contains the typed host transport, normalized operations,
+- `connectors/logistics/fivepost` contains the typed host transport, normalized operations,
   deterministic candidate transport and tenant-scoped tests;
 - the catalog manifest, presentation metadata, runtime-support contract and
   generated catalogs are synchronized;

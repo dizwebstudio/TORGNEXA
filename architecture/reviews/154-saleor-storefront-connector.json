@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/154-saleor-storefront-connector.json",
-    "connectors/saleor",
+    "connectors/storefronts/saleor",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/saleor",
     "frontend/public/connector-logos/saleor.svg",
@@ -103,7 +103,7 @@
   "provider": {
     "id": "saleor",
     "route": "connector_sdk",
-    "manifest": "connectors/saleor/manifest.json",
+    "manifest": "connectors/storefronts/saleor/manifest.json",
     "connector_spec": "docs/connectors/saleor/spec.md",
     "capability_audit": "docs/connectors/saleor/capability-audit.md",
     "conformance_plan": "docs/connectors/saleor/conformance-plan.md"

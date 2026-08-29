@@ -9,10 +9,11 @@ import (
 	"net/url"
 	"strings"
 
-	cdek "github.com/torgnexa/torgnexa/connectors/cdek"
-	dellin "github.com/torgnexa/torgnexa/connectors/dellin"
-	fivepost "github.com/torgnexa/torgnexa/connectors/fivepost"
-	pek "github.com/torgnexa/torgnexa/connectors/pek"
+	cdek "github.com/torgnexa/torgnexa/connectors/logistics/cdek"
+	dellin "github.com/torgnexa/torgnexa/connectors/logistics/dellin"
+	fivepost "github.com/torgnexa/torgnexa/connectors/logistics/fivepost"
+	pek "github.com/torgnexa/torgnexa/connectors/logistics/pek"
+	pochtarussia "github.com/torgnexa/torgnexa/connectors/logistics/pochta-russia"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -221,3 +222,40 @@ func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
 }
 
 var _ dellin.Transport = dellinHTTP{}
+
+// pochtarussiaHTTP verifies both credentials required by the official
+// Otpravka REST API. The application token is sent as AccessToken and the
+// generated user key as Basic X-User-Authorization; neither value leaves the
+// callback-scoped secret path or is persisted by the transport.
+type pochtarussiaHTTP struct{ h *httpTransport }
+
+func (transport pochtarussiaHTTP) Ping(ctx context.Context, secret []byte) error {
+	if transport.h == nil {
+		return errors.New("Почта России credential probe unavailable")
+	}
+	var credentials struct {
+		Token string `json:"token"`
+		Key   string `json:"key"`
+	}
+	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.Token) == "" || strings.TrimSpace(credentials.Key) == "" {
+		return errors.New("Почта России credentials must be JSON with token and key")
+	}
+	headers := http.Header{
+		"Authorization":        []string{"AccessToken " + credentials.Token},
+		"X-User-Authorization": []string{"Basic " + credentials.Key},
+		"Accept":               []string{"application/json"},
+	}
+	status, response, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/1.0/settings", url.Values{}, nil, headers, nil, nil)
+	if err != nil {
+		return err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return fmt.Errorf("Почта России credential probe rejected with status %d", status)
+	}
+	if len(response) == 0 || !json.Valid(response) {
+		return errors.New("Почта России credential probe returned invalid JSON")
+	}
+	return nil
+}
+
+var _ pochtarussia.Transport = pochtarussiaHTTP{}

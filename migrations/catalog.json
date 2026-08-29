@@ -453,6 +453,26 @@
       },
       "backfill": null,
       "sha256": "3aadf8cc27e278ba0ffed782601d61986e1bed6e72d182724c92da7f7b9371f7"
+    },
+    {
+      "version": 22,
+      "name": "ai_provider_gemini_grok",
+      "file": "000022_ai_provider_gemini_grok.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [21],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "45da4146d803a61db2938af55e5b4a1600377cd9621f2be3bc776512542b4ef5"
     }
   ]
 }

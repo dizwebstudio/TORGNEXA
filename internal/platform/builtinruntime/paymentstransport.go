@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	robokassa "github.com/torgnexa/torgnexa/connectors/robokassa"
-	sbp "github.com/torgnexa/torgnexa/connectors/sbp"
-	yookassa "github.com/torgnexa/torgnexa/connectors/yookassa"
+	robokassa "github.com/torgnexa/torgnexa/connectors/payments/robokassa"
+	sbp "github.com/torgnexa/torgnexa/connectors/payments/sbp"
+	yookassa "github.com/torgnexa/torgnexa/connectors/payments/yookassa"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -32,7 +32,7 @@ func sha256Hex(v []byte) string {
 
 // splitBasicCredential separates a "username\npassword" secret bundle, the
 // same one-secret-slot convention onec/woocommerce/prestashop already use
-// for HTTP Basic Auth (see connectors/onec/connector.go parseCredentialBundle).
+// for HTTP Basic Auth (see connectors/erp/onec/connector.go parseCredentialBundle).
 func splitBasicCredential(secret []byte) (user, pass []byte, err error) {
 	if len(secret) < 3 || len(secret) > 4096 {
 		return nil, nil, errors.New("payment credential: invalid length")

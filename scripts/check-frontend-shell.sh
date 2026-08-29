@@ -5,7 +5,16 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 command -v node >/dev/null
-command -v tsc >/dev/null
+
+if command -v tsc >/dev/null 2>&1; then
+  tsc_bin="$(command -v tsc)"
+elif [[ -x frontend/node_modules/.bin/tsc ]]; then
+  # Prefer the repository's pinned compiler when the host has no global tsc.
+  tsc_bin="$root/frontend/node_modules/.bin/tsc"
+else
+  echo "frontend-check: tsc is required (install frontend dependencies or provide a global compiler)" >&2
+  exit 1
+fi
 
 node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
 if [[ "$node_major" -lt 22 ]]; then
@@ -15,15 +24,20 @@ fi
 
 tmp="frontend/.repository-test"
 rm -rf "$tmp"
-trap 'rm -rf "$tmp"' EXIT
+# Docker-based local runs may leave frontend/dist owned by an unprivileged
+# container user. Build validation must not depend on being able to overwrite
+# that deployment artifact, so keep its output in an isolated temporary dir.
+build_dir="$(mktemp -d "${TMPDIR:-/tmp}/torgnexa-frontend-build.XXXXXX")"
+trap 'rm -rf "$tmp" "$build_dir"' EXIT
 
-tsc -p frontend/tsconfig.logic.json
+"$tsc_bin" -p frontend/tsconfig.logic.json
 node --test frontend/test/*.test.mjs
-tsc -p frontend/tsconfig.repository.json
+"$tsc_bin" -p frontend/tsconfig.repository.json
 python3 scripts/generate-frontend-connector-catalog.py --check
 
 python3 - <<'PY'
 import json
+import re
 from pathlib import Path
 
 root = Path('.')
@@ -55,13 +69,21 @@ source_files = [p for p in sorted((root/'frontend/src').rglob('*')) if p.is_file
 source = '\n'.join(p.read_text(errors='strict') for p in source_files)
 handwritten_source = '\n'.join(p.read_text(errors='strict') for p in source_files if 'generated' not in p.relative_to(root/'frontend/src').parts)
 lower = source.lower()
-handwritten_lower = handwritten_source.lower()
 for forbidden in ('localstorage', 'sessionstorage', 'document.cookie', 'organization_id', 'workspace_id'):
     if forbidden in lower:
         raise SystemExit(f'frontend-check: forbidden browser/session or tenant selector token: {forbidden}')
-for provider in ('wildberries', 'ozon', 'yandex_market', 'aliexpress', 'avito', 'megamarket'):
-    if provider in handwritten_lower:
-        raise SystemExit(f'frontend-check: provider-specific branch/token is forbidden in shell source: {provider}')
+provider_names = ('wildberries', 'ozon', 'yandex_market', 'aliexpress', 'avito', 'megamarket')
+# Provider names are valid display data (the catalog and documentation must
+# show the services). Only reject routing branches that compare a connector
+# identity to a provider literal; operational behavior must remain metadata- or
+# capability-driven.
+identity = r'(?:\.\s*id\b|\bconnector_(?:id|account_id)\b|\bconnector(?:Id|ID)\b)'
+comparison = r'(?:===|!==|==|!=)'
+for provider in provider_names:
+    literal = rf'["\'][^"\']*{re.escape(provider)}[^"\']*["\']'
+    branch = re.compile(rf'{identity}\s*{comparison}\s*{literal}|\bcase\s+{literal}', re.IGNORECASE)
+    if branch.search(handwritten_source):
+        raise SystemExit(f'frontend-check: provider-specific branch is forbidden in shell source: {provider}')
 if 'from "@torgnexa/sdk"' not in source:
     raise SystemExit('frontend-check: frontend must consume the generated TypeScript SDK package')
 if 'window.__TORGNEXA_AUTH_ADAPTER__' not in source:
@@ -74,7 +96,7 @@ print('Frontend static policy: PASS')
 PY
 
 if [[ -d frontend/node_modules ]]; then
-  npm --prefix frontend run build
+  npm --prefix frontend run build -- --outDir "$build_dir"
 else
   echo "frontend-check: node_modules absent; frontend remains source-only and cannot enter a production JS release without a committed lockfile"
 fi

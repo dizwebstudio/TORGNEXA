@@ -20,7 +20,7 @@ const roleLabels:Record<string,string>={customer:"Покупатель",supplier
 export function CounterpartiesPage(){
  const api=useApi() as unknown as Client;
  const [tab,setTab]=useState<"roles"|"search">("roles");
- return <Page eyebrow="Commerce Core" title="Контрагенты" description="Роли контрагентов (покупатель/поставщик/партнёр) и канонический справочник юридических лиц.">
+ return <Page eyebrow="Контрагенты" title="Контрагенты" description="Роли контрагентов (покупатель/поставщик/партнёр) и канонический справочник юридических лиц.">
   <div className="catalog-tabs" role="tablist">
    <button role="tab" aria-selected={tab==="roles"} className={tab==="roles"?"active":""} onClick={()=>setTab("roles")}>Роли</button>
    <button role="tab" aria-selected={tab==="search"} className={tab==="search"?"active":""} onClick={()=>setTab("search")}>Поиск по реестру</button>
@@ -54,7 +54,7 @@ function Search({api}:{api:Client}){
  });
  return <div className="catalog-stack">
   <section className="panel inline-create">
-   <div><h2>Поиск в реестре юридических лиц</h2><p>Canonical-справочник — используется MCP-инструментом «Поиск контрагентов» и обработкой заказов.</p></div>
+   <div><h2>Поиск в реестре юридических лиц</h2><p>Канонический справочник — используется инструментом «Поиск контрагентов» и обработкой заказов.</p></div>
    <form onSubmit={e=>{e.preventDefault();setSubmitted({q:query.trim(),inn:inn.trim(),partyType})}}>
     <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Название или код"/>
     <input value={inn} onChange={e=>setInn(e.target.value)} placeholder="ИНН" maxLength={12}/>

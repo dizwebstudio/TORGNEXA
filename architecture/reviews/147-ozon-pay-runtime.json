@@ -10,11 +10,11 @@
     "VALIDATION_REPORT.md",
     "architecture/policy.json",
     "architecture/reviews/147-ozon-pay-runtime.json",
-    "connectors/ozon-pay/candidate_transport.go",
-    "connectors/ozon-pay/connector.go",
-    "connectors/ozon-pay/connector_test.go",
-    "connectors/ozon-pay/manifest.json",
-    "connectors/ozon-pay/presentation.json",
+    "connectors/payments/ozon-pay/candidate_transport.go",
+    "connectors/payments/ozon-pay/connector.go",
+    "connectors/payments/ozon-pay/connector_test.go",
+    "connectors/payments/ozon-pay/manifest.json",
+    "connectors/payments/ozon-pay/presentation.json",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/10-integrations-matrix.md",
     "docs/connectors/ozon-pay/README.md",
@@ -65,6 +65,6 @@
     {"area":"operations_rollback","status":"affected","evidence":"The finance entry can be disabled through runtime support without a migration or destructive rollback."},
     {"area":"testing_conformance","status":"affected","evidence":"Deterministic connector and host transport tests cover credential shape, callback use and bounded request routing; the machine report records SDK checks."}
   ],
-  "provider": {"id":"ozon-pay","route":"connector_sdk","manifest":"connectors/ozon-pay/manifest.json","connector_spec":"docs/connectors/ozon-pay/spec.md","capability_audit":"docs/connectors/ozon-pay/capability-audit.md","conformance_plan":"docs/connectors/ozon-pay/conformance-plan.md"},
+  "provider": {"id":"ozon-pay","route":"connector_sdk","manifest":"connectors/payments/ozon-pay/manifest.json","connector_spec":"docs/connectors/ozon-pay/spec.md","capability_audit":"docs/connectors/ozon-pay/capability-audit.md","conformance_plan":"docs/connectors/ozon-pay/conformance-plan.md"},
   "follow_up_tasks": []
 }

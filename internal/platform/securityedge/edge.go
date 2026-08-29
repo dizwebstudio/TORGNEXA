@@ -94,7 +94,7 @@ func ClientIP(remoteAddr, forwarded string, c Config) (netip.Addr, error) {
 }
 func AdminAllowed(ip netip.Addr, c Config) bool { return trusted(ip, c.AdminCIDRs) }
 func SecurityHeaders(c Config) map[string]string {
-	return map[string]string{"Strict-Transport-Security": "max-age=" + itoa(c.HSTSSeconds) + "; includeSubDomains", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Permissions-Policy": "camera=(), microphone=(), geolocation=()", "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; object-src 'none'", "Cross-Origin-Opener-Policy": "same-origin"}
+	return map[string]string{"Strict-Transport-Security": "max-age=" + itoa(c.HSTSSeconds) + "; includeSubDomains", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Permissions-Policy": "camera=(), microphone=(), geolocation=()", "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; frame-ancestors 'none'; object-src 'none'", "Cross-Origin-Opener-Policy": "same-origin"}
 }
 func itoa(n int64) string {
 	if n == 0 {

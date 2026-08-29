@@ -12,7 +12,7 @@ Audit current Russia-facing seller integration path and implement supported base
 Task 036 registers `aliexpress-ru` as a deliberately narrow read-only marketplace provider. Admission is based on the Russia-facing seller API (`openapi.aliexpress.ru`, JWT in `X-Auth-Token`) and grants only `products.read`; it does not import global AliExpress API assumptions.
 
 ## Deliverables
-- `connectors/aliexpress-ru`: host-mediated Russia seller product reader, cursor, fixtures, adversarial tests and Task-064 conformance candidate;
+- `connectors/marketplaces/aliexpress-ru`: host-mediated Russia seller product reader, cursor, fixtures, adversarial tests and Task-064 conformance candidate;
 - `docs/connectors/aliexpress-ru`: capability audit, spec, reconciliation notes, conformance plan/report;
 - architecture provider admission `ARCH-036`;
 - explicit deferred capability boundary for inventory, prices, orders and every mutation.

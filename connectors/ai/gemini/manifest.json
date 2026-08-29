@@ -1,0 +1,11 @@
+{
+  "id": "gemini",
+  "name": "Google Gemini",
+  "family": "ai",
+  "version": "1.0.0",
+  "sdk_version": 1,
+  "capabilities": ["ai.completion.generate"],
+  "auth": [{"kind": "api_key", "secret_class": "ai_provider_credential", "required": true}],
+  "connection_test": {"url": "https://generativelanguage.googleapis.com/v1beta/models", "method": "GET", "headers": {"x-goog-api-key": "${secret}"}},
+  "rate_limit": {"max_concurrency": 2, "min_interval_ms": 200, "request_timeout_ms": 30000, "retry": {"max_attempts": 3, "base_backoff_ms": 500, "max_backoff_ms": 10000}}
+}

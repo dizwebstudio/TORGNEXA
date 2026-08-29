@@ -70,13 +70,20 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 		return SandboxProbeResult{}, err
 	}
 	defer os.RemoveAll(root)
-	if err := os.MkdirAll(filepath.Join(root, "bin"), 0555); err != nil {
+	bin := filepath.Join(root, "bin")
+	// The staging directory must be writable while the host copies the
+	// emulator. It is sealed below before entering the isolated namespace.
+	if err := os.MkdirAll(bin, 0700); err != nil {
 		return SandboxProbeResult{}, err
 	}
-	if err := copyExecutable(emulatorExecutable, filepath.Join(root, "bin", "emulator")); err != nil {
+	if err := copyExecutable(emulatorExecutable, filepath.Join(bin, "emulator")); err != nil {
 		return SandboxProbeResult{}, err
 	}
-	// No /etc, /run, /home, /proc or production secret mount is created.
+	// No /etc, /run, /home, /proc or production secret mount is created. Seal
+	// both directories after staging so the child cannot write its root.
+	if err := os.Chmod(bin, 0555); err != nil {
+		return SandboxProbeResult{}, err
+	}
 	if err := os.Chmod(root, 0555); err != nil {
 		return SandboxProbeResult{}, err
 	}

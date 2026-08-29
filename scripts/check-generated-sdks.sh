@@ -7,6 +7,13 @@ export PYTHONDONTWRITEBYTECODE=1
 export LC_ALL=C
 export TZ=UTC
 
+# py_compile writes bytecode even when PYTHONDONTWRITEBYTECODE is set. Keep
+# that verification output outside the repository so a root-owned Docker
+# cache cannot make the SDK gate fail with a misleading permission error.
+python_cache="$(mktemp -d)"
+trap 'rm -rf -- "$python_cache"' EXIT
+export PYTHONPYCACHEPREFIX="$python_cache"
+
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd -- "$repo_root"
 

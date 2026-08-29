@@ -175,6 +175,8 @@ func RequiredSyncCapabilities(family Family, entityType string) (Capability, Cap
 			return "products.read", "products.write", true
 		case "inventory":
 			return "inventory.read", "inventory.write", true
+		case "prices":
+			return "prices.read", "prices.write", true
 		case "orders":
 			return "orders.read", "orders.status.write", true
 		}

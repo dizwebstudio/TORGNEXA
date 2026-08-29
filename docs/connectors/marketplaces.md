@@ -1,7 +1,7 @@
 # Marketplace Connectors
 
 This page is the entry point for marketplace integrations shipped in the
-repository. It records repository state as of **2026-08-26**. Connector
+repository. It records repository state as of **2026-08-28**. Connector
 manifests remain the authoritative source for admitted capabilities; provider
 specifications and audits explain how those capabilities map to the remote API.
 
@@ -15,6 +15,8 @@ specifications and audits explain how those capabilities map to the remote API.
 | [Megamarket](megamarket/README.md) | `inventory.read`, `orders.read`, `products.read` | none | [audit](megamarket/capability-audit.md), [spec](megamarket/spec.md), [conformance](megamarket/conformance-report.json), [reconciliation](megamarket/reconciliation.md) |
 | [Magnit Market](magnit-market/README.md) | `inventory.read`, `orders.read`, `prices.read`, `products.read` | none | [audit](magnit-market/capability-audit.md), [spec](magnit-market/spec.md), [conformance](magnit-market/conformance-report.json), [reconciliation](magnit-market/reconciliation.md) |
 | [AliExpress RU](aliexpress-ru/README.md) | `products.read` | none | [audit](aliexpress-ru/capability-audit.md), [spec](aliexpress-ru/spec.md), [conformance](aliexpress-ru/conformance-report.json), [reconciliation](aliexpress-ru/reconciliation.md) |
+| Lamoda | `inventory.read`, `orders.read`, `prices.read`, `products.read` (SDK contract) | health-check only | [audit](lamoda/capability-audit.md), [spec](lamoda/spec.md), [conformance](lamoda/conformance-report.json) |
+| М.Видео | `inventory.read`, `orders.read`, `products.read` (SDK contract) | health-check only | [audit](mvideo/capability-audit.md), [spec](mvideo/spec.md), [conformance](mvideo/conformance-report.json) |
 
 Each linked conformance report currently records a passing 13/13 repository
 suite for connector version 1.0.0 and SDK v1. That result proves the bounded,
@@ -60,6 +62,10 @@ or qualification on the exact production account and release topology.
 Start with `templates/connector-spec.md`, declare the minimum required
 capabilities in the manifest, and add deterministic remote-response tests. A
 verified connector must pass `contracts/conformance/connector-conformance.yaml`.
+Lamoda and М.Видео are deliberately health-only in the current runtime. The
+operator supplies the current HTTPS partner endpoint and credentials; a green
+probe proves connectivity for that account only. It does not enable product,
+price, stock or order synchronization.
 Any write expansion also needs canonical desired-state semantics, retry and
 idempotency rules, reconciliation behavior, risk classification and audit
 evidence before the capability is admitted.

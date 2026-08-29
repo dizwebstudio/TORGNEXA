@@ -3,9 +3,9 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "e41e3e3e9fca2b93ca359e822d46b2a610fde36f2eebbf81dc541bda9f41060d",
+    "sha256": "c553429d319160d151b2698cf78587ee795039b1b16015826fb7d9199f484580",
     "openapi_version": "3.1.0",
-    "api_version": "0.21.1",
+    "api_version": "0.21.2",
     "server_path": "/api/v1"
   },
   "operations": [
@@ -28,6 +28,11 @@
       "operation_id": "assignProductCategory",
       "method": "POST",
       "path": "/products/{product_id}/categories/{category_id}"
+    },
+    {
+      "operation_id": "changeOrderStatus",
+      "method": "PATCH",
+      "path": "/orders/{order_id}/status"
     },
     {
       "operation_id": "checkConnectorAccount",

@@ -11,7 +11,7 @@ platforms, with a large installed base among mid-market merchants.
 
 ## Scope
 
-- New `connectors/magento` package: products/inventory/prices/orders/returns
+- New `connectors/storefronts/magento` package: products/inventory/prices/orders/returns
   read, prices/inventory write, order cancellation write, and product update
   (excluding SKU rename — see Explicit exclusions). Host-injected transport
   (`store_host`/`base_path`/`store_currency` runtime config), the same

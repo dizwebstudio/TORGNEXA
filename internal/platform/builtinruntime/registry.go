@@ -10,47 +10,51 @@ import (
 	"strings"
 	"time"
 
-	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
-	bitrixstore "github.com/torgnexa/torgnexa/connectors/bitrix"
-	bitrix24 "github.com/torgnexa/torgnexa/connectors/bitrix24"
-	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
-	cdek "github.com/torgnexa/torgnexa/connectors/cdek"
-	claude "github.com/torgnexa/torgnexa/connectors/claude"
-	cscart "github.com/torgnexa/torgnexa/connectors/cs-cart"
-	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
-	dellin "github.com/torgnexa/torgnexa/connectors/dellin"
-	fivepost "github.com/torgnexa/torgnexa/connectors/fivepost"
-	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
-	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
-	lmstudio "github.com/torgnexa/torgnexa/connectors/lm-studio"
-	magento "github.com/torgnexa/torgnexa/connectors/magento"
-	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
-	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
-	medusa "github.com/torgnexa/torgnexa/connectors/medusa"
-	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
-	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
-	ollama "github.com/torgnexa/torgnexa/connectors/ollama"
-	onec "github.com/torgnexa/torgnexa/connectors/onec"
-	openwebui "github.com/torgnexa/torgnexa/connectors/open-webui"
-	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
-	opencart "github.com/torgnexa/torgnexa/connectors/opencart"
-	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
-	ozondelivery "github.com/torgnexa/torgnexa/connectors/ozon-delivery"
-	ozonpay "github.com/torgnexa/torgnexa/connectors/ozon-pay"
-	pek "github.com/torgnexa/torgnexa/connectors/pek"
-	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
-	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
-	robokassa "github.com/torgnexa/torgnexa/connectors/robokassa"
-	saleor "github.com/torgnexa/torgnexa/connectors/saleor"
-	sbp "github.com/torgnexa/torgnexa/connectors/sbp"
-	shopify "github.com/torgnexa/torgnexa/connectors/shopify"
-	shopware "github.com/torgnexa/torgnexa/connectors/shopware"
-	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
-	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
-	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
-	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
-	yandexgpt "github.com/torgnexa/torgnexa/connectors/yandexgpt"
-	yookassa "github.com/torgnexa/torgnexa/connectors/yookassa"
+	claude "github.com/torgnexa/torgnexa/connectors/ai/claude"
+	deepseek "github.com/torgnexa/torgnexa/connectors/ai/deepseek"
+	gemini "github.com/torgnexa/torgnexa/connectors/ai/gemini"
+	gigachat "github.com/torgnexa/torgnexa/connectors/ai/gigachat"
+	grok "github.com/torgnexa/torgnexa/connectors/ai/grok"
+	kimi "github.com/torgnexa/torgnexa/connectors/ai/kimi"
+	lmstudio "github.com/torgnexa/torgnexa/connectors/ai/lm-studio"
+	ollama "github.com/torgnexa/torgnexa/connectors/ai/ollama"
+	openwebui "github.com/torgnexa/torgnexa/connectors/ai/open-webui"
+	openaicompatible "github.com/torgnexa/torgnexa/connectors/ai/openai-compatible"
+	qwen "github.com/torgnexa/torgnexa/connectors/ai/qwen"
+	yandexgpt "github.com/torgnexa/torgnexa/connectors/ai/yandexgpt"
+	bitrix24 "github.com/torgnexa/torgnexa/connectors/crm/bitrix24"
+	moysklad "github.com/torgnexa/torgnexa/connectors/erp/moysklad"
+	onec "github.com/torgnexa/torgnexa/connectors/erp/onec"
+	cbrfx "github.com/torgnexa/torgnexa/connectors/finance/cbr-fx"
+	cdek "github.com/torgnexa/torgnexa/connectors/logistics/cdek"
+	dellin "github.com/torgnexa/torgnexa/connectors/logistics/dellin"
+	fivepost "github.com/torgnexa/torgnexa/connectors/logistics/fivepost"
+	ozondelivery "github.com/torgnexa/torgnexa/connectors/logistics/ozon-delivery"
+	pek "github.com/torgnexa/torgnexa/connectors/logistics/pek"
+	pochtarussia "github.com/torgnexa/torgnexa/connectors/logistics/pochta-russia"
+	aliexpressru "github.com/torgnexa/torgnexa/connectors/marketplaces/aliexpress-ru"
+	magnitmarket "github.com/torgnexa/torgnexa/connectors/marketplaces/magnit-market"
+	megamarket "github.com/torgnexa/torgnexa/connectors/marketplaces/megamarket"
+	ozon "github.com/torgnexa/torgnexa/connectors/marketplaces/ozon"
+	wildberries "github.com/torgnexa/torgnexa/connectors/marketplaces/wildberries"
+	yandexmarket "github.com/torgnexa/torgnexa/connectors/marketplaces/yandex-market"
+	dolyami "github.com/torgnexa/torgnexa/connectors/payments/dolyami"
+	ozonpay "github.com/torgnexa/torgnexa/connectors/payments/ozon-pay"
+	robokassa "github.com/torgnexa/torgnexa/connectors/payments/robokassa"
+	sbp "github.com/torgnexa/torgnexa/connectors/payments/sbp"
+	yookassa "github.com/torgnexa/torgnexa/connectors/payments/yookassa"
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
+	telegram "github.com/torgnexa/torgnexa/connectors/social/telegram"
+	bitrixstore "github.com/torgnexa/torgnexa/connectors/storefronts/bitrix"
+	cscart "github.com/torgnexa/torgnexa/connectors/storefronts/cs-cart"
+	magento "github.com/torgnexa/torgnexa/connectors/storefronts/magento"
+	medusa "github.com/torgnexa/torgnexa/connectors/storefronts/medusa"
+	opencart "github.com/torgnexa/torgnexa/connectors/storefronts/opencart"
+	prestashop "github.com/torgnexa/torgnexa/connectors/storefronts/prestashop"
+	saleor "github.com/torgnexa/torgnexa/connectors/storefronts/saleor"
+	shopify "github.com/torgnexa/torgnexa/connectors/storefronts/shopify"
+	shopware "github.com/torgnexa/torgnexa/connectors/storefronts/shopware"
+	woocommerce "github.com/torgnexa/torgnexa/connectors/storefronts/woocommerce"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/fx"
 )
@@ -337,6 +341,30 @@ func (r *Registry) SupportsProductWrite(account sdk.Account) bool {
 	return SupportsCapability(account.ConnectorID, "products.write")
 }
 
+// ProductStatus translates the canonical catalog lifecycle into the remote
+// vocabulary accepted by the admitted product writer. The SDK deliberately
+// keeps ProductWriteRequest.StatusRemoteID provider-native; this translation
+// therefore belongs at the provider composition boundary, not in Core or the
+// generic commerce event route.
+func (r *Registry) ProductStatus(connectorID, status string) (string, bool) {
+	if r == nil || !SupportsCapability(connectorID, "products.write") {
+		return "", false
+	}
+	mappings := map[string]map[string]string{
+		"bitrix":      {"draft": "N", "active": "Y", "archived": "N"},
+		"cs-cart":     {"draft": "D", "active": "A", "archived": "H"},
+		"magento":     {"draft": "disabled", "active": "enabled", "archived": "disabled"},
+		"medusa":      {"draft": "draft", "active": "published", "archived": "rejected"},
+		"opencart":    {"draft": "draft", "active": "publish", "archived": "draft"},
+		"saleor":      {"draft": "unpublished", "active": "published", "archived": "unpublished"},
+		"shopify":     {"draft": "draft", "active": "active", "archived": "archived"},
+		"shopware":    {"draft": "inactive", "active": "active", "archived": "inactive"},
+		"woocommerce": {"draft": "draft", "active": "publish", "archived": "private"},
+	}
+	value, ok := mappings[connectorID][status]
+	return value, ok
+}
+
 // SocialPublisher resolves an admitted social publisher without exposing the
 // provider implementation outside this reviewed composition boundary.
 func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.SocialPublisher, error) {
@@ -460,6 +488,13 @@ func (r *Registry) RuntimeConfigRequired(connectorID string) bool {
 	return r != nil && ok && value.RuntimeConfigRequired
 }
 
+// HealthOnly reports whether an account may be activated after a successful
+// health check even though no domain capability is admitted yet. This keeps
+// provider credentials testable without manufacturing a synchronization route.
+func (r *Registry) HealthOnly(connectorID string) bool {
+	return r != nil && HealthOnly(connectorID)
+}
+
 // SocialTextLimit reports the exact provider ceiling admitted on the shared
 // Social surface. Zero means the text-publish route is unavailable.
 func (r *Registry) SocialTextLimit(connectorID string) int {
@@ -493,6 +528,10 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		return ozon.New(ozonHTTP{r.http}, nil), nil
 	case "ozon-pay":
 		return ozonpay.New(ozonPayHTTP{r.http}, nil), nil
+	case "dolyami":
+		if load != nil {
+			return dolyami.New(dolyamiHTTP{base: r.http}, dolyamiConfigSource{load: load}, nil), nil
+		}
 	case "ozon-delivery":
 		return ozondelivery.New(ozonDeliveryHTTP{r.http}, nil), nil
 	case "moysklad":
@@ -581,10 +620,38 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		return cdek.New(cdekHTTP{r.http}, nil), nil
 	case "dellin":
 		return dellin.New(dellinHTTP{r.http}, nil), nil
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 	default:
+		if HealthOnly(account.ConnectorID) {
+			return catalogProbeConnector{h: r.http, id: account.ConnectorID, config: load}, nil
+		}
 		return nil, ErrUnavailable
 	}
 	return nil, ErrConfigurationNeeded
+}
+
+type dolyamiConfigSource struct{ load ConfigLoader }
+
+func (source dolyamiConfigSource) Resolve(ctx context.Context, account sdk.Account) (dolyami.Configuration, error) {
+	if source.load == nil {
+		return dolyami.Configuration{}, dolyami.ErrConfigurationMissing
+	}
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return dolyami.Configuration{}, dolyami.ErrConfigurationMissing
+	}
+	var value struct {
+		ProbeURL string `json:"probe_url"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return dolyami.Configuration{}, dolyami.ErrInvalidConfiguration
+	}
+	configuration := dolyami.Configuration{ProbeURL: value.ProbeURL}
+	if configuration.Validate() != nil {
+		return dolyami.Configuration{}, dolyami.ErrInvalidConfiguration
+	}
+	return configuration, nil
 }
 
 // PriceWriter resolves only first-party connectors that explicitly advertise
@@ -630,6 +697,11 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -639,7 +711,37 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	if r == nil || account.Validate() != nil {
 		return false
 	}
-	return account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor"
+	// Keep the adapter-level admission stable for callers that use this port
+	// outside the generic sync route. The generated runtime-support contract
+	// separately controls which entities the production worker may route.
+	return account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop"
+}
+
+// InventoryWriter resolves first-party connectors with an executable
+// inventory.write route. The support declaration remains the source of truth
+// for which connector accounts are admitted to this surface.
+func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.InventoryWriter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// SupportsInventoryWrite reports whether the built-in runtime has an
+// executable inventory.write adapter for the account's connector.
+func (r *Registry) SupportsInventoryWrite(account sdk.Account) bool {
+	if r == nil || account.Validate() != nil {
+		return false
+	}
+	return SupportsCapability(account.ConnectorID, "inventory.write")
 }
 
 type marketplaceReader struct {
@@ -1123,6 +1225,10 @@ func (r *Registry) AICompletion(ctx context.Context, account sdk.Account, runtim
 		return deepseek.New(deepseekHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	case "claude":
 		return claude.New(claudeHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "gemini":
+		return gemini.New(geminiHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
+	case "grok":
+		return grok.New(grokHTTP{r.http}, nil).Complete(ctx, account, runtime, host, model, systemPrompt, userPrompt)
 	default:
 		return "", "", ErrUnavailable
 	}

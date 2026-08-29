@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {allowedNavigation, canOpenPath} from "../.repository-test/shell/navigation.js";
+import {allowedNavigation, canOpenPath, isKnownPath, navigationItems} from "../.repository-test/shell/navigation.js";
 import {connectorCatalog} from "../.repository-test/generated/connector-catalog.js";
 
 test("navigation is capability-aware", () => {
@@ -22,4 +22,13 @@ test("generated connector catalog is sorted, unique and contains marketplace man
 test("unknown or missing capability fails closed", () => {
   assert.equal(canOpenPath("/compliance", ["products.read"]), false);
   assert.equal(canOpenPath("/missing", ["products.read"]), false);
+});
+
+test("navigation shortcuts are unique and unknown nested routes are 404 candidates", () => {
+  const shortcuts = navigationItems.map((item) => item.shortcut).filter(Boolean);
+  assert.equal(new Set(shortcuts).size, shortcuts.length);
+  assert.equal(navigationItems.find((item) => item.id === "orders")?.shortcut, "G O");
+  assert.equal(isKnownPath("/orders/order-1"), true);
+  assert.equal(isKnownPath("/orders/order-1/unknown"), false);
+  assert.equal(isKnownPath("/missing"), false);
 });

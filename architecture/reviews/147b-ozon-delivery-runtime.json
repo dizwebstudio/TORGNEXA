@@ -11,11 +11,11 @@
     "VALIDATION_REPORT.md",
     "architecture/policy.json",
     "architecture/reviews/147b-ozon-delivery-runtime.json",
-    "connectors/ozon-delivery/candidate_transport.go",
-    "connectors/ozon-delivery/connector.go",
-    "connectors/ozon-delivery/connector_test.go",
-    "connectors/ozon-delivery/manifest.json",
-    "connectors/ozon-delivery/presentation.json",
+    "connectors/logistics/ozon-delivery/candidate_transport.go",
+    "connectors/logistics/ozon-delivery/connector.go",
+    "connectors/logistics/ozon-delivery/connector_test.go",
+    "connectors/logistics/ozon-delivery/manifest.json",
+    "connectors/logistics/ozon-delivery/presentation.json",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/10-integrations-matrix.md",
     "docs/connectors/ozon-delivery/README.md",
@@ -67,6 +67,6 @@
     {"area":"operations_rollback","status":"affected","evidence":"The Delivery entry can be disabled through runtime support without a migration or destructive rollback."},
     {"area":"testing_conformance","status":"affected","evidence":"Deterministic connector and host transport tests cover credential shape, callback use and bounded request routing; the machine report records SDK checks."}
   ],
-  "provider": {"id":"ozon-delivery","route":"connector_sdk","manifest":"connectors/ozon-delivery/manifest.json","connector_spec":"docs/connectors/ozon-delivery/spec.md","capability_audit":"docs/connectors/ozon-delivery/capability-audit.md","conformance_plan":"docs/connectors/ozon-delivery/conformance-plan.md"},
+  "provider": {"id":"ozon-delivery","route":"connector_sdk","manifest":"connectors/logistics/ozon-delivery/manifest.json","connector_spec":"docs/connectors/ozon-delivery/spec.md","capability_audit":"docs/connectors/ozon-delivery/capability-audit.md","conformance_plan":"docs/connectors/ozon-delivery/conformance-plan.md"},
   "follow_up_tasks": []
 }

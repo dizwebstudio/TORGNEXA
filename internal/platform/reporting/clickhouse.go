@@ -215,7 +215,7 @@ func (p *ClickHouseQueryPort) Inventory(ctx context.Context, scope tenancy.Scope
 	if ctx == nil || !scope.Valid() || query.Validate() != nil {
 		return nil, ErrInvalid
 	}
-	const statement = `SELECT offer_id,warehouse_id,quantity,formatDateTime(changed_at,'%FT%T.%6fZ','UTC') AS changed_at,event_id FROM torgnexa_reporting.inventory_current_v1 WHERE organization_id={organization_id:String} AND workspace_id={workspace_id:String} AND ({offer_id:String}='' OR offer_id={offer_id:String}) AND ({warehouse_id:String}='' OR warehouse_id={warehouse_id:String}) ORDER BY changed_at DESC,offer_id,warehouse_id LIMIT {limit:UInt64} FORMAT JSONEachRow`
+	const statement = `SELECT offer_id,warehouse_id,quantity,formatDateTime(changed_at,'%FT%T.%fZ','UTC') AS changed_at,event_id FROM torgnexa_reporting.inventory_current_v1 WHERE organization_id={organization_id:String} AND workspace_id={workspace_id:String} AND ({offer_id:String}='' OR offer_id={offer_id:String}) AND ({warehouse_id:String}='' OR warehouse_id={warehouse_id:String}) ORDER BY changed_at DESC,offer_id,warehouse_id LIMIT {limit:UInt64} FORMAT JSONEachRow`
 	params := tenantParams(scope)
 	params.Set("param_offer_id", query.OfferID)
 	params.Set("param_warehouse_id", query.WarehouseID)
@@ -249,7 +249,7 @@ func (p *ClickHouseQueryPort) Freshness(ctx context.Context, scope tenancy.Scope
 	if ctx == nil || !scope.Valid() {
 		return nil, ErrInvalid
 	}
-	const statement = `SELECT event_family,formatDateTime(last_occurred_at,'%FT%T.%6fZ','UTC') AS last_occurred_at,formatDateTime(last_ingested_at,'%FT%T.%6fZ','UTC') AS last_ingested_at,formatDateTime(observed_at,'%FT%T.%6fZ','UTC') AS observed_at,source_lag_seconds,event_count FROM torgnexa_reporting.freshness_v1 WHERE organization_id={organization_id:String} AND workspace_id={workspace_id:String} ORDER BY event_family LIMIT 500 FORMAT JSONEachRow`
+	const statement = `SELECT event_family,formatDateTime(last_occurred_at,'%FT%T.%fZ','UTC') AS last_occurred_at,formatDateTime(last_ingested_at,'%FT%T.%fZ','UTC') AS last_ingested_at,formatDateTime(observed_at,'%FT%T.%fZ','UTC') AS observed_at,source_lag_seconds,event_count FROM torgnexa_reporting.freshness_v1 WHERE organization_id={organization_id:String} AND workspace_id={workspace_id:String} ORDER BY event_family LIMIT 500 FORMAT JSONEachRow`
 	var wire []struct {
 		EventFamily      string `json:"event_family"`
 		LastOccurredAt   string `json:"last_occurred_at"`

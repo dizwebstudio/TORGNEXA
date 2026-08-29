@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/143-pek-logistics-connector.json",
-    "connectors/pek",
+    "connectors/logistics/pek",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "contracts/connectors/builtin-runtime-support-v1.schema.json",
     "docs/connectors/pek",
@@ -60,7 +60,7 @@
   "provider": {
     "id": "pek",
     "route": "connector_sdk",
-    "manifest": "connectors/pek/manifest.json",
+    "manifest": "connectors/logistics/pek/manifest.json",
     "connector_spec": "docs/connectors/pek/spec.md",
     "capability_audit": "docs/connectors/pek/capability-audit.md",
     "conformance_plan": "docs/connectors/pek/conformance-plan.md"

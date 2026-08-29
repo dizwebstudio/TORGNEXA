@@ -10,8 +10,8 @@
     "VALIDATION_REPORT.md",
     "architecture/policy.json",
     "architecture/reviews/145-cdek-dellin-delivery-verification.json",
-    "connectors/cdek/manifest.json",
-    "connectors/dellin",
+    "connectors/logistics/cdek/manifest.json",
+    "connectors/logistics/dellin",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/10-integrations-matrix.md",
     "docs/connectors/cdek",
@@ -69,7 +69,7 @@
   "provider": {
     "id": "dellin",
     "route": "connector_sdk",
-    "manifest": "connectors/dellin/manifest.json",
+    "manifest": "connectors/logistics/dellin/manifest.json",
     "connector_spec": "docs/connectors/dellin/spec.md",
     "capability_audit": "docs/connectors/dellin/capability-audit.md",
     "conformance_plan": "docs/connectors/dellin/conformance-plan.md"

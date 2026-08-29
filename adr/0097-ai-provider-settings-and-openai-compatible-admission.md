@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-Operators need a tenant-scoped way to configure an external AI provider (API key/host/model) and to send a bounded, caller-assembled analytics prompt to it for a completion, without Core, App or the settings API ever branching on which provider is configured. Task 122 must therefore do two things in one reviewed change, exactly as ADR 0048 did for the first marketplace provider: introduce a new settings/API capability (tenant-scoped `ai_provider_accounts`, create/list/disable/analyze endpoints) and register the first concrete provider under that capability, `openai-compatible`, family `ai`, under `connectors/openai-compatible`.
+Operators need a tenant-scoped way to configure an external AI provider (API key/host/model) and to send a bounded, caller-assembled analytics prompt to it for a completion, without Core, App or the settings API ever branching on which provider is configured. Task 122 must therefore do two things in one reviewed change, exactly as ADR 0048 did for the first marketplace provider: introduce a new settings/API capability (tenant-scoped `ai_provider_accounts`, create/list/disable/analyze endpoints) and register the first concrete provider under that capability, `openai-compatible`, family `ai`, under `connectors/ai/openai-compatible`.
 
 Leaving the capability without an admitted provider would ship dead settings UI; admitting a provider without the surrounding capability would give provider code a caller surface it does not own. Task 090's `internal/platform/builtinruntime` composition boundary already exists as the sole module allowed to branch on `ConnectorID`, so this task routes all provider dispatch through it rather than inventing a second exemption.
 

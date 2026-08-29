@@ -25,7 +25,7 @@ function headers(pathname, contentType, fileExists) {
   const immutable = fileExists && pathname.startsWith("/assets/");
   return {
     "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-store",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data:; font-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https:",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data: https:; font-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https:",
     "Content-Type": contentType,
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",

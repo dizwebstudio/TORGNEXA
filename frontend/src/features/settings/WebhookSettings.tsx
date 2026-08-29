@@ -47,9 +47,9 @@ export function WebhookSettings(){
   </section>:null}
   {canRead?<section className="drawer-section">
     <h3>Доставки</h3>
-    <p className="settings-copy">История и повторная отправка по known delivery_id (например, из системы-получателя или лога инцидента).</p>
+    <p className="settings-copy">История и повторная отправка по известному идентификатору доставки (например, из системы-получателя или лога инцидента).</p>
     <div className="settings-grid">
-     <label className="field"><span>Delivery ID</span><input value={deliveryId} maxLength={128} onChange={e=>setDeliveryId(e.target.value)}/></label>
+     <label className="field"><span>Идентификатор доставки</span><input value={deliveryId} maxLength={128} onChange={e=>setDeliveryId(e.target.value)}/></label>
     </div>
     <div className="account-actions">
      <button className="button ghost" disabled={!deliveryId.trim()||lookupHistory.isPending} onClick={()=>lookupHistory.mutate()}>{lookupHistory.isPending?"Ищем…":"История попыток"}</button>

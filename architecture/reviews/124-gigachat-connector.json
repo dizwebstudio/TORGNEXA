@@ -7,11 +7,11 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/124-gigachat-connector.json",
-    "connectors/gigachat/capability-audit.md",
-    "connectors/gigachat/conformance.go",
-    "connectors/gigachat/connector.go",
-    "connectors/gigachat/connector_test.go",
-    "connectors/gigachat/manifest.json",
+    "connectors/ai/gigachat/capability-audit.md",
+    "connectors/ai/gigachat/conformance.go",
+    "connectors/ai/gigachat/connector.go",
+    "connectors/ai/gigachat/connector_test.go",
+    "connectors/ai/gigachat/manifest.json",
     "docs/connectors/gigachat/capability-audit.md",
     "docs/connectors/gigachat/conformance-plan.md",
     "docs/connectors/gigachat/conformance-report.json",
@@ -112,7 +112,7 @@
   "provider": {
     "id": "gigachat",
     "route": "connector_sdk",
-    "manifest": "connectors/gigachat/manifest.json",
+    "manifest": "connectors/ai/gigachat/manifest.json",
     "connector_spec": "docs/connectors/gigachat/spec.md",
     "capability_audit": "docs/connectors/gigachat/capability-audit.md",
     "conformance_plan": "docs/connectors/gigachat/conformance-plan.md"

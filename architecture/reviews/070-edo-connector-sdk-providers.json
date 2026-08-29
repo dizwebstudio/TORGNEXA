@@ -11,8 +11,8 @@
     "adr/0068-provider-neutral-edo.md",
     "architecture/policy.json",
     "architecture/reviews/070-edo-connector-sdk-providers.json",
-    "connectors/diadoc",
-    "connectors/saby-edo",
+    "connectors/edo/diadoc",
+    "connectors/edo/saby-edo",
     "contracts/operations/070-edo-v1.md",
     "docs/connectors/diadoc",
     "docs/connectors/saby-edo",
@@ -115,7 +115,7 @@
   "provider": {
     "id": "diadoc",
     "route": "connector_sdk",
-    "manifest": "connectors/diadoc/manifest.json",
+    "manifest": "connectors/edo/diadoc/manifest.json",
     "connector_spec": "docs/connectors/diadoc/spec.md",
     "capability_audit": "docs/connectors/diadoc/capability-audit.md",
     "conformance_plan": "docs/connectors/diadoc/conformance-plan.md"

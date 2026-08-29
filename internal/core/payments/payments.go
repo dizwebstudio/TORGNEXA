@@ -25,13 +25,13 @@ var (
 )
 
 var (
-	sortableIDPattern  = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
-	connectorIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
-	tokenPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
-	sourcePattern      = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
-	reasonPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
-	refPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
-	digestPattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
+	accountRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+	tokenPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+	sourcePattern     = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
+	reasonPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	refPattern        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+	digestPattern     = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 type PaymentID string
@@ -138,8 +138,9 @@ type Payment struct {
 }
 
 func (p Payment) Validate() error {
+	accountRef := p.ConnectorAccountID
 	if !p.ID.Valid() || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) ||
-		!connectorIDPattern.MatchString(p.ConnectorAccountID) || !refPattern.MatchString(p.ExternalID) ||
+		!accountRefPattern.MatchString(accountRef) || !refPattern.MatchString(p.ExternalID) ||
 		(p.RemoteID != "" && !refPattern.MatchString(p.RemoteID)) ||
 		!validOptionalText(p.Purpose, 210, false) || p.Amount.Validate() != nil ||
 		p.CommissionMinorUnits < 0 || !p.Status.Valid() || !validOptionalToken(p.RemoteStatus) ||
@@ -182,7 +183,8 @@ type CreatePayment struct {
 }
 
 func (c CreatePayment) Validate() error {
-	if !c.ID.Valid() || !connectorIDPattern.MatchString(c.ConnectorAccountID) || !refPattern.MatchString(c.ExternalID) ||
+	accountRef := c.ConnectorAccountID
+	if !c.ID.Valid() || !accountRefPattern.MatchString(accountRef) || !refPattern.MatchString(c.ExternalID) ||
 		!validOptionalText(c.Purpose, 210, false) || c.Amount.Validate() != nil || !isUTC(c.ExpiresAt) || !c.ExpiresAt.After(time.Now().UTC()) {
 		return ErrInvalidRecord
 	}
@@ -335,7 +337,8 @@ type WebhookEvidence struct {
 }
 
 func (e WebhookEvidence) Validate() error {
-	if !refPattern.MatchString(e.DeliveryID) || !connectorIDPattern.MatchString(e.ConnectorAccountID) ||
+	accountRef := e.ConnectorAccountID
+	if !refPattern.MatchString(e.DeliveryID) || !accountRefPattern.MatchString(accountRef) ||
 		!refPattern.MatchString(e.RemotePaymentID) || !tokenPattern.MatchString(e.EventType) ||
 		!digestPattern.MatchString(e.BodyDigest) || !isUTC(e.VerifiedAt) {
 		return ErrInvalidRecord

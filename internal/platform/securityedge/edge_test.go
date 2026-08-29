@@ -24,7 +24,7 @@ func TestHeadersCSRFAndLimits(t *testing.T) {
 		t.Fatal("config invalid")
 	}
 	h := SecurityHeaders(c)
-	if h["Strict-Transport-Security"] == "" || h["Content-Security-Policy"] == "" {
+	if h["Strict-Transport-Security"] == "" || h["Content-Security-Policy"] == "" || !strings.Contains(h["Content-Security-Policy"], "img-src 'self' data: https:") {
 		t.Fatal("headers missing")
 	}
 	if CSRFAllowed("POST", "https://evil.example", c) {

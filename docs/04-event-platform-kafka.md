@@ -51,6 +51,18 @@ entity type, and entity ID. Therefore one tenant aggregate is stable on one
 partition without exposing raw aggregate identifiers in the key. Ordering is
 per aggregate, not global.
 
+## Compose topic bootstrap
+
+The Community and single-VPS Compose profiles run a one-shot `kafka-init`
+container after the broker health check and before any application process.
+It idempotently creates every base topic from `deploy/kafka/topics.txt` plus its
+`.retry` and `.dlq` variants. This is explicit rather than relying on broker
+auto-creation, which is disabled or restricted in common Kafka deployments.
+`TORGNEXA_KAFKA_TOPIC_PARTITIONS` and
+`TORGNEXA_KAFKA_TOPIC_REPLICATION_FACTOR` control the created topic shape;
+single-node Community defaults both to `1`, while a production quorum must set a
+replication factor supported by its broker count.
+
 ## Producer requirements
 
 `kafkaeventbus.NewPublisher` fails closed unless the concrete producer reports:

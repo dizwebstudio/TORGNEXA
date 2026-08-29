@@ -1,4 +1,155 @@
-# Repository validation report — Tasks through 153 — 2026-08-28
+# Repository validation report — Tasks through 159 — 2026-08-28
+
+## Task 159 repository validation
+
+- Google Gemini and Grok are visible in Settings → AI providers and the report
+  AI selector;
+- Gemini uses `x-goog-api-key` and `generateContent`; Grok uses xAI Chat
+  Completions with a Bearer key;
+- both providers expose only bounded non-streaming text completion through the
+  governed AI egress path;
+- migration, OpenAPI, manifests, generated catalogs, policy, docs, tests and
+  conformance evidence are synchronized: **61 providers / 18 generic / 43
+  separate / 0 planned**;
+- Midjourney remains intentionally unavailable because its official policy
+  disallows third-party automation and provides no general public API.
+
+## OpenCart bridge extension validation
+
+- reference OpenCart 4.x extension is present under
+  `connectors/storefronts/opencart/extension/torgnexa`;
+- all 12 PHP bridge files pass `php -l` in `php:8.3-cli-alpine`;
+- `scripts/package-opencart-bridge.sh` produces a valid
+  `torgnexa.ocmod.zip` with the OpenCart `install.json` payload. The filename
+  is intentionally fixed because OpenCart derives the installed extension
+  code from it;
+- the bridge exposes the required health, catalog, variant, inventory and
+  order routes, uses a bearer-token digest boundary, and keeps customer PII
+  out of order projections;
+- live OpenCart Docker qualification remains deployment evidence and requires
+  a non-production OpenCart 4.x instance with the extension installed.
+
+### Local Docker smoke (2026-08-29)
+
+- `docker-compose.opencart-test.yml` builds OpenCart 4.1.0.4 and MariaDB with
+  a pinned SHA-256 release archive, installs the bridge and seeds synthetic
+  products/order data;
+- `scripts/opencart-smoke.sh`: **PASS** — unauthorized/authorized health,
+  product list and SKU lookup, price replay/conflict, inventory write/read,
+  product create/replay, order list and status update;
+- PHP 8.3 lint, OpenCart package `unzip -t` and Compose config: **PASS**;
+- the stack is local-only and is removed with
+  `docker compose -f docker-compose.opencart-test.yml down -v`; this evidence
+  does not qualify a production seller shop.
+
+## WooCommerce Docker smoke (2026-08-29)
+
+- `docker-compose.woocommerce-test.yml` builds WordPress 6.8.2, WooCommerce
+  9.8.5 and MariaDB, enables the official REST API v3 and creates a synthetic
+  Consumer Key/Secret pair;
+- Compose health now waits for the seeded `TORGNEXA-WOO-COFFEE` SKU instead of
+  treating an empty freshly-installed REST catalog as ready;
+- `scripts/woocommerce-smoke.sh`: **PASS** — unauthorized/authorized Basic
+  Auth, product list/SKU lookup, product price and managed-stock update,
+  order list/status update and refunds endpoint;
+- HTTPS uses a disposable self-signed certificate only for local validation;
+  the production transport must verify the remote certificate;
+- the stack is removed with
+  `docker compose -f docker-compose.woocommerce-test.yml down -v`; this is
+  deployment evidence for the WooCommerce API surface, not a production store
+  qualification.
+
+## PrestaShop Webservice Docker smoke (2026-08-29)
+
+- `docker-compose.prestashop-test.yml` builds the official
+  `prestashop/prestashop:8.1-apache` image with MariaDB, enables the native
+  Webservice API and seeds two synthetic products plus a least-privilege API
+  key;
+- `scripts/prestashop-smoke.sh`: **PASS** — unauthorized/authorized Basic
+  Auth, product list and reference lookup, official plural JSON envelope for a
+  single resource, XML product-price PATCH, StockAvailable PATCH/readback and
+  orders resource reachability;
+- connector unit coverage now accepts the plural JSON envelope returned by the
+  real `/api/products/{id}`, `/api/combinations/{id}` and `/api/orders/{id}`
+  endpoints while preserving emulator compatibility;
+- the storefront and Webservice screenshots are embedded in public
+  documentation and the full runbook is
+  `docs/connectors/prestashop/docker-smoke.md`;
+- the stack is removed with
+  `docker compose -f docker-compose.prestashop-test.yml down -v`; this is local
+  deployment evidence, not a production seller-shop qualification.
+
+## Task 158 repository validation
+
+- «Долями» виден в категории «Платежи» как branded card;
+- credentials используют callback-scoped логин/пароль и mTLS certificate;
+- health-check использует одноразовый сертификатный HTTP-клиент и HTTPS probe;
+- runtime support: `separate_surface/finance/health_only`, без payment route;
+- manifests, policy, generated catalogs, docs, review и conformance evidence
+  согласованы: **59 manifests / 18 generic / 41 separate / 0 planned**;
+- live payment qualification, fixtures и webhook signature verification не
+  заявлены и остаются отдельным gate.
+
+## Task 157 repository validation
+
+- Lamoda and М.Видео are visible as branded cards in «Интеграции →
+  Маркетплейсы»;
+- both cards use tenant-scoped API-key enrollment and the shared bounded HTTPS
+  catalog probe with an operator-supplied endpoint;
+- runtime support is `separate_surface/marketplace/health_only` with zero
+  operational capabilities and zero product sync directions;
+- policy, manifests, generated Go/TypeScript catalogs, docs, conformance
+  evidence and architecture reviews agree on **58 manifests / 18 generic /
+  40 separate / 0 planned**;
+- frontend tests/build, contract checks and Go validation are required before
+  release; live partner qualification is intentionally not claimed.
+
+## Task 156 repository validation
+
+- all former 14 `planned` entries are grouped into four explicit category
+  surfaces: classified/verticals (3), social (6), EDO (2) and government (3);
+- generated runtime support is synchronized at **58 manifests / 18 generic /
+  40 separate / 0 planned**;
+- every new card supports tenant-scoped credential enrollment and a bounded
+  authenticated health check; no product, publication, document, regulated
+  write or synchronization capability is admitted;
+- the host-mediated catalog probe rejects non-HTTPS/private/unknown hosts,
+  unknown credential placeholders and unconfigured endpoints, and normalizes
+  provider failures without exposing secrets;
+- API account enablement, generated Go/TypeScript catalogs, frontend category
+  presentation and public documentation use the same contract;
+- focused and full Go tests/vet, contract generation, frontend UI tests and
+  production frontend build: **PASS**;
+- domain workflows remain qualification-gated and are not claimed as live
+  production integrations without official non-production evidence.
+
+## Connector category layout validation
+
+- all 58 built-in providers now live under one family-derived category level:
+  `connectors/<category>/<provider>`;
+- architecture policy, provider review evidence, runtime imports, lifecycle
+  inventory and generated frontend/Go catalogs use the categorized paths;
+- category-family mismatches fail closed in the architecture checker and
+  frontend catalog generator;
+- focused Go tests, all connector tests, `go vet`, contract validation,
+  frontend logic tests (30/30) and clean production Go/frontend Docker builds:
+  **PASS**;
+- no runtime API or database contract changes were introduced by the move.
+
+## Task 155 repository validation
+
+- «Почта России» is visible as a separate logistics card in «Интеграции →
+  Доставка»;
+- the official Otpravka application token and user authorization key remain
+  callback-scoped and the host performs only the fixed `/1.0/settings` probe;
+- exact `Authorization: AccessToken` and `X-User-Authorization: Basic`
+  headers, strict credential decoding, bounded JSON responses and fixed-host
+  egress are covered by deterministic tests;
+- rates, shipments, labels, returns, pickup points and tracking remain
+  fail-closed pending a current non-production carrier qualification;
+- generated catalog/runtime support, policy/review, connector docs and
+  conformance evidence are synchronized (**56 manifests / 18 generic / 38
+  separate / 0 planned**).
 
 ## Task 153 repository validation
 
@@ -12,10 +163,9 @@
 - focused connector and builtin-runtime tests: **PASS**;
 - live qualification is **not claimed** without a non-production CS-Cart store
   with API access enabled;
-- CS-Cart generated catalog/runtime rows are synchronized (**54 admitted
-  manifests / 17 generic / 23 separate / 14 planned**). The repository-wide
-  catalog check is currently blocked by the pre-existing unregistered
-  `connectors/saleor` directory in the dirty tree; it is not part of Task 153.
+- CS-Cart generated catalog/runtime rows are synchronized (**56 admitted
+  manifests / 18 generic / 24 separate / 14 planned**); Saleor and «Почта
+  России» are registered by Tasks 154–155.
 
 ## Task 152 repository validation
 
@@ -91,13 +241,13 @@ this report.
 
 ## Inventory
 
-- repository-implemented tasks: `001`–`152`; live provider qualification for
+- repository-implemented tasks: `001`–`157`; live provider qualification for
   Bitrix24, 1С-Битрикс and logistics carriers remains an external environment gate;
-- architecture policy: **128 modules / 52 provider modules / 140 reviews**;
+- architecture policy: **127 modules / 58 provider modules / 147 reviews**;
 - active PostgreSQL baseline: **21 migrations**, latest `000021`; archived pre-v1 lineage: **74 migrations**, legacy head `000074`;
 - public OpenAPI/generated SDK surface: **138 operations / OpenAPI 0.21.1**;
-- connector catalog: **53 manifests / 16 generic runtime integrations / 23
-  working providers on separate surfaces / 14 planned**;
+- connector catalog: **58 manifests / 18 generic runtime integrations / 40
+  providers on separate surfaces / 0 planned**;
 
 ## Task 141 repository validation
 

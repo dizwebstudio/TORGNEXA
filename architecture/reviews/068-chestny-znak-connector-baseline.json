@@ -11,7 +11,7 @@
     "adr/0066-chestny-znak-read-status-baseline.md",
     "architecture/policy.json",
     "architecture/reviews/068-chestny-znak-connector-baseline.json",
-    "connectors/chestny-znak",
+    "connectors/government/chestny-znak",
     "contracts/operations/068-chestny-znak-v1.md",
     "docs/connectors/chestny-znak",
     "docs/operations/068-chestny-znak-connector.md",
@@ -114,7 +114,7 @@
   "provider": {
     "id": "chestny-znak",
     "route": "connector_sdk",
-    "manifest": "connectors/chestny-znak/manifest.json",
+    "manifest": "connectors/government/chestny-znak/manifest.json",
     "connector_spec": "docs/connectors/chestny-znak/spec.md",
     "capability_audit": "docs/connectors/chestny-znak/capability-audit.md",
     "conformance_plan": "docs/connectors/chestny-znak/conformance-plan.md"

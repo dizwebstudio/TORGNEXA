@@ -17,35 +17,37 @@ import (
 	"sync"
 	"time"
 
-	aliexpressru "github.com/torgnexa/torgnexa/connectors/aliexpress-ru"
-	bitrixstore "github.com/torgnexa/torgnexa/connectors/bitrix"
-	bitrix24 "github.com/torgnexa/torgnexa/connectors/bitrix24"
-	cbrfx "github.com/torgnexa/torgnexa/connectors/cbr-fx"
-	claude "github.com/torgnexa/torgnexa/connectors/claude"
-	cscart "github.com/torgnexa/torgnexa/connectors/cs-cart"
-	deepseek "github.com/torgnexa/torgnexa/connectors/deepseek"
-	gigachat "github.com/torgnexa/torgnexa/connectors/gigachat"
-	kimi "github.com/torgnexa/torgnexa/connectors/kimi"
-	magento "github.com/torgnexa/torgnexa/connectors/magento"
-	magnitmarket "github.com/torgnexa/torgnexa/connectors/magnit-market"
-	maxmessenger "github.com/torgnexa/torgnexa/connectors/max-messenger"
-	medusa "github.com/torgnexa/torgnexa/connectors/medusa"
-	megamarket "github.com/torgnexa/torgnexa/connectors/megamarket"
-	moysklad "github.com/torgnexa/torgnexa/connectors/moysklad"
-	onec "github.com/torgnexa/torgnexa/connectors/onec"
-	openaicompatible "github.com/torgnexa/torgnexa/connectors/openai-compatible"
-	opencart "github.com/torgnexa/torgnexa/connectors/opencart"
-	ozon "github.com/torgnexa/torgnexa/connectors/ozon"
-	prestashop "github.com/torgnexa/torgnexa/connectors/prestashop"
-	qwen "github.com/torgnexa/torgnexa/connectors/qwen"
-	saleor "github.com/torgnexa/torgnexa/connectors/saleor"
-	shopify "github.com/torgnexa/torgnexa/connectors/shopify"
-	shopware "github.com/torgnexa/torgnexa/connectors/shopware"
-	telegram "github.com/torgnexa/torgnexa/connectors/telegram"
-	wildberries "github.com/torgnexa/torgnexa/connectors/wildberries"
-	woocommerce "github.com/torgnexa/torgnexa/connectors/woocommerce"
-	yandexmarket "github.com/torgnexa/torgnexa/connectors/yandex-market"
-	yandexgpt "github.com/torgnexa/torgnexa/connectors/yandexgpt"
+	claude "github.com/torgnexa/torgnexa/connectors/ai/claude"
+	deepseek "github.com/torgnexa/torgnexa/connectors/ai/deepseek"
+	gemini "github.com/torgnexa/torgnexa/connectors/ai/gemini"
+	gigachat "github.com/torgnexa/torgnexa/connectors/ai/gigachat"
+	grok "github.com/torgnexa/torgnexa/connectors/ai/grok"
+	kimi "github.com/torgnexa/torgnexa/connectors/ai/kimi"
+	openaicompatible "github.com/torgnexa/torgnexa/connectors/ai/openai-compatible"
+	qwen "github.com/torgnexa/torgnexa/connectors/ai/qwen"
+	yandexgpt "github.com/torgnexa/torgnexa/connectors/ai/yandexgpt"
+	bitrix24 "github.com/torgnexa/torgnexa/connectors/crm/bitrix24"
+	moysklad "github.com/torgnexa/torgnexa/connectors/erp/moysklad"
+	onec "github.com/torgnexa/torgnexa/connectors/erp/onec"
+	cbrfx "github.com/torgnexa/torgnexa/connectors/finance/cbr-fx"
+	aliexpressru "github.com/torgnexa/torgnexa/connectors/marketplaces/aliexpress-ru"
+	magnitmarket "github.com/torgnexa/torgnexa/connectors/marketplaces/magnit-market"
+	megamarket "github.com/torgnexa/torgnexa/connectors/marketplaces/megamarket"
+	ozon "github.com/torgnexa/torgnexa/connectors/marketplaces/ozon"
+	wildberries "github.com/torgnexa/torgnexa/connectors/marketplaces/wildberries"
+	yandexmarket "github.com/torgnexa/torgnexa/connectors/marketplaces/yandex-market"
+	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
+	telegram "github.com/torgnexa/torgnexa/connectors/social/telegram"
+	bitrixstore "github.com/torgnexa/torgnexa/connectors/storefronts/bitrix"
+	cscart "github.com/torgnexa/torgnexa/connectors/storefronts/cs-cart"
+	magento "github.com/torgnexa/torgnexa/connectors/storefronts/magento"
+	medusa "github.com/torgnexa/torgnexa/connectors/storefronts/medusa"
+	opencart "github.com/torgnexa/torgnexa/connectors/storefronts/opencart"
+	prestashop "github.com/torgnexa/torgnexa/connectors/storefronts/prestashop"
+	saleor "github.com/torgnexa/torgnexa/connectors/storefronts/saleor"
+	shopify "github.com/torgnexa/torgnexa/connectors/storefronts/shopify"
+	shopware "github.com/torgnexa/torgnexa/connectors/storefronts/shopware"
+	woocommerce "github.com/torgnexa/torgnexa/connectors/storefronts/woocommerce"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorsandbox"
 )
 
@@ -613,6 +615,28 @@ func (t claudeHTTP) Do(ctx context.Context, r claude.Request) (claude.Response, 
 	return claude.Response{StatusCode: s, Body: b}, e
 }
 
+type geminiHTTP struct{ h *httpTransport }
+
+func (t geminiHTTP) Do(ctx context.Context, r gemini.Request) (gemini.Response, error) {
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return gemini.Response{StatusCode: s, Body: b}, e
+}
+
+type grokHTTP struct{ h *httpTransport }
+
+func (t grokHTTP) Do(ctx context.Context, r grok.Request) (grok.Response, error) {
+	hdr := http.Header{}
+	for k, v := range r.Headers {
+		hdr.Set(k, v)
+	}
+	s, b, _, _, _, e := t.h.do(ctx, http.MethodPost, r.Host, r.Path, url.Values{}, r.Body, hdr, nil, nil)
+	return grok.Response{StatusCode: s, Body: b}, e
+}
+
 type gigaChatHTTP struct{ h *httpTransport }
 
 func (t gigaChatHTTP) Do(ctx context.Context, r gigachat.Request) (gigachat.Response, error) {
@@ -627,7 +651,7 @@ func (t gigaChatHTTP) Do(ctx context.Context, r gigachat.Request) (gigachat.Resp
 type shopwareHTTP struct{ h *httpTransport }
 
 // Do passes headers through verbatim: unlike the other storefront
-// transports, connectors/shopware manages its own OAuth2 client_credentials
+// transports, connectors/storefronts/shopware manages its own OAuth2 client_credentials
 // token lifecycle (Authorization: Bearer <token>, set by the connector
 // itself once it has exchanged/cached one), so this transport never sets an
 // auth header on its own.

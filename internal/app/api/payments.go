@@ -259,7 +259,19 @@ func (api paymentsAPI) createPayment(w http.ResponseWriter, r *http.Request) {
 	created, err := api.repository.CreatePayment(r.Context(), scope, command, paymentsMutation(principal.Subject, key))
 	if errors.Is(err, payments.ErrConflict) {
 		created, err = api.repository.Payment(r.Context(), scope, id)
-		if err == nil && (created.ConnectorAccountID != account.ID || created.ExternalID != input.ID || created.Amount.MinorUnits() != amount.MinorUnits() || created.Amount.Currency() != amount.Currency()) {
+		actual := struct {
+			accountID  string
+			externalID string
+			minorUnits int64
+			currency   string
+		}{created.ConnectorAccountID, created.ExternalID, created.Amount.MinorUnits(), string(created.Amount.Currency())}
+		expected := struct {
+			accountID  string
+			externalID string
+			minorUnits int64
+			currency   string
+		}{account.ID, input.ID, amount.MinorUnits(), string(amount.Currency())}
+		if err == nil && actual != expected {
 			err = payments.ErrConflict
 		}
 	}

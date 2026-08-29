@@ -7,4 +7,4 @@ Task 011 repository evidence:
 - `conformance-plan.md` — Task-064 and semantic qualification;
 - `conformance-report.json` — machine-readable passing Task-064 report.
 
-Implementation: `connectors/wildberries`.
+Implementation: `connectors/marketplaces/wildberries`.

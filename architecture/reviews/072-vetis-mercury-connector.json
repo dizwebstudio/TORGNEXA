@@ -11,7 +11,7 @@
     "adr/0070-vetis-mercury-government-connector.md",
     "architecture/policy.json",
     "architecture/reviews/072-vetis-mercury-connector.json",
-    "connectors/vetis-mercury",
+    "connectors/government/vetis-mercury",
     "contracts/operations/072-vetis-v1.md",
     "docs/connectors/vetis-mercury",
     "docs/operations/072-vetis-mercury-connector.md",
@@ -114,7 +114,7 @@
   "provider": {
     "id": "vetis-mercury",
     "route": "connector_sdk",
-    "manifest": "connectors/vetis-mercury/manifest.json",
+    "manifest": "connectors/government/vetis-mercury/manifest.json",
     "connector_spec": "docs/connectors/vetis-mercury/spec.md",
     "capability_audit": "docs/connectors/vetis-mercury/capability-audit.md",
     "conformance_plan": "docs/connectors/vetis-mercury/conformance-plan.md"

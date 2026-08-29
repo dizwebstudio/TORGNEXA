@@ -70,15 +70,36 @@ func (q OrderQuery) Validate() error {
 }
 
 type ProductHit struct {
-	ID        string    `json:"id"`
-	Code      string    `json:"code"`
-	Title     string    `json:"title"`
-	Status    string    `json:"status"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string        `json:"id"`
+	Code        string        `json:"code"`
+	Title       string        `json:"title"`
+	Description string        `json:"description,omitempty"`
+	Status      string        `json:"status"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+	ImageURL    string        `json:"image_url,omitempty"`
+	Price       *ProductPrice `json:"price,omitempty"`
 }
 
 func (h ProductHit) Validate() error {
-	if !sortableIDPattern.MatchString(h.ID) || !validCode(h.Code) || !validTitle(h.Title) || (h.Status != "draft" && h.Status != "active" && h.Status != "archived") || !isUTC(h.UpdatedAt) {
+	if !sortableIDPattern.MatchString(h.ID) || !validCode(h.Code) || !validTitle(h.Title) || !validDescription(h.Description) || (h.Status != "draft" && h.Status != "active" && h.Status != "archived") || !isUTC(h.UpdatedAt) {
+		return ErrInvalid
+	}
+	if h.Price != nil && h.Price.Validate() != nil {
+		return ErrInvalid
+	}
+	return nil
+}
+
+// ProductPrice is the representative regular price of the first active offer
+// returned in a product search projection. It remains optional because a
+// product may not have an active offer or a regular price yet.
+type ProductPrice struct {
+	MinorUnits int64  `json:"minor_units"`
+	Currency   string `json:"currency"`
+}
+
+func (p ProductPrice) Validate() error {
+	if p.MinorUnits < 0 || !validCurrency(p.Currency) {
 		return ErrInvalid
 	}
 	return nil
@@ -109,6 +130,9 @@ type OrderHit struct {
 	GrandMinorUnits int64     `json:"grand_minor_units"`
 	PlacedAt        time.Time `json:"placed_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	ProductTitle    string    `json:"product_title,omitempty"`
+	ProductSKU      string    `json:"product_sku,omitempty"`
+	ProductImageURL string    `json:"product_image_url,omitempty"`
 }
 
 func (h OrderHit) Validate() error {
@@ -279,6 +303,17 @@ func validTitle(v string) bool {
 	}
 	for _, r := range v {
 		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+func validDescription(v string) bool {
+	if v != strings.TrimSpace(v) || !utf8.ValidString(v) || utf8.RuneCountInString(v) > 20000 {
+		return false
+	}
+	for _, r := range v {
+		if r < 0x20 && r != '\n' && r != '\r' && r != '\t' || r == 0x7f {
 			return false
 		}
 	}

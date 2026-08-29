@@ -8,6 +8,7 @@ import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {connectorCatalog} from "../generated/connector-catalog";
 import {Page} from "./Page";
+import {Drawer} from "../components/Drawer";
 
 interface Settlement{id:string;source_system:string;source_account_id:string;source_entry_ref:string;order_id?:string;adjusts_entry_id?:string;fee_code?:string;fx_rate_ref?:string;kind:string;amount:{minor_units:number;currency:string};occurred_at:string;imported_at:string;disputed:boolean}
 interface FXRate{id:string;base_currency:string;quote_currency:string;rate:string;source:string;source_reference?:string;rate_type:string;observed_at:string;effective_at:string}
@@ -48,7 +49,7 @@ export function FinancePage(){
 function Settlements({api}:{api:Client}){
  const q=useQuery({queryKey:["settlements"],queryFn:async()=>decodeSettlements((await api.listSettlementEntries({limit:200})).body),staleTime:15_000});
  if(q.isPending)return <LoadingBlock/>;
- if(q.isError)return <ErrorBlock>Не удалось загрузить расчёты.</ErrorBlock>;
+ if(q.isError)return <ErrorBlock retry={()=>void q.refetch()}>Не удалось загрузить расчёты.</ErrorBlock>;
  if(q.data.length===0)return <EmptyState title="Записей о расчётах пока нет" text="Появляются после импорта отчётов площадок."/>;
  const columns=[
   {key:"occurred",label:"Дата",value:(v:Settlement)=>v.occurred_at,render:(v:Settlement)=><time>{new Date(v.occurred_at).toLocaleString("ru-RU")}</time>},
@@ -64,7 +65,7 @@ function Settlements({api}:{api:Client}){
 function FXRates({api}:{api:Client}){
  const q=useQuery({queryKey:["fx-rates"],queryFn:async()=>decodeFX((await api.listFXRates({limit:200})).body),staleTime:15_000});
  if(q.isPending)return <LoadingBlock/>;
- if(q.isError)return <ErrorBlock>Не удалось загрузить курсы валют.</ErrorBlock>;
+ if(q.isError)return <ErrorBlock retry={()=>void q.refetch()}>Не удалось загрузить курсы валют.</ErrorBlock>;
  if(q.data.length===0)return <EmptyState title="Курсов пока нет" text="Появляются по мере поступления сведений от источника курсов."/>;
  const columns=[
   {key:"pair",label:"Пара",value:(v:FXRate)=>`${v.base_currency}/${v.quote_currency}`,render:(v:FXRate)=><strong className="mono">{v.base_currency}/{v.quote_currency}</strong>},
@@ -78,9 +79,10 @@ function FXRates({api}:{api:Client}){
 
 function Payments({api}:{api:Client}){
  const cache=useQueryClient(),toast=useToast();
- const [accountId,setAccountId]=useState(""),[purpose,setPurpose]=useState(""),[amount,setAmount]=useState(""),[currency,setCurrency]=useState("RUB");
+ const [accountId,setAccountId]=useState(""),[purpose,setPurpose]=useState(""),[amount,setAmount]=useState(""),[currency,setCurrency]=useState("RUB"),[selected,setSelected]=useState<Payment|null>(null);
  const accounts=useQuery({queryKey:["payments","connector-accounts"],queryFn:async()=>decodeAccounts((await api.listConnectorAccounts({limit:100})).body),staleTime:10_000});
  const payments=useQuery({queryKey:["payments"],queryFn:async()=>decodePayments((await api.listPayments({limit:200})).body),refetchInterval:10_000});
+ const detail=useQuery({queryKey:["payment",selected?.id],enabled:!!selected,queryFn:async()=>((await api.getPayment({paymentId:selected!.id})).body as Payment)});
  const paymentAccounts=(accounts.data??[]).filter(value=>value.family==="payment"&&value.status==="active"&&value.health_status==="healthy"&&value.capabilities.some(c=>c.capability==="payments.create"&&c.enabled));
  const connectorName=(connectorId:string)=>connectorCatalog.find(v=>v.id===connectorId)?.name??connectorId;
 
@@ -102,7 +104,7 @@ function Payments({api}:{api:Client}){
  });
 
  if(accounts.isPending||payments.isPending)return <LoadingBlock/>;
- if(accounts.isError||payments.isError)return <ErrorBlock>Не удалось загрузить платежи.</ErrorBlock>;
+ if(accounts.isError||payments.isError)return <ErrorBlock retry={()=>{void Promise.all([accounts.refetch(),payments.refetch()])}}>Не удалось загрузить платежи.</ErrorBlock>;
 
  const validAmount=/^\d+([.,]\d{1,2})?$/.test(amount.trim())&&Number(amount.replace(",","."))>0;
  const columns=[
@@ -116,6 +118,9 @@ function Payments({api}:{api:Client}){
 
  return <>
   {paymentAccounts.length===0?<section className="panel social-onboarding"><div><h2>Сначала подключите платёжный шлюз</h2><p>Добавьте кабинет СБП или YooKassa, сохраните учётные данные, включите payments.create и активируйте кабинет.</p></div><button className="button primary" onClick={()=>window.location.assign("/integrations")}>Открыть интеграции</button></section>:<section className="panel social-setup"><div className="section-heading"><div><p className="eyebrow">Новый платёж</p><h2>Создать платёж</h2></div></div><div className="social-form-grid"><label className="field"><span>Кабинет</span><select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Выберите кабинет</option>{paymentAccounts.map(a=><option key={a.id} value={a.id}>{connectorName(a.connector_id)} · {a.id}</option>)}</select></label><label className="field"><span>Сумма</span><input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="1500.00"/></label><label className="field"><span>Валюта</span><input value={currency} onChange={e=>setCurrency(e.target.value.toUpperCase().slice(0,3))} maxLength={3}/></label><label className="field"><span>Назначение</span><input maxLength={210} value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Заказ #42"/></label><button className="button primary" disabled={!accountId||!validAmount||create.isPending} onClick={()=>create.mutate()}>Создать платёж</button></div></section>}
-  {payments.data.length===0?<EmptyState title="Платежей пока нет" text="Появятся после первого списания через подключённый шлюз."/>:<DataTable rows={payments.data} columns={columns} rowKey={v=>v.id} searchPlaceholder="Назначение, статус…"/>}
+  {payments.data.length===0?<EmptyState title="Платежей пока нет" text="Появятся после первого списания через подключённый шлюз."/>:<DataTable rows={payments.data} columns={columns} rowKey={v=>v.id} searchPlaceholder="Назначение, статус…" onOpen={setSelected}/>}
+  <Drawer open={!!selected} title="Платёж" subtitle={selected?.external_id} onClose={()=>setSelected(null)}>{detail.isPending?<LoadingBlock/>:detail.isError?<ErrorBlock retry={()=>void detail.refetch()}>Не удалось открыть платёж.</ErrorBlock>:detail.data?<PaymentDetail payment={detail.data}/>:null}</Drawer>
  </>;
 }
+
+function PaymentDetail({payment}:{payment:Payment}){return <div className="catalog-stack"><div className="drawer-kpis"><div><small>Сумма</small><strong>{money(payment.amount)}</strong></div><div><small>Статус</small><StatusBadge value={paymentStatusLabels[payment.status]??payment.status}/></div><div><small>Комиссия</small><strong>{money({minor_units:payment.commission_minor_units,currency:payment.amount.currency})}</strong></div></div><dl className="detail-list"><div><dt>Внешний ID</dt><dd className="mono">{payment.external_id}</dd></div><div><dt>Назначение</dt><dd>{payment.purpose||"—"}</dd></div><div><dt>Причина</dt><dd>{payment.reason_code||"—"}</dd></div><div><dt>Создан</dt><dd>{new Date(payment.created_at).toLocaleString("ru-RU")}</dd></div><div><dt>Обновлён</dt><dd>{new Date(payment.updated_at).toLocaleString("ru-RU")}</dd></div><div><dt>Версия</dt><dd>{payment.version}</dd></div></dl></div>}

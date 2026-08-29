@@ -11,7 +11,7 @@
     "adr/0080-final-cdek-as-production-reference-logistics-provider.md",
     "architecture/policy.json",
     "architecture/reviews/090-reference-logistics-connector.json",
-    "connectors/cdek",
+    "connectors/logistics/cdek",
     "contracts/connector-capabilities.yaml",
     "contracts/logistics/reference-carrier-capabilities.yaml",
     "contracts/operations/090-contract-v1.md",
@@ -113,7 +113,7 @@
   "provider": {
     "id": "cdek",
     "route": "connector_sdk",
-    "manifest": "connectors/cdek/manifest.json",
+    "manifest": "connectors/logistics/cdek/manifest.json",
     "connector_spec": "docs/connectors/cdek/spec.md",
     "capability_audit": "docs/connectors/cdek/capability-audit.md",
     "conformance_plan": "docs/connectors/cdek/conformance-plan.md"

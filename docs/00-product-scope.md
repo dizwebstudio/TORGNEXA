@@ -4,13 +4,14 @@ TORGNEXA is an open-source/self-hosted, API-first commerce and distribution oper
 
 ## In scope
 
-- marketplace: Wildberries, Ozon, Yandex Market, Megamarket, Magnit Market, AliExpress RU;
+- marketplace: Wildberries, Ozon, Yandex Market, Megamarket, Magnit Market, AliExpress RU, Lamoda, М.Видео;
 - classified/vertical: Avito, Auto.ru, CIAN;
 - social/content: VK, Telegram, MAX, Instagram, Threads, OK, Rutube, Dzen, YouTube, with plugin expansion;
 - ERP: 1C and MoySklad;
 - PIM/MDM, pricing, inventory, orders/returns, procurement, WMS, fulfillment/PUDO;
 - advertising/promotions, customer-service inbox, claims/disputes;
 - settlement/payment reconciliation, P&L, unit economics and sourced FX conversion;
+- payment rails including SBP, YooKassa, Robokassa and «Долями»;
 - Chestny ZNAK, UKEP, MChD, EDO, KKT/OFD, VetIS/Mercury, EGAIS and Product Compliance;
 - bidirectional sync, scheduled/on-demand reconciliation, import/export;
 - REST, signed webhooks, n8n node/triggers, MCP/OpenClaw;

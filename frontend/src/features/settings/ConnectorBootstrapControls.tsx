@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
+import {labelFor, bootstrapJobStatusLabels} from "../../components/labels";
 
 interface Account {id: string; version: number; status: string; health_status: string}
 interface Preview {id: string; account_id: string; account_version: number; policy_count: number; read_count: number; write_count: number; created_at: string; expires_at: string; consumed_at?: string}
@@ -38,7 +39,7 @@ export function ConnectorBootstrapControls({account}:{account:Account}) {
   const activeHealthy=account.status==="active"&&account.health_status==="healthy";
   return <fieldset className="bootstrap-settings"><legend>Импорт и расписание</legend>
     <small>Предпросмотр ничего не меняет во внешней системе и действует 30 минут. Импорт и расписание выполняются сервером, даже если браузер закрыт.</small>
-    <div className="bootstrap-summary"><span>Предпросмотр</span><strong>{preview?`${preview.policy_count} политик · чтение ${preview.read_count} · запись ${preview.write_count}`:"не выполнен"}</strong><span>Последняя задача</span><strong>{job?`${job.status} · запусков ${job.started_runs}`:"—"}</strong></div>
+    <div className="bootstrap-summary"><span>Предпросмотр</span><strong>{preview?`${preview.policy_count} политик · чтение ${preview.read_count} · запись ${preview.write_count}`:"не выполнен"}</strong><span>Последняя задача</span><strong>{job?`${labelFor(job.status,bootstrapJobStatusLabels)} · запусков ${job.started_runs}`:"—"}</strong></div>
     <div className="integration-actions"><button className="button ghost" disabled={!activeHealthy||previewMutation.isPending} onClick={()=>previewMutation.mutate()}>{previewMutation.isPending?"Проверяем…":"Пробный запуск"}</button><button className="button primary" disabled={!preview||Boolean(preview.consumed_at)||startMutation.isPending} onClick={()=>startMutation.mutate()}>{startMutation.isPending?"Ставим…":"Первоначальный импорт"}</button></div>
     <div className="bootstrap-schedule-grid"><label className="field"><span>Режим</span><select value={mode} onChange={(event)=>setMode(event.target.value as "incremental"|"scheduled_full")}><option value="incremental">Инкрементальный</option><option value="scheduled_full">Полная сверка</option></select></label><label className="field"><span>Период, минут</span><input type="number" min={15} max={10080} value={interval} onChange={(event)=>setInterval(Number(event.target.value))}/></label><label className="capability-option"><input type="checkbox" checked={enabled} onChange={(event)=>setEnabled(event.target.checked)}/><span><strong>Расписание включено</strong><small>Следующий запуск: {formatTime(schedule?.next_run_at)}</small></span></label></div>
     <button className="button ghost" disabled={scheduleMutation.isPending||interval<15||interval>10080||(enabled&&!preview)} onClick={()=>scheduleMutation.mutate()}>{scheduleMutation.isPending?"Сохраняем…":"Сохранить расписание"}</button>

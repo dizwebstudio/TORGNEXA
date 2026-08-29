@@ -4444,6 +4444,11 @@
             "id": "018f0000-0000-7000-8000-000000000101",
             "code": "SKU-42",
             "title": "Cordless drill",
+            "description": "A compact cordless drill",
+            "price": {
+              "minor_units": 129900,
+              "currency": "RUB"
+            },
             "status": "active",
             "updated_at": "2026-08-10T08:00:00Z"
           }

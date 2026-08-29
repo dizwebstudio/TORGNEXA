@@ -15,10 +15,16 @@ func TestGeneratedCatalogMatchesConnectorManifests(t *testing.T) {
 	if !ok {
 		t.Fatal("resolve test path")
 	}
-	paths, err := filepath.Glob(filepath.Join(filepath.Dir(file), "..", "..", "..", "connectors", "*", "manifest.json"))
+	root := filepath.Join(filepath.Dir(file), "..", "..", "..", "connectors")
+	paths, err := filepath.Glob(filepath.Join(root, "*", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	nested, err := filepath.Glob(filepath.Join(root, "*", "*", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths = append(paths, nested...)
 	want := make([]Manifest, 0, len(paths))
 	for _, path := range paths {
 		data, readErr := os.ReadFile(path) // #nosec G304 -- paths come from a fixed repository glob.

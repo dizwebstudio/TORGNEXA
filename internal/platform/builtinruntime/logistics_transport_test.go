@@ -79,6 +79,26 @@ func TestOzonDeliveryCredentialProbe(t *testing.T) {
 	}
 }
 
+func TestRussianPostCredentialProbe(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/1.0/settings" || r.Method != http.MethodGet || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России request: method=%s path=%s authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"user": "synthetic"})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if err := transport.Ping(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`)); err != nil {
+		t.Fatalf("Почта России probe failed: %v", err)
+	}
+	if err := transport.Ping(context.Background(), []byte(`{"token":"token-1"}`)); err == nil {
+		t.Fatal("malformed Почта России credentials accepted")
+	}
+	if err := transport.Ping(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz","unexpected":"value"}`)); err == nil {
+		t.Fatal("unknown Почта России credential field accepted")
+	}
+}
+
 func TestOzonPayCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/product/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {

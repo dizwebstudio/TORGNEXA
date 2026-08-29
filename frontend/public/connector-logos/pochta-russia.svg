@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" role="img" aria-label="Почта России">
+  <rect width="220" height="80" rx="16" fill="#fff"/>
+  <rect x="16" y="16" width="48" height="48" rx="14" fill="#0055A4"/>
+  <path fill="#fff" d="M27 28h26l-13 13-13-13Zm0 4v20l9-10-9-10Zm26 0v20l-9-10 9-10ZM30 54h20L40 43 30 54Z"/>
+  <text x="76" y="36" fill="#1F2937" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800">Почта</text>
+  <text x="76" y="55" fill="#0055A4" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800">России</text>
+</svg>

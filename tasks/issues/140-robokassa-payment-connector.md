@@ -10,9 +10,9 @@ Merchants who already hold a Robokassa contract cannot connect it.
 
 ## Scope
 
-- New `connectors/robokassa` package (manifest, connector, operations,
+- New `connectors/payments/robokassa` package (manifest, connector, operations,
   candidate transport, conformance candidate, unit tests), mirroring the
-  `connectors/yookassa` structure: fixed hosts, no per-account
+  `connectors/payments/yookassa` structure: fixed hosts, no per-account
   `ConfigurationSource` needed.
 - Real HTTP transport (`robokassaHTTP` in
   `internal/platform/builtinruntime/paymentstransport.go`):

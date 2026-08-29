@@ -6,7 +6,7 @@ Task 012 is the second admitted marketplace provider after the provider-neutral 
 
 Canonical report: `docs/connectors/ozon/conformance-report.json`.
 
-The provider adapter runs all thirteen Task-064 checks through the shared `conformance.SandboxFixture`; Ozon-specific semantic tests remain in `connectors/ozon`.
+The provider adapter runs all thirteen Task-064 checks through the shared `conformance.SandboxFixture`; Ozon-specific semantic tests remain in `connectors/marketplaces/ozon`.
 
 ## Semantic fixture coverage
 

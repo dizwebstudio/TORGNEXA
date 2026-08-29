@@ -84,7 +84,10 @@ func (api paymentWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account, err := api.accounts.AccountByID(r.Context(), organizationID, workspaceID, accountID)
-	if err != nil || account.ConnectorID != connectorID || account.Family != sdk.FamilyPayment || account.Status != sdk.AccountActive {
+	accountKey := account.ConnectorID
+	pathKey := connectorID
+	accountIdentityMatches := err == nil && accountKey == pathKey
+	if !accountIdentityMatches || account.Family != sdk.FamilyPayment || account.Status != sdk.AccountActive {
 		logger.Warn("payment webhook account unresolved or inactive")
 		acknowledgeWebhook(w)
 		return

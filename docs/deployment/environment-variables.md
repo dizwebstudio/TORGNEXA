@@ -186,30 +186,36 @@ Allowlist не заменяет discovery-проверку, mapping ролей �
 
 | Переменная | По умолчанию | Ограничения |
 |---|---:|---|
+| `TORGNEXA_KAFKA_TOPIC_PARTITIONS` | `1` | Положительное целое. Число partitions для создаваемых Compose topics. |
+| `TORGNEXA_KAFKA_TOPIC_REPLICATION_FACTOR` | `1` | Положительное целое; не больше числа доступных Kafka brokers. Для одновузлового Community — `1`. |
 | `TORGNEXA_KAFKA_CONSUMER_GROUP` | `torgnexa.webhooks.v1` | Непустое имя до 128 символов. Экземпляры одного worker-кластера используют одну группу. |
 | `TORGNEXA_WORKER_POLL_INTERVAL` | `500ms` | `50ms`–`30s` |
 | `TORGNEXA_WORKER_DISPATCH_BATCH` | `32` | `1`–`1000` |
 | `TORGNEXA_WORKER_LEASE` | `90s` | `10s`–`10m`; должно превышать время обработки пачки. |
 | `TORGNEXA_WORKER_RECONCILIATION_ENABLED` | `true` | Включает периодическую сверку и обработку расхождений. |
-| `TORGNEXA_WORKER_UPLOADS_ENABLED` | `false` | Включайте только после настройки доступного ClamAV и S3. |
+| `TORGNEXA_WORKER_UPLOADS_ENABLED` | `true` | В Community Compose включено для загрузки изображений; worker выпускает только файлы, прошедшие ClamAV и S3-пайплайн. |
 
-Community Compose использует внутренний broker `kafka:29092` и канонический
-набор event topics. `TORGNEXA_KAFKA_BROKERS` и `TORGNEXA_KAFKA_TOPICS` нужны
-только при прямом запуске worker вне Community Compose.
+Community Compose использует внутренний broker `kafka:29092`. Одноразовый
+сервис `kafka-init` идемпотентно создаёт канонический набор base topics и их
+`.retry`/`.dlq` варианты до запуска API, worker, scheduler и MCP. При прямом запуске worker вне Community Compose список
+`TORGNEXA_KAFKA_TOPICS` должен включать как минимум
+`commerce.inventory.events.v1` и `commerce.pricing.events.v1`, иначе отдельный
+маршрут `commerce-sync` не получит изменения остатков и цен.
 
 ## Проверка загрузок ClamAV
 
 | Переменная | По умолчанию | Назначение |
 |---|---:|---|
 | `TORGNEXA_CLAMAV_NETWORK` | `tcp` | Сетевой тип подключения. |
-| `TORGNEXA_CLAMAV_ADDRESS` | `127.0.0.1:3310` | Адрес `host:port`. В контейнере `127.0.0.1` означает сам worker. |
+| `TORGNEXA_CLAMAV_ADDRESS` | `clamav:3310` | Адрес `host:port` контейнера ClamAV. Для внешнего worker укажите адрес доступного scanner. |
 | `TORGNEXA_CLAMAV_ENGINE_VERSION` | `runtime` | Метка версии движка для аудита. |
 | `TORGNEXA_CLAMAV_SIGNATURE_VERSION` | `runtime` | Метка базы сигнатур. |
 | `TORGNEXA_CLAMAV_TIMEOUT` | `30s` | От `1s` до `2m`. |
 
-Перед `TORGNEXA_WORKER_UPLOADS_ENABLED=true` добавьте ClamAV в доступную worker
-сеть и укажите Docker DNS-имя, например `clamav:3310`. Недоступный сканер не
-должен обходиться: загрузки остаются в карантине.
+Community Compose уже запускает официальный контейнер ClamAV и подключает его к
+worker по адресу `clamav:3310`. Недоступный сканер не обходится: загрузки
+остаются в карантине. Для отдельного worker подключите собственный ClamAV перед
+включением `TORGNEXA_WORKER_UPLOADS_ENABLED=true`.
 
 ## Внешние уведомления
 

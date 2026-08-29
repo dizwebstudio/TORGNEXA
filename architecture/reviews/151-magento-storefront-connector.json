@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/151-magento-storefront-connector.json",
-    "connectors/magento",
+    "connectors/storefronts/magento",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/magento",
     "frontend/public/connector-logos/magento.svg",
@@ -104,7 +104,7 @@
   "provider": {
     "id": "magento",
     "route": "connector_sdk",
-    "manifest": "connectors/magento/manifest.json",
+    "manifest": "connectors/storefronts/magento/manifest.json",
     "connector_spec": "docs/connectors/magento/spec.md",
     "capability_audit": "docs/connectors/magento/capability-audit.md",
     "conformance_plan": "docs/connectors/magento/conformance-plan.md"

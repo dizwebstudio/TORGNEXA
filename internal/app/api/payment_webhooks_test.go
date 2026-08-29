@@ -27,6 +27,10 @@ type fakePaymentsRepository struct {
 	changeStatusLog []payments.ChangePaymentStatus
 }
 
+const testGatewayID = "test-gateway"
+
+func compositeKey(left, right string) string { return left + "|" + right }
+
 func newFakePaymentsRepository() *fakePaymentsRepository {
 	return &fakePaymentsRepository{byID: map[payments.PaymentID]payments.Payment{}, byRemote: map[string]payments.PaymentID{}, evidence: map[string]bool{}}
 }
@@ -34,7 +38,8 @@ func newFakePaymentsRepository() *fakePaymentsRepository {
 func (f *fakePaymentsRepository) seed(p payments.Payment) {
 	f.byID[p.ID] = p
 	if p.RemoteID != "" {
-		f.byRemote[p.ConnectorAccountID+"|"+p.RemoteID] = p.ID
+		accountRef := p.ConnectorAccountID
+		f.byRemote[compositeKey(accountRef, p.RemoteID)] = p.ID
 	}
 }
 
@@ -54,7 +59,8 @@ func (f *fakePaymentsRepository) PaymentByExternalID(_ context.Context, _ paymen
 	return payments.Payment{}, payments.ErrNotFound
 }
 func (f *fakePaymentsRepository) PaymentByRemoteID(_ context.Context, _ payments.Scope, connectorAccountID, remoteID string) (payments.Payment, error) {
-	id, ok := f.byRemote[connectorAccountID+"|"+remoteID]
+	accountRef := connectorAccountID
+	id, ok := f.byRemote[compositeKey(accountRef, remoteID)]
 	if !ok {
 		return payments.Payment{}, payments.ErrNotFound
 	}
@@ -103,7 +109,8 @@ func (f *fakePaymentsRepository) ChangeRefundStatus(context.Context, payments.Sc
 	return payments.Refund{}, errNotImplementedInFake
 }
 func (f *fakePaymentsRepository) RecordWebhookEvidence(_ context.Context, _ payments.Scope, evidence payments.WebhookEvidence) (bool, error) {
-	key := evidence.ConnectorAccountID + "|" + evidence.DeliveryID
+	accountRef := evidence.ConnectorAccountID
+	key := compositeKey(accountRef, evidence.DeliveryID)
 	if f.evidence[key] {
 		return false, nil
 	}
@@ -183,7 +190,7 @@ func testWebhookAccount() sdk.Account {
 	at := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
 	return sdk.Account{
 		ID: "acct-1", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
-		ConnectorID: "yookassa", Family: sdk.FamilyPayment, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef",
+		ConnectorID: testGatewayID, Family: sdk.FamilyPayment, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef",
 		Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: at, UpdatedAt: at,
 	}
 }
@@ -221,7 +228,7 @@ func TestPaymentWebhookAppliesVerifiedTransitionExactlyOnce(t *testing.T) {
 	}
 	api := paymentWebhookAPI{repository: repo, accounts: fakeWebhookAccounts{account: testWebhookAccount()}, secrets: fakeWebhookSecrets{}, registry: resolver}
 
-	path := paymentWebhooksPathPrefix + "yookassa/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
+	path := paymentWebhooksPathPrefix + testGatewayID + "/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
 	req := webhookRequest(path, `{"event":"payment.succeeded","object":{"id":"yk_remote_1","status":"succeeded"}}`)
 	rr := httptest.NewRecorder()
 	api.receive(rr, req)
@@ -245,7 +252,7 @@ func TestPaymentWebhookRedeliveryIsANoOp(t *testing.T) {
 		return sdk.PaymentWebhook{DeliveryID: "delivery-1", EventType: "payment_succeeded", RemotePaymentID: "yk_remote_1", BodyDigest: strings.Repeat("a", 64), OccurredAt: time.Now().UTC()}, nil
 	}}}
 	api := paymentWebhookAPI{repository: repo, accounts: fakeWebhookAccounts{account: testWebhookAccount()}, secrets: fakeWebhookSecrets{}, registry: resolver}
-	path := paymentWebhooksPathPrefix + "yookassa/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
+	path := paymentWebhooksPathPrefix + testGatewayID + "/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
 	body := `{"event":"payment.succeeded","object":{"id":"yk_remote_1","status":"succeeded"}}`
 
 	for i := 0; i < 2; i++ {
@@ -269,7 +276,7 @@ func TestPaymentWebhookIgnoresUnverifiedBodyStatus(t *testing.T) {
 		return sdk.PaymentWebhook{DeliveryID: "delivery-1", EventType: "payment_created", RemotePaymentID: "yk_remote_1", BodyDigest: strings.Repeat("a", 64), OccurredAt: time.Now().UTC()}, nil
 	}}}
 	api := paymentWebhookAPI{repository: repo, accounts: fakeWebhookAccounts{account: testWebhookAccount()}, secrets: fakeWebhookSecrets{}, registry: resolver}
-	path := paymentWebhooksPathPrefix + "yookassa/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
+	path := paymentWebhooksPathPrefix + testGatewayID + "/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
 	// Spoofed body claims succeeded; the verified EventType above says created.
 	spoofed := `{"event":"payment.succeeded","object":{"id":"yk_remote_1","status":"succeeded"}}`
 	rr := httptest.NewRecorder()
@@ -293,7 +300,7 @@ func TestPaymentWebhookUnknownAccountNeverReachesGatewayOrChangeStatus(t *testin
 		return sdk.PaymentWebhook{}, nil
 	}}}
 	api := paymentWebhookAPI{repository: repo, accounts: fakeWebhookAccounts{account: testWebhookAccount()}, secrets: fakeWebhookSecrets{}, registry: resolver}
-	path := paymentWebhooksPathPrefix + "yookassa/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/does-not-exist"
+	path := paymentWebhooksPathPrefix + testGatewayID + "/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/does-not-exist"
 	rr := httptest.NewRecorder()
 	api.receive(rr, webhookRequest(path, `{}`))
 	if rr.Code != http.StatusOK {
@@ -314,7 +321,7 @@ func TestPaymentWebhookVerificationFailureProducesSameResponseAsSuccess(t *testi
 		return sdk.PaymentWebhook{}, errNotImplementedInFake
 	}}}
 	api := paymentWebhookAPI{repository: repo, accounts: fakeWebhookAccounts{account: testWebhookAccount()}, secrets: fakeWebhookSecrets{}, registry: resolver}
-	path := paymentWebhooksPathPrefix + "yookassa/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
+	path := paymentWebhooksPathPrefix + testGatewayID + "/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1"
 	rr := httptest.NewRecorder()
 	api.receive(rr, webhookRequest(path, `{"event":"payment.succeeded","object":{"id":"yk_remote_1"}}`))
 	if rr.Code != http.StatusOK {
@@ -326,15 +333,15 @@ func TestPaymentWebhookVerificationFailureProducesSameResponseAsSuccess(t *testi
 }
 
 func TestParsePaymentWebhookPath(t *testing.T) {
-	connectorID, orgID, wsID, accountID, ok := parsePaymentWebhookPath(paymentWebhooksPathPrefix + "yookassa/org-1/ws-1/acct-1")
-	if !ok || connectorID != "yookassa" || orgID != "org-1" || wsID != "ws-1" || accountID != "acct-1" {
-		t.Fatalf("parse = %q %q %q %q %v", connectorID, orgID, wsID, accountID, ok)
+	gatewayID, orgID, wsID, accountID, ok := parsePaymentWebhookPath(paymentWebhooksPathPrefix + testGatewayID + "/org-1/ws-1/acct-1")
+	if !ok || gatewayID != testGatewayID || orgID != "org-1" || wsID != "ws-1" || accountID != "acct-1" {
+		t.Fatalf("parse = %q %q %q %q %v", gatewayID, orgID, wsID, accountID, ok)
 	}
 	for _, bad := range []string{
-		paymentWebhooksPathPrefix + "yookassa/org-1/ws-1",
-		paymentWebhooksPathPrefix + "yookassa/org-1/ws-1/acct-1/extra",
-		paymentWebhooksPathPrefix + "yookassa//ws-1/acct-1",
-		webhookPathPrefix + "other/yookassa/org-1/ws-1/acct-1",
+		paymentWebhooksPathPrefix + testGatewayID + "/org-1/ws-1",
+		paymentWebhooksPathPrefix + testGatewayID + "/org-1/ws-1/acct-1/extra",
+		paymentWebhooksPathPrefix + testGatewayID + "//ws-1/acct-1",
+		webhookPathPrefix + "other/" + testGatewayID + "/org-1/ws-1/acct-1",
 	} {
 		if _, _, _, _, ok := parsePaymentWebhookPath(bad); ok {
 			t.Fatalf("expected %q to be rejected", bad)

@@ -37,11 +37,13 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
@@ -176,6 +178,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	searchRepository, err := searchrepo.New(db)
 	if err != nil {
 		return newRuntimeError("search_repository_startup_failed", err)
+	}
+	orderRepository, err := ordersrepo.New(db)
+	if err != nil {
+		return newRuntimeError("orders_repository_startup_failed", err)
 	}
 	catalogRepository, err := catalogrepo.New(db)
 	if err != nil {
@@ -338,6 +344,14 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("clickhouse_reporting_startup_failed", err)
 	}
+	postgresReportRepository, err := reportrepo.New(db)
+	if err != nil {
+		return newRuntimeError("postgres_report_repository_startup_failed", err)
+	}
+	reportRepository, err = newInventoryFallbackReportReader(reportRepository, postgresReportRepository)
+	if err != nil {
+		return newRuntimeError("report_reader_startup_failed", err)
+	}
 	authn, tenantResolver, authz, err := newOIDCSecurity(cfg, settingsSecurityRepository, tenantRepository)
 	if err != nil {
 		return newRuntimeError("oidc_security_startup_failed", err)
@@ -359,7 +373,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	routeDeps := productionRouteDependencies{
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
-		tenancy: tenantRepository, search: searchRepository, catalog: catalogRepository, pricing: pricingRepository, pim: pimRepository,
+		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, pim: pimRepository,
 		images: imageRepository, inventory: inventoryRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,

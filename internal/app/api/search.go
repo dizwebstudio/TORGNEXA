@@ -91,6 +91,7 @@ func newSearchRoutes(engine search.Provider, auditService auditCapturer) []Prote
 			}
 			count, err := repository.SeedDemoOrders(r.Context(), scope, principal.Subject)
 			if err != nil {
+				slog.Default().ErrorContext(r.Context(), "demo dataset seed failed", "error", err)
 				writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 				return
 			}
@@ -103,6 +104,7 @@ func newSearchRoutes(engine search.Provider, auditService auditCapturer) []Prote
 				correlationID = "demo-dataset:create"
 			}
 			if _, err := auditService.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "demo.dataset.created", ResourceType: "demo_dataset", ResourceID: scope.WorkspaceID().String(), CorrelationID: correlationID, Risk: audit.RiskWriteSafe, Summary: audit.Summary{"orders_created": count, "synthetic": true}}); err != nil {
+				slog.Default().ErrorContext(r.Context(), "demo dataset audit capture failed", "error", err)
 				writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 				return
 			}

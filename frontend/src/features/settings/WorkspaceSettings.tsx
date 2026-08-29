@@ -4,6 +4,7 @@ import {useApi} from "../../api/ApiProvider";
 import {useAuth} from "../../auth/AuthProvider";
 import {ErrorBlock, LoadingBlock} from "../../components/ApiState";
 import {StatusBadge} from "../../components/StatusBadge";
+import {labelFor, workspaceStatusLabels} from "../../components/labels";
 
 interface WorkspaceProfile {organization_name: string; workspace_name: string; organization_status: string; workspace_status: string; organization_version: number; workspace_version: number; updated_at: string}
 interface CloudSubscription{id:string;plan_id:string;plan_version:number;state:string;current_period_start:string;current_period_end:string}
@@ -51,7 +52,7 @@ export function WorkspaceSettings() {
   if (query.isError) return <ErrorBlock>Не удалось загрузить настройки workspace.</ErrorBlock>;
   return <>
   <section className="panel settings-card">
-    <div className="settings-card-heading"><div><p className="eyebrow">Организация</p><h2>Рабочее пространство</h2></div><span className="status status-active">{query.data.workspace_status}</span></div>
+    <div className="settings-card-heading"><div><p className="eyebrow">Организация</p><h2>Рабочее пространство</h2></div><StatusBadge value={labelFor(query.data.workspace_status,workspaceStatusLabels)}/></div>
     <div className="settings-form">
       <label className="field"><span>Название организации</span><input value={organizationName} maxLength={200} autoComplete="organization" onChange={(event: {target: {value: string}}) => setOrganizationName(event.target.value)} /></label>
       <label className="field"><span>Название workspace</span><input value={workspaceName} maxLength={200} autoComplete="off" onChange={(event: {target: {value: string}}) => setWorkspaceName(event.target.value)} /></label>

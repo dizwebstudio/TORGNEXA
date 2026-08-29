@@ -1,15 +1,26 @@
 # Package status — 2026-08-28
 
-**Tasks 001–153 are repository-implemented.** Task 153 adds a separate
-CS-Cart storefront connector; Task 152 adds 1С-Битрикс; Tasks 149–150 add Ollama, LM Studio
+**Tasks 001–159 are repository-implemented.** Task 159 adds Google Gemini and
+Grok to the governed AI-provider surface. Midjourney remains intentionally
+unavailable because its official policy disallows third-party automation. Task
+158 adds «Долями» to the
+Payments catalog as a health-only mTLS/basic surface. Task 157 adds Lamoda and М.Видео
+to the Marketplace catalog as health-only surfaces. Task 156 groups the remaining
+14 providers into four explicit category surfaces and closes their
+credential/health-check runtime path without claiming domain operations. Task
+155 adds «Почта России» to
+the separate Delivery surface; Task 154 adds a separate Saleor storefront
+connector; Task 153 adds CS-Cart; Task 152 adds 1С-Битрикс; Tasks 149–150 add Ollama, LM Studio
 and Open WebUI to the dedicated AI-provider surface through a private-address
 local transport. Task 147 adds separate Ozon Pay
 and Ozon Доставка surfaces with truthful Seller API health probes. Task 145 moves СДЭК out of
 `planned` and adds Деловые Линии to the separate Delivery verification
-surface; both remain qualification-gated for shipment operations. The catalog
-therefore contains 17 generic product integrations, 23 working separate-surface
-providers and 14 planned connectors. Architecture policy: **128 modules / 53
-providers / 141 reviews**. Active migrations are **21**, latest `000021`, with
+surface; both remain qualification-gated for shipment operations. Connector
+packages are organized as `connectors/<category>/<provider>`, with provider
+IDs and generated catalog order unchanged. The catalog therefore contains 18
+generic product integrations and 43 separate-surface providers; there are no
+planned connectors. Architecture policy: **127 modules / 61 providers / 150
+reviews**. Active migrations are **22**, latest `000022`, with
 the original **74-file / legacy head 000074** chain archived as immutable
 evidence. Public OpenAPI is **138 operations / 0.21.1**.
 
@@ -21,13 +32,60 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 474
-- adrs: 108
-- tasks: 155
+- docs: 511
+- adrs: 113
+- tasks: 162
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2606
+- total source files (excluding local secrets/build/dependency/cache trees): 2767
+
+
+## Connector category layout
+
+- all built-in connector packages use the family-derived
+  `connectors/<category>/<provider>` layout;
+- policy/review references, runtime imports, lifecycle inventory and manifest
+  generators are synchronized with the categorized paths;
+- the provider ID remains the package boundary and generated catalog order is
+  stable by ID.
+
+
+## Task 154 additions
+
+- Saleor storefront package is registered under `connectors/storefronts/saleor`;
+- the generated catalog, policy and architecture review use the categorized
+  path while public documentation remains under `docs/connectors/saleor`.
+
+## Task 156 additions
+
+- four category surfaces for the former 14 planned providers;
+- schema-backed `health_only` support with generated Go/TypeScript projections;
+- host-mediated bounded credential probes and fail-closed API admission;
+- frontend category heading and health-only setup guidance;
+- ADR, architecture review, task/backlog/execution-plan and validation evidence.
+
+## Task 157 additions
+
+- Lamoda and М.Видео provider packages are registered under
+  `connectors/marketplaces/<provider>` with branded marketplace cards;
+- runtime support adds the `marketplace` health-only surface and keeps product,
+  price, stock and order capabilities fail-closed;
+- credentials are tenant-scoped and the operator supplies a bounded HTTPS probe
+  endpoint; no provider payload is persisted;
+- manifests, generated catalogs, policy/reviews, conformance reports and
+  provider documentation are synchronized.
+
+## Task 155 additions
+
+- «Почта России» is registered under `connectors/logistics/pochta-russia`;
+- the Delivery card accepts an encrypted application token and user
+  authorization key and checks the official Otpravka settings endpoint;
+- the host transport keeps credentials callback-scoped and permits only the
+  fixed HTTPS health probe; rates, shipments, labels, returns, pickup points
+  and tracking remain qualification-gated;
+- generated runtime/catalog projections, policy/review, conformance evidence,
+  frontend presentation and operator documentation are synchronized.
 
 
 ## Task 153 additions
@@ -174,7 +232,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `ai_provider_accounts` (migration `000012_ai_advisory.sql`, RLS forced) plus four additive OpenAPI 0.16.0 operations under `/settings/ai-providers(:disable|:analyze)`, gated by `settings.ai_providers.read`/`write` and a separate `ai.analyze` capability;
 - migration `000013_ai_provider_credential_class.sql` additively admits `ai_provider_credential` into `secret_references.class`;
 - `internal/platform/aiadvisory` is a non-branching port; `internal/platform/builtinruntime.Registry.AICompletion` is the sole `switch account.ConnectorID` dispatch point for the capability;
-- four `ai`-family providers admitted through Connector SDK v1 with only `ai.completion.generate`, each with no `net/*` import: `connectors/openai-compatible` (Task 122, establishes the capability, ADR 0097), `connectors/kimi` (Task 123, Moonshot AI), `connectors/gigachat` (Task 124, Sber, per-call OAuth exchange), `connectors/yandexgpt` (Task 125, folder-scoped `gpt://` URIs);
+- four `ai`-family providers admitted through Connector SDK v1 with only `ai.completion.generate`, each with no `net/*` import: `connectors/ai/openai-compatible` (Task 122, establishes the capability, ADR 0097), `connectors/ai/kimi` (Task 123, Moonshot AI), `connectors/ai/gigachat` (Task 124, Sber, per-call OAuth exchange), `connectors/ai/yandexgpt` (Task 125, folder-scoped `gpt://` URIs);
 - Task-064 provider conformance for all four: 13/13 PASS each; task cards `122`–`125`: `repository-complete`; provider count becomes 36.
 
 ## Task 121 additions
@@ -262,7 +320,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Task 097 additions
 
 - provider-neutral Connector SDK family `crm` with entity and product-row read/write capabilities;
-- provider: `connectors/bitrix24` using OAuth Bearer plus universal `crm.item.*` / `crm.item.productrow.*` methods;
+- provider: `connectors/crm/bitrix24` using OAuth Bearer plus universal `crm.item.*` / `crm.item.productrow.*` methods;
 - bounded entity/product-row reads and reconciled desired-state writes with stable TORGNEXA origin identity;
 - docs/contract: `docs/connectors/bitrix24/*` and `contracts/operations/097-bitrix24-crm-connector-v1.md`;
 - architecture: ADR `0089` + `ARCH-097`; provider count becomes 32;
@@ -270,7 +328,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Tasks 095–096 additions
 
-- providers: `connectors/prestashop` and `connectors/opencart`; provider count becomes 31;
+- providers: `connectors/storefronts/prestashop` and `connectors/storefronts/opencart`; provider count becomes 31;
 - PrestaShop: native Webservice reads plus exact price, StockAvailable and order-state reconciliation writes;
 - OpenCart: versioned `extension/torgnexa/api/*` bridge contract with SKU reconciliation and exact-state writes;
 - docs/contracts: `docs/connectors/{prestashop,opencart}/*` and operation contracts `095`/`096`;
@@ -279,7 +337,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Task 094 additions
 
-- provider: `connectors/woocommerce` with modern WooCommerce v3 read/write/webhook behavior and Task-064 conformance evidence;
+- provider: `connectors/storefronts/woocommerce` with modern WooCommerce v3 read/write/webhook behavior and Task-064 conformance evidence;
 - Connector SDK v1: additive commerce write, return and verified webhook interfaces; frozen root `Connector`/`Runtime` unchanged;
 - docs/contract: `docs/connectors/woocommerce/*` and `contracts/operations/094-woocommerce-connector-v1.md`;
 - architecture: ADR `0086` + `ARCH-094`; provider count becomes 29;
@@ -297,7 +355,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Tasks 068–075 additions
 
-- providers: `connectors/chestny-znak`, `diadoc`, `saby-edo`, `vetis-mercury`, `sbp` with Task-064 conformance evidence;
+- providers: `connectors/government/chestny-znak`, `diadoc`, `saby-edo`, `vetis-mercury`, `sbp` with Task-064 conformance evidence;
 - platform modules: marking, signing, EDO, fiscalization, VetIS evidence, payments, logistics and PUDO;
 - Connector SDK v1: additive government/EDO/fiscal/payment/logistics/pickup capability interfaces; frozen root Connector/Runtime unchanged;
 - migrations: `000041` through `000048`;
@@ -307,7 +365,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Task 089b additions
 
 - FX runtime/storage: `internal/platform/fx` completion plus `internal/platform/postgres/fxrepo`;
-- reference provider: `connectors/cbr-fx` and `docs/connectors/cbr-fx`;
+- reference provider: `connectors/finance/cbr-fx` and `docs/connectors/cbr-fx`;
 - migration: `000040_fx_rate_provider_completion.sql`;
 - architecture: `adr/0065-fx-rate-provider-completion.md` + `ARCH-089B`;
 - financial consumers: evidence-bearing reporting/payment-reconciliation FX bridges;
@@ -451,6 +509,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0106-bitrix24-crm-production-runtime.md`
 - `adr/0107-claude-ai-provider.md`
 - `adr/0108-oauth-per-tenant-host-template.md`
+- `adr/0110-categorical-health-check-surfaces.md`
+- `adr/0111-mvideo-lamoda-marketplace-surfaces.md`
+- `adr/0112-dolyami-payment-surface.md`
+- `adr/0113-gemini-grok-ai-providers.md`
+- `adr/0114-prestashop-price-inventory-runtime-route.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -594,6 +657,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/151-magento-storefront-connector.json`
 - `architecture/reviews/152-bitrix-storefront-connector.json`
 - `architecture/reviews/153-cs-cart-storefront-connector.json`
+- `architecture/reviews/154-saleor-storefront-connector.json`
+- `architecture/reviews/155-pochta-russia-logistics-connector.json`
+- `architecture/reviews/156-categorical-runtime-surfaces.json`
+- `architecture/reviews/157a-lamoda-marketplace-surface.json`
+- `architecture/reviews/157b-mvideo-marketplace-surface.json`
+- `architecture/reviews/158a-dolyami-payment-surface.json`
+- `architecture/reviews/159a-gemini-ai-provider.json`
+- `architecture/reviews/159b-grok-ai-provider.json`
+- `architecture/reviews/160-prestashop-commerce-sync-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -605,569 +677,620 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `cmd/torgnexa-runtime-qualifier/main_test.go`
 - `cmd/torgnexa-slo-report/main.go`
 - `cmd/worker/main.go`
-- `connectors/aliexpress-ru/conformance.go`
-- `connectors/aliexpress-ru/connector.go`
-- `connectors/aliexpress-ru/connector_test.go`
-- `connectors/aliexpress-ru/fixtures/products-last.json`
-- `connectors/aliexpress-ru/fixtures/products-page-1.json`
-- `connectors/aliexpress-ru/helpers.go`
-- `connectors/aliexpress-ru/manifest.json`
-- `connectors/aliexpress-ru/presentation.json`
-- `connectors/aliexpress-ru/products.go`
-- `connectors/auto-ru/classified.go`
-- `connectors/auto-ru/config.go`
-- `connectors/auto-ru/conformance.go`
-- `connectors/auto-ru/connector.go`
-- `connectors/auto-ru/connector_test.go`
-- `connectors/auto-ru/fixtures/account.json`
-- `connectors/auto-ru/fixtures/feed-history.json`
-- `connectors/auto-ru/fixtures/feed-task.json`
-- `connectors/auto-ru/fixtures/offers.json`
-- `connectors/auto-ru/manifest.json`
-- `connectors/auto-ru/presentation.json`
-- `connectors/auto-ru/vehicle.go`
-- `connectors/avito/classified.go`
-- `connectors/avito/config.go`
-- `connectors/avito/conformance.go`
-- `connectors/avito/connector.go`
-- `connectors/avito/connector_test.go`
-- `connectors/avito/fixtures/account-self.json`
-- `connectors/avito/fixtures/chats.json`
-- `connectors/avito/fixtures/item-stats.json`
-- `connectors/avito/fixtures/items.json`
-- `connectors/avito/fixtures/message-reply.json`
-- `connectors/avito/fixtures/messages.json`
-- `connectors/avito/manifest.json`
-- `connectors/avito/presentation.json`
-- `connectors/bitrix/config.go`
-- `connectors/bitrix/conformance.go`
-- `connectors/bitrix/connector.go`
-- `connectors/bitrix/connector_test.go`
-- `connectors/bitrix/cursor.go`
-- `connectors/bitrix/manifest.json`
-- `connectors/bitrix/presentation.json`
-- `connectors/bitrix/products.go`
-- `connectors/bitrix/remote.go`
-- `connectors/bitrix/write.go`
-- `connectors/bitrix24/config.go`
-- `connectors/bitrix24/conformance.go`
-- `connectors/bitrix24/connector.go`
-- `connectors/bitrix24/connector_test.go`
-- `connectors/bitrix24/cursor.go`
-- `connectors/bitrix24/manifest.json`
-- `connectors/bitrix24/presentation.json`
-- `connectors/bitrix24/read.go`
-- `connectors/bitrix24/remote.go`
-- `connectors/bitrix24/write.go`
-- `connectors/cbr-fx/conformance.go`
-- `connectors/cbr-fx/connector.go`
-- `connectors/cbr-fx/connector_test.go`
-- `connectors/cbr-fx/fixtures/daily.xml`
-- `connectors/cbr-fx/manifest.json`
-- `connectors/cbr-fx/presentation.json`
-- `connectors/cbr-fx/rates.go`
-- `connectors/cdek/candidate_transport.go`
-- `connectors/cdek/conformance.go`
-- `connectors/cdek/connector.go`
-- `connectors/cdek/connector_test.go`
-- `connectors/cdek/manifest.json`
-- `connectors/cdek/operations.go`
-- `connectors/cdek/presentation.json`
-- `connectors/chestny-znak/candidate_transport.go`
-- `connectors/chestny-znak/conformance.go`
-- `connectors/chestny-znak/connector.go`
-- `connectors/chestny-znak/connector_test.go`
-- `connectors/chestny-znak/manifest.json`
-- `connectors/chestny-znak/operations.go`
-- `connectors/chestny-znak/presentation.json`
-- `connectors/cian/config.go`
-- `connectors/cian/conformance.go`
-- `connectors/cian/connector.go`
-- `connectors/cian/connector_test.go`
-- `connectors/cian/fixtures/import-report-errors.json`
-- `connectors/cian/fixtures/import-report.json`
-- `connectors/cian/fixtures/import-state.json`
-- `connectors/cian/manifest.json`
-- `connectors/cian/presentation.json`
-- `connectors/cian/property.go`
-- `connectors/cian/status.go`
-- `connectors/claude/conformance.go`
-- `connectors/claude/connector.go`
-- `connectors/claude/connector_test.go`
-- `connectors/claude/manifest.json`
-- `connectors/claude/presentation.json`
-- `connectors/cs-cart/config.go`
-- `connectors/cs-cart/conformance.go`
-- `connectors/cs-cart/connector.go`
-- `connectors/cs-cart/connector_test.go`
-- `connectors/cs-cart/cursor.go`
-- `connectors/cs-cart/manifest.json`
-- `connectors/cs-cart/presentation.json`
-- `connectors/cs-cart/products.go`
-- `connectors/cs-cart/remote.go`
-- `connectors/cs-cart/write.go`
-- `connectors/deepseek/conformance.go`
-- `connectors/deepseek/connector.go`
-- `connectors/deepseek/connector_test.go`
-- `connectors/deepseek/manifest.json`
-- `connectors/deepseek/presentation.json`
-- `connectors/dellin/candidate_transport.go`
-- `connectors/dellin/connector.go`
-- `connectors/dellin/connector_test.go`
-- `connectors/dellin/manifest.json`
-- `connectors/dellin/presentation.json`
-- `connectors/dellin/transport.go`
-- `connectors/diadoc/candidate_transport.go`
-- `connectors/diadoc/conformance.go`
-- `connectors/diadoc/connector.go`
-- `connectors/diadoc/connector_test.go`
-- `connectors/diadoc/manifest.json`
-- `connectors/diadoc/operations.go`
-- `connectors/diadoc/presentation.json`
-- `connectors/egais/candidate_transport.go`
-- `connectors/egais/conformance.go`
-- `connectors/egais/connector.go`
-- `connectors/egais/connector_test.go`
-- `connectors/egais/manifest.json`
-- `connectors/egais/operations.go`
-- `connectors/egais/presentation.json`
-- `connectors/fivepost/candidate_transport.go`
-- `connectors/fivepost/conformance.go`
-- `connectors/fivepost/connector.go`
-- `connectors/fivepost/connector_test.go`
-- `connectors/fivepost/manifest.json`
-- `connectors/fivepost/operations.go`
-- `connectors/fivepost/presentation.json`
-- `connectors/gigachat/conformance.go`
-- `connectors/gigachat/connector.go`
-- `connectors/gigachat/connector_test.go`
-- `connectors/gigachat/manifest.json`
-- `connectors/gigachat/presentation.json`
-- `connectors/instagram/config.go`
-- `connectors/instagram/conformance.go`
-- `connectors/instagram/connector.go`
-- `connectors/instagram/connector_test.go`
-- `connectors/instagram/fixtures/container.json`
-- `connectors/instagram/fixtures/profile.json`
-- `connectors/instagram/fixtures/published.json`
-- `connectors/instagram/fixtures/status.json`
-- `connectors/instagram/manifest.json`
-- `connectors/instagram/presentation.json`
-- `connectors/instagram/social.go`
-- `connectors/kimi/conformance.go`
-- `connectors/kimi/connector.go`
-- `connectors/kimi/connector_test.go`
-- `connectors/kimi/manifest.json`
-- `connectors/kimi/presentation.json`
-- `connectors/lm-studio/candidate_transport.go`
-- `connectors/lm-studio/conformance.go`
-- `connectors/lm-studio/connector.go`
-- `connectors/lm-studio/connector_test.go`
-- `connectors/lm-studio/manifest.json`
-- `connectors/lm-studio/presentation.json`
-- `connectors/lm-studio/transport.go`
-- `connectors/magento/config.go`
-- `connectors/magento/conformance.go`
-- `connectors/magento/connector.go`
-- `connectors/magento/connector_test.go`
-- `connectors/magento/cursor.go`
-- `connectors/magento/inventory.go`
-- `connectors/magento/manifest.json`
-- `connectors/magento/orders.go`
-- `connectors/magento/presentation.json`
-- `connectors/magento/prices.go`
-- `connectors/magento/products.go`
-- `connectors/magento/returns.go`
-- `connectors/magento/webhook.go`
-- `connectors/magento/wire.go`
-- `connectors/magento/write.go`
-- `connectors/magnit-market/config.go`
-- `connectors/magnit-market/conformance.go`
-- `connectors/magnit-market/connector.go`
-- `connectors/magnit-market/connector_test.go`
-- `connectors/magnit-market/fixtures/orders-last.json`
-- `connectors/magnit-market/fixtures/orders-page-1.json`
-- `connectors/magnit-market/fixtures/prices-last.json`
-- `connectors/magnit-market/fixtures/prices-page-1.json`
-- `connectors/magnit-market/fixtures/products-last.json`
-- `connectors/magnit-market/fixtures/products-page-1.json`
-- `connectors/magnit-market/fixtures/shops.json`
-- `connectors/magnit-market/fixtures/short-last.json`
-- `connectors/magnit-market/fixtures/short-page-1.json`
-- `connectors/magnit-market/fixtures/stocks.json`
-- `connectors/magnit-market/helpers.go`
-- `connectors/magnit-market/inventory.go`
-- `connectors/magnit-market/manifest.json`
-- `connectors/magnit-market/orders.go`
-- `connectors/magnit-market/presentation.json`
-- `connectors/magnit-market/prices.go`
-- `connectors/magnit-market/products.go`
-- `connectors/max-messenger/config.go`
-- `connectors/max-messenger/conformance.go`
-- `connectors/max-messenger/connector.go`
-- `connectors/max-messenger/connector_test.go`
-- `connectors/max-messenger/fixtures/get-channel.json`
-- `connectors/max-messenger/fixtures/get-me.json`
-- `connectors/max-messenger/fixtures/get-membership.json`
-- `connectors/max-messenger/fixtures/send-message.json`
-- `connectors/max-messenger/fixtures/upload-image.json`
-- `connectors/max-messenger/fixtures/upload-init-image.json`
-- `connectors/max-messenger/fixtures/webhook-message-created.json`
-- `connectors/max-messenger/manifest.json`
-- `connectors/max-messenger/presentation.json`
-- `connectors/max-messenger/social.go`
-- `connectors/max-messenger/webhook.go`
-- `connectors/medusa/config.go`
-- `connectors/medusa/conformance.go`
-- `connectors/medusa/connector.go`
-- `connectors/medusa/connector_test.go`
-- `connectors/medusa/cursor.go`
-- `connectors/medusa/inventory.go`
-- `connectors/medusa/manifest.json`
-- `connectors/medusa/orders.go`
-- `connectors/medusa/presentation.json`
-- `connectors/medusa/prices.go`
-- `connectors/medusa/products.go`
-- `connectors/medusa/returns.go`
-- `connectors/medusa/webhook.go`
-- `connectors/medusa/wire.go`
-- `connectors/medusa/write.go`
-- `connectors/megamarket/config.go`
-- `connectors/megamarket/conformance.go`
-- `connectors/megamarket/connector.go`
-- `connectors/megamarket/connector_test.go`
-- `connectors/megamarket/fixtures/orders.json`
-- `connectors/megamarket/fixtures/products-last.json`
-- `connectors/megamarket/fixtures/products-page-1.json`
-- `connectors/megamarket/fixtures/stock-blue.json`
-- `connectors/megamarket/fixtures/stock-red.json`
-- `connectors/megamarket/helpers.go`
-- `connectors/megamarket/inventory.go`
-- `connectors/megamarket/manifest.json`
-- `connectors/megamarket/orders.go`
-- `connectors/megamarket/presentation.json`
-- `connectors/megamarket/products.go`
-- `connectors/moysklad/catalog.go`
-- `connectors/moysklad/conformance.go`
-- `connectors/moysklad/connector.go`
-- `connectors/moysklad/connector_test.go`
-- `connectors/moysklad/fixtures/catalog-page.json`
-- `connectors/moysklad/fixtures/inventory-page.json`
-- `connectors/moysklad/fixtures/orders-page.json`
-- `connectors/moysklad/inventory.go`
-- `connectors/moysklad/json.go`
-- `connectors/moysklad/manifest.json`
-- `connectors/moysklad/orders.go`
-- `connectors/moysklad/presentation.json`
-- `connectors/odnoklassniki/analytics.go`
-- `connectors/odnoklassniki/config.go`
-- `connectors/odnoklassniki/conformance.go`
-- `connectors/odnoklassniki/connector.go`
-- `connectors/odnoklassniki/connector_test.go`
-- `connectors/odnoklassniki/fixtures/group.json`
-- `connectors/odnoklassniki/fixtures/photo-ticket.json`
-- `connectors/odnoklassniki/fixtures/photo-upload.json`
-- `connectors/odnoklassniki/fixtures/topic-stat.json`
-- `connectors/odnoklassniki/fixtures/topic-status.json`
-- `connectors/odnoklassniki/fixtures/topic.json`
-- `connectors/odnoklassniki/fixtures/video-ticket.json`
-- `connectors/odnoklassniki/manifest.json`
-- `connectors/odnoklassniki/presentation.json`
-- `connectors/odnoklassniki/social.go`
-- `connectors/ollama/candidate_transport.go`
-- `connectors/ollama/conformance.go`
-- `connectors/ollama/connector.go`
-- `connectors/ollama/connector_test.go`
-- `connectors/ollama/manifest.json`
-- `connectors/ollama/presentation.json`
-- `connectors/ollama/transport.go`
-- `connectors/onec/catalog.go`
-- `connectors/onec/config.go`
-- `connectors/onec/conformance.go`
-- `connectors/onec/connector.go`
-- `connectors/onec/connector_test.go`
-- `connectors/onec/fixtures/catalog-page.json`
-- `connectors/onec/fixtures/inventory-page.json`
-- `connectors/onec/inventory.go`
-- `connectors/onec/manifest.json`
-- `connectors/onec/odata.go`
-- `connectors/onec/presentation.json`
-- `connectors/open-webui/candidate_transport.go`
-- `connectors/open-webui/conformance.go`
-- `connectors/open-webui/connector.go`
-- `connectors/open-webui/connector_test.go`
-- `connectors/open-webui/manifest.json`
-- `connectors/open-webui/presentation.json`
-- `connectors/open-webui/transport.go`
-- `connectors/openai-compatible/conformance.go`
-- `connectors/openai-compatible/connector.go`
-- `connectors/openai-compatible/connector_test.go`
-- `connectors/openai-compatible/manifest.json`
-- `connectors/openai-compatible/presentation.json`
-- `connectors/opencart/config.go`
-- `connectors/opencart/conformance.go`
-- `connectors/opencart/connector.go`
-- `connectors/opencart/connector_test.go`
-- `connectors/opencart/cursor.go`
-- `connectors/opencart/manifest.json`
-- `connectors/opencart/presentation.json`
-- `connectors/opencart/read.go`
-- `connectors/opencart/remote.go`
-- `connectors/opencart/write.go`
-- `connectors/ozon-delivery/candidate_transport.go`
-- `connectors/ozon-delivery/connector.go`
-- `connectors/ozon-delivery/connector_test.go`
-- `connectors/ozon-delivery/manifest.json`
-- `connectors/ozon-delivery/presentation.json`
-- `connectors/ozon-delivery/transport.go`
-- `connectors/ozon-pay/candidate_transport.go`
-- `connectors/ozon-pay/connector.go`
-- `connectors/ozon-pay/connector_test.go`
-- `connectors/ozon-pay/manifest.json`
-- `connectors/ozon-pay/presentation.json`
-- `connectors/ozon-pay/transport.go`
-- `connectors/ozon/conformance.go`
-- `connectors/ozon/connector.go`
-- `connectors/ozon/connector_test.go`
-- `connectors/ozon/fixtures/product-info-last.json`
-- `connectors/ozon/fixtures/product-info.json`
-- `connectors/ozon/fixtures/product-list-last.json`
-- `connectors/ozon/fixtures/product-list-page-1.json`
-- `connectors/ozon/fixtures/stocks.json`
-- `connectors/ozon/fixtures/warehouses.json`
-- `connectors/ozon/inventory.go`
-- `connectors/ozon/manifest.json`
-- `connectors/ozon/presentation.json`
-- `connectors/ozon/products.go`
-- `connectors/pek/candidate_transport.go`
-- `connectors/pek/conformance.go`
-- `connectors/pek/connector.go`
-- `connectors/pek/connector_test.go`
-- `connectors/pek/manifest.json`
-- `connectors/pek/operations.go`
-- `connectors/pek/presentation.json`
-- `connectors/prestashop/config.go`
-- `connectors/prestashop/conformance.go`
-- `connectors/prestashop/connector.go`
-- `connectors/prestashop/connector_test.go`
-- `connectors/prestashop/cursor.go`
-- `connectors/prestashop/manifest.json`
-- `connectors/prestashop/money.go`
-- `connectors/prestashop/presentation.json`
-- `connectors/prestashop/read.go`
-- `connectors/prestashop/remote.go`
-- `connectors/prestashop/write.go`
-- `connectors/qwen/conformance.go`
-- `connectors/qwen/connector.go`
-- `connectors/qwen/connector_test.go`
-- `connectors/qwen/manifest.json`
-- `connectors/qwen/presentation.json`
-- `connectors/robokassa/candidate_transport.go`
-- `connectors/robokassa/conformance.go`
-- `connectors/robokassa/connector.go`
-- `connectors/robokassa/connector_test.go`
-- `connectors/robokassa/manifest.json`
-- `connectors/robokassa/operations.go`
-- `connectors/robokassa/presentation.json`
-- `connectors/rutube/config.go`
-- `connectors/rutube/conformance.go`
-- `connectors/rutube/connector.go`
-- `connectors/rutube/connector_test.go`
-- `connectors/rutube/fixtures/channel.json`
-- `connectors/rutube/fixtures/upload-session.json`
-- `connectors/rutube/fixtures/video-processing.json`
-- `connectors/rutube/fixtures/video-published.json`
-- `connectors/rutube/manifest.json`
-- `connectors/rutube/presentation.json`
-- `connectors/rutube/video.go`
-- `connectors/saby-edo/candidate_transport.go`
-- `connectors/saby-edo/conformance.go`
-- `connectors/saby-edo/connector.go`
-- `connectors/saby-edo/connector_test.go`
-- `connectors/saby-edo/manifest.json`
-- `connectors/saby-edo/operations.go`
-- `connectors/saby-edo/presentation.json`
-- `connectors/saleor/config.go`
-- `connectors/saleor/conformance.go`
-- `connectors/saleor/connector.go`
-- `connectors/saleor/connector_test.go`
-- `connectors/saleor/cursor.go`
-- `connectors/saleor/inventory.go`
-- `connectors/saleor/manifest.json`
-- `connectors/saleor/orders.go`
-- `connectors/saleor/prices.go`
-- `connectors/saleor/products.go`
-- `connectors/saleor/resolve.go`
-- `connectors/saleor/returns.go`
-- `connectors/saleor/variant.go`
-- `connectors/saleor/webhook.go`
-- `connectors/saleor/write.go`
-- `connectors/sbp/candidate_transport.go`
-- `connectors/sbp/config.go`
-- `connectors/sbp/conformance.go`
-- `connectors/sbp/connector.go`
-- `connectors/sbp/connector_test.go`
-- `connectors/sbp/manifest.json`
-- `connectors/sbp/operations.go`
-- `connectors/sbp/presentation.json`
-- `connectors/shopify/config.go`
-- `connectors/shopify/conformance.go`
-- `connectors/shopify/connector.go`
-- `connectors/shopify/connector_test.go`
-- `connectors/shopify/cursor.go`
-- `connectors/shopify/inventory.go`
-- `connectors/shopify/manifest.json`
-- `connectors/shopify/orders.go`
-- `connectors/shopify/presentation.json`
-- `connectors/shopify/prices.go`
-- `connectors/shopify/products.go`
-- `connectors/shopify/returns.go`
-- `connectors/shopify/webhook.go`
-- `connectors/shopify/wire.go`
-- `connectors/shopify/write.go`
-- `connectors/shopware/config.go`
-- `connectors/shopware/conformance.go`
-- `connectors/shopware/connector.go`
-- `connectors/shopware/connector_test.go`
-- `connectors/shopware/cursor.go`
-- `connectors/shopware/inventory.go`
-- `connectors/shopware/manifest.json`
-- `connectors/shopware/orders.go`
-- `connectors/shopware/presentation.json`
-- `connectors/shopware/prices.go`
-- `connectors/shopware/products.go`
-- `connectors/shopware/returns.go`
-- `connectors/shopware/webhook.go`
-- `connectors/shopware/wire.go`
-- `connectors/shopware/write.go`
-- `connectors/telegram/config.go`
-- `connectors/telegram/conformance.go`
-- `connectors/telegram/connector.go`
-- `connectors/telegram/connector_test.go`
-- `connectors/telegram/fixtures/delete-message.json`
-- `connectors/telegram/fixtures/edit-message.json`
-- `connectors/telegram/fixtures/get-chat-member.json`
-- `connectors/telegram/fixtures/get-me.json`
-- `connectors/telegram/fixtures/rate-limit.json`
-- `connectors/telegram/fixtures/send-album.json`
-- `connectors/telegram/fixtures/send-message.json`
-- `connectors/telegram/fixtures/send-photo.json`
-- `connectors/telegram/fixtures/send-video.json`
-- `connectors/telegram/manifest.json`
-- `connectors/telegram/presentation.json`
-- `connectors/telegram/social.go`
-- `connectors/threads/config.go`
-- `connectors/threads/conformance.go`
-- `connectors/threads/connector.go`
-- `connectors/threads/connector_test.go`
-- `connectors/threads/fixtures/container.json`
-- `connectors/threads/fixtures/profile.json`
-- `connectors/threads/fixtures/published.json`
-- `connectors/threads/fixtures/status.json`
-- `connectors/threads/fixtures/token.json`
-- `connectors/threads/manifest.json`
-- `connectors/threads/presentation.json`
-- `connectors/threads/social.go`
-- `connectors/threads/token.go`
-- `connectors/vetis-mercury/candidate_transport.go`
-- `connectors/vetis-mercury/conformance.go`
-- `connectors/vetis-mercury/connector.go`
-- `connectors/vetis-mercury/connector_test.go`
-- `connectors/vetis-mercury/manifest.json`
-- `connectors/vetis-mercury/operations.go`
-- `connectors/vetis-mercury/presentation.json`
-- `connectors/vk/config.go`
-- `connectors/vk/conformance.go`
-- `connectors/vk/connector.go`
-- `connectors/vk/connector_test.go`
-- `connectors/vk/engagement.go`
-- `connectors/vk/fixtures/api-rate-limit.json`
-- `connectors/vk/fixtures/comment-reply.json`
-- `connectors/vk/fixtures/comments.json`
-- `connectors/vk/fixtures/post-reach.json`
-- `connectors/vk/fixtures/save-photo.json`
-- `connectors/vk/fixtures/upload-photo.json`
-- `connectors/vk/fixtures/upload-server.json`
-- `connectors/vk/fixtures/wall-post-status.json`
-- `connectors/vk/fixtures/wall-post.json`
-- `connectors/vk/manifest.json`
-- `connectors/vk/presentation.json`
-- `connectors/vk/social.go`
-- `connectors/wildberries/conformance.go`
-- `connectors/wildberries/connector.go`
-- `connectors/wildberries/connector_test.go`
-- `connectors/wildberries/fixtures/cards-page-1.json`
-- `connectors/wildberries/fixtures/cards-page-full.json`
-- `connectors/wildberries/fixtures/stocks.json`
-- `connectors/wildberries/fixtures/warehouses.json`
-- `connectors/wildberries/inventory.go`
-- `connectors/wildberries/manifest.json`
-- `connectors/wildberries/presentation.json`
-- `connectors/wildberries/products.go`
-- `connectors/woocommerce/config.go`
-- `connectors/woocommerce/conformance.go`
-- `connectors/woocommerce/connector.go`
-- `connectors/woocommerce/connector_test.go`
-- `connectors/woocommerce/cursor.go`
-- `connectors/woocommerce/inventory.go`
-- `connectors/woocommerce/manifest.json`
-- `connectors/woocommerce/numbers.go`
-- `connectors/woocommerce/orders.go`
-- `connectors/woocommerce/presentation.json`
-- `connectors/woocommerce/prices.go`
-- `connectors/woocommerce/products.go`
-- `connectors/woocommerce/remote.go`
-- `connectors/woocommerce/returns.go`
-- `connectors/woocommerce/target.go`
-- `connectors/woocommerce/webhook.go`
-- `connectors/woocommerce/write.go`
-- `connectors/yandex-market/config.go`
-- `connectors/yandex-market/conformance.go`
-- `connectors/yandex-market/connector.go`
-- `connectors/yandex-market/connector_test.go`
-- `connectors/yandex-market/fixtures/notification-order.json`
-- `connectors/yandex-market/fixtures/orders.json`
-- `connectors/yandex-market/fixtures/prices.json`
-- `connectors/yandex-market/fixtures/products-last.json`
-- `connectors/yandex-market/fixtures/products-page-1.json`
-- `connectors/yandex-market/fixtures/stocks-campaign.json`
-- `connectors/yandex-market/fixtures/stocks-partner.json`
-- `connectors/yandex-market/fixtures/warehouses-last.json`
-- `connectors/yandex-market/fixtures/warehouses-page-1.json`
-- `connectors/yandex-market/helpers.go`
-- `connectors/yandex-market/inventory.go`
-- `connectors/yandex-market/manifest.json`
-- `connectors/yandex-market/notifications.go`
-- `connectors/yandex-market/orders.go`
-- `connectors/yandex-market/presentation.json`
-- `connectors/yandex-market/prices.go`
-- `connectors/yandex-market/products.go`
-- `connectors/yandex-market/write.go`
-- `connectors/yandexgpt/conformance.go`
-- `connectors/yandexgpt/connector.go`
-- `connectors/yandexgpt/connector_test.go`
-- `connectors/yandexgpt/manifest.json`
-- `connectors/yandexgpt/presentation.json`
-- `connectors/yookassa/candidate_transport.go`
-- `connectors/yookassa/conformance.go`
-- `connectors/yookassa/connector.go`
-- `connectors/yookassa/connector_test.go`
-- `connectors/yookassa/manifest.json`
-- `connectors/yookassa/operations.go`
-- `connectors/yookassa/presentation.json`
-- `connectors/youtube/comments.go`
-- `connectors/youtube/config.go`
-- `connectors/youtube/conformance.go`
-- `connectors/youtube/connector.go`
-- `connectors/youtube/connector_test.go`
-- `connectors/youtube/fixtures/channel.json`
-- `connectors/youtube/fixtures/comments-page.json`
-- `connectors/youtube/fixtures/upload-session.json`
-- `connectors/youtube/fixtures/video-processing.json`
-- `connectors/youtube/fixtures/video-published.json`
-- `connectors/youtube/manifest.json`
-- `connectors/youtube/presentation.json`
-- `connectors/youtube/video.go`
+- `connectors/ai/claude/conformance.go`
+- `connectors/ai/claude/connector.go`
+- `connectors/ai/claude/connector_test.go`
+- `connectors/ai/claude/manifest.json`
+- `connectors/ai/claude/presentation.json`
+- `connectors/ai/deepseek/conformance.go`
+- `connectors/ai/deepseek/connector.go`
+- `connectors/ai/deepseek/connector_test.go`
+- `connectors/ai/deepseek/manifest.json`
+- `connectors/ai/deepseek/presentation.json`
+- `connectors/ai/gemini/candidate_transport.go`
+- `connectors/ai/gemini/conformance.go`
+- `connectors/ai/gemini/connector.go`
+- `connectors/ai/gemini/connector_test.go`
+- `connectors/ai/gemini/manifest.json`
+- `connectors/ai/gemini/presentation.json`
+- `connectors/ai/gigachat/conformance.go`
+- `connectors/ai/gigachat/connector.go`
+- `connectors/ai/gigachat/connector_test.go`
+- `connectors/ai/gigachat/manifest.json`
+- `connectors/ai/gigachat/presentation.json`
+- `connectors/ai/grok/candidate_transport.go`
+- `connectors/ai/grok/conformance.go`
+- `connectors/ai/grok/connector.go`
+- `connectors/ai/grok/connector_test.go`
+- `connectors/ai/grok/manifest.json`
+- `connectors/ai/grok/presentation.json`
+- `connectors/ai/kimi/conformance.go`
+- `connectors/ai/kimi/connector.go`
+- `connectors/ai/kimi/connector_test.go`
+- `connectors/ai/kimi/manifest.json`
+- `connectors/ai/kimi/presentation.json`
+- `connectors/ai/lm-studio/candidate_transport.go`
+- `connectors/ai/lm-studio/conformance.go`
+- `connectors/ai/lm-studio/connector.go`
+- `connectors/ai/lm-studio/connector_test.go`
+- `connectors/ai/lm-studio/manifest.json`
+- `connectors/ai/lm-studio/presentation.json`
+- `connectors/ai/lm-studio/transport.go`
+- `connectors/ai/ollama/candidate_transport.go`
+- `connectors/ai/ollama/conformance.go`
+- `connectors/ai/ollama/connector.go`
+- `connectors/ai/ollama/connector_test.go`
+- `connectors/ai/ollama/manifest.json`
+- `connectors/ai/ollama/presentation.json`
+- `connectors/ai/ollama/transport.go`
+- `connectors/ai/open-webui/candidate_transport.go`
+- `connectors/ai/open-webui/conformance.go`
+- `connectors/ai/open-webui/connector.go`
+- `connectors/ai/open-webui/connector_test.go`
+- `connectors/ai/open-webui/manifest.json`
+- `connectors/ai/open-webui/presentation.json`
+- `connectors/ai/open-webui/transport.go`
+- `connectors/ai/openai-compatible/conformance.go`
+- `connectors/ai/openai-compatible/connector.go`
+- `connectors/ai/openai-compatible/connector_test.go`
+- `connectors/ai/openai-compatible/manifest.json`
+- `connectors/ai/openai-compatible/presentation.json`
+- `connectors/ai/qwen/conformance.go`
+- `connectors/ai/qwen/connector.go`
+- `connectors/ai/qwen/connector_test.go`
+- `connectors/ai/qwen/manifest.json`
+- `connectors/ai/qwen/presentation.json`
+- `connectors/ai/yandexgpt/conformance.go`
+- `connectors/ai/yandexgpt/connector.go`
+- `connectors/ai/yandexgpt/connector_test.go`
+- `connectors/ai/yandexgpt/manifest.json`
+- `connectors/ai/yandexgpt/presentation.json`
+- `connectors/classified/auto-ru/classified.go`
+- `connectors/classified/auto-ru/config.go`
+- `connectors/classified/auto-ru/conformance.go`
+- `connectors/classified/auto-ru/connector.go`
+- `connectors/classified/auto-ru/connector_test.go`
+- `connectors/classified/auto-ru/fixtures/account.json`
+- `connectors/classified/auto-ru/fixtures/feed-history.json`
+- `connectors/classified/auto-ru/fixtures/feed-task.json`
+- `connectors/classified/auto-ru/fixtures/offers.json`
+- `connectors/classified/auto-ru/manifest.json`
+- `connectors/classified/auto-ru/presentation.json`
+- `connectors/classified/auto-ru/vehicle.go`
+- `connectors/classified/avito/classified.go`
+- `connectors/classified/avito/config.go`
+- `connectors/classified/avito/conformance.go`
+- `connectors/classified/avito/connector.go`
+- `connectors/classified/avito/connector_test.go`
+- `connectors/classified/avito/fixtures/account-self.json`
+- `connectors/classified/avito/fixtures/chats.json`
+- `connectors/classified/avito/fixtures/item-stats.json`
+- `connectors/classified/avito/fixtures/items.json`
+- `connectors/classified/avito/fixtures/message-reply.json`
+- `connectors/classified/avito/fixtures/messages.json`
+- `connectors/classified/avito/manifest.json`
+- `connectors/classified/avito/presentation.json`
+- `connectors/classified/cian/config.go`
+- `connectors/classified/cian/conformance.go`
+- `connectors/classified/cian/connector.go`
+- `connectors/classified/cian/connector_test.go`
+- `connectors/classified/cian/fixtures/import-report-errors.json`
+- `connectors/classified/cian/fixtures/import-report.json`
+- `connectors/classified/cian/fixtures/import-state.json`
+- `connectors/classified/cian/manifest.json`
+- `connectors/classified/cian/presentation.json`
+- `connectors/classified/cian/property.go`
+- `connectors/classified/cian/status.go`
+- `connectors/crm/bitrix24/config.go`
+- `connectors/crm/bitrix24/conformance.go`
+- `connectors/crm/bitrix24/connector.go`
+- `connectors/crm/bitrix24/connector_test.go`
+- `connectors/crm/bitrix24/cursor.go`
+- `connectors/crm/bitrix24/manifest.json`
+- `connectors/crm/bitrix24/presentation.json`
+- `connectors/crm/bitrix24/read.go`
+- `connectors/crm/bitrix24/remote.go`
+- `connectors/crm/bitrix24/write.go`
+- `connectors/edo/diadoc/candidate_transport.go`
+- `connectors/edo/diadoc/conformance.go`
+- `connectors/edo/diadoc/connector.go`
+- `connectors/edo/diadoc/connector_test.go`
+- `connectors/edo/diadoc/manifest.json`
+- `connectors/edo/diadoc/operations.go`
+- `connectors/edo/diadoc/presentation.json`
+- `connectors/edo/saby-edo/candidate_transport.go`
+- `connectors/edo/saby-edo/conformance.go`
+- `connectors/edo/saby-edo/connector.go`
+- `connectors/edo/saby-edo/connector_test.go`
+- `connectors/edo/saby-edo/manifest.json`
+- `connectors/edo/saby-edo/operations.go`
+- `connectors/edo/saby-edo/presentation.json`
+- `connectors/erp/moysklad/catalog.go`
+- `connectors/erp/moysklad/conformance.go`
+- `connectors/erp/moysklad/connector.go`
+- `connectors/erp/moysklad/connector_test.go`
+- `connectors/erp/moysklad/fixtures/catalog-page.json`
+- `connectors/erp/moysklad/fixtures/inventory-page.json`
+- `connectors/erp/moysklad/fixtures/orders-page.json`
+- `connectors/erp/moysklad/inventory.go`
+- `connectors/erp/moysklad/json.go`
+- `connectors/erp/moysklad/manifest.json`
+- `connectors/erp/moysklad/orders.go`
+- `connectors/erp/moysklad/presentation.json`
+- `connectors/erp/onec/catalog.go`
+- `connectors/erp/onec/config.go`
+- `connectors/erp/onec/conformance.go`
+- `connectors/erp/onec/connector.go`
+- `connectors/erp/onec/connector_test.go`
+- `connectors/erp/onec/fixtures/catalog-page.json`
+- `connectors/erp/onec/fixtures/inventory-page.json`
+- `connectors/erp/onec/inventory.go`
+- `connectors/erp/onec/manifest.json`
+- `connectors/erp/onec/odata.go`
+- `connectors/erp/onec/presentation.json`
+- `connectors/finance/cbr-fx/conformance.go`
+- `connectors/finance/cbr-fx/connector.go`
+- `connectors/finance/cbr-fx/connector_test.go`
+- `connectors/finance/cbr-fx/fixtures/daily.xml`
+- `connectors/finance/cbr-fx/manifest.json`
+- `connectors/finance/cbr-fx/presentation.json`
+- `connectors/finance/cbr-fx/rates.go`
+- `connectors/government/chestny-znak/candidate_transport.go`
+- `connectors/government/chestny-znak/conformance.go`
+- `connectors/government/chestny-znak/connector.go`
+- `connectors/government/chestny-znak/connector_test.go`
+- `connectors/government/chestny-znak/manifest.json`
+- `connectors/government/chestny-znak/operations.go`
+- `connectors/government/chestny-znak/presentation.json`
+- `connectors/government/egais/candidate_transport.go`
+- `connectors/government/egais/conformance.go`
+- `connectors/government/egais/connector.go`
+- `connectors/government/egais/connector_test.go`
+- `connectors/government/egais/manifest.json`
+- `connectors/government/egais/operations.go`
+- `connectors/government/egais/presentation.json`
+- `connectors/government/vetis-mercury/candidate_transport.go`
+- `connectors/government/vetis-mercury/conformance.go`
+- `connectors/government/vetis-mercury/connector.go`
+- `connectors/government/vetis-mercury/connector_test.go`
+- `connectors/government/vetis-mercury/manifest.json`
+- `connectors/government/vetis-mercury/operations.go`
+- `connectors/government/vetis-mercury/presentation.json`
+- `connectors/logistics/cdek/candidate_transport.go`
+- `connectors/logistics/cdek/conformance.go`
+- `connectors/logistics/cdek/connector.go`
+- `connectors/logistics/cdek/connector_test.go`
+- `connectors/logistics/cdek/manifest.json`
+- `connectors/logistics/cdek/operations.go`
+- `connectors/logistics/cdek/presentation.json`
+- `connectors/logistics/dellin/candidate_transport.go`
+- `connectors/logistics/dellin/connector.go`
+- `connectors/logistics/dellin/connector_test.go`
+- `connectors/logistics/dellin/manifest.json`
+- `connectors/logistics/dellin/presentation.json`
+- `connectors/logistics/dellin/transport.go`
+- `connectors/logistics/fivepost/candidate_transport.go`
+- `connectors/logistics/fivepost/conformance.go`
+- `connectors/logistics/fivepost/connector.go`
+- `connectors/logistics/fivepost/connector_test.go`
+- `connectors/logistics/fivepost/manifest.json`
+- `connectors/logistics/fivepost/operations.go`
+- `connectors/logistics/fivepost/presentation.json`
+- `connectors/logistics/ozon-delivery/candidate_transport.go`
+- `connectors/logistics/ozon-delivery/connector.go`
+- `connectors/logistics/ozon-delivery/connector_test.go`
+- `connectors/logistics/ozon-delivery/manifest.json`
+- `connectors/logistics/ozon-delivery/presentation.json`
+- `connectors/logistics/ozon-delivery/transport.go`
+- `connectors/logistics/pek/candidate_transport.go`
+- `connectors/logistics/pek/conformance.go`
+- `connectors/logistics/pek/connector.go`
+- `connectors/logistics/pek/connector_test.go`
+- `connectors/logistics/pek/manifest.json`
+- `connectors/logistics/pek/operations.go`
+- `connectors/logistics/pek/presentation.json`
+- `connectors/logistics/pochta-russia/candidate_transport.go`
+- `connectors/logistics/pochta-russia/conformance.go`
+- `connectors/logistics/pochta-russia/connector.go`
+- `connectors/logistics/pochta-russia/connector_test.go`
+- `connectors/logistics/pochta-russia/manifest.json`
+- `connectors/logistics/pochta-russia/presentation.json`
+- `connectors/logistics/pochta-russia/transport.go`
+- `connectors/marketplaces/aliexpress-ru/conformance.go`
+- `connectors/marketplaces/aliexpress-ru/connector.go`
+- `connectors/marketplaces/aliexpress-ru/connector_test.go`
+- `connectors/marketplaces/aliexpress-ru/fixtures/products-last.json`
+- `connectors/marketplaces/aliexpress-ru/fixtures/products-page-1.json`
+- `connectors/marketplaces/aliexpress-ru/helpers.go`
+- `connectors/marketplaces/aliexpress-ru/manifest.json`
+- `connectors/marketplaces/aliexpress-ru/presentation.json`
+- `connectors/marketplaces/aliexpress-ru/products.go`
+- `connectors/marketplaces/lamoda/connector.go`
+- `connectors/marketplaces/lamoda/connector_test.go`
+- `connectors/marketplaces/lamoda/manifest.json`
+- `connectors/marketplaces/lamoda/presentation.json`
+- `connectors/marketplaces/lamoda/transport.go`
+- `connectors/marketplaces/magnit-market/config.go`
+- `connectors/marketplaces/magnit-market/conformance.go`
+- `connectors/marketplaces/magnit-market/connector.go`
+- `connectors/marketplaces/magnit-market/connector_test.go`
+- `connectors/marketplaces/magnit-market/fixtures/orders-last.json`
+- `connectors/marketplaces/magnit-market/fixtures/orders-page-1.json`
+- `connectors/marketplaces/magnit-market/fixtures/prices-last.json`
+- `connectors/marketplaces/magnit-market/fixtures/prices-page-1.json`
+- `connectors/marketplaces/magnit-market/fixtures/products-last.json`
+- `connectors/marketplaces/magnit-market/fixtures/products-page-1.json`
+- `connectors/marketplaces/magnit-market/fixtures/shops.json`
+- `connectors/marketplaces/magnit-market/fixtures/short-last.json`
+- `connectors/marketplaces/magnit-market/fixtures/short-page-1.json`
+- `connectors/marketplaces/magnit-market/fixtures/stocks.json`
+- `connectors/marketplaces/magnit-market/helpers.go`
+- `connectors/marketplaces/magnit-market/inventory.go`
+- `connectors/marketplaces/magnit-market/manifest.json`
+- `connectors/marketplaces/magnit-market/orders.go`
+- `connectors/marketplaces/magnit-market/presentation.json`
+- `connectors/marketplaces/magnit-market/prices.go`
+- `connectors/marketplaces/magnit-market/products.go`
+- `connectors/marketplaces/megamarket/config.go`
+- `connectors/marketplaces/megamarket/conformance.go`
+- `connectors/marketplaces/megamarket/connector.go`
+- `connectors/marketplaces/megamarket/connector_test.go`
+- `connectors/marketplaces/megamarket/fixtures/orders.json`
+- `connectors/marketplaces/megamarket/fixtures/products-last.json`
+- `connectors/marketplaces/megamarket/fixtures/products-page-1.json`
+- `connectors/marketplaces/megamarket/fixtures/stock-blue.json`
+- `connectors/marketplaces/megamarket/fixtures/stock-red.json`
+- `connectors/marketplaces/megamarket/helpers.go`
+- `connectors/marketplaces/megamarket/inventory.go`
+- `connectors/marketplaces/megamarket/manifest.json`
+- `connectors/marketplaces/megamarket/orders.go`
+- `connectors/marketplaces/megamarket/presentation.json`
+- `connectors/marketplaces/megamarket/products.go`
+- `connectors/marketplaces/mvideo/connector.go`
+- `connectors/marketplaces/mvideo/connector_test.go`
+- `connectors/marketplaces/mvideo/manifest.json`
+- `connectors/marketplaces/mvideo/presentation.json`
+- `connectors/marketplaces/mvideo/transport.go`
+- `connectors/marketplaces/ozon/conformance.go`
+- `connectors/marketplaces/ozon/connector.go`
+- `connectors/marketplaces/ozon/connector_test.go`
+- `connectors/marketplaces/ozon/fixtures/product-info-last.json`
+- `connectors/marketplaces/ozon/fixtures/product-info.json`
+- `connectors/marketplaces/ozon/fixtures/product-list-last.json`
+- `connectors/marketplaces/ozon/fixtures/product-list-page-1.json`
+- `connectors/marketplaces/ozon/fixtures/stocks.json`
+- `connectors/marketplaces/ozon/fixtures/warehouses.json`
+- `connectors/marketplaces/ozon/inventory.go`
+- `connectors/marketplaces/ozon/manifest.json`
+- `connectors/marketplaces/ozon/presentation.json`
+- `connectors/marketplaces/ozon/products.go`
+- `connectors/marketplaces/wildberries/conformance.go`
+- `connectors/marketplaces/wildberries/connector.go`
+- `connectors/marketplaces/wildberries/connector_test.go`
+- `connectors/marketplaces/wildberries/fixtures/cards-page-1.json`
+- `connectors/marketplaces/wildberries/fixtures/cards-page-full.json`
+- `connectors/marketplaces/wildberries/fixtures/stocks.json`
+- `connectors/marketplaces/wildberries/fixtures/warehouses.json`
+- `connectors/marketplaces/wildberries/inventory.go`
+- `connectors/marketplaces/wildberries/manifest.json`
+- `connectors/marketplaces/wildberries/presentation.json`
+- `connectors/marketplaces/wildberries/products.go`
+- `connectors/marketplaces/yandex-market/config.go`
+- `connectors/marketplaces/yandex-market/conformance.go`
+- `connectors/marketplaces/yandex-market/connector.go`
+- `connectors/marketplaces/yandex-market/connector_test.go`
+- `connectors/marketplaces/yandex-market/fixtures/notification-order.json`
+- `connectors/marketplaces/yandex-market/fixtures/orders.json`
+- `connectors/marketplaces/yandex-market/fixtures/prices.json`
+- `connectors/marketplaces/yandex-market/fixtures/products-last.json`
+- `connectors/marketplaces/yandex-market/fixtures/products-page-1.json`
+- `connectors/marketplaces/yandex-market/fixtures/stocks-campaign.json`
+- `connectors/marketplaces/yandex-market/fixtures/stocks-partner.json`
+- `connectors/marketplaces/yandex-market/fixtures/warehouses-last.json`
+- `connectors/marketplaces/yandex-market/fixtures/warehouses-page-1.json`
+- `connectors/marketplaces/yandex-market/helpers.go`
+- `connectors/marketplaces/yandex-market/inventory.go`
+- `connectors/marketplaces/yandex-market/manifest.json`
+- `connectors/marketplaces/yandex-market/notifications.go`
+- `connectors/marketplaces/yandex-market/orders.go`
+- `connectors/marketplaces/yandex-market/presentation.json`
+- `connectors/marketplaces/yandex-market/prices.go`
+- `connectors/marketplaces/yandex-market/products.go`
+- `connectors/marketplaces/yandex-market/write.go`
+- `connectors/payments/dolyami/config.go`
+- `connectors/payments/dolyami/connector.go`
+- `connectors/payments/dolyami/connector_test.go`
+- `connectors/payments/dolyami/errors.go`
+- `connectors/payments/dolyami/manifest.json`
+- `connectors/payments/dolyami/presentation.json`
+- `connectors/payments/dolyami/transport.go`
+- `connectors/payments/ozon-pay/candidate_transport.go`
+- `connectors/payments/ozon-pay/connector.go`
+- `connectors/payments/ozon-pay/connector_test.go`
+- `connectors/payments/ozon-pay/manifest.json`
+- `connectors/payments/ozon-pay/presentation.json`
+- `connectors/payments/ozon-pay/transport.go`
+- `connectors/payments/robokassa/candidate_transport.go`
+- `connectors/payments/robokassa/conformance.go`
+- `connectors/payments/robokassa/connector.go`
+- `connectors/payments/robokassa/connector_test.go`
+- `connectors/payments/robokassa/manifest.json`
+- `connectors/payments/robokassa/operations.go`
+- `connectors/payments/robokassa/presentation.json`
+- `connectors/payments/sbp/candidate_transport.go`
+- `connectors/payments/sbp/config.go`
+- `connectors/payments/sbp/conformance.go`
+- `connectors/payments/sbp/connector.go`
+- `connectors/payments/sbp/connector_test.go`
+- `connectors/payments/sbp/manifest.json`
+- `connectors/payments/sbp/operations.go`
+- `connectors/payments/sbp/presentation.json`
+- `connectors/payments/yookassa/candidate_transport.go`
+- `connectors/payments/yookassa/conformance.go`
+- `connectors/payments/yookassa/connector.go`
+- `connectors/payments/yookassa/connector_test.go`
+- `connectors/payments/yookassa/manifest.json`
+- `connectors/payments/yookassa/operations.go`
+- `connectors/payments/yookassa/presentation.json`
+- `connectors/social/instagram/config.go`
+- `connectors/social/instagram/conformance.go`
+- `connectors/social/instagram/connector.go`
+- `connectors/social/instagram/connector_test.go`
+- `connectors/social/instagram/fixtures/container.json`
+- `connectors/social/instagram/fixtures/profile.json`
+- `connectors/social/instagram/fixtures/published.json`
+- `connectors/social/instagram/fixtures/status.json`
+- `connectors/social/instagram/manifest.json`
+- `connectors/social/instagram/presentation.json`
+- `connectors/social/instagram/social.go`
+- `connectors/social/max-messenger/config.go`
+- `connectors/social/max-messenger/conformance.go`
+- `connectors/social/max-messenger/connector.go`
+- `connectors/social/max-messenger/connector_test.go`
+- `connectors/social/max-messenger/fixtures/get-channel.json`
+- `connectors/social/max-messenger/fixtures/get-me.json`
+- `connectors/social/max-messenger/fixtures/get-membership.json`
+- `connectors/social/max-messenger/fixtures/send-message.json`
+- `connectors/social/max-messenger/fixtures/upload-image.json`
+- `connectors/social/max-messenger/fixtures/upload-init-image.json`
+- `connectors/social/max-messenger/fixtures/webhook-message-created.json`
+- `connectors/social/max-messenger/manifest.json`
+- `connectors/social/max-messenger/presentation.json`
+- `connectors/social/max-messenger/social.go`
+- `connectors/social/max-messenger/webhook.go`
+- `connectors/social/odnoklassniki/analytics.go`
+- `connectors/social/odnoklassniki/config.go`
+- `connectors/social/odnoklassniki/conformance.go`
+- `connectors/social/odnoklassniki/connector.go`
+- `connectors/social/odnoklassniki/connector_test.go`
+- `connectors/social/odnoklassniki/fixtures/group.json`
+- `connectors/social/odnoklassniki/fixtures/photo-ticket.json`
+- `connectors/social/odnoklassniki/fixtures/photo-upload.json`
+- `connectors/social/odnoklassniki/fixtures/topic-stat.json`
+- `connectors/social/odnoklassniki/fixtures/topic-status.json`
+- `connectors/social/odnoklassniki/fixtures/topic.json`
+- `connectors/social/odnoklassniki/fixtures/video-ticket.json`
+- `connectors/social/odnoklassniki/manifest.json`
+- `connectors/social/odnoklassniki/presentation.json`
+- `connectors/social/odnoklassniki/social.go`
+- `connectors/social/rutube/config.go`
+- `connectors/social/rutube/conformance.go`
+- `connectors/social/rutube/connector.go`
+- `connectors/social/rutube/connector_test.go`
+- `connectors/social/rutube/fixtures/channel.json`
+- `connectors/social/rutube/fixtures/upload-session.json`
+- `connectors/social/rutube/fixtures/video-processing.json`
+- `connectors/social/rutube/fixtures/video-published.json`
+- `connectors/social/rutube/manifest.json`
+- `connectors/social/rutube/presentation.json`
+- `connectors/social/rutube/video.go`
+- `connectors/social/telegram/config.go`
+- `connectors/social/telegram/conformance.go`
+- `connectors/social/telegram/connector.go`
+- `connectors/social/telegram/connector_test.go`
+- `connectors/social/telegram/fixtures/delete-message.json`
+- `connectors/social/telegram/fixtures/edit-message.json`
+- `connectors/social/telegram/fixtures/get-chat-member.json`
+- `connectors/social/telegram/fixtures/get-me.json`
+- `connectors/social/telegram/fixtures/rate-limit.json`
+- `connectors/social/telegram/fixtures/send-album.json`
+- `connectors/social/telegram/fixtures/send-message.json`
+- `connectors/social/telegram/fixtures/send-photo.json`
+- `connectors/social/telegram/fixtures/send-video.json`
+- `connectors/social/telegram/manifest.json`
+- `connectors/social/telegram/presentation.json`
+- `connectors/social/telegram/social.go`
+- `connectors/social/threads/config.go`
+- `connectors/social/threads/conformance.go`
+- `connectors/social/threads/connector.go`
+- `connectors/social/threads/connector_test.go`
+- `connectors/social/threads/fixtures/container.json`
+- `connectors/social/threads/fixtures/profile.json`
+- `connectors/social/threads/fixtures/published.json`
+- `connectors/social/threads/fixtures/status.json`
+- `connectors/social/threads/fixtures/token.json`
+- `connectors/social/threads/manifest.json`
+- `connectors/social/threads/presentation.json`
+- `connectors/social/threads/social.go`
+- `connectors/social/threads/token.go`
+- `connectors/social/vk/config.go`
+- `connectors/social/vk/conformance.go`
+- `connectors/social/vk/connector.go`
+- `connectors/social/vk/connector_test.go`
+- `connectors/social/vk/engagement.go`
+- `connectors/social/vk/fixtures/api-rate-limit.json`
+- `connectors/social/vk/fixtures/comment-reply.json`
+- `connectors/social/vk/fixtures/comments.json`
+- `connectors/social/vk/fixtures/post-reach.json`
+- `connectors/social/vk/fixtures/save-photo.json`
+- `connectors/social/vk/fixtures/upload-photo.json`
+- `connectors/social/vk/fixtures/upload-server.json`
+- `connectors/social/vk/fixtures/wall-post-status.json`
+- `connectors/social/vk/fixtures/wall-post.json`
+- `connectors/social/vk/manifest.json`
+- `connectors/social/vk/presentation.json`
+- `connectors/social/vk/social.go`
+- `connectors/social/youtube/comments.go`
+- `connectors/social/youtube/config.go`
+- `connectors/social/youtube/conformance.go`
+- `connectors/social/youtube/connector.go`
+- `connectors/social/youtube/connector_test.go`
+- `connectors/social/youtube/fixtures/channel.json`
+- `connectors/social/youtube/fixtures/comments-page.json`
+- `connectors/social/youtube/fixtures/upload-session.json`
+- `connectors/social/youtube/fixtures/video-processing.json`
+- `connectors/social/youtube/fixtures/video-published.json`
+- `connectors/social/youtube/manifest.json`
+- `connectors/social/youtube/presentation.json`
+- `connectors/social/youtube/video.go`
+- `connectors/storefronts/bitrix/config.go`
+- `connectors/storefronts/bitrix/conformance.go`
+- `connectors/storefronts/bitrix/connector.go`
+- `connectors/storefronts/bitrix/connector_test.go`
+- `connectors/storefronts/bitrix/cursor.go`
+- `connectors/storefronts/bitrix/manifest.json`
+- `connectors/storefronts/bitrix/presentation.json`
+- `connectors/storefronts/bitrix/products.go`
+- `connectors/storefronts/bitrix/remote.go`
+- `connectors/storefronts/bitrix/write.go`
+- `connectors/storefronts/cs-cart/config.go`
+- `connectors/storefronts/cs-cart/conformance.go`
+- `connectors/storefronts/cs-cart/connector.go`
+- `connectors/storefronts/cs-cart/connector_test.go`
+- `connectors/storefronts/cs-cart/cursor.go`
+- `connectors/storefronts/cs-cart/manifest.json`
+- `connectors/storefronts/cs-cart/presentation.json`
+- `connectors/storefronts/cs-cart/products.go`
+- `connectors/storefronts/cs-cart/remote.go`
+- `connectors/storefronts/cs-cart/write.go`
+- `connectors/storefronts/magento/config.go`
+- `connectors/storefronts/magento/conformance.go`
+- `connectors/storefronts/magento/connector.go`
+- `connectors/storefronts/magento/connector_test.go`
+- `connectors/storefronts/magento/cursor.go`
+- `connectors/storefronts/magento/inventory.go`
+- `connectors/storefronts/magento/manifest.json`
+- `connectors/storefronts/magento/orders.go`
+- `connectors/storefronts/magento/presentation.json`
+- `connectors/storefronts/magento/prices.go`
+- `connectors/storefronts/magento/products.go`
+- `connectors/storefronts/magento/returns.go`
+- `connectors/storefronts/magento/webhook.go`
+- `connectors/storefronts/magento/wire.go`
+- `connectors/storefronts/magento/write.go`
+- `connectors/storefronts/medusa/config.go`
+- `connectors/storefronts/medusa/conformance.go`
+- `connectors/storefronts/medusa/connector.go`
+- `connectors/storefronts/medusa/connector_test.go`
+- `connectors/storefronts/medusa/cursor.go`
+- `connectors/storefronts/medusa/inventory.go`
+- `connectors/storefronts/medusa/manifest.json`
+- `connectors/storefronts/medusa/orders.go`
+- `connectors/storefronts/medusa/presentation.json`
+- `connectors/storefronts/medusa/prices.go`
+- `connectors/storefronts/medusa/products.go`
+- `connectors/storefronts/medusa/returns.go`
+- `connectors/storefronts/medusa/webhook.go`
+- `connectors/storefronts/medusa/wire.go`
+- `connectors/storefronts/medusa/write.go`
+- `connectors/storefronts/opencart/config.go`
+- `connectors/storefronts/opencart/conformance.go`
+- `connectors/storefronts/opencart/connector.go`
+- `connectors/storefronts/opencart/connector_test.go`
+- `connectors/storefronts/opencart/cursor.go`
+- `connectors/storefronts/opencart/extension/torgnexa/README.md`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/base.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/health.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/order.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/orders.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/orderstatus.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/product.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/productbysku.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/products.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/variant.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/variantinventory.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/controller/api/variantprice.php`
+- `connectors/storefronts/opencart/extension/torgnexa/catalog/model/api.php`
+- `connectors/storefronts/opencart/extension/torgnexa/install.json`
+- `connectors/storefronts/opencart/manifest.json`
+- `connectors/storefronts/opencart/presentation.json`
+- `connectors/storefronts/opencart/read.go`
+- `connectors/storefronts/opencart/remote.go`
+- `connectors/storefronts/opencart/write.go`
+- `connectors/storefronts/prestashop/config.go`
+- `connectors/storefronts/prestashop/conformance.go`
+- `connectors/storefronts/prestashop/connector.go`
+- `connectors/storefronts/prestashop/connector_test.go`
+- `connectors/storefronts/prestashop/cursor.go`
+- `connectors/storefronts/prestashop/manifest.json`
+- `connectors/storefronts/prestashop/money.go`
+- `connectors/storefronts/prestashop/presentation.json`
+- `connectors/storefronts/prestashop/read.go`
+- `connectors/storefronts/prestashop/remote.go`
+- `connectors/storefronts/prestashop/write.go`
+- `connectors/storefronts/saleor/config.go`
+- `connectors/storefronts/saleor/conformance.go`
+- `connectors/storefronts/saleor/connector.go`
+- `connectors/storefronts/saleor/connector_test.go`
+- `connectors/storefronts/saleor/cursor.go`
+- `connectors/storefronts/saleor/inventory.go`
+- `connectors/storefronts/saleor/manifest.json`
+- `connectors/storefronts/saleor/orders.go`
+- `connectors/storefronts/saleor/presentation.json`
+- `connectors/storefronts/saleor/prices.go`
+- `connectors/storefronts/saleor/products.go`
+- `connectors/storefronts/saleor/resolve.go`
+- `connectors/storefronts/saleor/returns.go`
+- `connectors/storefronts/saleor/variant.go`
+- `connectors/storefronts/saleor/webhook.go`
+- `connectors/storefronts/saleor/write.go`
+- `connectors/storefronts/shopify/config.go`
+- `connectors/storefronts/shopify/conformance.go`
+- `connectors/storefronts/shopify/connector.go`
+- `connectors/storefronts/shopify/connector_test.go`
+- `connectors/storefronts/shopify/cursor.go`
+- `connectors/storefronts/shopify/inventory.go`
+- `connectors/storefronts/shopify/manifest.json`
+- `connectors/storefronts/shopify/orders.go`
+- `connectors/storefronts/shopify/presentation.json`
+- `connectors/storefronts/shopify/prices.go`
+- `connectors/storefronts/shopify/products.go`
+- `connectors/storefronts/shopify/returns.go`
+- `connectors/storefronts/shopify/webhook.go`
+- `connectors/storefronts/shopify/wire.go`
+- `connectors/storefronts/shopify/write.go`
+- `connectors/storefronts/shopware/config.go`
+- `connectors/storefronts/shopware/conformance.go`
+- `connectors/storefronts/shopware/connector.go`
+- `connectors/storefronts/shopware/connector_test.go`
+- `connectors/storefronts/shopware/cursor.go`
+- `connectors/storefronts/shopware/inventory.go`
+- `connectors/storefronts/shopware/manifest.json`
+- `connectors/storefronts/shopware/orders.go`
+- `connectors/storefronts/shopware/presentation.json`
+- `connectors/storefronts/shopware/prices.go`
+- `connectors/storefronts/shopware/products.go`
+- `connectors/storefronts/shopware/returns.go`
+- `connectors/storefronts/shopware/webhook.go`
+- `connectors/storefronts/shopware/wire.go`
+- `connectors/storefronts/shopware/write.go`
+- `connectors/storefronts/woocommerce/config.go`
+- `connectors/storefronts/woocommerce/conformance.go`
+- `connectors/storefronts/woocommerce/connector.go`
+- `connectors/storefronts/woocommerce/connector_test.go`
+- `connectors/storefronts/woocommerce/cursor.go`
+- `connectors/storefronts/woocommerce/inventory.go`
+- `connectors/storefronts/woocommerce/manifest.json`
+- `connectors/storefronts/woocommerce/numbers.go`
+- `connectors/storefronts/woocommerce/orders.go`
+- `connectors/storefronts/woocommerce/presentation.json`
+- `connectors/storefronts/woocommerce/prices.go`
+- `connectors/storefronts/woocommerce/products.go`
+- `connectors/storefronts/woocommerce/remote.go`
+- `connectors/storefronts/woocommerce/returns.go`
+- `connectors/storefronts/woocommerce/target.go`
+- `connectors/storefronts/woocommerce/webhook.go`
+- `connectors/storefronts/woocommerce/write.go`
 - `contracts/ai/agent-policy-v1.schema.json`
 - `contracts/ai/agent-provenance-v1.schema.json`
 - `contracts/ai/prompt-injection-regressions-v1.json`
@@ -1398,8 +1521,23 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `deploy/postgres/legacy_pre_v1_catalog.tsv`
 - `deploy/postgres/migrate.sh`
 - `deploy/postgres/rebaseline-pre-v1.sh`
+- `docker-compose.opencart-test.yml`
+- `docker-compose.prestashop-test.yml`
 - `docker-compose.production.yml`
+- `docker-compose.woocommerce-test.yml`
 - `docker-compose.yml`
+- `docker/opencart-test/Dockerfile`
+- `docker/opencart-test/configure.php`
+- `docker/opencart-test/entrypoint.sh`
+- `docker/opencart-test/seed-demo.php`
+- `docker/opencart-test/seed.sql`
+- `docker/prestashop-test/Dockerfile`
+- `docker/prestashop-test/seed-demo.php`
+- `docker/prestashop-test/seed-demo.sh`
+- `docker/woocommerce-test/Dockerfile`
+- `docker/woocommerce-test/entrypoint.sh`
+- `docker/woocommerce-test/local-rest-canonical.php`
+- `docker/woocommerce-test/seed-demo.php`
 - `docs/00-product-scope.md`
 - `docs/01-architecture.md`
 - `docs/02-domain-model.md`
@@ -1560,6 +1698,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/diadoc/conformance-report.json`
 - `docs/connectors/diadoc/reconciliation.md`
 - `docs/connectors/diadoc/spec.md`
+- `docs/connectors/dolyami/capability-audit.md`
+- `docs/connectors/dolyami/conformance-plan.md`
+- `docs/connectors/dolyami/conformance-report.json`
+- `docs/connectors/dolyami/spec.md`
 - `docs/connectors/dzen/README.md`
 - `docs/connectors/dzen/capability-audit.md`
 - `docs/connectors/dzen/fixtures/article.json`
@@ -1578,10 +1720,20 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/fivepost/conformance-report.json`
 - `docs/connectors/fivepost/reconciliation.md`
 - `docs/connectors/fivepost/spec.md`
+- `docs/connectors/gemini/README.md`
+- `docs/connectors/gemini/capability-audit.md`
+- `docs/connectors/gemini/conformance-plan.md`
+- `docs/connectors/gemini/conformance-report.json`
+- `docs/connectors/gemini/spec.md`
 - `docs/connectors/gigachat/capability-audit.md`
 - `docs/connectors/gigachat/conformance-plan.md`
 - `docs/connectors/gigachat/conformance-report.json`
 - `docs/connectors/gigachat/spec.md`
+- `docs/connectors/grok/README.md`
+- `docs/connectors/grok/capability-audit.md`
+- `docs/connectors/grok/conformance-plan.md`
+- `docs/connectors/grok/conformance-report.json`
+- `docs/connectors/grok/spec.md`
 - `docs/connectors/instagram/README.md`
 - `docs/connectors/instagram/capability-audit.md`
 - `docs/connectors/instagram/conformance-plan.md`
@@ -1592,6 +1744,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/kimi/conformance-plan.md`
 - `docs/connectors/kimi/conformance-report.json`
 - `docs/connectors/kimi/spec.md`
+- `docs/connectors/lamoda/capability-audit.md`
+- `docs/connectors/lamoda/conformance-plan.md`
+- `docs/connectors/lamoda/conformance-report.json`
+- `docs/connectors/lamoda/spec.md`
 - `docs/connectors/lm-studio/README.md`
 - `docs/connectors/lm-studio/capability-audit.md`
 - `docs/connectors/lm-studio/conformance-plan.md`
@@ -1634,6 +1790,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/moysklad/conformance-report.json`
 - `docs/connectors/moysklad/reconciliation.md`
 - `docs/connectors/moysklad/spec.md`
+- `docs/connectors/mvideo/capability-audit.md`
+- `docs/connectors/mvideo/conformance-plan.md`
+- `docs/connectors/mvideo/conformance-report.json`
+- `docs/connectors/mvideo/spec.md`
 - `docs/connectors/odnoklassniki/README.md`
 - `docs/connectors/odnoklassniki/capability-audit.md`
 - `docs/connectors/odnoklassniki/conformance-plan.md`
@@ -1665,6 +1825,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/opencart/capability-audit.md`
 - `docs/connectors/opencart/conformance-plan.md`
 - `docs/connectors/opencart/conformance-report.json`
+- `docs/connectors/opencart/docker-smoke.md`
 - `docs/connectors/opencart/reconciliation.md`
 - `docs/connectors/opencart/spec.md`
 - `docs/connectors/ozon-delivery/README.md`
@@ -1688,10 +1849,16 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/pek/conformance-report.json`
 - `docs/connectors/pek/reconciliation.md`
 - `docs/connectors/pek/spec.md`
+- `docs/connectors/pochta-russia/README.md`
+- `docs/connectors/pochta-russia/capability-audit.md`
+- `docs/connectors/pochta-russia/conformance-plan.md`
+- `docs/connectors/pochta-russia/conformance-report.json`
+- `docs/connectors/pochta-russia/spec.md`
 - `docs/connectors/prestashop/README.md`
 - `docs/connectors/prestashop/capability-audit.md`
 - `docs/connectors/prestashop/conformance-plan.md`
 - `docs/connectors/prestashop/conformance-report.json`
+- `docs/connectors/prestashop/docker-smoke.md`
 - `docs/connectors/prestashop/reconciliation.md`
 - `docs/connectors/prestashop/spec.md`
 - `docs/connectors/qwen/capability-audit.md`
@@ -1716,6 +1883,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/saby-edo/conformance-report.json`
 - `docs/connectors/saby-edo/reconciliation.md`
 - `docs/connectors/saby-edo/spec.md`
+- `docs/connectors/saleor/README.md`
+- `docs/connectors/saleor/capability-audit.md`
+- `docs/connectors/saleor/conformance-plan.md`
+- `docs/connectors/saleor/conformance-report.json`
+- `docs/connectors/saleor/reconciliation.md`
+- `docs/connectors/saleor/spec.md`
 - `docs/connectors/sbp/README.md`
 - `docs/connectors/sbp/capability-audit.md`
 - `docs/connectors/sbp/conformance-plan.md`
@@ -1767,6 +1940,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/woocommerce/capability-audit.md`
 - `docs/connectors/woocommerce/conformance-plan.md`
 - `docs/connectors/woocommerce/conformance-report.json`
+- `docs/connectors/woocommerce/docker-smoke.md`
 - `docs/connectors/woocommerce/reconciliation.md`
 - `docs/connectors/woocommerce/spec.md`
 - `docs/connectors/yandex-market/README.md`
@@ -1820,6 +1994,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/migrations/000019-search-provider.md`
 - `docs/migrations/000020-durable-webhooks.md`
 - `docs/migrations/000021-notifications.md`
+- `docs/migrations/000022-ai-provider-gemini-grok.md`
 - `docs/migrations/000022-upload-quarantine-foundation.md`
 - `docs/migrations/000023-upload-security-pipeline.md`
 - `docs/migrations/000024-sync-engine.md`
@@ -1895,11 +2070,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/connector-logos/deepseek.svg`
 - `frontend/public/connector-logos/dellin.svg`
 - `frontend/public/connector-logos/diadoc.svg`
+- `frontend/public/connector-logos/dolyami.svg`
 - `frontend/public/connector-logos/egais.svg`
 - `frontend/public/connector-logos/fivepost.svg`
+- `frontend/public/connector-logos/gemini.svg`
 - `frontend/public/connector-logos/gigachat.svg`
+- `frontend/public/connector-logos/grok.svg`
 - `frontend/public/connector-logos/instagram.svg`
 - `frontend/public/connector-logos/kimi.svg`
+- `frontend/public/connector-logos/lamoda.svg`
 - `frontend/public/connector-logos/lm-studio.svg`
 - `frontend/public/connector-logos/magento.svg`
 - `frontend/public/connector-logos/magnit-market.svg`
@@ -1907,6 +2086,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/connector-logos/medusa.svg`
 - `frontend/public/connector-logos/megamarket.svg`
 - `frontend/public/connector-logos/moysklad.svg`
+- `frontend/public/connector-logos/mvideo.svg`
 - `frontend/public/connector-logos/odnoklassniki.svg`
 - `frontend/public/connector-logos/ollama.svg`
 - `frontend/public/connector-logos/onec.svg`
@@ -1917,11 +2097,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/connector-logos/ozon-pay.svg`
 - `frontend/public/connector-logos/ozon.svg`
 - `frontend/public/connector-logos/pek.svg`
+- `frontend/public/connector-logos/pochta-russia.svg`
 - `frontend/public/connector-logos/prestashop.svg`
 - `frontend/public/connector-logos/qwen.svg`
 - `frontend/public/connector-logos/robokassa.svg`
 - `frontend/public/connector-logos/rutube.svg`
 - `frontend/public/connector-logos/saby-edo.svg`
+- `frontend/public/connector-logos/saleor.svg`
 - `frontend/public/connector-logos/sbp.svg`
 - `frontend/public/connector-logos/shopify.svg`
 - `frontend/public/connector-logos/shopware.svg`
@@ -1936,7 +2118,16 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/connector-logos/yookassa.svg`
 - `frontend/public/connector-logos/youtube.svg`
 - `frontend/public/docs/documentation.png`
+- `frontend/public/docs/integration-connection.png`
+- `frontend/public/docs/integrations.png`
 - `frontend/public/docs/login.png`
+- `frontend/public/docs/mobile.png`
+- `frontend/public/docs/opencart-smoke.png`
+- `frontend/public/docs/opencart-store.png`
+- `frontend/public/docs/prestashop-guide.png`
+- `frontend/public/docs/prestashop-store.png`
+- `frontend/public/docs/woocommerce-guide.png`
+- `frontend/public/docs/woocommerce-store.png`
 - `frontend/public/oidc/silent-callback.html`
 - `frontend/repository-shims.d.ts`
 - `frontend/serve.mjs`
@@ -1961,11 +2152,14 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/components/Drawer.tsx`
 - `frontend/src/components/EmptyState.tsx`
 - `frontend/src/components/Icon.tsx`
+- `frontend/src/components/ProductImage.tsx`
 - `frontend/src/components/ServerDataGrid.tsx`
 - `frontend/src/components/Skeleton.tsx`
 - `frontend/src/components/StatusBadge.tsx`
 - `frontend/src/components/Toast.tsx`
 - `frontend/src/components/icon-names.ts`
+- `frontend/src/components/quantity.ts`
+- `frontend/src/components/useFocusTrap.ts`
 - `frontend/src/env.d.ts`
 - `frontend/src/features/catalog/ProductList.tsx`
 - `frontend/src/features/notifications/NotificationList.tsx`
@@ -2084,6 +2278,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/oidc_membership_test.go`
 - `internal/app/api/oidc_security.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
+- `internal/app/api/order_status.go`
+- `internal/app/api/order_status_test.go`
 - `internal/app/api/payment_webhooks.go`
 - `internal/app/api/payment_webhooks_test.go`
 - `internal/app/api/payments.go`
@@ -2117,6 +2313,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/mcp/server.go`
 - `internal/app/mcp/server_test.go`
 - `internal/app/mcp/tools.go`
+- `internal/app/worker/commerce_write_route.go`
+- `internal/app/worker/commerce_write_route_test.go`
 - `internal/app/worker/connector_registry.go`
 - `internal/app/worker/fx_reference.go`
 - `internal/app/worker/fx_reference_test.go`
@@ -2164,6 +2362,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/architecture/diff_test.go`
 - `internal/platform/architecture/go_tree.go`
 - `internal/platform/architecture/json.go`
+- `internal/platform/architecture/provider_paths.go`
+- `internal/platform/architecture/provider_paths_test.go`
 - `internal/platform/architecture/types.go`
 - `internal/platform/audit/audit.go`
 - `internal/platform/audit/audit_test.go`
@@ -2174,8 +2374,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/backupdr/policy_test.go`
 - `internal/platform/bootstrap/bootstrap.go`
 - `internal/platform/bootstrap/bootstrap_test.go`
+- `internal/platform/builtinruntime/catalog_probe.go`
+- `internal/platform/builtinruntime/catalog_probe_test.go`
 - `internal/platform/builtinruntime/certtransport.go`
 - `internal/platform/builtinruntime/certtransport_test.go`
+- `internal/platform/builtinruntime/dolyami_transport.go`
+- `internal/platform/builtinruntime/dolyami_transport_test.go`
 - `internal/platform/builtinruntime/http.go`
 - `internal/platform/builtinruntime/http_test.go`
 - `internal/platform/builtinruntime/local_ai_transport.go`
@@ -2520,6 +2724,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000019_payments_remote_id_lookup.sql`
 - `migrations/000020_ai_provider_claude.sql`
 - `migrations/000021_ai_provider_local_runtime.sql`
+- `migrations/000022_ai_provider_gemini_grok.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2628,6 +2833,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-postgres-backup-restore.sh`
 - `scripts/check-postgres-upgrade.sh`
 - `scripts/check-pre-v1-baseline.sh`
+- `scripts/check-production-health.sh`
 - `scripts/check-production-qualification.sh`
 - `scripts/check-secret-canary.sh`
 - `scripts/check-semver.sh`
@@ -2635,8 +2841,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-tenancy-postgres.sh`
 - `scripts/check-trust-control-postgres.sh`
 - `scripts/check.sh`
+- `scripts/community-demo-member.sql`
 - `scripts/dzen-content-transformer-test.py`
 - `scripts/dzen-content-transformer.py`
+- `scripts/ensure-community-demo-user.sh`
 - `scripts/ensure-community-secrets-key.sh`
 - `scripts/generate-frontend-connector-catalog.py`
 - `scripts/generate-package-index.py`
@@ -2645,6 +2853,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/generate-release-sboms.sh`
 - `scripts/init-community-env.sh`
 - `scripts/install-security-tools.sh`
+- `scripts/opencart-smoke.sh`
 - `scripts/p4_common.py`
 - `scripts/p4_hosting_rules.py`
 - `scripts/p4_live_connectors.py`
@@ -2652,13 +2861,16 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/p4_qualification_test.py`
 - `scripts/p4_release_stage.py`
 - `scripts/p4_root_evidence.py`
+- `scripts/package-opencart-bridge.sh`
 - `scripts/package-release-evidence.sh`
+- `scripts/prestashop-smoke.sh`
 - `scripts/promote-github-release.sh`
 - `scripts/runtime-load.py`
 - `scripts/scan-supply-chain.sh`
 - `scripts/stage-github-release.sh`
 - `scripts/verify-action-pins.sh`
 - `scripts/verify-release-evidence-external.sh`
+- `scripts/woocommerce-smoke.sh`
 - `sdk/examples/go/go.mod`
 - `sdk/examples/go/main.go`
 - `sdk/examples/python/example.py`
@@ -2843,6 +3055,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/151-magento-storefront-connector.md`
 - `tasks/issues/152-bitrix-storefront-connector.md`
 - `tasks/issues/153-cs-cart-storefront-connector.md`
+- `tasks/issues/154-saleor-storefront-connector.md`
+- `tasks/issues/155-pochta-russia-logistics-connector.md`
+- `tasks/issues/156-categorical-runtime-surfaces.md`
+- `tasks/issues/157-mvideo-lamoda-marketplace-surfaces.md`
+- `tasks/issues/158-dolyami-payment-surface.md`
+- `tasks/issues/159-gemini-grok-ai-providers.md`
+- `tasks/issues/160-prestashop-commerce-sync-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

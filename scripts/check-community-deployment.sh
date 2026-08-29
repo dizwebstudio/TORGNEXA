@@ -2,13 +2,14 @@
 set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_root"
-required=(postgres keycloak-db-init migrate app-db-role kafka valkey clickhouse garage-config garage keycloak api worker scheduler mcp)
+required=(postgres keycloak-db-init migrate app-db-role kafka kafka-init valkey clickhouse garage-config garage clamav keycloak api worker scheduler mcp)
 for svc in "${required[@]}"; do
   grep -Eq "^  ${svc}:$" docker-compose.yml || { echo "missing compose service: $svc" >&2; exit 1; }
 done
-for f in Dockerfile .dockerignore deploy/postgres/migrate.sh deploy/postgres/configure-app-role.sh deploy/postgres/rebaseline-pre-v1.sh deploy/postgres/catalog.tsv deploy/postgres/legacy_pre_v1_catalog.tsv deploy/postgres/legacy_pre_v1_catalog.sha256 deploy/keycloak/init-db.sh deploy/keycloak/torgnexa-realm.json deploy/garage/render-config.sh; do
+for f in Dockerfile .dockerignore deploy/postgres/migrate.sh deploy/postgres/configure-app-role.sh deploy/postgres/rebaseline-pre-v1.sh deploy/postgres/catalog.tsv deploy/postgres/legacy_pre_v1_catalog.tsv deploy/postgres/legacy_pre_v1_catalog.sha256 deploy/keycloak/init-db.sh deploy/keycloak/torgnexa-realm.json deploy/garage/render-config.sh deploy/kafka/bootstrap-topics.sh deploy/kafka/topics.txt; do
   [[ -f "$f" && ! -L "$f" ]] || { echo "missing/unsafe deployment file: $f" >&2; exit 1; }
 done
+[[ -x deploy/kafka/bootstrap-topics.sh ]] || { echo 'Kafka topic bootstrap must be executable' >&2; exit 1; }
 if grep -Eq 'image:[[:space:]]+[^#[:space:]]*:latest([[:space:]]|$)' docker-compose.yml; then
   echo 'floating :latest image is forbidden' >&2; exit 1
 fi
@@ -68,6 +69,12 @@ if realm.get('realm')!='torgnexa' or realm.get('enabled') is not True:
 roles={r['name'] for r in realm['roles']['realm']}
 if roles != {'admin','manager','operator','viewer'}:
     raise SystemExit('Keycloak role baseline drift')
+topic_lines=[line.strip() for line in (root/'deploy/kafka/topics.txt').read_text().splitlines() if line.strip() and not line.lstrip().startswith('#')]
+if len(topic_lines) != len(set(topic_lines)) or any(not re.fullmatch(r'[a-z0-9][a-z0-9._-]*', topic) for topic in topic_lines):
+    raise SystemExit('invalid or duplicate Kafka bootstrap topic')
+catalog_topics=sorted({'.'.join(event['event_type'].split('.')[:2])+'.events.'+event['event_type'].split('.')[-1] for event in json.loads((root/'contracts/events/event-catalog.json').read_text())['events']})
+if topic_lines != catalog_topics:
+    raise SystemExit('deploy/kafka/topics.txt drifted from contracts/events/event-catalog.json')
 
 compose=compose_text
 for match in re.finditer(r'(?m)^\s+image:\s+([^#\s]+)', compose):

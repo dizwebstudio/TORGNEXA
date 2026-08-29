@@ -970,13 +970,18 @@ func validateImmutableImage(reference string) error {
 	}
 	approved := map[string]struct{}{
 		"apache/kafka":                 {},
+		"clamav/clamav":                {},
 		"clickhouse/clickhouse-server": {},
 		"dxflrs/garage":                {},
 		"golang":                       {},
+		"mariadb":                      {},
 		"node":                         {},
+		"php":                          {},
 		"postgres":                     {},
+		"prestashop/prestashop":        {},
 		"quay.io/keycloak/keycloak":    {},
 		"valkey/valkey":                {},
+		"wordpress":                    {},
 	}
 	if _, ok := approved[repository]; !ok {
 		return fmt.Errorf("repository %q is not approved", repository)

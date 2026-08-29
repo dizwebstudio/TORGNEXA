@@ -4,7 +4,7 @@
 `repository-complete` — 2026-08-19.
 
 ## Objective
-Register Kimi (Moonshot AI) as a second `ai`-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing `connectors/openai-compatible`.
+Register Kimi (Moonshot AI) as a second `ai`-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing `connectors/ai/openai-compatible`.
 
 ## Dependencies
 122
@@ -19,7 +19,7 @@ Run required repository checks and report results, risks and follow-ups.
 
 ## Implementation evidence
 - `kimi` is admitted through Connector SDK v1 with `ai.completion.generate` only, defaulting to host `api.moonshot.ai` with an account-configurable hostname override;
-- request/response marshaling is declared directly inside `connectors/kimi` (not imported from `connectors/openai-compatible`, since provider packages may not import each other);
+- request/response marshaling is declared directly inside `connectors/ai/kimi` (not imported from `connectors/ai/openai-compatible`, since provider packages may not import each other);
 - `internal/platform/builtinruntime.Registry.AICompletion` gains one additional `case "kimi"` dispatch arm;
 - deterministic fixtures/tests, `ARCH-123`, capability audit/spec docs and Task-064 conformance report are present.
 

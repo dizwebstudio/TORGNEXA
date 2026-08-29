@@ -19,6 +19,22 @@ func (r reportReaderStub) Report(context.Context, tenancy.Scope, string, reportr
 	return r.data, nil
 }
 
+func TestInventoryReportFallsBackToOperationalStock(t *testing.T) {
+	primary := reportrepo.Data{ID: "inventory_current", Source: "clickhouse", Columns: []reportrepo.Column{{Key: "quantity", Label: "Количество"}}, Rows: [][]string{}}
+	fallback := reportrepo.Data{ID: "inventory_current", Source: "postgresql", Columns: []reportrepo.Column{{Key: "sku", Label: "SKU"}}, Rows: [][]string{{"DEMO-SKU"}}}
+	reader, err := newInventoryFallbackReportReader(reportReaderStub{data: primary}, reportReaderStub{data: fallback})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := reader.Report(context.Background(), validTestScope(t), "inventory_current", reportrepo.Filter{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data.Source != "postgresql" || len(data.Rows) != 1 || data.Rows[0][0] != "DEMO-SKU" {
+		t.Fatalf("unexpected fallback report: %+v", data)
+	}
+}
+
 func TestListReportsRequiresScopeAndReturnsCatalog(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, ReportsPath, nil)
 	denied := httptest.NewRecorder()

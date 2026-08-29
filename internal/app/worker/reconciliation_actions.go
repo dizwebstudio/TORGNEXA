@@ -147,12 +147,9 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 		if err != nil {
 			return err
 		}
-		status := "draft"
-		if current.Status == catalog.StatusActive {
-			status = "publish"
-		}
-		if current.Status == catalog.StatusArchived {
-			status = "private"
+		status, ok := e.registry.productStatus(ac.account, current.Status)
+		if !ok {
+			return reconciliation.ErrActionUnsafe
 		}
 		_, err = writer.UpsertProduct(ctx, ac.account, ac.runtime, sdk.ProductWriteRequest{RemoteID: req.Drift.RemoteID, SellerSKU: current.Code, Title: current.Title, Description: current.Description, StatusRemoteID: status, IdempotencyKey: req.IdempotencyKey})
 		return err

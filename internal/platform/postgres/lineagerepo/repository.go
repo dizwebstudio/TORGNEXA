@@ -72,7 +72,7 @@ func AppendTransaction(ctx context.Context, tx *sql.Tx, scope lineage.Scope, rec
 	ON CONFLICT (id) DO NOTHING`, record.ID, record.OrganizationID, record.WorkspaceID, record.Source, record.ActorID, record.Operation,
 		record.Output.System, record.Output.EntityType, record.Output.EntityID, record.Output.Version, record.Output.Field, observed,
 		record.Transformation.Kind, record.Transformation.ID, record.Transformation.Version, record.Transformation.MappingID, record.Transformation.RuleID,
-		record.CorrelationID, record.CausationID, record.AuditID, record.EventID, string(record.Result), record.OccurredAt)
+		record.CorrelationID, record.CausationID, record.AuditID, record.EventID, string(record.Result), fingerprint, record.OccurredAt)
 	if err != nil {
 		return fmt.Errorf("lineage repository: insert record: %w", err)
 	}

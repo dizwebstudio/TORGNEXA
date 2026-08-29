@@ -18,3 +18,22 @@ Required routes:
 Every write receives an idempotency key. The bridge must persist/reject conflicting replays in store-local extension storage and must not return customer billing/shipping PII in order JSON.
 
 OpenCart option/variant authoring and distribution as a signed Marketplace `.ocmod.zip` are deliberately separate from connector admission.
+
+## Reference extension
+
+This repository includes a reference OpenCart 4.x extension in
+`connectors/storefronts/opencart/extension/torgnexa`. It is packaged with
+`scripts/package-opencart-bridge.sh` and installed through the native OpenCart
+Extension Installer. The extension uses the namespaced MVC-L structure
+documented by OpenCart and performs all catalog/stock/order queries through
+OpenCart's own database layer.
+
+OpenCart sanitizes `-` characters when resolving controller paths. The public
+routes `product-by-sku`, `variant-price`, `variant-inventory` and `order-status`
+are consequently backed by the files `productbysku.php`, `variantprice.php`,
+`variantinventory.php` and `orderstatus.php`.
+
+The bridge accepts a bearer token from `TORGNEXA_OPENCART_BRIDGE_TOKEN` (or
+`TORGNEXA_BRIDGE_TOKEN` for compatibility) and compares only its SHA-256 digest.
+For a persistent store configuration, set the lowercase digest in
+`torgnexa_token_sha256`; never store the raw token in `oc_setting`.

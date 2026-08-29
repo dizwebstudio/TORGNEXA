@@ -24,6 +24,25 @@
       }
     ]
   },
+  "users": [
+    {
+      "id": "0198b8d0-0000-7000-8000-000000000010",
+      "username": "demo",
+      "enabled": true,
+      "email": "demo@local.torgnexa",
+      "emailVerified": true,
+      "firstName": "Демо",
+      "lastName": "Оператор",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    }
+  ],
   "clients": [
     {
       "clientId": "torgnexa-web",

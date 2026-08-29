@@ -12,7 +12,7 @@ different storefront connector in this repository so far.
 
 ## Scope
 
-- New `connectors/saleor` package: products/inventory/prices/orders/returns
+- New `connectors/storefronts/saleor` package: products/inventory/prices/orders/returns
   read, prices/inventory write, order cancellation write, and product
   update (SKU rename included — see Explicit exclusions for why *create*
   is still unsupported). Host-injected transport

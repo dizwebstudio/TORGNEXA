@@ -66,6 +66,7 @@ type connectorRuntimeAdmission interface {
 	SupportsCapability(string, string) bool
 	SupportsSync(string, string, string) bool
 	RuntimeConfigRequired(string) bool
+	HealthOnly(string) bool
 	Health(context.Context, sdk.Account, sdk.Runtime, func(context.Context, string) (json.RawMessage, error)) (sdk.Health, error)
 }
 
@@ -867,7 +868,8 @@ func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Requ
 			return
 		}
 	}
-	if !hasEnabledCapability(settings) {
+	healthOnly := api.registry.HealthOnly(current.ConnectorID)
+	if !hasEnabledCapability(settings) && !healthOnly {
 		writeProblem(w, 422, "At least one account capability must be enabled")
 		return
 	}

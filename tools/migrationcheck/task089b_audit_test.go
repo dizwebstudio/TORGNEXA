@@ -17,7 +17,7 @@ func TestTask089bUsesExactArithmeticAndAppendOnlyEvidence(t *testing.T) {
 		"internal/platform/fx/runtime.go",
 		"internal/platform/fx/financial_converter.go",
 		"internal/platform/fx/connector_adapter.go",
-		"connectors/cbr-fx/rates.go",
+		"connectors/finance/cbr-fx/rates.go",
 	} {
 		data := task089aRead(t, root, relative)
 		if task089bFloatPattern.Match(data) {

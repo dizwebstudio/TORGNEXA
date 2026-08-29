@@ -95,7 +95,7 @@ func (s *fakeAgentKillSwitchStore) RecordKillSwitch(_ context.Context, _ tenancy
 }
 
 func testMCPAccount(id string) mcpaccounts.Account {
-	return mcpaccounts.Account{ID: id, Label: "n8n", AgentID: "agent-1", ModelID: "claude", IntegrationID: "n8n", Permissions: []string{"commerce.products.read", "commerce.price.change.request"}, Enabled: true, Version: 1}
+	return mcpaccounts.Account{ID: id, Label: "workflow", AgentID: "agent-1", ModelID: "model.test", IntegrationID: "integration.test", Permissions: []string{"commerce.products.read", "commerce.price.change.request"}, Enabled: true, Version: 1}
 }
 
 func TestGetMCPAccountPolicyReportsNotInstalledUntilFirstInstall(t *testing.T) {

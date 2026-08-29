@@ -8,7 +8,7 @@
     "adr/0108-oauth-per-tenant-host-template.md",
     "architecture/policy.json",
     "architecture/reviews/144-shopify-oauth-storefront-connector.json",
-    "connectors/shopify",
+    "connectors/storefronts/shopify",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/shopify",
     "frontend/public/connector-logos/shopify.svg",
@@ -112,7 +112,7 @@
   "provider": {
     "id": "shopify",
     "route": "connector_sdk",
-    "manifest": "connectors/shopify/manifest.json",
+    "manifest": "connectors/storefronts/shopify/manifest.json",
     "connector_spec": "docs/connectors/shopify/spec.md",
     "capability_audit": "docs/connectors/shopify/capability-audit.md",
     "conformance_plan": "docs/connectors/shopify/conformance-plan.md"

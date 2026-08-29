@@ -314,6 +314,24 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		components = append(components, component{name: "reconciliation", run: func(componentCtx context.Context) error {
 			return runReconciliation(componentCtx, logger, dispatchRepository, engine, reconciliationRepository, resolver, runtimeRegistry, workerID, cfg.Worker)
 		}})
+		commerceRoute, routeErr := newCommerceWriteRoute(syncRepository, accountRepository, mappingRepository, catalogRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
+			return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
+		})
+		if routeErr != nil {
+			return fail("worker_commerce_sync_route_startup_failed", routeErr)
+		}
+		commerceReader, readerErr := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".commerce-sync-consumer", commerceSyncKafkaConsumerGroup, consumerTopics)
+		if readerErr != nil {
+			return fail("worker_commerce_sync_kafka_reader_startup_failed", readerErr)
+		}
+		defer func() { _ = commerceReader.Close() }()
+		commerceConsumer, consumerErr := kafkaeventbus.NewConsumer(commerceReader, producer, cfg.Worker.KafkaTopics, kafkaeventbus.RetryPolicy{MaxAttempts: 8, InitialBackoff: time.Second, MaxBackoff: 5 * time.Minute}, nil)
+		if consumerErr != nil {
+			return fail("worker_commerce_sync_kafka_consumer_startup_failed", consumerErr)
+		}
+		components = append(components, component{name: "commerce-sync", run: func(componentCtx context.Context) error {
+			return commerceConsumer.Run(componentCtx, commerceRoute.Handle)
+		}})
 	}
 
 	privacyRepository, repoErr := retentionrepo.New(db)
@@ -513,6 +531,13 @@ func (r *sourceResolver) Resolve(ctx context.Context, scope tenancy.Scope, run r
 	manifest, err := sdk.CatalogManifest(account.ConnectorID)
 	if err != nil {
 		return nil, syncengine.Policy{}, sdk.Account{}, err
+	}
+	// Price and inventory policies are event-driven outbound routes. They do
+	// not have a remote page/snapshot source for the reconciliation scanner;
+	// return a bounded empty source so manually queued runs complete without
+	// retrying forever while the commerce-sync consumer handles mutations.
+	if policy.EntityType == commercePricesEntity || policy.EntityType == commerceInventoryEntity {
+		return eventOnlyReconciliationSource{}, policy, account, nil
 	}
 	runtime, err := connectorruntime.NewForAccount(r.secrets, r.oauthRefresh, scope, account)
 	if err != nil {

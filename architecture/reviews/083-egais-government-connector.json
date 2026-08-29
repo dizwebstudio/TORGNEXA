@@ -11,7 +11,7 @@
     "adr/0075-final-egais-through-governmentconnector-and-utm.md",
     "architecture/policy.json",
     "architecture/reviews/083-egais-government-connector.json",
-    "connectors/egais",
+    "connectors/government/egais",
     "contracts/operations/083-contract-v1.md",
     "docs/compliance/083-egais-government-connector.md",
     "docs/connectors/egais",
@@ -113,7 +113,7 @@
   "provider": {
     "id": "egais",
     "route": "connector_sdk",
-    "manifest": "connectors/egais/manifest.json",
+    "manifest": "connectors/government/egais/manifest.json",
     "connector_spec": "docs/connectors/egais/spec.md",
     "capability_audit": "docs/connectors/egais/capability-audit.md",
     "conformance_plan": "docs/connectors/egais/conformance-plan.md"

@@ -34,11 +34,41 @@ type reportReader interface {
 
 type clickHouseReportReader struct{ queries *reporting.QueryService }
 
+// inventoryFallbackReportReader keeps the current-stock report useful while
+// the disposable ClickHouse projection is empty or temporarily unavailable.
+// PostgreSQL remains the operational source of truth for current inventory;
+// event-backed ClickHouse rows are preferred whenever they are available.
+type inventoryFallbackReportReader struct {
+	primary  reportReader
+	fallback reportReader
+}
+
 func newClickHouseReportReader(queries *reporting.QueryService) (reportReader, error) {
 	if queries == nil {
 		return nil, errors.New("reporting query service is required")
 	}
 	return &clickHouseReportReader{queries: queries}, nil
+}
+
+func newInventoryFallbackReportReader(primary, fallback reportReader) (reportReader, error) {
+	if primary == nil {
+		return nil, errors.New("primary report reader is required")
+	}
+	return &inventoryFallbackReportReader{primary: primary, fallback: fallback}, nil
+}
+
+func (r *inventoryFallbackReportReader) Report(ctx context.Context, scope tenancy.Scope, id string, filter reportrepo.Filter) (reportrepo.Data, error) {
+	data, primaryErr := r.primary.Report(ctx, scope, id, filter)
+	if id != "inventory_current" || r.fallback == nil || (primaryErr == nil && len(data.Rows) > 0) {
+		return data, primaryErr
+	}
+	if fallbackData, fallbackErr := r.fallback.Report(ctx, scope, id, filter); fallbackErr == nil {
+		return fallbackData, nil
+	}
+	if primaryErr != nil {
+		return reportrepo.Data{}, primaryErr
+	}
+	return data, nil
 }
 
 func (r *clickHouseReportReader) Report(ctx context.Context, scope tenancy.Scope, id string, filter reportrepo.Filter) (reportrepo.Data, error) {

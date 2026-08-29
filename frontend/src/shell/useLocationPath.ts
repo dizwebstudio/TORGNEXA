@@ -11,7 +11,10 @@ export function useLocationPath(): string {
 }
 
 export function navigate(path: string): void {
-  if (path === window.location.pathname) return;
-  window.history.pushState(null, "", path);
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const target = new URL(path, window.location.href);
+  const next = `${target.pathname}${target.search}${target.hash}`;
+  if (next === current) return;
+  window.history.pushState(null, "", next);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

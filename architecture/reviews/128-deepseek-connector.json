@@ -3,14 +3,14 @@
   "id": "ARCH-128",
   "task": "128",
   "change_class": "new_provider",
-  "summary": "Register DeepSeek as a further ai-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing connectors/openai-compatible or connectors/kimi (provider packages may not import each other).",
+  "summary": "Register DeepSeek as a further ai-family provider for the Task-122 AI provider account capability, reusing its OpenAI-compatible wire format without importing connectors/ai/openai-compatible or connectors/ai/kimi (provider packages may not import each other).",
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/128-deepseek-connector.json",
-    "connectors/deepseek/conformance.go",
-    "connectors/deepseek/connector.go",
-    "connectors/deepseek/connector_test.go",
-    "connectors/deepseek/manifest.json",
+    "connectors/ai/deepseek/conformance.go",
+    "connectors/ai/deepseek/connector.go",
+    "connectors/ai/deepseek/connector_test.go",
+    "connectors/ai/deepseek/manifest.json",
     "contracts/openapi/torgnexa-v1.yaml",
     "deploy/postgres/catalog.tsv",
     "docs/connectors/deepseek/capability-audit.md",
@@ -117,7 +117,7 @@
   "provider": {
     "id": "deepseek",
     "route": "connector_sdk",
-    "manifest": "connectors/deepseek/manifest.json",
+    "manifest": "connectors/ai/deepseek/manifest.json",
     "connector_spec": "docs/connectors/deepseek/spec.md",
     "capability_audit": "docs/connectors/deepseek/capability-audit.md",
     "conformance_plan": "docs/connectors/deepseek/conformance-plan.md"

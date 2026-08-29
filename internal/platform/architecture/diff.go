@@ -606,10 +606,19 @@ func isProviderPath(value string) bool {
 
 func providerIDFromPath(value string) string {
 	parts := strings.Split(value, "/")
-	if len(parts) < 2 || (parts[0] != "connectors" && parts[0] != "plugins") || !providerIDPattern.MatchString(parts[1]) {
+	if len(parts) < 2 || (parts[0] != "connectors" && parts[0] != "plugins") {
 		return ""
 	}
-	return parts[1]
+	if len(parts) >= 4 && providerIDPattern.MatchString(parts[2]) {
+		return parts[2]
+	}
+	if len(parts) == 3 && !strings.Contains(parts[2], ".") && providerIDPattern.MatchString(parts[2]) {
+		return parts[2]
+	}
+	if providerIDPattern.MatchString(parts[1]) {
+		return parts[1]
+	}
+	return ""
 }
 
 func providerEvidenceOwner(value string, configuration policy) string {

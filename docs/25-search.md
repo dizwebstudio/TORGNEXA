@@ -12,7 +12,7 @@ The MVP supports authenticated tenant/workspace search for:
 - optional UTC `placed_from` / `placed_to` range for orders;
 - bounded pages (`1..100`) with opaque keyset cursors.
 
-An empty `q` is a tenant-scoped list operation. Search results are minimal projections and intentionally omit organization/workspace identifiers, product descriptions, order items, customer content and credentials.
+An empty `q` is a tenant-scoped list operation. Product results include the canonical description and an optional representative regular price (`minor_units` + `currency`) from the first active offer, so catalog tables can render useful merchandising context without loading every offer. Results still omit organization/workspace identifiers, order items, customer content and credentials.
 
 ## Authorization and tenancy
 

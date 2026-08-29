@@ -27,7 +27,7 @@ surface with a host-mediated, production-safe Connector SDK adapter.
 
 ## Implementation evidence
 
-- `connectors/claude` implements the SDK v1 manifest, Messages request/response
+- `connectors/ai/claude` implements the SDK v1 manifest, Messages request/response
   mapping, health normalization, deterministic fixtures and conformance
   candidate;
 - migration `000020_ai_provider_claude.sql` widens the provider allow-list;

@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"strings"
 
-	ozondelivery "github.com/torgnexa/torgnexa/connectors/ozon-delivery"
-	ozonpay "github.com/torgnexa/torgnexa/connectors/ozon-pay"
+	ozondelivery "github.com/torgnexa/torgnexa/connectors/logistics/ozon-delivery"
+	ozonpay "github.com/torgnexa/torgnexa/connectors/payments/ozon-pay"
 )
 
 const ozonSellerAPIHost = "api-seller.ozon.ru"

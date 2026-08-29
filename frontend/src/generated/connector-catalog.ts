@@ -26,11 +26,12 @@ export interface ConnectorRuntimeSyncSupport {
 
 export interface ConnectorRuntimeSupport {
   readonly stage: "ready" | "separate_surface" | "planned";
-  readonly surface: "integrations" | "ai_providers" | "finance" | "social" | "crm" | "logistics" | "none";
+  readonly surface: "integrations" | "ai_providers" | "finance" | "social" | "crm" | "logistics" | "marketplace" | "classified" | "edo" | "government" | "none";
   readonly operationalCapabilities: readonly string[];
   readonly sync: readonly ConnectorRuntimeSyncSupport[];
   readonly runtimeConfigTemplate?: Readonly<Record<string, unknown>>;
   readonly socialTextMaxRunes?: number;
+  readonly healthOnly?: boolean;
 }
 
 export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
@@ -72,11 +73,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["classified.listings.read", "classified.publications.status.read", "classified.publications.write"],
     authKinds: ["api_key"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "classified",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -95,11 +97,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "classified",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -109,10 +112,10 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     version: "1.0.0",
     presentation: {
       logo: "/connector-logos/bitrix.svg",
-      surface: "#F58220",
-      surfaceAlt: "#D94E0B",
-      foreground: "#FFFFFF",
-      accent: "#9E3107",
+      surface: "#FFF1F3",
+      surfaceAlt: "#FFE2E7",
+      foreground: "#272527",
+      accent: "#D91935",
     },
     capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
     authKinds: ["bearer"],
@@ -210,11 +213,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["government.reconciliation.run", "government.references.read", "marking.status.read"],
     authKinds: ["certificate"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "government",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -232,11 +237,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["classified.publications.status.read"],
     authKinds: ["api_key"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "classified",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -268,10 +274,10 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     version: "1.0.0",
     presentation: {
       logo: "/connector-logos/cs-cart.svg",
-      surface: "#202A44",
-      surfaceAlt: "#455B91",
-      foreground: "#FFFFFF",
-      accent: "#5E7BC7",
+      surface: "#F0F1FF",
+      surfaceAlt: "#E3F6FF",
+      foreground: "#1B2032",
+      accent: "#7381FD",
     },
     capabilities: ["products.read", "products.write"],
     authKinds: ["basic"],
@@ -344,11 +350,37 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["edo.documents.read", "edo.documents.send", "edo.documents.sign_request"],
     authKinds: ["api_key"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "edo",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
+    },
+  },
+  {
+    id: "dolyami",
+    name: "Долями",
+    family: "payment",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/dolyami.svg",
+      surface: "#131313",
+      surfaceAlt: "#F3E300",
+      foreground: "#FFFFFF",
+      accent: "#131313",
+    },
+    capabilities: ["payments.create", "payments.refund", "payments.status.read", "payments.webhooks"],
+    authKinds: ["basic", "certificate"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "finance",
+      operationalCapabilities: [],
+      sync: [
+      ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -366,11 +398,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["government.documents.read", "government.documents.write", "government.inventory.read", "government.reconciliation.run", "government.references.read"],
     authKinds: ["certificate"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "government",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -391,6 +425,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       stage: "separate_surface",
       surface: "logistics",
       operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/gemini.svg",
+      surface: "#4285F4",
+      surfaceAlt: "#8AB4F8",
+      foreground: "#FFFFFF",
+      accent: "#174EA6",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
       sync: [
       ],
     },
@@ -418,6 +474,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "grok",
+    name: "Grok (xAI)",
+    family: "ai",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/grok.svg",
+      surface: "#111111",
+      surfaceAlt: "#4B5563",
+      foreground: "#FFFFFF",
+      accent: "#000000",
+    },
+    capabilities: ["ai.completion.generate"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "ai_providers",
+      operationalCapabilities: ["ai.completion.generate"],
+      sync: [
+      ],
+    },
+  },
+  {
     id: "instagram",
     name: "Instagram",
     family: "social",
@@ -433,11 +511,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -460,6 +539,30 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["ai.completion.generate"],
       sync: [
       ],
+    },
+  },
+  {
+    id: "lamoda",
+    name: "Lamoda",
+    family: "marketplace",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/lamoda.svg",
+      surface: "#101010",
+      surfaceAlt: "#FF3B7A",
+      foreground: "#FFFFFF",
+      accent: "#D91E63",
+    },
+    capabilities: ["inventory.read", "orders.read", "prices.read", "products.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "marketplace",
+      operationalCapabilities: [],
+      sync: [
+      ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -628,6 +731,30 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "mvideo",
+    name: "М.Видео",
+    family: "marketplace",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/mvideo.svg",
+      surface: "#E30613",
+      surfaceAlt: "#FF6B35",
+      foreground: "#FFFFFF",
+      accent: "#C5000E",
+    },
+    capabilities: ["inventory.read", "orders.read", "products.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "marketplace",
+      operationalCapabilities: [],
+      sync: [
+      ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
+    },
+  },
+  {
     id: "odnoklassniki",
     name: "Odnoklassniki",
     family: "social",
@@ -643,11 +770,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["api_key", "oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -854,6 +982,28 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     },
   },
   {
+    id: "pochta-russia",
+    name: "Почта России",
+    family: "logistics",
+    version: "1.0.0",
+    presentation: {
+      logo: "/connector-logos/pochta-russia.svg",
+      surface: "#0055A4",
+      surfaceAlt: "#3B9AE8",
+      foreground: "#FFFFFF",
+      accent: "#003B73",
+    },
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    authKinds: ["api_key"],
+    runtime: {
+      stage: "separate_surface",
+      surface: "logistics",
+      operationalCapabilities: [],
+      sync: [
+      ],
+    },
+  },
+  {
     id: "prestashop",
     name: "PrestaShop",
     family: "storefront",
@@ -870,9 +1020,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
+        {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB","language_id":1,"shop_id":0},
     },
@@ -936,11 +1088,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["social.post.video"],
     authKinds: ["bearer"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -958,11 +1112,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["edo.documents.read", "edo.documents.send", "edo.documents.sign_request"],
     authKinds: ["bearer"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "edo",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -1101,11 +1257,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -1123,11 +1280,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     capabilities: ["government.inventory.read", "government.reconciliation.run", "vetis.documents.read", "vetis.documents.write"],
     authKinds: ["api_key"],
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "government",
       operationalCapabilities: [],
       sync: [
       ],
+      runtimeConfigTemplate: {"probe_url":""},
+      healthOnly: true,
     },
   },
   {
@@ -1146,11 +1305,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
   {
@@ -1284,11 +1444,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     authKinds: ["oauth2"],
     oauthGrantType: "authorization_code",
     runtime: {
-      stage: "planned",
-      surface: "none",
+      stage: "separate_surface",
+      surface: "social",
       operationalCapabilities: [],
       sync: [
       ],
+      healthOnly: true,
     },
   },
 ] as const;

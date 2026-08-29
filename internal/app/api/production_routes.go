@@ -47,6 +47,7 @@ type productionRouteDependencies struct {
 	connectorCallbacks *connectorauth.CallbackPolicy
 	tenancy            *tenancyrepo.Repository
 	search             *searchrepo.Repository
+	orders             orderStatusRepository
 	catalog            *catalogrepo.Repository
 	pricing            *pricingrepo.Repository
 	pim                *pimrepo.Repository
@@ -100,6 +101,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newRealtimeRoutes(deps.auditRepository)...)
 	routes = append(routes, newApprovalRoutes(deps.approvals, deps.search)...)
 	routes = append(routes, newSearchRoutes(deps.search, deps.auditService)...)
+	routes = append(routes, newOrderStatusRoutes(deps.orders)...)
 	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)

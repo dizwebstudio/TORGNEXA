@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/070b-saby-edo-provider.json",
-    "connectors/saby-edo",
+    "connectors/edo/saby-edo",
     "docs/connectors/saby-edo",
     "tasks/issues/070-edo-connector-sdk-providers.md"
   ],
@@ -101,7 +101,7 @@
   "provider": {
     "id": "saby-edo",
     "route": "connector_sdk",
-    "manifest": "connectors/saby-edo/manifest.json",
+    "manifest": "connectors/edo/saby-edo/manifest.json",
     "connector_spec": "docs/connectors/saby-edo/spec.md",
     "capability_audit": "docs/connectors/saby-edo/capability-audit.md",
     "conformance_plan": "docs/connectors/saby-edo/conformance-plan.md"

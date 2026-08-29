@@ -15,7 +15,7 @@ Wire reference: [Anthropic Messages API](https://docs.anthropic.com/en/api/messa
 
 ## Transport contract
 
-`connectors/claude` implements Anthropic's non-streaming Messages API shape
+`connectors/ai/claude` implements Anthropic's non-streaming Messages API shape
 directly. It sends `model`, a bounded `max_tokens` value, an optional top-level
 `system` prompt and one user message. The response is accepted only when it
 contains a non-empty `content` block with `type: text`; tool use, streaming and

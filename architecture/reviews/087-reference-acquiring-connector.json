@@ -11,7 +11,7 @@
     "adr/0079-final-yookassa-as-production-reference-acquirer.md",
     "architecture/policy.json",
     "architecture/reviews/087-reference-acquiring-connector.json",
-    "connectors/yookassa",
+    "connectors/payments/yookassa",
     "contracts/operations/087-contract-v1.md",
     "docs/connectors/yookassa",
     "docs/payments/087-reference-acquiring-connector.md",
@@ -109,7 +109,7 @@
   "provider": {
     "id": "yookassa",
     "route": "connector_sdk",
-    "manifest": "connectors/yookassa/manifest.json",
+    "manifest": "connectors/payments/yookassa/manifest.json",
     "connector_spec": "docs/connectors/yookassa/spec.md",
     "capability_audit": "docs/connectors/yookassa/capability-audit.md",
     "conformance_plan": "docs/connectors/yookassa/conformance-plan.md"

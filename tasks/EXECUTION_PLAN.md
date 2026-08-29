@@ -10,7 +10,11 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
 - Contiguous implemented baseline: Tasks `001`–`134`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces; Task `134` closes the host-owned OAuth access-token projection and refresh boundary. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
-- Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152` and `153` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates.
+- Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152`, `153`, `154`, `155` and `156` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates. Task `156` groups all former planned entries into explicit category surfaces and admits only health checks.
+- Task `157` is repository-complete: Lamoda and М.Видео are visible in the Marketplace catalog as health-only surfaces with tenant-scoped API-key enrollment and bounded operator-configured HTTPS probes; product, price, stock and order operations remain qualification-gated.
+- Task `158` is repository-complete: «Долями» is visible in Payments as an mTLS/basic health-only surface; payment mutations and webhooks remain qualification-gated.
+- Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
+- Task `161` is repository-complete: `commerce-sync` now consumes canonical product change events, invokes admitted ProductWriter routes with provider-native status translation, and persists product mappings only after validated remote receipts.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -22,6 +26,69 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   external hosting qualification does not serialize the entire backlog.
 
 Task `065` has `public_release_ready:true` because Task 117 resolved the repository license as Apache-2.0. Task 118 now stages release bytes as a non-public draft and independently verifies OIDC/Sigstore/SLSA plus GitHub asset digests before final promotion. This is still not operational acceptance until that protected flow actually passes for the real tag/topology.
+
+## Phase 30 — М.Видео и Lamoda marketplace surfaces
+
+`157`
+
+Task 157 adds branded Lamoda and М.Видео cards to «Интеграции →
+Маркетплейсы». Both providers use the generic account/SecretProvider path and
+health-only catalog probe; no unqualified marketplace domain operation is
+advertised.
+
+### Gate RUNTIME-157
+
+- generated catalogs and runtime support report 58 providers: 18 `ready`, 40
+  `separate_surface`, 0 `planned`, including two marketplace health-only rows;
+- cards expose API-key enrollment, operator HTTPS probe configuration and a
+  clear «Проверка подключения» state;
+- API and worker reject product/price/inventory/order capability enablement for
+  both providers;
+- manifests, conformance evidence, policy/reviews and provider docs are in
+  sync; no migration or public API change is required;
+- domain activation waits for a current partner test account, fixtures,
+  idempotent bridge and a fresh provider qualification review.
+
+## Phase 31 — «Долями» payment surface
+
+`158`
+
+Task 158 adds «Долями» to «Интеграции → Платежи». The card stores the partner
+login/password and mTLS certificate in SecretProvider and uses a one-shot
+host-mediated client against the operator-configured endpoint. The runtime
+inventory is **18 generic / 41 separate-surface / 0 planned** across 59
+providers. Create, Commit, Cancel, Info, Refund and webhook operations remain
+closed until provider qualification.
+
+### Gate RUNTIME-158
+
+- the card and generated runtime support are `separate_surface/finance/health_only`;
+- mTLS private material is callback-scoped and never retained by a pooled client;
+- runtime configuration contains only the HTTPS probe URL, not credentials;
+- no payment capability is executable or selectable from the account;
+- official API fixtures, signature verification and idempotent payment routing
+  are required before promotion to a payment gateway.
+
+## Phase 32 — Google Gemini and Grok AI providers
+
+`159`
+
+Task 159 adds Google Gemini and Grok to the existing tenant-scoped AI analytics
+surface. Gemini uses `x-goog-api-key` and `generateContent`; Grok uses xAI's
+Bearer-authenticated Chat Completions endpoint. Midjourney is documented as
+unavailable because its official policy does not provide a general API and
+prohibits third-party automation.
+
+### Gate RUNTIME-159
+
+- generated catalogs and runtime support report 61 providers: 18 `ready`, 43
+  `separate_surface`, 0 `planned`;
+- API, UI and migration provider allow-lists include `gemini` and `grok`;
+- credentials remain callback-scoped and only `ai.completion.generate` is
+  executable;
+- package tests, conformance evidence, SDK generation and frontend checks pass;
+- streaming, tools, image/video generation and Midjourney automation remain
+  outside the admitted contract.
 
 Task `027` has a completed deterministic repository drill, not a qualified
 deployment backup chain. Each release/deployment must additionally retain a
@@ -329,11 +396,12 @@ Task 121 is repository-complete. Fresh installs execute 11 active migrations (`0
 Task 130 is repository-complete. Connector manifests remain the SDK inventory,
 while `contracts/connectors/builtin-runtime-support-v1.json` is the exact source
 of truth for production availability. Settings and the API expose only 11
-generic product integrations as executable, direct six AI connectors to their
+generic integrations as executable, direct six AI connectors to their
 dedicated surface and keep 21 manifest-only connectors visibly planned but
 non-connectable. AliExpress RU, Magnit Market, Megamarket, OpenCart and
-PrestaShop join the built-in product runtime without broadening the worker past
-the canonical `products` entity.
+PrestaShop join the built-in runtime. PrestaShop additionally has an explicit
+outbound worker route for `prices` and `inventory`; all other generic sync
+routes remain product-scoped.
 
 ### Gate RUNTIME-130
 
@@ -343,7 +411,8 @@ the canonical `products` entity.
   connector/entity/direction requests must fail closed at API and worker
   boundaries;
 - all 11 ready connectors resolve product readers, while only OpenCart and
-  WooCommerce admit outbound product synchronization;
+  WooCommerce admit outbound product synchronization; PrestaShop admits
+  outbound prices and inventory through `torgnexa.commerce-sync.v1`;
 - full Go test/vet, contracts, architecture, SDK and frontend production-build
   gates must pass before the runtime images are recreated.
 
@@ -639,3 +708,100 @@ unsupported inventory, prices, orders and webhooks remain unavailable.
 - Go tests/vet, contracts, frontend tests/build and package-index checks pass;
 - live qualification still requires a non-production CS-Cart store with API
   access enabled for the administrator.
+
+## Phase 28 — «Почта России» logistics connector
+
+`155`
+
+Task 155 adds «Почта России» to the separate «Доставка» surface. The official
+Otpravka application token and user authorization key are stored encrypted and
+checked through a fixed HTTPS settings probe. Shipment, tariff, document,
+return, pickup and tracking operations remain closed until a current test
+account and fixtures qualify the REST/API contracts.
+
+### Gate RUNTIME-155
+
+- the Delivery card, manifest, runtime-support contract, policy/review and
+  generated catalogs agree on `separate_surface/logistics` with zero admitted
+  operational capabilities;
+- credentials stay callback-scoped, strict JSON decoding rejects unknown fields,
+  and the host sends only the documented authentication headers to the fixed
+  `otpravka-api.pochta.ru` host;
+- deterministic connector, transport, conformance, contract and frontend
+  checks pass without production credentials or network access;
+- rates, shipments, labels, returns, pickup points and tracking cannot be
+  enabled until non-production provider qualification is retained.
+
+## Phase 29 — Категорийные health-check поверхности
+
+`156`
+
+Task 156 closes the remaining 14 planned catalog entries as explicit
+category-specific `separate_surface` records: Auto.ru, Avito and CIAN are in
+«Объявления и вертикали»; Instagram, Odnoklassniki, Rutube, Threads, VK and
+YouTube are in «Социальные сети»; Diadoc and Saby EDO are in «ЭДО»; Chestny
+ZNAK, EGAIS and VetIS/Mercury are in «Госсистемы». A new `health_only` contract
+flag enables tenant-scoped credentials and authenticated, bounded host probes
+without inventing domain operations.
+
+### Gate RUNTIME-156
+
+- generated support/catalog parity reports 56 providers: 18 `ready`, 38
+  `separate_surface`, 0 `planned`;
+- the UI groups cards by category and clearly labels health-only accounts;
+- API enablement rejects non-empty capabilities for these rows and allows only
+  the health-check account path;
+- arbitrary hosts, non-HTTPS probes and unknown credential placeholders fail
+  closed;
+- contract generation, Go tests/vet, frontend tests/build and documentation
+  checks pass;
+- domain publication, synchronization, EDO and government writes remain
+  qualification-gated and are not represented as production capabilities.
+
+## Phase 30 — PrestaShop commerce sync runtime route
+
+`160`
+
+Task 160 closes the gap between the qualified PrestaShop Webservice price and
+StockAvailable writes and the production worker. A dedicated
+`torgnexa.commerce-sync.v1` consumer routes canonical price/inventory events
+through enabled outbound policies, tenant-scoped offer mappings and the
+existing connector receipt/retry machinery. Only regular prices and discrete
+stock quantities are admitted; reads, fractional units and other entity writes
+remain outside this route.
+
+### Gate RUNTIME-160
+
+- PrestaShop is the only runtime-support row advertising outbound `prices` and
+  `inventory` sync, and generated Go/TypeScript catalogs agree;
+- account capability snapshots, offer mappings and deterministic receipts are
+  checked before/after every remote write;
+- retryable provider failures use Kafka retry topics while malformed,
+  unmapped and non-retryable failures use the DLQ;
+- route tests, Go test/vet, contract and architecture checks pass, with the
+  Docker Webservice smoke retained as the provider-level qualification.
+
+## Phase 31 — Canonical product event runtime route
+
+`161`
+
+Task 161 closes the outbound catalog gap: `commerce-sync` no longer silently
+ignores `commerce.catalog.product_changed.v1`. For every connector admitted by
+the generated runtime-support contract, the worker loads the current
+tenant-scoped product, resolves or safely creates the `product` mapping, maps
+the lifecycle status at the built-in provider boundary, and records the
+validated applied/duplicate receipt. Price and inventory events retain their
+existing offer-mapping and PrestaShop-only route.
+
+### Gate RUNTIME-161
+
+- product event payload validation, canonical snapshot loading and policy,
+  account-capability and runtime admission remain fail-closed;
+- provider-native status translation matches each admitted ProductWriter
+  contract, without provider branches in the worker route;
+- product creates persist mappings only after a validated remote receipt and
+  retry safely after a crash between remote effect and local commit;
+- `offer_changed.v1` remains ignored and price/inventory mapping behavior is
+  unchanged;
+- Go tests/vet, contract and architecture checks pass before release
+  qualification.

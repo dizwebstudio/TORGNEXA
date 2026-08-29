@@ -6,7 +6,7 @@
   "summary": "Compose the qualified Bitrix24 CRM adapter through the host-owned OAuth and HTTPS runtime on a dedicated CRM surface.",
   "scopes": [
     "adr/0106-bitrix24-crm-production-runtime.md",
-    "connectors/bitrix24",
+    "connectors/crm/bitrix24",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/10-integrations-matrix.md",
     "docs/69-frontend-shell.md",

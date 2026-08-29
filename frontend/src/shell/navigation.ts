@@ -15,7 +15,7 @@ export interface NavigationItem {
 export const navigationItems: readonly NavigationItem[] = [
   {id: "dashboard", label: "Обзор", path: "/", risk: "READ", icon: "dashboard", shortcut: "G D"},
   {id: "catalog", label: "Каталог", path: "/catalog", capability: "products.read", risk: "READ", icon: "catalog", shortcut: "G C"},
-  {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G D"},
+  {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G O"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},
   {id: "incidents", label: "Инциденты", path: "/incidents", capability: "stock.read", risk: "READ", icon: "incident", shortcut: "G E"},
   {id: "connectors", label: "Интеграции", path: "/integrations", capability: "connectors.read", risk: "READ", icon: "connectors", shortcut: "G X"},
@@ -48,4 +48,12 @@ export function routeForPath(pathname: string): NavigationItem | undefined {
 export function canOpenPath(pathname: string, capabilities: readonly string[]): boolean {
   const route = routeForPath(pathname);
   return Boolean(route && hasCapability(capabilities, route.capability));
+}
+
+export function isKnownPath(pathname: string): boolean {
+  const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
+  if (normalized === "/" || navigationItems.some((item) => item.path === normalized)) return true;
+  if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/orders\/[^/]+$/.test(normalized)) return true;
+  if (normalized === "/oauth/connectors/callback") return true;
+  return /^\/incidents\/(warehouse|drift|connector|approval)\/[^/]+$/.test(normalized);
 }

@@ -167,6 +167,26 @@ services:
       retries: 20
     security_opt: [no-new-privileges:true]
 
+  # Kafka does not reliably create topics when a consumer subscribes to an
+  # empty broker. Bootstrap every canonical base topic and its retry/DLQ
+  # variants before any application process can publish an outbox event.
+  kafka-init:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      TORGNEXA_KAFKA_TOPIC_PARTITIONS: ${TORGNEXA_KAFKA_TOPIC_PARTITIONS:-1}
+      TORGNEXA_KAFKA_TOPIC_REPLICATION_FACTOR: ${TORGNEXA_KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+    volumes:
+      - ./deploy/kafka/bootstrap-topics.sh:/bootstrap-topics.sh:ro
+      - ./deploy/kafka/topics.txt:/topics.txt:ro
+    entrypoint: [/bin/sh, /bootstrap-topics.sh]
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
   valkey:
     image: valkey/valkey:9.1.1-alpine@sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328
     restart: unless-stopped
@@ -249,6 +269,17 @@ services:
       timeout: 5s
       retries: 20
 
+  clamav:
+    image: clamav/clamav:1.4.3@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4
+    restart: unless-stopped
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, clamdcheck.sh]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     restart: unless-stopped
@@ -295,6 +326,8 @@ services:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       valkey:
         condition: service_healthy
       clickhouse:
@@ -317,13 +350,13 @@ services:
     environment:
       <<: *app-env
       TORGNEXA_WORKER_RECONCILIATION_ENABLED: ${TORGNEXA_WORKER_RECONCILIATION_ENABLED:-true}
-      TORGNEXA_WORKER_UPLOADS_ENABLED: ${TORGNEXA_WORKER_UPLOADS_ENABLED:-false}
+      TORGNEXA_WORKER_UPLOADS_ENABLED: ${TORGNEXA_WORKER_UPLOADS_ENABLED:-true}
       TORGNEXA_KAFKA_CONSUMER_GROUP: ${TORGNEXA_KAFKA_CONSUMER_GROUP:-torgnexa.webhooks.v1}
       TORGNEXA_WORKER_POLL_INTERVAL: ${TORGNEXA_WORKER_POLL_INTERVAL:-500ms}
       TORGNEXA_WORKER_DISPATCH_BATCH: ${TORGNEXA_WORKER_DISPATCH_BATCH:-32}
       TORGNEXA_WORKER_LEASE: ${TORGNEXA_WORKER_LEASE:-90s}
       TORGNEXA_CLAMAV_NETWORK: ${TORGNEXA_CLAMAV_NETWORK:-tcp}
-      TORGNEXA_CLAMAV_ADDRESS: ${TORGNEXA_CLAMAV_ADDRESS:-127.0.0.1:3310}
+      TORGNEXA_CLAMAV_ADDRESS: ${TORGNEXA_CLAMAV_ADDRESS:-clamav:3310}
       TORGNEXA_CLAMAV_ENGINE_VERSION: ${TORGNEXA_CLAMAV_ENGINE_VERSION:-runtime}
       TORGNEXA_CLAMAV_SIGNATURE_VERSION: ${TORGNEXA_CLAMAV_SIGNATURE_VERSION:-runtime}
       TORGNEXA_CLAMAV_TIMEOUT: ${TORGNEXA_CLAMAV_TIMEOUT:-30s}
@@ -332,7 +365,11 @@ services:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       valkey:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
 
   scheduler:
@@ -343,6 +380,8 @@ services:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       valkey:
         condition: service_healthy
 
@@ -354,6 +393,8 @@ services:
       TORGNEXA_HTTP_ADDR: 0.0.0.0:8090
     depends_on:
       app-db-role:
+        condition: service_completed_successfully
+      kafka-init:
         condition: service_completed_successfully
       keycloak:
         condition: service_healthy

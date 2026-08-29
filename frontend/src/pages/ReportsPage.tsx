@@ -45,7 +45,7 @@ export function ReportsPage(){
      </div>
     </div>
     {exportError?<ErrorBlock>{exportError}</ErrorBlock>:null}
-    {report.isPending?<LoadingBlock/>:report.isError?<ErrorBlock>Не удалось сформировать отчёт.</ErrorBlock>:report.data.rows.length===0?<EmptyState title="Данных по фильтрам нет" text="Измените период или фильтры отчёта."/>:<>
+    {report.isPending?<LoadingBlock/>:report.isError?<ErrorBlock retry={()=>void report.refetch()}>Не удалось сформировать отчёт.</ErrorBlock>:report.data.rows.length===0?<EmptyState title="Данных по фильтрам нет" text="Измените период или фильтры отчёта."/>:<>
      <p className="settings-note">Сформирован {new Date(report.data.generated_at).toLocaleString("ru-RU")} · источник {report.data.source==="clickhouse"?"ClickHouse":"PostgreSQL"}</p>
      {salesSummary?<div className="analytics-kpis"><article><small>Заказы</small><strong>{salesSummary.orders}</strong></article><article><small>Выполнено</small><strong>{salesSummary.fulfilled}</strong></article><article><small>Отменено</small><strong>{salesSummary.cancelled}</strong></article><article><small>Оборот</small><strong>{new Intl.NumberFormat("ru-RU",{style:"currency",currency:currency||report.data.rows[0]?.[1]||"RUB",maximumFractionDigits:0}).format(salesSummary.gross/100)}</strong></article></div>:null}
      <Chart report={report.data}/>

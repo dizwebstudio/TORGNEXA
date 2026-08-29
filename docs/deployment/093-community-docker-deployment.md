@@ -2,13 +2,13 @@
 
 ## Quick start
 
-Requirements: Docker Engine with Compose v2 and enough resources for PostgreSQL, Kafka, ClickHouse, Keycloak and the TORGNEXA processes.
+Requirements: Docker Engine with Compose v2 and enough resources for PostgreSQL, Kafka, ClickHouse, Keycloak, ClamAV and the TORGNEXA processes.
 
 ```bash
 make community-up
 ```
 
-The first invocation creates `.env` with random local credentials and mode `0600`, validates the deployment policy, builds the shared TORGNEXA application image definition, initializes the databases/object store, applies all reviewed migrations, then starts API, worker, scheduler and MCP.
+The first invocation creates `.env` with random local credentials and mode `0600`, validates the deployment policy, builds the shared TORGNEXA application image definition, initializes the databases/object store, applies all reviewed migrations, creates the canonical Kafka base/retry/DLQ topics, then starts API, worker, scheduler and MCP.
 
 Before changing ports, OIDC, worker, ClamAV or notification settings, see the
 [complete `.env` reference](environment-variables.md). It explains every
@@ -66,7 +66,11 @@ Application services depend on `service_completed_successfully`; a failed migrat
 
 ## Keycloak
 
-A one-shot `keycloak-db-init` creates a dedicated Keycloak role/database. Keycloak imports `deploy/keycloak/torgnexa-realm.json`. The bundled setup uses `start-dev` deliberately because this is the single-host Community baseline. Public production deployment must use an optimized TLS-enabled Keycloak topology and external edge.
+A one-shot `keycloak-db-init` creates a dedicated Keycloak role/database. Keycloak imports `deploy/keycloak/torgnexa-realm.json`. For local browser checks use the synthetic account `demo` / `demo-local-only`; `make community-up` reconciles both the Keycloak account and its administrator membership in the configured development workspace, including when an existing volume predates the realm import. The bundled setup uses `start-dev` deliberately because this is the single-host Community baseline. Public production deployment must use an optimized TLS-enabled Keycloak topology and external edge.
+
+Community Compose includes ClamAV at the internal address `clamav:3310`, so
+product image uploads are enabled by default and remain behind the quarantine
+and release pipeline.
 
 ## Frontend
 

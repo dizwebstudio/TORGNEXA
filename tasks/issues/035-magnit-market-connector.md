@@ -12,7 +12,7 @@ Create current capability audit/spec and implement supported baseline connector 
 Task 035 registers `magnit-market` as a read-only marketplace provider through Connector SDK v1. The baseline uses the current official Magnit Market Partner API with `X-Api-Key` authentication and grants only `products.read`, `prices.read`, `inventory.read`, and `orders.read`.
 
 ## Deliverables
-- `connectors/magnit-market`: host-mediated connector, fixtures and adversarial tests;
+- `connectors/marketplaces/magnit-market`: host-mediated connector, fixtures and adversarial tests;
 - `docs/connectors/magnit-market`: current capability audit, connector spec, reconciliation notes, conformance plan and immutable Task-064 report;
 - architecture provider admission `ARCH-035`;
 - explicit unsupported/write capability boundary.

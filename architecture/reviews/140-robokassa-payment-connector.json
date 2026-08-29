@@ -7,7 +7,7 @@
   "scopes": [
     "architecture/policy.json",
     "architecture/reviews/140-robokassa-payment-connector.json",
-    "connectors/robokassa",
+    "connectors/payments/robokassa",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/connectors/robokassa",
     "frontend/public/connector-logos/robokassa.svg",
@@ -108,7 +108,7 @@
   "provider": {
     "id": "robokassa",
     "route": "connector_sdk",
-    "manifest": "connectors/robokassa/manifest.json",
+    "manifest": "connectors/payments/robokassa/manifest.json",
     "connector_spec": "docs/connectors/robokassa/spec.md",
     "capability_audit": "docs/connectors/robokassa/capability-audit.md",
     "conformance_plan": "docs/connectors/robokassa/conformance-plan.md"

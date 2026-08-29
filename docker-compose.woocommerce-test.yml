@@ -1,0 +1,67 @@
+name: torgnexa-woocommerce-test
+
+services:
+  db:
+    image: mariadb:11.4@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430
+    environment:
+      MARIADB_ROOT_PASSWORD: woocommerce-root-demo
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress-demo
+    volumes:
+      - woocommerce-demo-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root -p\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+
+  woocommerce:
+    build:
+      context: .
+      dockerfile: docker/woocommerce-test/Dockerfile
+      args:
+        WORDPRESS_VERSION: "6.8.2-php8.3-apache"
+        WOOCOMMERCE_VERSION: "9.8.5"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress-demo
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_DEBUG: "0"
+      WORDPRESS_SITEURL: http://127.0.0.1:${WOOCOMMERCE_HTTP_PORT:-8096}
+      WORDPRESS_TITLE: TORGNEXA Demo Store
+      WORDPRESS_ADMIN_USER: admin
+      WORDPRESS_ADMIN_PASSWORD: admin-demo-123
+      WORDPRESS_ADMIN_EMAIL: demo@torgnexa.local
+      WOO_CONSUMER_KEY: ck_torgnexa_demo_20260829_000000000000000000
+      WOO_CONSUMER_SECRET: cs_torgnexa_demo_20260829_0000000000000000
+      WOO_WEBHOOK_SECRET: whsec_torgnexa_demo_20260829_000000000000000000000000
+      WOO_STORE_CURRENCY: USD
+    ports:
+      - "${WOOCOMMERCE_HTTP_PORT:-8096}:80"
+      - "${WOOCOMMERCE_HTTPS_PORT:-8446}:443"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -kfsSL -u \"$${WOO_CONSUMER_KEY}:$${WOO_CONSUMER_SECRET}\" 'https://127.0.0.1/wp-json/wc/v3/products?per_page=100' | grep -q '\"sku\":\"TORGNEXA-WOO-COFFEE\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 512M
+
+volumes:
+  woocommerce-demo-db:

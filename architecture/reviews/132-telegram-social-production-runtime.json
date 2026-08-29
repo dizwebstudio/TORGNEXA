@@ -6,7 +6,7 @@
   "summary": "Compose Telegram text publishing through the provider-neutral Social Core API and crash-safe worker runtime.",
   "scopes": [
     "adr/0102-telegram-social-production-runtime.md",
-    "connectors/telegram",
+    "connectors/social/telegram",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "contracts/openapi/torgnexa-v1.yaml",
     "frontend/src/pages/SocialPage.tsx",

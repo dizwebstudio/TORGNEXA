@@ -586,6 +586,7 @@ func writeArchitectureFixture(t *testing.T) string {
 		ProviderImplementationRoots: append([]string(nil), canonicalProviderRoots...),
 		ProviderAdmission:           admission{Enabled: false, RequiredTasks: []string{"010", "025", "029", "064"}},
 		CoreExternalImports:         []string{},
+		CoreSharedImports:           []string{},
 		ProviderAllowedImports:      []string{"internal/platform/connectors"},
 		SensitivePaths:              append([]string(nil), canonicalSensitivePaths...),
 		Modules:                     []module{{Path: "internal/core/synthetic", Kind: "core_domain"}},

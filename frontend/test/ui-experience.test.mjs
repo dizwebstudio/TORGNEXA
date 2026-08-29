@@ -14,6 +14,10 @@ test("shell exposes icon navigation, command search, theme and activity center",
   assert.match(shell, /metaKey\|\|event\.ctrlKey/);
   assert.match(shell, /Управление торговлей/);
   assert.doesNotMatch(shell, /Commerce Orchestration/);
+  assert.match(shell, /isKnownPath/);
+  assert.match(shell, /Страница не найдена/);
+  assert.match(shell, /Не удалось загрузить часть активности/);
+  assert.match(shell, /Повторить/);
 });
 
 test("dashboard is operational and includes onboarding and orchestration state", () => {
@@ -22,7 +26,7 @@ test("dashboard is operational and includes onboarding and orchestration state",
   assert.match(dashboard, /Складские инциденты/);
   assert.match(dashboard, /Требуют человека/);
   assert.match(dashboard, /Первый запуск/);
-  assert.match(dashboard, /Commerce Orchestration/);
+  assert.match(dashboard, /Оркестрация Commerce/);
 });
 
 test("data table provides search sort pagination columns selection and bookmarkable views without browser persistence", () => {
@@ -33,9 +37,11 @@ test("data table provides search sort pagination columns selection and bookmarka
 
 test("inventory exposes warehouse incidents and fulfillment allocation lineage", () => {
   const inventory = read("pages/InventoryPage.tsx");
+  assert.match(inventory, /Остатки и исполнение заказов/);
+  assert.match(inventory, /Исполнение заказов/);
   assert.match(inventory, /listWarehouseIncidents/);
   assert.match(inventory, /listFulfillmentAllocations/);
-  assert.match(inventory, /Автоматический failover/);
+  assert.match(inventory, /Автоматическое переключение/);
   assert.match(inventory, /ReplacesID/);
 });
 
@@ -59,19 +65,31 @@ test("integration settings use overview cards and a focused drawer", () => {
   assert.match(css, /\.integration-catalog-heading > div:first-child \{[^}]*min-width:0/);
 });
 
-test("integration catalog distinguishes executable, separate and planned runtime stages", () => {
+test("integration catalog groups every connector by an explicit runtime surface", () => {
   const integrations = read("features/settings/IntegrationCatalog.tsx");
   const generated = read("generated/connector-catalog.ts");
   assert.equal([...generated.matchAll(/^      stage: "ready"/gm)].length, 18);
-  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 23);
-  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 14);
+  assert.equal([...generated.matchAll(/^      stage: "separate_surface"/gm)].length, 43);
+  assert.equal([...generated.matchAll(/^      stage: "planned"/gm)].length, 0);
   assert.match(integrations, /Подключение пока недоступно/);
   assert.match(integrations, /Создать кабинет или включить заявленные возможности нельзя/);
-  assert.match(integrations, /Перейти к AI-провайдерам/);
+  assert.match(integrations, /Перейти к провайдерам ИИ/);
+  assert.match(integrations, /navigate\("\/settings#ai-provider-settings"\)/);
+  assert.match(read("pages/SettingsPage.tsx"), /ai-provider-settings/);
+  assert.match(read("pages/SettingsPage.tsx"), /hashchange/);
+  assert.match(read("shell/useLocationPath.ts"), /window\.location\.search\}\$\{window\.location\.hash/);
+  assert.match(generated, /id: "pochta-russia"/);
+  assert.match(integrations, /Почты России/);
   assert.match(read("features/settings/AIProviderSettings.tsx"), /Claude \(Anthropic\)/);
   assert.match(read("features/settings/AIProviderSettings.tsx"), /Ollama/);
   assert.match(read("features/settings/AIProviderSettings.tsx"), /LM Studio/);
   assert.match(read("features/settings/AIProviderSettings.tsx"), /Open WebUI/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /Google Gemini/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /Grok \(xAI\)/);
+  assert.match(read("features/settings/AIProviderSettings.tsx"), /<h2>Провайдеры ИИ<\/h2>/);
+  assert.match(read("features/reports/AskAI.tsx"), /Провайдер ИИ/);
+  assert.match(read("features/reports/AskAI.tsx"), /Google Gemini/);
+  assert.match(read("features/reports/AskAI.tsx"), /Grok \(xAI\)/);
   assert.match(read("features/reports/AskAI.tsx"), /Claude \(Anthropic\)/);
   assert.match(read("features/reports/AskAI.tsx"), /Ollama/);
   assert.match(read("features/reports/AskAI.tsx"), /LM Studio/);
@@ -79,6 +97,8 @@ test("integration catalog distinguishes executable, separate and planned runtime
   assert.match(integrations, /Перейти к курсам валют/);
   assert.match(integrations, /Текстовые публикации работают/);
   assert.match(integrations, /CRM-контур работает/);
+  assert.match(integrations, /Подключение доступно в категории/);
+  assert.match(integrations, /integration-family-heading/);
   assert.match(integrations, /runtime\.operationalCapabilities/);
   assert.match(integrations, /runtimeConfigTemplate/);
   assert.match(generated, /name: "1С-Битрикс"/);
@@ -87,6 +107,47 @@ test("integration catalog distinguishes executable, separate and planned runtime
   assert.match(generated, /name: "CS-Cart"/);
   assert.match(integrations, /официальный REST API 2\.0/);
   assert.match(integrations, /JSON вида \{ email, api_key \}/);
+  assert.match(generated, /id: "lamoda"/);
+  assert.match(generated, /id: "mvideo"/);
+  assert.match(generated, /id: "dolyami"/);
+  assert.match(generated, /name: "Долями"/);
+  assert.match(integrations, /certificate_pem, private_key_pem/);
+  assert.match(generated, /surface: "marketplace"/);
+  assert.match(generated, /healthOnly: true/);
+  assert.match(read("pages/PublicDocumentationPage.tsx"), /Lamoda/);
+});
+
+test("AI provider settings keep form controls aligned and separated", () => {
+  const settings = read("features/settings/AIProviderSettings.tsx");
+  const css = read("styles.css");
+  assert.match(settings, /settings-grid ai-provider-form/);
+  assert.match(settings, /account-actions ai-provider-form-actions/);
+  assert.match(css, /\.settings-grid > \* \{ min-width: 0; \}/);
+  assert.match(css, /\.field input,\.field select,\.field textarea/);
+  assert.match(css, /\.ai-provider-form-actions \{ margin-top: 14px; \}/);
+});
+
+test("catalog product creation starts from a real product card", () => {
+  const catalog = read("features/catalog/ProductList.tsx");
+  const css = read("styles.css");
+  for (const token of ["product-create-card", "Карточка товара", "product-create-card-tabs", "Создать карточку", "product-create-description"]) assert.ok(catalog.includes(token), token);
+  for (const token of [".product-create-card-header", ".product-create-card-tabs", ".product-create-form", ".product-create-card-footer"]) assert.ok(css.includes(token), token);
+  assert.match(catalog, /api\.createProduct\(\{body:\{code,title,description\}\}\)/);
+  assert.match(catalog, /useState\("main"\)/);
+  assert.match(catalog, /\[\["main","Основные данные"\],\["offers","Предложения и цены"\]/);
+  assert.match(catalog, /product-create-image-section/);
+  assert.match(catalog, /type="file" accept="image\/\*"/);
+  assert.match(catalog, /uploadAndAttachImage/);
+  assert.match(catalog, /catalog-primary-image/);
+  assert.match(catalog, /role="tablist"/);
+  assert.match(catalog, /type="button" role="tab"/);
+  assert.match(catalog, /api\.createProductImage\(\{productId:productID/);
+  assert.match(catalog, /Заполнить демо-каталог/);
+  assert.match(catalog, /createDemoOrders/);
+  assert.match(catalog, /catalog-product-thumbnail/);
+  assert.match(catalog, /image_url/);
+  for (const token of [".product-create-image-form", ".product-create-image-preview", ".product-create-image-empty"]) assert.ok(css.includes(token), token);
+  for (const token of [".catalog-product-cell", ".catalog-product-thumbnail", ".catalog-product-copy"]) assert.ok(css.includes(token), token);
 });
 
 test("visual system includes dark mode mobile labels focus and reduced motion", () => {
@@ -94,15 +155,81 @@ test("visual system includes dark mode mobile labels focus and reduced motion", 
   for (const token of ['data-theme="dark"', ".nav-label", ":focus-visible", "prefers-reduced-motion", ".toast-region", ".drawer-layer", ".skeleton"]) assert.ok(css.includes(token), token);
 });
 
+test("technical status values are localized in badges", () => {
+  const badge = read("components/StatusBadge.tsx");
+  assert.match(badge, /critical: "Критический"/);
+  assert.match(badge, /needs_attention: "Требует внимания"/);
+  assert.match(badge, /statusLabels\[normalized\]/);
+  for (const token of ["disputed: \"Оспорен\"", "expired: \"Срок истёк\"", "revoked: \"Отозван\""]) assert.match(badge, new RegExp(token));
+});
+
+test("connector capabilities are presented in Russian", () => {
+  const settings = read("features/settings/IntegrationCatalog.tsx");
+  for (const token of ["Просмотр товаров", "Управление кабинетами интеграций", "Просмотр политик ИИ", "Управление участниками рабочего пространства", "Просмотр состояния безопасности"]) assert.match(settings, new RegExp(token));
+  assert.doesNotMatch(settings, /Получать данные ·/);
+});
+
+test("storefront connector logos use official marks and brand palettes", () => {
+  const bitrix = readRoot("frontend/public/connector-logos/bitrix.svg");
+  const csCart = readRoot("frontend/public/connector-logos/cs-cart.svg");
+  const catalog = read("generated/connector-catalog.ts");
+  assert.match(bitrix, /width="344" height="67"/);
+  assert.match(bitrix, /fill="#D91935"/);
+  assert.match(bitrix, /fill="#231F20"/);
+  assert.doesNotMatch(bitrix, /#F58220|#E04A16/);
+  assert.match(csCart, /width="139" height="34"/);
+  assert.match(csCart, /#7381FD/);
+  assert.match(csCart, /#76C7FF/);
+  assert.match(csCart, /#1B2032/);
+  assert.doesNotMatch(csCart, /#202A44|CS-CART/);
+  assert.match(catalog, /surface: "#FFF1F3"/);
+  assert.match(catalog, /surface: "#F0F1FF"/);
+  assert.match(catalog, /accent: "#D91935"/);
+  assert.match(catalog, /accent: "#7381FD"/);
+});
+
+test("orders expose guarded lifecycle actions and modal focus management", () => {
+  const orders = read("features/orders/OrderList.tsx");
+  const dialog = read("components/Dialog.tsx");
+  const drawer = read("components/Drawer.tsx");
+  const palette = read("components/CommandPalette.tsx");
+  assert.match(orders, /changeOrderStatus/);
+  for (const token of ["Подтвердить заказ", "Передать в обработку", "Передать в исполнение", "Отменить заказ"]) assert.match(orders, new RegExp(token));
+  for (const modal of [dialog, drawer, palette]) {
+    assert.match(modal, /useFocusTrap/);
+    assert.match(modal, /aria-modal="true"/);
+    assert.match(modal, /tabIndex=\{-1\}/);
+  }
+});
+
+test("frontend image policy permits catalog HTTPS thumbnails", () => {
+  const server = readRoot("frontend/serve.mjs");
+  assert.match(server, /img-src 'self' data: https:/);
+});
+
 test("task 120 uses server-side grids with cursor pagination for core commerce lists", () => {
   const grid = read("components/ServerDataGrid.tsx");
   const catalog = read("features/catalog/ProductList.tsx");
   const orders = read("features/orders/OrderList.tsx");
-  assert.match(grid, /server-side/);
+  assert.match(grid, /на сервере/);
   assert.match(catalog, /next_cursor/);
   assert.match(catalog, /listProducts\(\{limit:25,q:/);
   assert.match(orders, /next_cursor/);
   assert.match(orders, /listOrders\(\{limit:25,q:/);
+});
+
+test("orders show product card thumbnails in list and detail", () => {
+  const orders = read("features/orders/OrderList.tsx");
+  const image = read("components/ProductImage.tsx");
+  const css = read("styles.css");
+  assert.match(orders, /order-product-thumbnail/);
+  assert.match(orders, /ProductImage/);
+  assert.match(orders, /product_image_url/);
+  assert.match(orders, /product_title\|\|v\.product_sku/);
+  assert.match(image, /getUploadContent/);
+  assert.match(image, /URL\.createObjectURL/);
+  assert.match(css, /\.order-product-cell/);
+  assert.match(css, /\.line-item \.order-product-thumbnail/);
 });
 
 test("task 120 realtime is an authenticated SSE invalidation channel", () => {
@@ -142,7 +269,7 @@ test("public documentation follows current navigation, settings and sign-in beha
   assert.match(docs, /Карточки площадок/);
   assert.match(docs, /make community-init/);
   const environmentVariables = [...envExample.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]);
-  assert.equal(environmentVariables.length, 54);
+  assert.equal(environmentVariables.length, 56);
   for (const variable of environmentVariables) assert.ok(docs.includes(variable), variable);
   assert.match(docs, /Как работает ClamAV/);
   assert.match(docs, /Fail-open режима нет/);
@@ -153,12 +280,50 @@ test("public documentation follows current navigation, settings and sign-in beha
 test("task 120 provides a unified incident center and deep links", () => {
   const center = read("pages/IncidentCenterPage.tsx");
   const nav = read("shell/navigation.ts");
+  assert.match(center, /eyebrow="Операции"/);
+  assert.match(center, /title="Центр инцидентов"/);
+  assert.match(center, /kindName/);
+  assert.match(center, /Доступные данные всё равно показаны/);
   assert.match(center, /listWarehouseIncidents/);
   assert.match(center, /getSyncStatus/);
   assert.match(center, /listConnectorAccounts/);
   assert.match(center, /listApprovals/);
+  assert.match(center, /История/);
+  assert.match(center, /historyRows/);
+  assert.match(center, /terminal/);
   assert.match(center, /\/incidents\//);
   assert.match(nav, /normalized\.startsWith\(item\.path \+ "\/"\)/);
+});
+
+test("demo catalog includes an actionable warehouse incident and stock position", () => {
+  const repository = readRoot("internal/platform/postgres/searchrepo/repository.go");
+  assert.match(repository, /DEMO-INCIDENT-WH/);
+  assert.match(repository, /Демо-склад для инцидентов/);
+  assert.match(repository, /warehouse_incidents/);
+  assert.match(repository, /demo_outage/);
+  assert.match(repository, /seedDemoInventoryPosition\(ctx, tx, org, ws, offerID, warehouseID, 18, 0/);
+  assert.match(repository, /SELECT EXISTS\(SELECT 1 FROM inventory_positions/);
+  assert.match(repository, /seedDemoCatalogMerchandising/);
+  assert.match(repository, /pim_categories/);
+  assert.match(repository, /VALUES\(\$1,\$2,\$3,\$4,\$5,'draft',1/);
+  assert.match(repository, /activate demo category/);
+  assert.match(repository, /INSERT INTO prices/);
+  assert.match(repository, /seedDemoFulfillmentAllocations/);
+  assert.match(repository, /fulfillment_allocations/);
+});
+
+test("community browser checks have a synthetic Keycloak user and upload scanner", () => {
+  const realm = readRoot("deploy/keycloak/torgnexa-realm.json");
+  const compose = readRoot("docker-compose.yml");
+  const helper = readRoot("scripts/ensure-community-demo-user.sh");
+  assert.match(realm, /"username": "demo"/);
+  assert.match(realm, /"realmRoles": \["admin"\]/);
+  assert.match(compose, /clamav\/clamav:1\.4\.3@sha256:/);
+  assert.match(compose, /TORGNEXA_WORKER_UPLOADS_ENABLED: \$\{TORGNEXA_WORKER_UPLOADS_ENABLED:-true\}/);
+  assert.match(helper, /set-password/);
+  assert.match(helper, /add-roles/);
+  assert.match(helper, /community-demo-member\.sql/);
+  assert.match(readRoot("scripts/community-demo-member.sql"), /demo_subject/);
 });
 
 test("task 120 command palette searches server-side and opens entities directly", () => {

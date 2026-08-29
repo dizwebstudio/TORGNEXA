@@ -71,8 +71,101 @@ func TestSearchSQLCarriesTenantPredicatesIntoRootAndChildMatches(t *testing.T) {
 	}
 }
 
+func TestProductSearchSQLProjectsDescriptionAndRegularPrice(t *testing.T) {
+	for _, want := range []string{
+		"p.description",
+		"regular_price.minor_units",
+		"regular_price.currency",
+		"pr.kind='regular'",
+		"e.status='active'",
+	} {
+		if !strings.Contains(productSearchSQL, want) {
+			t.Fatalf("product search projection missing %q", want)
+		}
+	}
+}
+
 func TestLikePrefixEscapesSQLWildcards(t *testing.T) {
 	if got, want := likePrefix(`50%_\sale`), `50\%\_\\sale%`; got != want {
 		t.Fatalf("like prefix=%q want=%q", got, want)
+	}
+}
+
+func TestDemoCatalogContainsTwentyFourVisualProducts(t *testing.T) {
+	if got, want := len(demoCatalogProducts), 24; got != want {
+		t.Fatalf("demo catalog size=%d want=%d", got, want)
+	}
+	seen := make(map[string]struct{}, len(demoCatalogProducts))
+	for _, item := range demoCatalogProducts {
+		if item.Code == "" || item.Title == "" || item.Description == "" || item.ImageAlt == "" {
+			t.Fatalf("demo product %q is incomplete", item.Code)
+		}
+		if !strings.HasPrefix(item.ImageURL, "https://images.unsplash.com/") {
+			t.Fatalf("demo product %q does not use an HTTPS Unsplash image", item.Code)
+		}
+		if _, exists := seen[item.Code]; exists {
+			t.Fatalf("duplicate demo product code %q", item.Code)
+		}
+		seen[item.Code] = struct{}{}
+	}
+}
+
+func TestDemoCatalogUsesDistinctInventorySKUs(t *testing.T) {
+	seen := make(map[string]struct{}, len(demoCatalogProducts))
+	for index := range demoCatalogProducts {
+		sku := demoSKU(index)
+		if sku == "" {
+			t.Fatalf("demo product %d has an empty SKU", index)
+		}
+		if _, exists := seen[sku]; exists {
+			t.Fatalf("duplicate demo SKU %q", sku)
+		}
+		seen[sku] = struct{}{}
+	}
+	if got, want := demoSKU(0), "DEMO-SKU"; got != want {
+		t.Fatalf("primary demo SKU=%q want=%q", got, want)
+	}
+	if got, want := demoSKU(23), "DEMO-SKU-023"; got != want {
+		t.Fatalf("last demo SKU=%q want=%q", got, want)
+	}
+}
+
+func TestDemoStatusExamplesCoverVisibleLifecycleStatuses(t *testing.T) {
+	catalogStatuses := make(map[string]bool)
+	for _, item := range demoCatalogStatusProducts {
+		if item.Code == "" || item.SKU == "" || item.Title == "" || item.Description == "" || item.ImageAlt == "" {
+			t.Fatalf("demo status product %q is incomplete", item.Code)
+		}
+		if !strings.HasPrefix(item.ImageURL, "https://images.unsplash.com/") {
+			t.Fatalf("demo status product %q does not use an HTTPS Unsplash image", item.Code)
+		}
+		catalogStatuses[item.Status] = true
+	}
+	for _, want := range []string{"draft", "archived"} {
+		if !catalogStatuses[want] {
+			t.Fatalf("demo catalog does not cover %s status", want)
+		}
+	}
+
+	orderStatuses := map[string]bool{"pending": true}
+	for _, target := range demoOrderStatusPaths {
+		for _, status := range target.path {
+			orderStatuses[status] = true
+		}
+	}
+	for _, want := range []string{"pending", "confirmed", "processing", "fulfilled", "cancelled"} {
+		if !orderStatuses[want] {
+			t.Fatalf("demo orders do not cover %s status", want)
+		}
+	}
+
+	incidentStatuses := map[string]bool{"needs_attention": true}
+	for _, item := range demoIncidentHistory {
+		incidentStatuses[item.status] = true
+	}
+	for _, want := range []string{"completed", "needs_attention", "resolved"} {
+		if !incidentStatuses[want] {
+			t.Fatalf("demo incidents do not cover %s status", want)
+		}
 	}
 }

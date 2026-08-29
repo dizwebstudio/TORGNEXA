@@ -1,0 +1,10 @@
+{
+  "extension_id": 0,
+  "extension_download_id": 0,
+  "name": "TORGNEXA OpenCart Bridge",
+  "description": "Versioned, tenant-safe bridge for the TORGNEXA OpenCart connector.",
+  "code": "torgnexa",
+  "version": "1.0.0",
+  "author": "TORGNEXA",
+  "link": "https://github.com/dizwebstudio/TORGNEXA"
+}

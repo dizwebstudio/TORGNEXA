@@ -25,7 +25,9 @@ support contract. Eleven connectors have a generic product bridge, seven AI
 connectors belong to their dedicated settings surface, CBR FX runs in Finance,
 and 20 entries remain discoverable but fail closed until an end-to-end
 application bridge is added. Task 131 closes the first planned connector with
-real production composition rather than changing its label alone.
+real production composition rather than changing its label alone. Task 156
+later replaces the remaining planned labels with explicit health-only category
+surfaces; see the current inventory below.
 
 ## Bitrix24 CRM runtime closure
 
@@ -106,6 +108,28 @@ catalog reads, creates and updates are admitted with cursor pagination,
 idempotent SKU lookup and read-after-write reconciliation; inventory, prices,
 orders and webhooks remain fail-closed. The runtime inventory is now 17
 generic integrations, 23 separate-surface providers and 14 planned entries.
+
+## Saleor storefront runtime
+
+Task 154 adds Saleor as a self-hosted GraphQL storefront connector. Product,
+inventory, price and order operations reuse the existing host-mediated SDK
+boundary; unsupported mutations remain fail-closed. The runtime inventory is
+18 generic integrations, 23 separate-surface providers and 14 planned entries.
+
+## Почта России logistics connector
+
+Task 155 adds «Почта России» to the separate Delivery surface with encrypted
+application-token/user-key enrollment and a bounded
+`otpravka-api.pochta.ru/1.0/settings` probe. Rates, shipments, labels, returns,
+pickup points and tracking remain qualification-gated until a current
+non-production carrier account and fixtures are available.
+
+## Connector package layout
+
+Built-in providers are organized under one family-derived category level:
+`connectors/<category>/<provider>`. Architecture policy/reviews, lifecycle
+inventory and catalog generators enforce this layout while retaining stable
+provider IDs and the `docs/connectors/<provider>` documentation paths.
 
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.
@@ -313,3 +337,47 @@ response-timing or status-code signal distinguishes them (ADR-0105). SBP
 webhook delivery remains code-complete but unverified for the same reason as
 its other operations: no real acquiring-bank gateway exists in this
 environment.
+
+## Task 156 — Categorical runtime surfaces
+
+Repository implementation complete: the remaining 14 manifest-only providers
+are grouped into «Объявления и вертикали», «Социальные сети», «ЭДО» and
+«Госсистемы». Each has tenant-scoped credential enrollment and a bounded
+authenticated health check through the host-mediated catalog probe. They expose
+no product, publication, document, regulated-write or synchronization
+capability until a separate provider qualification adds the required domain
+bridge and worker route. Current inventory: **18 generic / 38 separate-surface /
+0 planned** across 56 providers.
+
+## Task 157 — М.Видео и Lamoda marketplace surfaces
+
+Repository implementation complete: Lamoda and М.Видео are registered under
+`connectors/marketplaces`, shown as branded cards in the «Маркетплейсы» tab and
+admitted only to tenant-scoped credential enrollment plus a bounded operator-
+configured HTTPS health probe. Their SDK manifests document the expected
+marketplace vocabulary, but the runtime exposes zero domain capabilities and
+zero product sync directions until current partner API qualification is
+complete. Current inventory: **18 generic / 40 separate-surface / 0 planned**
+across 58 providers.
+
+## Task 158 — «Долями» payment surface
+
+Repository implementation complete: «Долями» is registered under
+`connectors/payments`, shown in the «Платежи» tab and admitted to a dedicated
+mTLS/basic health-check surface. The partner login/password and certificate
+remain encrypted and callback-scoped; the probe URL is operator-owned runtime
+configuration. Payment creation, commit/cancel, refunds, status reads and
+webhooks remain closed until a current Dolyami qualification package exists.
+Current inventory: **18 generic / 41 separate-surface / 0 planned** across 59
+providers.
+
+## Task 159 — Google Gemini and Grok AI providers
+
+Repository implementation complete: Google Gemini and Grok are available in
+Settings → AI providers and the report AI selector. Gemini uses the official
+`generateContent` REST contract with `x-goog-api-key`; Grok uses xAI Chat
+Completions with a Bearer key. Both expose only bounded non-streaming text
+completion through the existing governed AI surface. Midjourney is explicitly
+not admitted because its official policy provides no general public API and
+prohibits third-party automation. Current inventory: **18 generic / 43
+separate-surface / 0 planned** across 61 providers.

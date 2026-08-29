@@ -1,3 +1,43 @@
+const statusLabels: Readonly<Record<string, string>> = {
+  active: "Активен",
+  allocations: "Резервы исполнения",
+  archived: "Архив",
+  cancelled: "Отменён",
+  closed: "Закрыт",
+  completed: "Завершён",
+  confirmed: "Подтверждён",
+  critical: "Критический",
+  degraded: "Ограничен",
+  disabled: "Отключён",
+  disputed: "Оспорен",
+  draft: "Черновик",
+  error: "Ошибка",
+  executing: "Выполняется",
+  expired: "Срок истёк",
+  failed: "Ошибка",
+  fulfilled: "Выполнен",
+  failover: "Переключение",
+  healthy: "Работает",
+  info: "Информация",
+  live: "Подключено",
+  lost: "Потерян",
+  needs_attention: "Требует внимания",
+  open: "Открыт",
+  offline: "Недоступен",
+  operational_state: "Операционное состояние",
+  pending: "Ожидает",
+  planned: "Запланировано",
+  processing: "В работе",
+  rejected: "Отклонён",
+  resolved: "Решён",
+  revoked: "Отозван",
+  "server-side": "На сервере",
+  unknown: "Неизвестно",
+  unavailable: "Недоступен",
+  warning: "Предупреждение",
+};
+
 export function StatusBadge({value}: {value: string}) {
-  return <span className={`status status-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{value}</span>;
+  const normalized = value.trim().toLowerCase();
+  return <span className={`status status-${normalized.replace(/[^a-z0-9]+/g, "-")}`}>{statusLabels[normalized] ?? value}</span>;
 }

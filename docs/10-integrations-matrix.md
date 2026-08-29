@@ -14,10 +14,15 @@ but account creation, capability enablement and synchronization fail closed.
 
 ## Current production runtime
 
-The generic integration runtime currently supports only the canonical
-`products` entity. It does not advertise order, inventory, return, publication,
-message, payment or document synchronization merely because a provider SDK
-declares those capabilities.
+The generic integration runtime supports the canonical `products` entity in
+both directions where the generated runtime-support contract admits it. The
+`commerce-sync` worker consumes `commerce.catalog.product_changed.v1`, loads
+the canonical product, resolves the tenant-scoped `product` mapping (or
+creates it after a confirmed product upsert), and records an idempotent local
+receipt. It also explicitly routes outbound `prices` and `inventory` events
+for PrestaShop. It does not advertise order, return, publication, message,
+payment or document synchronization merely because a provider SDK declares
+those capabilities.
 
 | Connector | Working operations in Settings → Integrations | Product sync | Non-secret runtime config |
 |---|---|---|---|
@@ -28,30 +33,37 @@ declares those capabilities.
 | Medusa | product read/write | inbound + outbound | required |
 | МойСклад | ERP catalog read | inbound | no |
 | 1C | ERP catalog read | inbound | required |
-| OpenCart | product read/write | inbound + outbound | required |
+| OpenCart | product read/write через shop-local bridge `extension/torgnexa/api/*` | inbound + outbound | required; установить `torgnexa.ocmod.zip` |
 | Ozon | product read | inbound | no |
-| PrestaShop | product read | inbound | required |
+| PrestaShop | product read; price write; inventory write ([Docker Webservice smoke](connectors/prestashop/docker-smoke.md)) | products inbound; prices outbound; inventory outbound | required |
 | Shopify | product read/write | inbound + outbound | required |
 | Shopware 6 | product read/write | inbound + outbound | required |
 | Wildberries | product read | inbound | no |
-| WooCommerce | product read/write | inbound + outbound | required |
+| WooCommerce | product read/write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | inbound + outbound | required |
 | Yandex Market | product read | inbound | required |
 | Magento (Adobe Commerce) | product read/write | inbound + outbound | required |
 | CS-Cart | product read/write | inbound + outbound | required |
 | Saleor | product read/write | inbound + outbound | required |
 
-The host registry also contains price-writer adapters for Yandex Market,
-WooCommerce, Shopify, Medusa, Shopware 6 and Magento. The current worker has
-no `prices` entity bridge, so the catalog does not present price
-synchronization as an executable workflow yet.
+The host registry contains additional SDK price-writer adapters, but only
+PrestaShop is currently admitted to the production `prices`/`inventory`
+worker route. A product, price or inventory domain event is consumed by the
+dedicated `torgnexa.commerce-sync.v1` group, resolved through the tenant's
+enabled outbound policy and the corresponding `product` or `offer` mapping,
+sent with a deterministic idempotency key, and recorded in
+`sync_local_receipts` after an applied or duplicate receipt. Transient
+provider failures go through the normal Kafka retry topic; malformed events,
+missing offer mappings, product mapping collisions and non-retryable provider
+responses go to the DLQ.
 
 | Separate surface | Working operations | Tenant account |
 |---|---|---|
 | Bitrix24 CRM | lead/deal/contact/company reads and reconciled writes; lead/deal product-row reads/replacements | OAuth 2.0 + `portal_host` |
 
-AI connectors (`Claude (Anthropic)`, `DeepSeek`, `GigaChat`, `Kimi`,
-`LM Studio`, `Ollama`, `Open WebUI`, OpenAI-compatible, `Qwen`, and
-`YandexGPT`) are configured and executed in Settings → AI providers. They are
+AI connectors (`Claude (Anthropic)`, `DeepSeek`, `GigaChat`, `Google Gemini`,
+`Grok (xAI)`, `Kimi`, `LM Studio`, `Ollama`, `Open WebUI`, OpenAI-compatible,
+`Qwen`, and `YandexGPT`) are configured and executed in Settings → AI
+providers. They are
 marked as a separate surface and cannot create a generic connector account.
 Hosted providers use the common HTTPS transport. Ollama, LM Studio and Open
 WebUI use the host-mediated local transport and accept only the explicit local
@@ -60,6 +72,14 @@ only admitted capability. Default addresses are `http://ollama:11434/v1`,
 `http://host.docker.internal:1234/v1` and `http://open-webui:3000/api`.
 Claude uses the host-mediated Anthropic Messages API with an `x-api-key`; the
 model and optional HTTPS Base URL proxy are selected per tenant account.
+Google Gemini uses the official `generateContent` endpoint and the
+`x-goog-api-key` header; Grok uses xAI Chat Completions with a Bearer key. Both
+providers currently expose only bounded non-streaming text completion.
+
+Midjourney is not offered as a connectable AI account: its official policy
+states that it does not provide a public API and prohibits third-party
+automation. It therefore cannot be represented as a working TORGNEXA runtime
+connector without violating the provider's terms.
 
 CBR FX is executed by the worker as a separate Finance surface. It downloads
 the explicitly dated official Bank of Russia daily document, persists immutable
@@ -88,7 +108,7 @@ reads/replacements. It is intentionally not a generic product-sync source;
 deprecated Bitrix entity APIs, multifields and event subscriptions remain
 outside the v1 runtime claim.
 
-СДЭК, 5Post, ПЭК и «Деловые Линии» доступны на отдельной поверхности
+СДЭК, 5Post, ПЭК, «Деловые Линии» и «Почта России» доступны на отдельной поверхности
 «Доставка». Для перевозчиков можно создать кабинет, сохранить credentials в
 SecretProvider и запустить проверку официального API. Для СДЭК используется
 JSON с OAuth client credentials, для «Деловых Линий» — appkey и PAT. Товарная
@@ -106,27 +126,49 @@ Ozon Pay доступен отдельной карточкой на повер�
 активация мерчанта Ozon Pay и платёжные операции требуют отдельного договора,
 endpoint-квалификации и тестового аккаунта.
 
-The remaining 14 catalog entries are planned: Auto.ru, Avito, Chestny ZNAK,
-CIAN, Diadoc, EGAIS, Instagram, Odnoklassniki, Rutube, Saby EDO, Threads,
-VetIS/Mercury, VK and YouTube. Their SDK
-implementations and manifests remain useful for conformance and future runtime
-work, but the product no longer labels them as connectable.
+The former 14 planned entries are now grouped into explicit category surfaces.
+Each card supports tenant-scoped credential enrollment and an authenticated
+health check; none is advertised as a generic product-sync or publication
+route until its domain bridge is qualified.
 
-The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии» and Ozon
-Доставка SDK adapters. All five expose only the separately reviewed
+| Category surface | Providers | Current runtime contract |
+|---|---|---|
+| Объявления и вертикали | Auto.ru, Avito, CIAN | credential + official API health check |
+| Социальные сети | Instagram, Odnoklassniki, Rutube, Threads, VK, YouTube | credential + official API health check |
+| ЭДО | Diadoc, Saby EDO | credential + operator-supplied HTTPS health endpoint |
+| Госсистемы | Chestny ZNAK, EGAIS, VetIS/Mercury | credential + operator-supplied HTTPS health endpoint |
+
+This is a deliberate health-only admission: a healthy account proves that the
+stored credential can reach the configured endpoint, not that an unqualified
+regulated write, publication or document workflow is available. The catalog
+therefore has zero `planned` entries while retaining fail-closed domain
+capabilities.
+
+The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
+and Ozon Доставка SDK adapters. All six expose only the separately reviewed
 credential-check surface; shipment writes remain fail-closed until provider
 qualification.
 
+Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
+карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded
+проверку настроенного HTTPS endpoint, но товары, цены, остатки и заказы не
+передаются в worker до квалификации актуального партнёрского API.
+
+«Долями» доступен в категории «Платежи» как health-only карточка. Официальный
+API использует логин/пароль и mTLS-сертификат; TORGNEXA проверяет только
+настроенный endpoint, а Create/Commit/Cancel/Info/Refund и вебхуки требуют
+отдельной квалификации.
+
 | Family | Targets | Initial focus |
 |---|---|---|
-| Marketplace | Wildberries, Ozon, Yandex Market, Megamarket, Magnit Market, AliExpress RU | repository-qualified baselines; manifest-declared coverage is summarized in the [marketplace connector guide](connectors/marketplaces.md) |
+| Marketplace | Wildberries, Ozon, Yandex Market, Megamarket, Magnit Market, AliExpress RU, Lamoda, М.Видео | repository-qualified baselines plus health-only Lamoda/М.Видео cards; manifest-declared coverage is summarized in the [marketplace connector guide](connectors/marketplaces.md) |
 | Classified | Avito | listings, leads/messages, stats where officially permitted |
 | Vertical | Auto.ru, CIAN | partner/feed/API audit; Vehicle/Property mapping |
 | Social | VK, Telegram, MAX, Instagram, Threads, OK, Rutube, Dzen, YouTube | content/media/comments/analytics by capability |
 | ERP | 1C, MoySklad | catalog, stock, orders, shipments, returns, finance mapping |
 | Government | Chestny ZNAK, VetIS/Mercury, EGAIS | status/docs/reconciliation; regulated writes phased and approved |
 | EDO | Diadoc, Saby | provider SDK, document/status/signing workflow |
-| Payments | SBP + reference card/acquirer + plugin acquirers | payment/status/webhook/refund/commission/reconciliation |
+| Payments | SBP, YooKassa, Robokassa, «Долями» + reference card/acquirer + plugin acquirers | payment/status/webhook/refund/commission/reconciliation; «Долями» пока health-only |
 | Logistics | reference carrier + carrier plugins/PUDO | rate/create/cancel/track/label/return/capacity/issue |
 | Notifications | Email/TG/MAX/Webhook/n8n/SMS providers | transactional delivery/status/fallback with policy |
 | Enterprise IAM/SIEM | LDAP/AD, SAML, SCIM, JIT; syslog/webhook/Kafka/OTLP | federation/provisioning and security-event export |

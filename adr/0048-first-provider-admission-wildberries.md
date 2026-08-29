@@ -10,7 +10,7 @@ Task 011 must therefore do two things in one reviewed change: open the previousl
 
 ## Decision
 
-Enable `provider_admission` only after the four prerequisite tasks are already complete and register exactly one active provider: `wildberries`, family `marketplace`, under `connectors/wildberries`.
+Enable `provider_admission` only after the four prerequisite tasks are already complete and register exactly one active provider: `wildberries`, family `marketplace`, under `connectors/marketplaces/wildberries`.
 
 The admitted provider is read-only and declares only `products.read` and `inventory.read`. Its Go package may import the existing `internal/platform/connectors` SDK prefix and approved standard library only. It may not import Core, App, PostgreSQL, filesystem/process/network primitives or other provider packages. Network execution remains a host-injected transport under Task-025/029 controls; provider code does not import `net/http`.
 

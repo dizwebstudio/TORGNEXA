@@ -11,7 +11,7 @@
 
 ## Transport contract
 
-Kimi's Chat Completions wire format is OpenAI-compatible. `connectors/kimi` intentionally re-declares the request/response types rather than importing `connectors/openai-compatible`, since connector packages may not import each other (`architecture/policy.json` provider composition boundary). The provider receives a host-injected typed `Transport.Do(ctx, Request)`; host resolution, TLS, DNS pinning and public-IP-only enforcement are entirely host-owned. This package never imports `net/*`.
+Kimi's Chat Completions wire format is OpenAI-compatible. `connectors/ai/kimi` intentionally re-declares the request/response types rather than importing `connectors/ai/openai-compatible`, since connector packages may not import each other (`architecture/policy.json` provider composition boundary). The provider receives a host-injected typed `Transport.Do(ctx, Request)`; host resolution, TLS, DNS pinning and public-IP-only enforcement are entirely host-owned. This package never imports `net/*`.
 
 ## Security and privacy
 
