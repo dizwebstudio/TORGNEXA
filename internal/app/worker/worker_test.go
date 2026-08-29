@@ -115,3 +115,38 @@ func TestCatalogStatusDoesNotInventUnknownProviderState(t *testing.T) {
 		t.Fatal("unknown provider state must fail closed")
 	}
 }
+
+func TestCommerceReconciliationValueNormalizers(t *testing.T) {
+	cases := []struct {
+		value, currency string
+		want            int64
+	}{
+		{value: "123.45", currency: "RUB", want: 12345},
+		{value: "123.450", currency: "RUB", want: 12345},
+		{value: "1500", currency: "JPY", want: 1500},
+		{value: "1.234", currency: "KWD", want: 1234},
+	}
+	for _, test := range cases {
+		got, err := remotePriceToMinor(test.value, test.currency)
+		if err != nil || got != test.want {
+			t.Fatalf("remotePriceToMinor(%q, %q) = %d, %v; want %d", test.value, test.currency, got, err, test.want)
+		}
+	}
+	if _, err := remotePriceToMinor("1.239", "RUB"); err == nil {
+		t.Fatal("price precision beyond currency scale must fail closed")
+	}
+	if got := minorUnitsToMajor(12345, "RUB"); got != "123.45" {
+		t.Fatalf("minorUnitsToMajor = %q", got)
+	}
+	remoteID := inventoryRemoteID("warehouse::main", "offer.1")
+	location, variant, ok := splitInventoryRemoteID(remoteID)
+	if !ok || location != "warehouse::main" || variant != "offer.1" {
+		t.Fatalf("inventory remote id round trip = %q, %q, %v", location, variant, ok)
+	}
+	if offset, err := inventoryCursorOffset("inventory:25"); err != nil || offset != 25 {
+		t.Fatalf("inventory cursor = %d, %v", offset, err)
+	}
+	if _, err := inventoryCursorOffset("inventory:-1"); err == nil {
+		t.Fatal("negative inventory cursor must fail closed")
+	}
+}

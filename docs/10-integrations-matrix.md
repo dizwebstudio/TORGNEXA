@@ -17,37 +17,39 @@ but account creation, capability enablement and synchronization fail closed.
 The generic integration runtime supports the canonical `products` entity in
 both directions where the generated runtime-support contract admits it. The
 configured connector registry also resolves qualified price, inventory and
-order read adapters; this does not by itself create an inbound sync source.
-The `commerce-sync` worker consumes `commerce.catalog.product_changed.v1`, loads
+order read adapters and the reconciliation worker now provides the inbound
+price/inventory source and canonical local upsert bridge. The `commerce-sync`
+worker consumes `commerce.catalog.product_changed.v1`, loads
 the canonical product, resolves the tenant-scoped `product` mapping (or
 creates it after a confirmed product upsert), and records an idempotent local
-receipt. It also explicitly routes outbound `prices` and `inventory` events
-for the admitted storefront writers. It does not advertise inbound price or
-inventory synchronization merely because a provider SDK declares read
-capabilities; those sources still need canonical local upsert bridges. It does
-not advertise return, publication, message, payment or document
-synchronization merely because a provider SDK declares those capabilities.
+receipt. It also explicitly routes inbound reconciliation and outbound `prices` and `inventory` events
+for the admitted storefront writers. Inbound price updates use the mapped
+offer and exact currency minor units; inbound inventory updates use mapped
+offer/warehouse pairs and update the canonical position through the inventory
+ledger path. It does not advertise return, publication, message, payment or
+document synchronization merely because a provider SDK declares those
+capabilities.
 
 | Connector | Working operations in Settings → Integrations | Product sync | Non-secret runtime config |
 |---|---|---|---|
 | AliExpress RU | product read | inbound | no |
-| 1С-Битрикс | product/price/inventory reads; product/price/inventory writes via warehouse documents; order read/status write | products inbound + outbound; prices outbound; inventory outbound; orders inbound + outbound | required (`catalog_iblock_id`, `price_type_id`, `order_statuses`) |
-| Magnit Market | product/price/inventory/order reads | inbound | required |
-| Megamarket | product/inventory/order reads | inbound | required |
-| Medusa | product/price/inventory/order reads; product/price/inventory writes; order cancellation | inbound + outbound; prices outbound; inventory outbound; orders outbound (cancellation) | required |
+| 1С-Битрикс | product/price/inventory reads; product/price/inventory writes via warehouse documents; order read/status write | products, prices, inventory, orders inbound + outbound | required (`catalog_iblock_id`, `price_type_id`, `order_statuses`) |
+| Magnit Market | product/price/inventory/order reads | products, prices, inventory, orders inbound | required |
+| Megamarket | product/inventory/order reads | products, inventory, orders inbound | required |
+| Medusa | product/price/inventory/order reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound | required |
 | МойСклад | ERP catalog read | inbound | no |
 | 1C | ERP catalog read | inbound | required |
-| OpenCart | product/price/inventory reads; product/price/inventory writes через shop-local bridge `extension/torgnexa/api/*` | inbound + outbound; prices outbound; inventory outbound | required; установить `torgnexa.ocmod.zip` |
-| Ozon | product/inventory read | inbound | no |
-| PrestaShop | product/price/inventory reads; price/inventory writes ([Docker Webservice smoke](connectors/prestashop/docker-smoke.md)) | products inbound; prices outbound; inventory outbound | required |
-| Shopify | product/price/inventory/order reads; product/price/inventory writes; order cancellation | inbound + outbound; prices outbound; inventory outbound; orders outbound (cancellation) | required |
-| Shopware 6 | product/price/inventory/order reads; product/price/inventory writes; order cancellation | inbound + outbound; prices outbound; inventory outbound; orders outbound (cancellation) | required |
-| Wildberries | product/inventory read | inbound | no |
-| WooCommerce | product/price/inventory/order reads; product/price/inventory writes; order status write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | inbound + outbound; prices outbound; inventory outbound; orders outbound | required |
-| Yandex Market | product/price/inventory/order reads; price write | inbound; prices outbound | required |
-| Magento (Adobe Commerce) | product/price/inventory/order reads; product/price/inventory writes; order cancellation | inbound + outbound; prices outbound; inventory outbound; orders outbound (cancellation) | required |
+| OpenCart | product/price/inventory reads; product/price/inventory writes через shop-local bridge `extension/torgnexa/api/*` | products, prices, inventory inbound + outbound | required; установить `torgnexa.ocmod.zip` |
+| Ozon | product/inventory read | products, inventory inbound | no |
+| PrestaShop | product/price/inventory reads; price/inventory writes ([Docker Webservice smoke](connectors/prestashop/docker-smoke.md)) | products inbound; prices and inventory inbound + outbound | required |
+| Shopify | product/price/inventory/order reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound | required |
+| Shopware 6 | product/price/inventory/order reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound | required |
+| Wildberries | product/inventory read | products, inventory inbound | no |
+| WooCommerce | product/price/inventory/order reads; product/price/inventory writes; order status write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound | required |
+| Yandex Market | product/price/inventory/order reads; price write | products, prices inbound; prices outbound; inventory and orders inbound | required |
+| Magento (Adobe Commerce) | product/price/inventory/order reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound | required |
 | CS-Cart | product read/write | inbound + outbound | required |
-| Saleor | product/price/inventory/order reads; product/price/inventory writes; order cancellation | inbound + outbound; prices outbound; inventory outbound; orders outbound (cancellation) | required |
+| Saleor | product/price/inventory/order reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound | required |
 
 The host registry contains SDK price, inventory and order readers for the qualified
 marketplace/storefront adapters above. 1С-Битрикс, Magento, Medusa, OpenCart,

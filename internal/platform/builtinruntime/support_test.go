@@ -35,8 +35,8 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if !SupportsSync("woocommerce", "products", "bidirectional") || !SupportsSync("opencart", "products", "outbound") {
 		t.Fatal("qualified storefront writes are not exposed")
 	}
-	if !SupportsSync("prestashop", "prices", "outbound") || !SupportsSync("prestashop", "inventory", "outbound") || SupportsSync("prestashop", "prices", "inbound") {
-		t.Fatal("PrestaShop commerce write directions are not exact")
+	if !SupportsSync("prestashop", "prices", "bidirectional") || !SupportsSync("prestashop", "inventory", "bidirectional") {
+		t.Fatal("PrestaShop commerce sync directions are not exact")
 	}
 	if !SupportsAccountConfiguration("avito") || !HealthOnly("avito") || SupportsCapability("avito", "classified.listings.read") || SupportsSync("avito", "products", "inbound") {
 		t.Fatal("classified health-only surface projection is inaccurate")

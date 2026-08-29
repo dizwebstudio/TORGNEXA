@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "3c0d36d6de89087fc31103a1eeecdb8ee58fd8afdbbfb0300e9dbeadba83fdc7",
+    "sha256": "c2877dc3bbc08e84312daf3121f956cc1e6e574720354aef7194629e5428614c",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -27,7 +27,7 @@
     {
       "operation_id": "archiveWorkflow",
       "method": "POST",
-      "path": "/workflows:archive"
+      "path": "/workflow-commands/archive"
     },
     {
       "operation_id": "assignProductCategory",
@@ -37,7 +37,7 @@
     {
       "operation_id": "cancelWorkflowRun",
       "method": "POST",
-      "path": "/workflow-runs:cancel"
+      "path": "/workflow-run-commands/cancel"
     },
     {
       "operation_id": "changeOrderStatus",
@@ -582,7 +582,7 @@
     {
       "operation_id": "pauseWorkflow",
       "method": "POST",
-      "path": "/workflows:pause"
+      "path": "/workflow-commands/pause"
     },
     {
       "operation_id": "previewAIEgress",
@@ -597,7 +597,7 @@
     {
       "operation_id": "publishWorkflow",
       "method": "POST",
-      "path": "/workflows:publish"
+      "path": "/workflow-commands/publish"
     },
     {
       "operation_id": "putAIEgressPolicy",
@@ -657,7 +657,7 @@
     {
       "operation_id": "retryWorkflowRun",
       "method": "POST",
-      "path": "/workflow-runs:retry"
+      "path": "/workflow-run-commands/retry"
     },
     {
       "operation_id": "revokeSettingsSecuritySession",
@@ -692,7 +692,7 @@
     {
       "operation_id": "runWorkflow",
       "method": "POST",
-      "path": "/workflows:run"
+      "path": "/workflow-commands/run"
     },
     {
       "operation_id": "saveSettingsIdentityProviderDraft",
@@ -802,7 +802,7 @@
     {
       "operation_id": "validateWorkflow",
       "method": "POST",
-      "path": "/workflows:validate"
+      "path": "/workflow-commands/validate"
     }
   ],
   "sdks": [

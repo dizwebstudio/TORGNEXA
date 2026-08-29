@@ -1426,34 +1426,34 @@ paths:
         '201': {description: Draft workflow created}
         '400': {description: Invalid bounded workflow definition}
         '409': {description: Idempotency or identity conflict}
-  /workflows:validate:
+  /workflow-commands/validate:
     post:
       operationId: validateWorkflow
       security: [{bearerAuth: []}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowDefinition'}}}}
-      responses: {'200': {description: Deterministic validation result}, '400': {description: Invalid graph, action or limit}}
-  /workflows:publish:
+      responses: {'200': {description: Deterministic validation result}, '400': {description: Invalid graph; action or limit}}
+  /workflow-commands/publish:
     post:
       operationId: publishWorkflow
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowPublish'}}}}
       responses: {'200': {description: Immutable published version}, '400': {description: Invalid definition}, '409': {description: Optimistic version conflict}}
-  /workflows:pause:
+  /workflow-commands/pause:
     post:
       operationId: pauseWorkflow
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowStatusChange'}}}}
       responses: {'200': {description: Workflow paused}, '409': {description: State or version conflict}}
-  /workflows:archive:
+  /workflow-commands/archive:
     post:
       operationId: archiveWorkflow
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowStatusChange'}}}}
       responses: {'200': {description: Workflow archived}, '409': {description: State or version conflict}}
-  /workflows:run:
+  /workflow-commands/run:
     post:
       operationId: runWorkflow
       security: [{bearerAuth: []}]
@@ -1472,14 +1472,14 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}]
       responses: {'200': {description: Recent bounded workflow runs, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowRunPage'}}}}}
-  /workflow-runs:retry:
+  /workflow-run-commands/retry:
     post:
       operationId: retryWorkflowRun
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
       requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [run_id], properties: {run_id: {type: string, minLength: 1, maxLength: 128}}}}}}
       responses: {'202': {description: Replay queued as a new run identity}, '409': {description: Only terminal failed/cancelled runs can be replayed}}
-  /workflow-runs:cancel:
+  /workflow-run-commands/cancel:
     post:
       operationId: cancelWorkflowRun
       security: [{bearerAuth: []}]

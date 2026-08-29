@@ -108,7 +108,7 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			}
 			writeJSON(w, http.StatusCreated, toWorkflowView(item))
 		})},
-		{Method: http.MethodPost, Path: WorkflowsPath + ":validate", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-commands/validate", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var definition workflow.Definition
 			if decodeStrictJSON(r, &definition) != nil {
 				writeProblem(w, http.StatusBadRequest, "Bad Request")
@@ -121,7 +121,7 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"valid": true, "plan_digest": plan.Digest, "node_ids": plan.NodeIDs, "limits": map[string]int{"max_nodes": workflow.MaxNodes, "max_edges": workflow.MaxEdges}})
 		})},
-		{Method: http.MethodPost, Path: WorkflowsPath + ":publish", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-commands/publish", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			scope, ok := workflowScope(r)
 			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 			if !ok || store == nil || !validIdempotencyKey(key) {
@@ -144,11 +144,11 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			}
 			writeJSON(w, http.StatusOK, toWorkflowView(item))
 		})},
-		{Method: http.MethodPost, Path: WorkflowsPath + ":pause", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { workflowStatusAction(w, r, store, workflow.StatusPaused) })},
-		{Method: http.MethodPost, Path: WorkflowsPath + ":archive", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-commands/pause", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { workflowStatusAction(w, r, store, workflow.StatusPaused) })},
+		{Method: http.MethodPost, Path: "/api/v1/workflow-commands/archive", Permission: "workflows.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			workflowStatusAction(w, r, store, workflow.StatusArchived)
 		})},
-		{Method: http.MethodPost, Path: WorkflowsPath + ":run", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-commands/run", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			scope, ok := workflowScope(r)
 			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 			if !ok || store == nil || !validIdempotencyKey(key) {
@@ -177,7 +177,7 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			writeJSON(w, http.StatusAccepted, toWorkflowRunView(run))
 		})},
 		{Method: http.MethodGet, Path: WorkflowRunsPath, Permission: "workflows.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { listWorkflowRuns(w, r, store) })},
-		{Method: http.MethodPost, Path: WorkflowRunsPath + ":retry", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-run-commands/retry", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			scope, ok := workflowScope(r)
 			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 			if !ok || store == nil || !validIdempotencyKey(key) {
@@ -207,7 +207,7 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			}
 			writeJSON(w, http.StatusAccepted, toWorkflowRunView(retry))
 		})},
-		{Method: http.MethodPost, Path: WorkflowRunsPath + ":cancel", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		{Method: http.MethodPost, Path: "/api/v1/workflow-run-commands/cancel", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			scope, ok := workflowScope(r)
 			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 			if !ok || store == nil || !validIdempotencyKey(key) {

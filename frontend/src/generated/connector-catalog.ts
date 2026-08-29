@@ -125,8 +125,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1},
@@ -610,8 +610,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
@@ -637,6 +637,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "orders.read", "prices.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
+        {entityType: "prices", directions: ["inbound"]},
+        {entityType: "inventory", directions: ["inbound"]},
         {entityType: "orders", directions: ["inbound"]},
       ],
       runtimeConfigTemplate: {"shop_id":1,"stock_type":"FBS","order_window_days":30},
@@ -686,8 +688,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
@@ -713,6 +715,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "orders.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
+        {entityType: "inventory", directions: ["inbound"]},
         {entityType: "orders", directions: ["inbound"]},
       ],
       runtimeConfigTemplate: {"merchant_id":1,"scheme":"dbs","warehouses":[{"id":"main","name":"Основной склад"}]},
@@ -899,8 +902,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"},
     },
@@ -925,6 +928,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
+        {entityType: "inventory", directions: ["inbound"]},
       ],
     },
   },
@@ -1036,8 +1040,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "prices.read", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB","language_id":1,"shop_id":0},
     },
@@ -1154,8 +1158,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","channel":"default-channel","warehouse":"main-warehouse"},
@@ -1205,8 +1209,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"shop_domain":"example.myshopify.com","store_currency":"RUB"},
@@ -1232,8 +1236,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
@@ -1355,6 +1359,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
+        {entityType: "inventory", directions: ["inbound"]},
       ],
     },
   },
@@ -1378,8 +1383,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
-        {entityType: "prices", directions: ["outbound"]},
-        {entityType: "inventory", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"},
@@ -1405,7 +1410,8 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       operationalCapabilities: ["inventory.read", "orders.read", "prices.read", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
-        {entityType: "prices", directions: ["outbound"]},
+        {entityType: "prices", directions: ["inbound", "outbound"]},
+        {entityType: "inventory", directions: ["inbound"]},
         {entityType: "orders", directions: ["inbound"]},
       ],
       runtimeConfigTemplate: {"business_id":1,"campaign_id":1,"inventory_mode":"partner_warehouses","price_mode":"business_wide","warehouses":[]},

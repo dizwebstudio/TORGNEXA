@@ -1207,7 +1207,7 @@ type mappedOrderReader struct {
 }
 
 func (r mappedOrderReader) Read(ctx context.Context, request sdk.PageRequest) (sdk.OrderPage, error) {
-	if r.value == nil || request.Limit < 50 {
+	if r.value == nil || request.Limit < 1 {
 		return sdk.OrderPage{}, sdk.ErrInvalidReadRequest
 	}
 	limit := request.Limit

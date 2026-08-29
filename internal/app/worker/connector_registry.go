@@ -222,6 +222,10 @@ func (registry *runtimeRegistry) supportsWriteForEntity(account sdk.Account, ent
 		return registry.supportsProductWrite(account)
 	case "order":
 		return registry.supportsOrderStatusWrite(account)
+	case "price":
+		return registry.supportsPriceWrite(account)
+	case "inventory":
+		return registry.supportsInventoryWrite(account)
 	default:
 		return false
 	}
@@ -283,11 +287,15 @@ func (source *priceReconciliationSource) Scan(ctx context.Context, scope tenancy
 	if source == nil || source.database == nil || source.reader == nil || source.runtime == nil || source.now == nil || !scope.Valid() || req.Validate() != nil {
 		return reconciliation.ScanPage{}, reconciliation.ErrInvalid
 	}
-	page, err := source.reader.ReadPrices(ctx, source.account, source.runtime, sdk.PageRequest{Cursor: req.Cursor, Limit: req.Limit})
+	limit := req.Limit
+	if limit > 100 {
+		limit = 100
+	}
+	page, err := source.reader.ReadPrices(ctx, source.account, source.runtime, sdk.PageRequest{Cursor: req.Cursor, Limit: limit})
 	if err != nil {
 		return reconciliation.ScanPage{}, err
 	}
-	if page.Validate(req.Limit) != nil {
+	if page.Validate(limit) != nil {
 		return reconciliation.ScanPage{}, reconciliation.ErrInvalid
 	}
 	result := reconciliation.ScanPage{NextCursor: page.NextCursor, HasMore: page.NextCursor != "", RemoteObservedAt: source.now().UTC(), Subjects: make([]reconciliation.Subject, 0, len(page.Items))}
