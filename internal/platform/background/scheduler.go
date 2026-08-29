@@ -13,12 +13,15 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/core/workflow"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/workflowrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
@@ -49,12 +52,14 @@ type schedulerRunStore interface {
 }
 
 type syncScheduler struct {
-	sync     schedulerSyncStore
-	accounts schedulerAccountStore
-	runs     schedulerRunStore
-	workerID string
-	now      func() time.Time
-	logger   *slog.Logger
+	sync         schedulerSyncStore
+	accounts     schedulerAccountStore
+	runs         schedulerRunStore
+	workflows    *workflowrepo.Repository
+	activeScopes *workerrepo.Repository
+	workerID     string
+	now          func() time.Time
+	logger       *slog.Logger
 }
 
 // RunScheduler composes the durable Task-108 dispatch loop. It never performs
@@ -88,7 +93,15 @@ func RunScheduler(ctx context.Context, cfg config.Config, logger *slog.Logger) e
 	if err != nil {
 		return err
 	}
-	scheduler := syncScheduler{sync: syncStore, accounts: accountStore, runs: runStore, workerID: "scheduler.community", now: func() time.Time { return time.Now().UTC() }, logger: logger}
+	workflowStore, err := workflowrepo.New(db)
+	if err != nil {
+		return err
+	}
+	activeScopes, err := workerrepo.New(db)
+	if err != nil {
+		return err
+	}
+	scheduler := syncScheduler{sync: syncStore, accounts: accountStore, runs: runStore, workflows: workflowStore, activeScopes: activeScopes, workerID: "scheduler.community", now: func() time.Time { return time.Now().UTC() }, logger: logger}
 	logger.Info("service ready", "event", "service.ready", "poll_interval", schedulerPollInterval.String())
 	if err := scheduler.tick(ctx); err != nil && ctx.Err() == nil {
 		logger.Error("scheduler tick failed", "event", "scheduler.tick_failed", "error_code", "dispatch_failed")
@@ -121,7 +134,23 @@ func (s syncScheduler) tick(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+	if s.workflows != nil && s.activeScopes != nil {
+		scopes, scopeErr := s.activeScopes.ActiveScopes(ctx, schedulerBatch)
+		if scopeErr != nil && !errors.Is(scopeErr, workerrepo.ErrSchemaUnavailable) {
+			return scopeErr
+		}
+		for _, scope := range scopes {
+			if err := s.workflows.DispatchDueSchedules(ctx, workflowScope(scope), schedulerBatch); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
+}
+
+func workflowScope(scope tenancy.Scope) workflow.Scope {
+	converted, _ := workflow.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	return converted
 }
 
 func (s syncScheduler) process(ctx context.Context, job syncengine.ClaimedSyncJob) error {

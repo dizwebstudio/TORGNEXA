@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/catalog"
+	coreinventory "github.com/torgnexa/torgnexa/internal/core/inventory"
 	coreorders "github.com/torgnexa/torgnexa/internal/core/orders"
+	corepricing "github.com/torgnexa/torgnexa/internal/core/pricing"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	builtins "github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
@@ -22,8 +25,10 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectormaprepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
@@ -35,6 +40,8 @@ type reconciliationActionExecutor struct {
 	mappings      *connectormaprepo.Repository
 	catalog       *catalogrepo.Repository
 	orders        *ordersrepo.Repository
+	prices        *pricingrepo.Repository
+	inventory     *inventoryrepo.Repository
 	approvals     *approvalrepo.Repository
 	notifications *notificationrepo.Repository
 	secrets       secrets.SecretProvider
@@ -42,11 +49,11 @@ type reconciliationActionExecutor struct {
 	registry      *runtimeRegistry
 }
 
-func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, orderRepository *ordersrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
-	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || orderRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || refreshCoordinator == nil || registry == nil {
+func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, orderRepository *ordersrepo.Repository, priceRepository *pricingrepo.Repository, inventoryRepository *inventoryrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
+	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || orderRepository == nil || priceRepository == nil || inventoryRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || refreshCoordinator == nil || registry == nil {
 		return nil, errors.New("worker: reconciliation action dependencies required")
 	}
-	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, orders: orderRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, oauthRefresh: refreshCoordinator, registry: registry}, nil
+	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, orders: orderRepository, prices: priceRepository, inventory: inventoryRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, oauthRefresh: refreshCoordinator, registry: registry}, nil
 }
 
 type actionContext struct {
@@ -80,7 +87,7 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 		return err
 	}
 	entity := trimEntity(ac.policy.EntityType)
-	if entity != "product" && entity != "order" {
+	if entity != "product" && entity != "order" && entity != "price" && entity != "inventory" {
 		return reconciliation.ErrActionUnavailable
 	}
 	switch req.Direction {
@@ -97,8 +104,13 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 		}
 		return err
 	case reconciliation.RepairRemoteToLocal:
-		if entity == "order" {
+		switch entity {
+		case "order":
 			return e.autoFixOrderRemoteToLocal(ctx, scope, ac, req)
+		case "price":
+			return e.autoFixPriceRemoteToLocal(ctx, scope, ac, req)
+		case "inventory":
+			return e.autoFixInventoryRemoteToLocal(ctx, scope, ac, req)
 		}
 		remote, err := e.findRemoteProduct(ctx, scope, ac, req.Drift.RemoteID)
 		if err != nil {
@@ -138,8 +150,13 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 			return reconciliation.ErrActionUnsafe
 		}
 	case reconciliation.RepairLocalToRemote:
-		if entity == "order" {
+		switch entity {
+		case "order":
 			return e.autoFixOrderLocalToRemote(ctx, scope, ac, req)
+		case "price":
+			return e.autoFixPriceLocalToRemote(ctx, scope, ac, req)
+		case "inventory":
+			return e.autoFixInventoryLocalToRemote(ctx, scope, ac, req)
 		}
 		writer, err := e.registry.productWriter(scope, ac.account, ac.runtime)
 		if err != nil {
@@ -218,6 +235,262 @@ func (e *reconciliationActionExecutor) autoFixOrderLocalToRemote(ctx context.Con
 	}
 	_, err = writer.WriteOrderStatus(ctx, ac.account, ac.runtime, sdk.OrderStatusWriteRequest{OrderRemoteID: req.Drift.RemoteID, StatusRemoteID: status, IdempotencyKey: req.IdempotencyKey})
 	return err
+}
+
+func (e *reconciliationActionExecutor) autoFixPriceRemoteToLocal(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	offerID, err := corepricing.ParseOfferID(req.Drift.LocalEntityID)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	remote, err := e.findRemotePrice(ctx, scope, ac, req.Drift.RemoteID)
+	if err != nil {
+		return err
+	}
+	currency, err := corepricing.NewCurrency(remote.Currency)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	minorUnits, err := remotePriceToMinor(remote.Value, remote.Currency)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	amount, err := corepricing.NewMoney(minorUnits, currency)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	priceScope, err := corepricing.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	prices, err := e.prices.PricesByOffer(ctx, priceScope, offerID, 100)
+	if err != nil {
+		return err
+	}
+	for _, current := range prices {
+		if current.Kind != corepricing.KindRegular || current.Amount.Currency() != currency {
+			continue
+		}
+		if current.Amount.MinorUnits() == amount.MinorUnits() {
+			return nil
+		}
+		_, err = e.prices.Update(ctx, priceScope, corepricing.UpdatePrice{ID: current.ID, ExpectedVersion: current.Version, Amount: amount}, priceMutation(req.IdempotencyKey, req.Drift.ID))
+		return err
+	}
+	// A price can be absent after a remote-only import. Creating it is safe only
+	// for the already mapped offer and uses a deterministic identity for replay.
+	_, err = e.prices.Create(ctx, priceScope, corepricing.CreatePrice{ID: corepricing.PriceID(stableUUID("price:" + req.Drift.PolicyID + ":" + req.Drift.RemoteID + ":" + remote.Currency)), OfferID: offerID, Kind: corepricing.KindRegular, Amount: amount}, priceMutation(req.IdempotencyKey, req.Drift.ID))
+	return err
+}
+
+func (e *reconciliationActionExecutor) autoFixPriceLocalToRemote(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	offerID, err := corepricing.ParseOfferID(req.Drift.LocalEntityID)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	remote, err := e.findRemotePrice(ctx, scope, ac, req.Drift.RemoteID)
+	if err != nil {
+		return err
+	}
+	priceScope, err := corepricing.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	prices, err := e.prices.PricesByOffer(ctx, priceScope, offerID, 100)
+	if err != nil {
+		return err
+	}
+	for _, current := range prices {
+		if current.Kind != corepricing.KindRegular || current.Amount.Currency().String() != remote.Currency {
+			continue
+		}
+		writer, err := e.registry.priceWriter(scope, ac.account, ac.runtime)
+		if err != nil {
+			return err
+		}
+		value := minorUnitsToMajor(current.Amount.MinorUnits(), current.Amount.Currency().String())
+		receipt, err := writer.WritePrice(ctx, ac.account, ac.runtime, sdk.PriceWriteRequest{VariantRemoteID: req.Drift.RemoteID, Value: value, Currency: current.Amount.Currency().String(), IdempotencyKey: req.IdempotencyKey})
+		if err != nil {
+			return err
+		}
+		return receipt.Validate()
+	}
+	return reconciliation.ErrActionUnsafe
+}
+
+func (e *reconciliationActionExecutor) autoFixInventoryRemoteToLocal(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	locationID, variantID, ok := splitInventoryRemoteID(req.Drift.RemoteID)
+	if !ok {
+		return reconciliation.ErrActionUnsafe
+	}
+	offerMapping, err := e.mappings.MappingByRemote(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), ac.account.ID, "offer", variantID)
+	if err != nil || offerMapping.LocalEntityID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	warehouseMapping, err := e.mappings.MappingByRemote(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), ac.account.ID, "warehouse", locationID)
+	if err != nil || warehouseMapping.LocalEntityID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	positionID := coreinventory.PositionID(req.Drift.LocalEntityID)
+	if !positionID.Valid() {
+		return reconciliation.ErrActionUnsafe
+	}
+	inventoryScope, err := coreinventory.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	current, err := e.inventory.Position(ctx, inventoryScope, positionID)
+	if err != nil || current.OfferID.String() != offerMapping.LocalEntityID || current.WarehouseID.String() != warehouseMapping.LocalEntityID {
+		return reconciliation.ErrActionUnsafe
+	}
+	remote, err := e.findRemoteInventory(ctx, scope, ac, locationID, variantID)
+	if err != nil {
+		return err
+	}
+	available, err := coreinventory.NewDecimal(remote.Quantity, 0)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	reserved, err := current.Reserved.Value.Add(available)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	onHand, err := coreinventory.NewQuantity(reserved, current.OnHand.Unit)
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	currentAvailable, err := current.Available()
+	if err != nil {
+		return reconciliation.ErrActionUnsafe
+	}
+	if cmp, _ := currentAvailable.Value.Cmp(available); cmp == 0 {
+		return nil
+	}
+	_, err = e.inventory.SetOnHand(ctx, inventoryScope, coreinventory.ChangeQuantity{ID: positionID, ExpectedVersion: current.Version, Quantity: onHand, Reason: "remote_sync"}, inventoryMutation(req.IdempotencyKey, req.Drift.ID))
+	return err
+}
+
+func (e *reconciliationActionExecutor) autoFixInventoryLocalToRemote(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	positionID := coreinventory.PositionID(req.Drift.LocalEntityID)
+	if !positionID.Valid() {
+		return reconciliation.ErrActionUnsafe
+	}
+	locationID, variantID, ok := splitInventoryRemoteID(req.Drift.RemoteID)
+	if !ok {
+		return reconciliation.ErrActionUnsafe
+	}
+	inventoryScope, err := coreinventory.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	current, err := e.inventory.Position(ctx, inventoryScope, positionID)
+	if err != nil {
+		return err
+	}
+	available, err := current.Available()
+	if err != nil || available.Value.Scale() != 0 || available.Value.Coefficient() < 0 {
+		return reconciliation.ErrActionUnsafe
+	}
+	writer, err := e.registry.inventoryWriter(scope, ac.account, ac.runtime)
+	if err != nil {
+		return err
+	}
+	receipt, err := writer.WriteInventory(ctx, ac.account, ac.runtime, sdk.InventoryWriteRequest{VariantRemoteID: variantID, LocationRemoteID: locationID, Quantity: available.Value.Coefficient(), IdempotencyKey: req.IdempotencyKey})
+	if err != nil {
+		return err
+	}
+	return receipt.Validate()
+}
+
+func (e *reconciliationActionExecutor) findRemotePrice(ctx context.Context, scope tenancy.Scope, ac actionContext, remoteID string) (sdk.RemotePrice, error) {
+	reader, err := e.registry.priceReader(scope, ac.account, ac.runtime)
+	if err != nil {
+		return sdk.RemotePrice{}, err
+	}
+	cursor := ""
+	for pageNo := 0; pageNo < 100; pageNo++ {
+		page, err := reader.ReadPrices(ctx, ac.account, ac.runtime, sdk.PageRequest{Cursor: cursor, Limit: 100})
+		if err != nil {
+			return sdk.RemotePrice{}, err
+		}
+		for _, item := range page.Items {
+			if item.VariantRemoteID == remoteID {
+				return item, nil
+			}
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		if page.NextCursor == cursor {
+			return sdk.RemotePrice{}, errors.New("worker: remote price cursor did not advance")
+		}
+		cursor = page.NextCursor
+	}
+	return sdk.RemotePrice{}, errors.New("worker: remote price not found")
+}
+
+func (e *reconciliationActionExecutor) findRemoteInventory(ctx context.Context, scope tenancy.Scope, ac actionContext, locationID, variantID string) (sdk.RemoteInventory, error) {
+	reader, err := e.registry.inventoryReader(scope, ac.account, ac.runtime)
+	if err != nil {
+		return sdk.RemoteInventory{}, err
+	}
+	values, err := reader.ReadInventory(ctx, ac.account, ac.runtime, sdk.InventoryQuery{LocationRemoteID: locationID, VariantRemoteIDs: []string{variantID}})
+	if err != nil {
+		return sdk.RemoteInventory{}, err
+	}
+	for _, item := range values {
+		if item.LocationRemoteID == locationID && item.VariantRemoteID == variantID {
+			return item, nil
+		}
+	}
+	return sdk.RemoteInventory{}, errors.New("worker: remote inventory not found")
+}
+
+func priceMutation(key, causation string) corepricing.Mutation {
+	return corepricing.Mutation{AuditID: stableUUID("audit:" + key), EventID: stableID("evt_rec_", key), ActorID: "system:reconciliation", Source: "worker.reconciliation", CorrelationID: stableID("corr_rec_", key), CausationID: causation, OccurredAt: time.Now().UTC()}
+}
+
+func inventoryMutation(key, causation string) coreinventory.Mutation {
+	return coreinventory.Mutation{AuditID: stableUUID("audit:" + key), EventID: stableID("evt_rec_", key), ActorID: "system:reconciliation", Source: "worker.reconciliation", CorrelationID: stableID("corr_rec_", key), CausationID: causation, OccurredAt: time.Now().UTC()}
+}
+
+func remotePriceToMinor(value, currency string) (int64, error) {
+	parts := strings.Split(value, ".")
+	if len(parts) > 2 || len(parts) == 0 || parts[0] == "" {
+		return 0, errors.New("invalid remote price")
+	}
+	scale := currencyMinorScale(currency)
+	frac := ""
+	if len(parts) == 2 {
+		frac = parts[1]
+	}
+	if len(frac) > scale {
+		if strings.Trim(frac[scale:], "0") != "" {
+			return 0, errors.New("remote price has unsupported precision")
+		}
+		frac = frac[:scale]
+	}
+	frac += strings.Repeat("0", scale-len(frac))
+	combined := strings.TrimLeft(parts[0]+frac, "0")
+	if combined == "" {
+		return 0, nil
+	}
+	valueInt := new(big.Int)
+	if _, ok := valueInt.SetString(combined, 10); !ok || !valueInt.IsInt64() {
+		return 0, errors.New("remote price overflows canonical money")
+	}
+	return valueInt.Int64(), nil
 }
 
 func orderMutation(key, causation string) coreorders.Mutation {

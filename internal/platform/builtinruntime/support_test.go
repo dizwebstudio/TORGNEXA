@@ -325,7 +325,7 @@ func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 	}
 	for _, connectorID := range []string{"magnit-market", "megamarket", "medusa", "magento", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
-		if !SupportsCapability(connectorID, "orders.read") {
+		if !SupportsCapability(connectorID, "orders.read") || !SupportsSync(connectorID, "orders", "inbound") {
 			t.Fatalf("%s order reader capability is not admitted", connectorID)
 		}
 		if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, load); err != nil {

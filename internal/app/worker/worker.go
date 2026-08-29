@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/inventory"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/core/workflow"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
@@ -21,6 +23,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/eventbus"
 	"github.com/torgnexa/torgnexa/internal/platform/kafkaeventbus"
 	"github.com/torgnexa/torgnexa/internal/platform/kafkatransport"
+	"github.com/torgnexa/torgnexa/internal/platform/notifications"
 	"github.com/torgnexa/torgnexa/internal/platform/outbox"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
@@ -33,6 +36,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
@@ -42,6 +46,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/uploadrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/webhookrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/workflowrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/reporting"
 	"github.com/torgnexa/torgnexa/internal/platform/retention"
@@ -50,6 +55,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 	"github.com/torgnexa/torgnexa/internal/platform/webhooks"
+	"github.com/torgnexa/torgnexa/internal/platform/workflowengine"
 )
 
 var ErrConnectorSourceBridgeUnavailable = errors.New("worker: connector reconciliation source bridge unavailable")
@@ -188,10 +194,44 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_inbox_startup_failed", err)
 	}
+	workflowReader, err := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".workflow-consumer", "torgnexa.workflow.v1", consumerTopics)
+	if err != nil {
+		return fail("worker_workflow_kafka_reader_startup_failed", err)
+	}
+	defer func() { _ = workflowReader.Close() }()
+	workflowConsumer, err := kafkaeventbus.NewConsumer(workflowReader, producer, cfg.Worker.KafkaTopics, kafkaeventbus.RetryPolicy{MaxAttempts: 8, InitialBackoff: time.Second, MaxBackoff: 5 * time.Minute}, nil)
+	if err != nil {
+		return fail("worker_workflow_kafka_consumer_startup_failed", err)
+	}
 
 	dispatchRepository, err := workerrepo.New(db)
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
+	}
+	workflowRepository, err := workflowrepo.New(db)
+	if err != nil {
+		return fail("worker_workflow_repository_startup_failed", err)
+	}
+	workflowNotificationRepository, err := notificationrepo.New(db)
+	if err != nil {
+		return fail("worker_workflow_notification_repository_startup_failed", err)
+	}
+	workflowNotifications, err := notifications.NewService(workflowNotificationRepository, []notifications.Provider{notifications.WebUIProvider{}}, nil)
+	if err != nil {
+		return fail("worker_workflow_notification_service_startup_failed", err)
+	}
+	workflowAdapters, err := workflowengine.NewRegistry(map[string]workflowengine.Adapter{
+		"notification.create": workflowNotificationAdapter{service: workflowNotifications},
+		"sync.dry_run":        workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return nil }),
+		"reconciliation.run":  workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return workflowengine.ErrAdapterUnavailable }),
+		"approval.request":    workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return workflowengine.ErrApprovalRequired }),
+	})
+	if err != nil {
+		return fail("worker_workflow_adapter_registry_startup_failed", err)
+	}
+	workflowEngine, err := workflowengine.New(workflowRepository, workflowAdapters)
+	if err != nil {
+		return fail("worker_workflow_engine_startup_failed", err)
 	}
 	socialRepository, err := socialrepo.New(db)
 	if err != nil {
@@ -262,6 +302,21 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			})
 		}},
 	}
+	components = append(components, component{name: "workflow-automation", run: func(componentCtx context.Context) error {
+		return runWorkflowAutomation(componentCtx, logger, dispatchRepository, workflowRepository, workflowEngine, workerID, cfg.Worker)
+	}})
+	components = append(components, component{name: "workflow-events", run: func(componentCtx context.Context) error {
+		return workflowConsumer.Run(componentCtx, func(eventCtx context.Context, delivery eventbus.Delivery) error {
+			scope, scopeErr := workflow.ParseScope(delivery.Event.OrganizationID, delivery.Event.WorkspaceID)
+			if scopeErr != nil {
+				return eventbus.Permanent("workflow_invalid_scope")
+			}
+			if _, triggerErr := workflowRepository.TriggerEvent(eventCtx, scope, delivery.Event); triggerErr != nil {
+				return eventbus.Retryable("workflow_trigger_persist_failed")
+			}
+			return nil
+		})
+	}})
 	components = append(components, component{name: "social-publications", run: func(componentCtx context.Context) error {
 		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, secretRepository, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease)
 	}})
@@ -299,6 +354,14 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_orders_repository_startup_failed", repoErr)
 		}
+		priceRepository, repoErr := pricingrepo.New(db)
+		if repoErr != nil {
+			return fail("worker_pricing_repository_startup_failed", repoErr)
+		}
+		inventoryRepository, repoErr := inventoryrepo.New(db)
+		if repoErr != nil {
+			return fail("worker_inventory_repository_startup_failed", repoErr)
+		}
 		approvalRepository, repoErr := approvalrepo.New(db)
 		if repoErr != nil {
 			return fail("worker_approval_repository_startup_failed", repoErr)
@@ -307,7 +370,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_notification_repository_startup_failed", repoErr)
 		}
-		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, orderRepository, approvalRepository, notificationRepository, secretProvider, secretRepository, runtimeRegistry)
+		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, orderRepository, priceRepository, inventoryRepository, approvalRepository, notificationRepository, secretProvider, secretRepository, runtimeRegistry)
 		if actionErr != nil {
 			return fail("worker_reconciliation_action_startup_failed", actionErr)
 		}
@@ -510,6 +573,80 @@ func runTenantDispatch(ctx context.Context, logger *slog.Logger, dispatch *worke
 	})
 }
 
+func runWorkflowAutomation(ctx context.Context, logger *slog.Logger, dispatch *workerrepo.Repository, repository *workflowrepo.Repository, engine *workflowengine.Engine, workerID string, cfg config.Worker) error {
+	return pollLoop(ctx, cfg.PollInterval, func() error {
+		scopes, err := dispatch.ActiveScopes(ctx, cfg.DispatchBatch)
+		if errors.Is(err, workerrepo.ErrSchemaUnavailable) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, scope := range scopes {
+			leaseToken, tokenErr := randomID("workflow_lease_")
+			if tokenErr != nil {
+				return tokenErr
+			}
+			claims, claimErr := repository.ClaimRuns(ctx, workflowScope(scope), workerID, leaseToken, cfg.DispatchBatch, cfg.Lease)
+			if claimErr != nil {
+				return claimErr
+			}
+			for _, claim := range claims {
+				if execErr := engine.Execute(ctx, workflowScope(scope), claim.Run.ID, claim.LeaseToken); execErr != nil && !errors.Is(execErr, workflowengine.ErrApprovalRequired) {
+					logger.Warn("workflow run deferred", "event", "workflow.run_deferred", "run_id", claim.Run.ID, "error_code", "workflow_execution_failed")
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func workflowScope(scope tenancy.Scope) workflow.Scope {
+	converted, _ := workflow.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	return converted
+}
+
+type workflowNotificationAdapter struct{ service *notifications.Service }
+
+func (a workflowNotificationAdapter) Execute(ctx context.Context, request workflowengine.ActionRequest) error {
+	if a.service == nil {
+		return workflowengine.ErrAdapterUnavailable
+	}
+	var input struct {
+		RecipientID string                 `json:"recipient_id"`
+		DedupeKey   string                 `json:"dedupe_key"`
+		Severity    notifications.Severity `json:"severity"`
+		Title       string                 `json:"title"`
+		Body        string                 `json:"body"`
+	}
+	if len(request.Node.Config) > 0 {
+		if err := json.Unmarshal(request.Node.Config, &input); err != nil {
+			return workflow.ErrInvalid
+		}
+	}
+	if input.RecipientID == "" {
+		input.RecipientID = "operator"
+	}
+	if input.DedupeKey == "" {
+		input.DedupeKey = "workflow." + request.RunID + "." + request.Node.ID
+	}
+	if !input.Severity.Valid() {
+		input.Severity = notifications.SeverityInfo
+	}
+	if input.Title == "" {
+		input.Title = "Автоматизация завершена"
+	}
+	if input.Body == "" {
+		input.Body = "Workflow action выполнен."
+	}
+	scope, err := tenancy.ParseScope(request.Scope.OrganizationID(), request.Scope.WorkspaceID())
+	if err != nil {
+		return workflow.ErrInvalid
+	}
+	_, err = a.service.Notify(ctx, scope, notifications.Request{RecipientID: input.RecipientID, DedupeKey: input.DedupeKey, Severity: input.Severity, Title: input.Title, Body: input.Body, OccurredAt: time.Now().UTC()})
+	return err
+}
+
 type sourceResolver struct {
 	syncRepo     *syncrepo.Repository
 	accounts     *connectorrepo.Repository
@@ -536,13 +673,6 @@ func (r *sourceResolver) Resolve(ctx context.Context, scope tenancy.Scope, run r
 	manifest, err := sdk.CatalogManifest(account.ConnectorID)
 	if err != nil {
 		return nil, syncengine.Policy{}, sdk.Account{}, err
-	}
-	// Price and inventory policies are event-driven outbound routes. They do
-	// not have a remote page/snapshot source for the reconciliation scanner;
-	// return a bounded empty source so manually queued runs complete without
-	// retrying forever while the commerce-sync consumer handles mutations.
-	if policy.EntityType == commercePricesEntity || policy.EntityType == commerceInventoryEntity {
-		return eventOnlyReconciliationSource{}, policy, account, nil
 	}
 	runtime, err := connectorruntime.NewForAccount(r.secrets, r.oauthRefresh, scope, account)
 	if err != nil {

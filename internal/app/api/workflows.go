@@ -28,6 +28,7 @@ type workflowStore interface {
 	CreateRun(context.Context, workflow.Scope, workflow.RunRequest) (workflow.Run, error)
 	GetRun(context.Context, workflow.Scope, string) (workflow.Run, error)
 	ListRuns(context.Context, workflow.Scope, int) ([]workflow.Run, error)
+	CancelRun(context.Context, workflow.Scope, string, int64) (workflow.Run, error)
 }
 
 type workflowView struct {
@@ -176,6 +177,58 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			writeJSON(w, http.StatusAccepted, toWorkflowRunView(run))
 		})},
 		{Method: http.MethodGet, Path: WorkflowRunsPath, Permission: "workflows.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { listWorkflowRuns(w, r, store) })},
+		{Method: http.MethodPost, Path: WorkflowRunsPath + ":retry", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			scope, ok := workflowScope(r)
+			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+			if !ok || store == nil || !validIdempotencyKey(key) {
+				writeProblem(w, 400, "Bad Request")
+				return
+			}
+			var input struct {
+				RunID string `json:"run_id"`
+			}
+			if decodeStrictJSON(r, &input) != nil || input.RunID == "" {
+				writeProblem(w, 400, "Bad Request")
+				return
+			}
+			original, err := store.GetRun(r.Context(), scope, input.RunID)
+			if err != nil {
+				writeWorkflowError(w, err)
+				return
+			}
+			if original.Status != workflow.RunFailed && original.Status != workflow.RunCancelled {
+				writeProblem(w, 409, "Conflict")
+				return
+			}
+			retry, err := store.CreateRun(r.Context(), scope, workflow.RunRequest{ID: stableID("run_", 32, tenancyScope(scope), key), WorkflowID: original.WorkflowID, WorkflowVersion: original.WorkflowVersion, TriggerKind: original.TriggerKind, TriggerRef: "replay:" + original.ID, IdempotencyKey: key, InputDigest: original.InputDigest})
+			if err != nil {
+				writeWorkflowError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusAccepted, toWorkflowRunView(retry))
+		})},
+		{Method: http.MethodPost, Path: WorkflowRunsPath + ":cancel", Permission: "workflows.run", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			scope, ok := workflowScope(r)
+			key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+			if !ok || store == nil || !validIdempotencyKey(key) {
+				writeProblem(w, 400, "Bad Request")
+				return
+			}
+			var input struct {
+				RunID           string `json:"run_id"`
+				ExpectedVersion int64  `json:"expected_version"`
+			}
+			if decodeStrictJSON(r, &input) != nil || input.RunID == "" || input.ExpectedVersion < 1 {
+				writeProblem(w, 400, "Bad Request")
+				return
+			}
+			item, err := store.CancelRun(r.Context(), scope, input.RunID, input.ExpectedVersion)
+			if err != nil {
+				writeWorkflowError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, toWorkflowRunView(item))
+		})},
 		{Method: http.MethodGet, Path: WorkflowsPath + "/", PathPrefix: true, Permission: "workflows.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { workflowByPath(w, r, store) })},
 		{Method: http.MethodGet, Path: WorkflowRunsPath + "/", PathPrefix: true, Permission: "workflows.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { workflowRunByPath(w, r, store) })},
 	}

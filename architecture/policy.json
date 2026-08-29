@@ -479,6 +479,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/workflowrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/workerrepo",
       "kind": "infrastructure_adapter"
     },
@@ -572,6 +576,10 @@
     },
     {
       "path": "internal/platform/webhooks",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/workflowengine",
       "kind": "platform_capability"
     },
     {

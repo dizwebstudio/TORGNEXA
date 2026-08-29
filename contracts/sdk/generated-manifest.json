@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "770a9f546dd5e8c908711dc7a91ade5fabafd8642583f1505eb99e9eda71bdf7",
+    "sha256": "3c0d36d6de89087fc31103a1eeecdb8ee58fd8afdbbfb0300e9dbeadba83fdc7",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -33,6 +33,11 @@
       "operation_id": "assignProductCategory",
       "method": "POST",
       "path": "/products/{product_id}/categories/{category_id}"
+    },
+    {
+      "operation_id": "cancelWorkflowRun",
+      "method": "POST",
+      "path": "/workflow-runs:cancel"
     },
     {
       "operation_id": "changeOrderStatus",
@@ -648,6 +653,11 @@
       "operation_id": "retireApprovalPolicy",
       "method": "DELETE",
       "path": "/approval-policies/{policy_id}"
+    },
+    {
+      "operation_id": "retryWorkflowRun",
+      "method": "POST",
+      "path": "/workflow-runs:retry"
     },
     {
       "operation_id": "revokeSettingsSecuritySession",

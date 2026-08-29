@@ -8,9 +8,9 @@ current host bridge:
 |---|---|---|
 | `products.read` | admitted | `catalog.product.list`, page cursor and response validation |
 | `products.write` | admitted | idempotent `xmlId` lookup, `catalog.product.add/update`, read-after-write verification |
-| `inventory.read` | adapter-ready, runtime not admitted | SDK adapter reads active warehouses through `catalog.store.list` and integer balances through `catalog.storeproduct.list`; the generic worker still needs an inventory reconciliation source bridge |
+| `inventory.read` | admitted | SDK adapter reads active warehouses through `catalog.store.list` and integer balances through `catalog.storeproduct.list`; warehouse identity remains explicit |
 | `inventory.write` | admitted for outbound sync | absolute integer quantities become idempotent `S` (stock receipt) or `D` (write-off) documents with `catalog.document.add`, `catalog.document.element.add`, `catalog.document.conduct` and read-after-write verification |
-| `prices.read` | not admitted | generic inbound price reconciliation is not yet wired |
+| `prices.read` | admitted | SDK adapter reads the configured regular price type through `catalog.price.list`; runtime configuration requires `price_type_id` |
 | `prices.write` | admitted | `catalog.price.list` lookup by configured `price_type_id`, then `catalog.price.add/update` with read-after-write verification |
 | `orders.read`, `orders.status.write` | admitted | SDK adapter uses `sale.order.list`, `sale.basketitem.list`, `sale.order.get` and `sale.order.update` with read-after-write reconciliation; the runtime requires an explicit canonical-to-Bitrix `order_statuses` map and the worker routes order status events/reconciliation through it |
 

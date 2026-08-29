@@ -41,6 +41,14 @@ func TestCompileRejectsCycle(t *testing.T) {
 	}
 }
 
+func TestCompileRejectsDisconnectedGraph(t *testing.T) {
+	definition := validDefinition()
+	definition.Nodes = append(definition.Nodes, Node{ID: "orphan", Kind: NodeAction, Action: "sync.dry_run"})
+	if !errors.Is(mustCompileError(definition), ErrGraphUnreachable) {
+		t.Fatal("disconnected node must be rejected")
+	}
+}
+
 func TestDefinitionRejectsSecretConfig(t *testing.T) {
 	definition := validDefinition()
 	definition.Nodes[1].Config = json.RawMessage(`{"api_token":"not allowed"}`)

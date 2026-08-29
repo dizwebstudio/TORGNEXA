@@ -1472,6 +1472,20 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}]
       responses: {'200': {description: Recent bounded workflow runs, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowRunPage'}}}}}
+  /workflow-runs:retry:
+    post:
+      operationId: retryWorkflowRun
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [run_id], properties: {run_id: {type: string, minLength: 1, maxLength: 128}}}}}}
+      responses: {'202': {description: Replay queued as a new run identity}, '409': {description: Only terminal failed/cancelled runs can be replayed}}
+  /workflow-runs:cancel:
+    post:
+      operationId: cancelWorkflowRun
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [run_id, expected_version], properties: {run_id: {type: string, minLength: 1, maxLength: 128}, expected_version: {type: integer, minimum: 1}}}}}}
+      responses: {'200': {description: Run cancelled with evidence retained}, '409': {description: Optimistic version or lifecycle conflict}}
   /workflow-runs/{run_id}:
     get:
       operationId: getWorkflowRun

@@ -25,6 +25,7 @@ var (
 	ErrInvalidState     = errors.New("workflow: invalid state transition")
 	ErrConflict         = errors.New("workflow: optimistic version conflict")
 	ErrNotFound         = errors.New("workflow: not found")
+	ErrQuotaExceeded    = errors.New("workflow: quota exceeded")
 	ErrGraphCycle       = errors.New("workflow: graph contains a cycle")
 	ErrGraphUnreachable = errors.New("workflow: graph contains unreachable node")
 )
