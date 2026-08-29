@@ -155,6 +155,9 @@ func (c *Connector) WriteInventory(ctx context.Context, a sdk.Account, r sdk.Run
 	if c == nil || c.transport == nil || r == nil || r.Secrets() == nil || sdk.ValidateAccountAgainstManifest(a, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.write") != nil || req.Validate() != nil {
 		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
 	}
+	if req.LocationRemoteID != "" && req.LocationRemoteID != storeLocationID {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
 	cfg, e := c.configuration(ctx, a)
 	if e != nil {
 		return sdk.CommerceWriteReceipt{}, e

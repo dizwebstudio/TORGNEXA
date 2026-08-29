@@ -259,6 +259,7 @@ test("frontend image policy permits catalog HTTPS thumbnails", () => {
 test("public documentation is prerendered and served before the SPA fallback", () => {
   const packageJSON = JSON.parse(readRoot("frontend/package.json"));
   const server = readRoot("frontend/serve.mjs");
+  const docs = read("pages/PublicDocumentationPage.tsx");
   const compose = readRoot("docker-compose.production.yml");
   const dockerfile = readRoot("frontend/Dockerfile.production");
   const robots = readRoot("frontend/public/robots.txt");
@@ -268,6 +269,10 @@ test("public documentation is prerendered and served before the SPA fallback", (
   assert.match(server, /directoryIndex/);
   assert.match(server, /\.txt.*text\/plain/);
   assert.match(server, /\.xml.*application\/xml/);
+  assert.match(docs, /documentationPages/);
+  assert.match(docs, /documentationSectionIdForPath/);
+  assert.match(docs, /\/docs\/integrations/);
+  assert.doesNotMatch(docs, /href="#/);
   assert.match(compose, /TORGNEXA_PUBLIC_URL: \$\{TORGNEXA_PUBLIC_URL:\?set TORGNEXA_PUBLIC_URL/);
   assert.match(dockerfile, /TORGNEXA_PUBLIC_URL/);
   assert.match(robots, /Allow: \/docs/);

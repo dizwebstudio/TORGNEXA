@@ -607,10 +607,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
@@ -680,10 +681,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
@@ -890,10 +892,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"},
     },
@@ -1144,10 +1147,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","channel":"default-channel","warehouse":"main-warehouse"},
     },
@@ -1193,10 +1197,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"shop_domain":"example.myshopify.com","store_currency":"RUB"},
     },
@@ -1218,10 +1223,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
@@ -1362,10 +1368,11 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"},
     },

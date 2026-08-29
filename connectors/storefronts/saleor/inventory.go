@@ -99,6 +99,9 @@ func (connector *Connector) WriteInventory(ctx context.Context, account sdk.Acco
 		if e != nil {
 			return e
 		}
+		if request.LocationRemoteID != "" && request.LocationRemoteID != warehouseID {
+			return sdk.ErrInvalidCommerceWrite
+		}
 		current, e := connector.fetchVariant(ctx, configuration, credential, request.VariantRemoteID)
 		if e != nil {
 			return e

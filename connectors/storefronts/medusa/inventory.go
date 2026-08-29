@@ -165,6 +165,9 @@ func (connector *Connector) WriteInventory(ctx context.Context, account sdk.Acco
 		if e != nil {
 			return e
 		}
+		if request.LocationRemoteID != "" && request.LocationRemoteID != locationID {
+			return sdk.ErrInvalidCommerceWrite
+		}
 		sku, e := connector.fetchVariantSKU(ctx, configuration, credential, productID, variantID)
 		if e != nil {
 			return e

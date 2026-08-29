@@ -119,6 +119,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/workflow",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/platform/advertising",
       "kind": "platform_capability"
     },

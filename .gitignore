@@ -24,7 +24,11 @@ qualification/evidence/
 /.claude/
 /.agents/
 /skills/
-/prompts/
+# The architecture gate references this audit input as a versioned contract.
+# Keep other local prompt files ignored.
+/prompts/*
+!/prompts/
+!/prompts/05-architecture-gap-audit.txt
 /AGENTS.md
 /CODEX.md
 /HANDOFF.md

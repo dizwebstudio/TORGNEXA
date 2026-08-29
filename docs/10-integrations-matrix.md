@@ -30,26 +30,29 @@ those capabilities.
 | 1С-Битрикс | product read/write; regular price write; inventory write via warehouse documents; order read/status write | products inbound + outbound; prices outbound; inventory outbound; orders inbound + outbound | required (`catalog_iblock_id`, `price_type_id`, `order_statuses`) |
 | Magnit Market | product read | inbound | required |
 | Megamarket | product read | inbound | required |
-| Medusa | product read/write; price write | inbound + outbound; prices outbound | required |
+| Medusa | product read/write; price write; inventory write | inbound + outbound; prices outbound; inventory outbound | required |
 | МойСклад | ERP catalog read | inbound | no |
 | 1C | ERP catalog read | inbound | required |
-| OpenCart | product read/write; price write через shop-local bridge `extension/torgnexa/api/*` | inbound + outbound; prices outbound | required; установить `torgnexa.ocmod.zip` |
+| OpenCart | product read/write; price write; inventory write через shop-local bridge `extension/torgnexa/api/*` | inbound + outbound; prices outbound; inventory outbound | required; установить `torgnexa.ocmod.zip` |
 | Ozon | product read | inbound | no |
 | PrestaShop | product read; price write; inventory write ([Docker Webservice smoke](connectors/prestashop/docker-smoke.md)) | products inbound; prices outbound; inventory outbound | required |
-| Shopify | product read/write; price write | inbound + outbound; prices outbound | required |
-| Shopware 6 | product read/write; price write | inbound + outbound; prices outbound | required |
+| Shopify | product read/write; price write; inventory write | inbound + outbound; prices outbound; inventory outbound | required |
+| Shopware 6 | product read/write; price write; inventory write | inbound + outbound; prices outbound; inventory outbound | required |
 | Wildberries | product read | inbound | no |
-| WooCommerce | product read/write; price write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | inbound + outbound; prices outbound | required |
+| WooCommerce | product read/write; price write; inventory write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | inbound + outbound; prices outbound; inventory outbound | required |
 | Yandex Market | product read; price write | inbound; prices outbound | required |
-| Magento (Adobe Commerce) | product read/write; price write | inbound + outbound; prices outbound | required |
+| Magento (Adobe Commerce) | product read/write; price write; inventory write | inbound + outbound; prices outbound; inventory outbound | required |
 | CS-Cart | product read/write | inbound + outbound | required |
-| Saleor | product read/write; price write | inbound + outbound; prices outbound | required |
+| Saleor | product read/write; price write; inventory write | inbound + outbound; prices outbound; inventory outbound | required |
 
 The host registry contains additional SDK price-writer adapters. 1С-Битрикс,
 Magento, Medusa, OpenCart, PrestaShop, Saleor, Shopify, Shopware, WooCommerce
 and Yandex Market are admitted to the production price worker route. PrestaShop
 and 1С-Битрикс are also admitted to the inventory route. 1С-Битрикс order
-reads and status writes are admitted through its explicit status map. Inventory events
+reads and status writes are admitted through its explicit status map. The same
+outbound inventory route is admitted for Magento, Medusa, OpenCart, PrestaShop,
+Saleor, Shopify, Shopware and WooCommerce; every event requires a matching
+tenant-scoped warehouse mapping. Inventory events
 require an explicit tenant-scoped warehouse mapping. A product, price or inventory domain event is consumed by the
 dedicated `torgnexa.commerce-sync.v1` group, resolved through the tenant's
 enabled outbound policy and the corresponding `product` or `offer` mapping,

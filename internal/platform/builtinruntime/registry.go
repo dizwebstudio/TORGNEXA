@@ -299,26 +299,95 @@ func (r *Registry) OrderStatusWriter(ctx context.Context, account sdk.Account, r
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
 		return nil, ErrUnavailable
 	}
-	if account.ConnectorID != "bitrix" {
+	switch account.ConnectorID {
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := configuration.OrderStatuses(); err != nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "magento":
+		return configuredMagentoWriter(r, account, load)
+	case "medusa":
+		return configuredMedusaWriter(r, account, load)
+	case "saleor":
+		return configuredSaleorWriter(r, account, load)
+	case "shopify":
+		return configuredShopifyWriter(r, account, load)
+	case "shopware":
+		return configuredShopwareWriter(r, account, load)
+	case "woocommerce":
+		return configuredWooCommerceWriter(r, account, load)
+	default:
 		return nil, ErrUnavailable
 	}
+}
+
+func configuredMagentoWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
 	if load == nil {
 		return nil, ErrConfigurationNeeded
 	}
-	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := configuration.OrderStatuses(); err != nil {
+	return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+}
+
+func configuredMedusaWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if load == nil {
 		return nil, ErrConfigurationNeeded
 	}
-	return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+}
+
+func configuredSaleorWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+}
+
+func configuredShopifyWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+}
+
+func configuredShopwareWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+}
+
+func configuredWooCommerceWriter(r *Registry, account sdk.Account, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
 }
 
 // OrderStatus returns the provider-native status identifier configured for a
 // canonical order lifecycle value.
 func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status string, load ConfigLoader) (string, bool) {
-	if r == nil || account.ConnectorID != "bitrix" || load == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
+	if r == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
+		return "", false
+	}
+	if account.ConnectorID != "bitrix" {
+		return map[string]map[string]string{
+			"magento":   {"cancelled": "canceled"},
+			"medusa":    {"cancelled": "canceled"},
+			"saleor":    {"cancelled": "CANCELED"},
+			"shopify":   {"cancelled": "cancelled"},
+			"shopware":  {"cancelled": "cancelled"},
+			"woocommerce": {"pending": "pending", "confirmed": "on-hold", "processing": "processing", "fulfilled": "completed", "cancelled": "cancelled"},
+		}[account.ConnectorID][status]
+	}
+	if load == nil {
 		return "", false
 	}
 	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
@@ -427,7 +496,15 @@ func (r *Registry) SupportsOrderStatusWrite(account sdk.Account) bool {
 	if r == nil || account.Validate() != nil {
 		return false
 	}
-	return SupportsCapability(account.ConnectorID, "orders.status.write") && account.ConnectorID == "bitrix"
+	if !SupportsCapability(account.ConnectorID, "orders.status.write") {
+		return false
+	}
+	switch account.ConnectorID {
+	case "bitrix", "magento", "medusa", "saleor", "shopify", "shopware", "woocommerce":
+		return true
+	default:
+		return false
+	}
 }
 
 // ProductStatus translates the canonical catalog lifecycle into the remote
@@ -834,6 +911,41 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "woocommerce":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}

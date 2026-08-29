@@ -215,6 +215,20 @@ func TestStorefrontPriceWriterAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestStorefrontInventoryWriterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+	for _, connectorID := range []string{"bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce"} {
+		account := supportTestAccount(t, connectorID)
+		if !registry.SupportsInventoryWrite(account) || !SupportsCapability(connectorID, "inventory.write") || !SupportsSync(connectorID, "inventory", "outbound") {
+			t.Fatalf("%s inventory write support is not admitted", connectorID)
+		}
+		if _, err := registry.InventoryWriter(account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s inventory writer unavailable: %v", connectorID, err)
+		}
+	}
+}
+
 func TestBitrixInventoryWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	account := supportTestAccount(t, "bitrix")

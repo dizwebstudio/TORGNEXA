@@ -71,7 +71,7 @@ function documentationPageForId(id: DocumentationSectionId) {
 
 const DocumentationSectionContext = createContext<DocumentationSectionId | undefined>(undefined);
 
-function DocumentationMetadata({page}: {page: {path: string; title: string; description: string}}) {
+function DocumentationMetadata({page}: {page: {path: string; heading: string; title: string; description: string}}) {
   useEffect(() => {
     const previousTitle = document.title;
     const managed: Array<{element: HTMLMetaElement | HTMLLinkElement; previous: string | null; attribute: "content" | "href"; created: boolean}> = [];
@@ -98,18 +98,34 @@ function DocumentationMetadata({page}: {page: {path: string; title: string; desc
     setHeadValue("meta", 'meta[name="twitter:card"]', "content", "summary", {name: "twitter:card"});
     setHeadValue("link", 'link[rel="canonical"]', "href", canonical, {rel: "canonical"});
 
+    const breadcrumbItems = [
+      {"@type": "ListItem", position: 1, name: "TORGNEXA", item: window.location.origin},
+      {"@type": "ListItem", position: 2, name: "Документация", item: `${window.location.origin}/docs`},
+    ];
+    if (page.path !== "/docs") breadcrumbItems.push({"@type": "ListItem", position: 3, name: page.heading, item: canonical});
     const structuredData = document.createElement("script");
     structuredData.type = "application/ld+json";
     structuredData.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "TechArticle",
-      headline: page.title,
-      description: page.description,
-      inLanguage: "ru-RU",
-      url: canonical,
-      mainEntityOfPage: canonical,
-      isPartOf: {"@type": "TechArticle", url: `${window.location.origin}/docs`, name: docsTitle},
-      publisher: {"@type": "Organization", name: "TORGNEXA"},
+      "@graph": [
+        {
+          "@type": "TechArticle",
+          "@id": `${canonical}#article`,
+          headline: page.title,
+          description: page.description,
+          inLanguage: "ru-RU",
+          url: canonical,
+          mainEntityOfPage: canonical,
+          isPartOf: {"@type": "TechArticle", "@id": `${window.location.origin}/docs#article`, url: `${window.location.origin}/docs`, name: docsTitle},
+          publisher: {"@type": "Organization", name: "TORGNEXA"},
+        },
+        {
+          "@type": "BreadcrumbList",
+          "@id": `${canonical}#breadcrumb`,
+          itemListElement: breadcrumbItems,
+        },
+      ],
     });
     document.head.appendChild(structuredData);
 
