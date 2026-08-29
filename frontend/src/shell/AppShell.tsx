@@ -28,6 +28,7 @@ import {CommandPalette} from "../components/CommandPalette";
 import {Drawer} from "../components/Drawer";
 import {StatusBadge} from "../components/StatusBadge";
 import {useUi} from "../app/UiProvider";
+import {UserAvatar} from "../components/UserAvatar";
 
 const realtimeLabels: Readonly<Record<string, string>> = {live: "Подключено", connecting: "Подключение…", offline: "Недоступно"};
 
@@ -73,7 +74,7 @@ export function AppShell() {
     <aside className="sidebar">
       <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Управление торговлей</small></span></button>
       <nav aria-label="Основная навигация">{navigation.map((item) => <button key={item.id} aria-current={path===item.path?"page":undefined} title={item.label} className={`nav-item ${path === item.path ? "active" : ""}`} onClick={() => navigate(item.path)}><span className="nav-icon"><Icon name={item.icon}/></span><span className="nav-label">{item.label}</span></button>)}</nav>
-      <div className="sidebar-footer"><div className="profile"><span className="avatar">{auth.session?.displayName.slice(0, 1).toUpperCase()}</span><span className="profile-copy"><strong>{auth.session?.displayName}</strong><small>Защищённая сессия</small></span></div><button className="icon-button" onClick={() => void auth.logout()} title="Выйти" aria-label="Выйти"><Icon name="logout"/></button></div>
+      <div className="sidebar-footer"><div className="profile"><UserAvatar session={auth.session!}/><span className="profile-copy"><strong>{auth.session?.displayName}</strong><small>Защищённая сессия</small></span></div><button className="icon-button" onClick={() => void auth.logout()} title="Выйти" aria-label="Выйти"><Icon name="logout"/></button></div>
     </aside>
     <main className="main-column">
       <header className="topbar"><div className="topbar-context"><button className="mobile-menu" onClick={()=>setMobileOpen(v=>!v)} aria-label="Меню"><Icon name="menu"/></button><div><span className="workspace-label">TORGNEXA</span><strong>{current?.label??"Текущий контур"}</strong></div></div><div className="topbar-right"><button className="quick-search" onClick={()=>setCommandOpen(true)}><Icon name="search"/><span>Поиск и переход</span><kbd>⌘ K</kbd></button><button className="icon-button topbar-icon" onClick={()=>setActivityOpen(true)} aria-label="Центр активности"><Icon name="activity"/></button><button className={`icon-button topbar-icon ${compact?"active":""}`} onClick={toggleCompact} aria-label="Сменить плотность таблиц" title="Плотность интерфейса"><Icon name="columns"/></button><button className="icon-button topbar-icon" onClick={toggleTheme} aria-label="Сменить тему"><Icon name={theme==="dark"?"sun":"moon"}/></button><span className={`realtime-pill ${realtime}`} title={realtime==="live"?"Поток обновлений подключён":realtime==="connecting"?"Подключаем поток обновлений":"Поток обновлений временно недоступен"}><span/>{realtimeLabels[realtime]}</span><span className="security-pill"><span/>защищено</span></div></header>

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "connector_id": "medusa",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/medusa/conformance-report.json"
+  },
+  "docker_store": {
+    "status": "pass",
+    "checked_at": "2026-08-29",
+    "compose": "docker-compose.medusa-test.yml",
+    "endpoint": "http://127.0.0.1:19000",
+    "sku": "SHORTS-M",
+    "checks": [
+      "unauthenticated request denied",
+      "catalog/product/variant reads",
+      "inventory item and stock location reads",
+      "product title/description/status write with read-after-write",
+      "variant USD price write with read-after-write",
+      "inventory stocked quantity write with read-after-write",
+      "automatic restoration of product/price/stock"
+    ],
+    "smoke_script": "scripts/medusa-smoke.sh"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "MEDUSA_BASE_URL",
+      "MEDUSA_API_TOKEN",
+      "MEDUSA_TEST_SKU"
+    ]
+  },
+  "smoke_script": "scripts/medusa-smoke.sh",
+  "reason_code": "external_non_production_endpoint_not_configured"
+}

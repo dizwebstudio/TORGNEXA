@@ -57,6 +57,18 @@ executable gate is `scripts/cscart-smoke.sh`, documented in
 Commerce uses the same split: `scripts/magento-smoke.sh` is documented in
 `docs/connectors/magento/docker-live-qualification.md`; its canonical SDK
 report does not imply that a merchant store or Integration token works.
+Medusa v2 follows the same rule: run `scripts/medusa-smoke.sh` using the raw
+secret API key documented in
+`docs/connectors/medusa/docker-live-qualification.md`.
+Saleor follows the same split for its GraphQL API: run
+`scripts/saleor-smoke.sh` against the disposable stack or a non-production
+endpoint as described in `docs/connectors/saleor/docker-live-qualification.md`;
+the Docker pass does not certify an external merchant installation.
+Shopify has no self-hosted Docker store, so its local gate is a stateful Admin
+REST protocol double: run `scripts/shopify-smoke.sh` with
+`docker-compose.shopify-test.yml` as documented in
+`docs/connectors/shopify/docker-live-qualification.md`. A real Shopify Dev Store
+and app token are still required for merchant qualification.
 
 ## Machine-readable report
 

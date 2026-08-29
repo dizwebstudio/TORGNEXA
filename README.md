@@ -40,6 +40,17 @@ ports bind to `127.0.0.1`.
 при первом запросе API её членство в development workspace создаётся
 автоматически.
 
+Полный авторизованный браузерный smoke-тест запускается отдельной командой:
+
+```bash
+make community-e2e
+```
+
+Команда использует чистый профиль Chrome, проходит настоящий вход через
+Keycloak и проверяет каталог, карточку товара с изображением и заказы с
+миниатюрами. Для запуска нужны поднятый Community-стек и установленный
+`google-chrome` (или переменная `CHROME_BIN`).
+
 The generated file is self-documented. A complete list of variables, accepted
 formats, examples and safe rotation rules is available in
 [`docs/deployment/environment-variables.md`](docs/deployment/environment-variables.md).

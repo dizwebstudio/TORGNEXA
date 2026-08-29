@@ -4,7 +4,7 @@ export const settingsTabs = [
   {id: "notifications", label: "Каналы и важность"},
   {id: "mcp", label: "MCP-агенты"},
   {id: "trust", label: "Контроль и сценарии"},
-  {id: "webhooks", label: "Webhooks"},
+  {id: "webhooks", label: "Вебхуки"},
   {id: "plugins", label: "Плагины"},
 ] as const;
 

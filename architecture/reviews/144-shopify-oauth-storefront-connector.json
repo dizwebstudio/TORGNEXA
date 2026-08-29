@@ -106,7 +106,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "New connectorauth/sdk unit tests cover host template resolution, suffix bounding, and scope-separator behavior; provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/shopify/conformance-report.json records this genuine result rather than a fabricated pass."
+      "evidence": "New connectorauth/sdk unit tests cover host template resolution, suffix bounding, and scope-separator behavior; provider tests and the canonical Task-064 report pass 13 of 13 checks, including sandbox_isolation. Because Shopify has no official self-hosted Docker store, the stateful protocol double passed Admin REST API 2026-07 contract smoke (reads, product/price/inventory writes, read-after-write and cleanup) on 2026-08-29; external Dev Store qualification remains a separate blocked gate documented in docs/connectors/shopify/live-qualification-status.json."
     }
   ],
   "provider": {

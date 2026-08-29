@@ -82,6 +82,20 @@ CDN topology. `supply-chain/js-artifacts.json` still has frontend release
 publication disabled, so the local Compose artifact does not bypass Task-065
 release policy or change the single-host/non-HA qualification of Task 093.
 
+### Авторизованный браузерный smoke-тест
+
+После запуска стека выполните `make community-e2e`. Перед тестом команда
+идемпотентно восстанавливает пользователя Keycloak `demo` и его активное
+членство в development workspace. Затем чистый профиль Chrome проходит
+настоящий authorization-code вход, идемпотентно запускает заполнение
+синтетического демо-контура и проверяет в интерфейсе каталог, главное
+изображение карточки, вкладку изображений и миниатюры товара в списке и
+деталях заказов. Пользовательские товары и заказы не изменяются; тест не
+сохраняет профиль, токены или cookies. При сбое диагностический снимок
+записывается в `/tmp`, а не в репозиторий. Можно указать `CHROME_BIN`,
+`TORGNEXA_E2E_BASE_URL` и `TORGNEXA_E2E_KEYCLOAK_URL` для нестандартных
+локальных адресов.
+
 ## Production boundary
 
 This Compose file is not an HA topology. Before public production deployment repeat backup/restore and upgrade rehearsals, supply-chain/signing qualification, hosted architecture rules, provider staging qualification, TLS/WAF/DDoS design, secret management and capacity/SLO tests against the actual topology.

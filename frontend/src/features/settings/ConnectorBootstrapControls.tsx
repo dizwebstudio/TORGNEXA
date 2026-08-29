@@ -45,6 +45,6 @@ export function ConnectorBootstrapControls({account}:{account:Account}) {
     <button className="button ghost" disabled={scheduleMutation.isPending||interval<15||interval>10080||(enabled&&!preview)} onClick={()=>scheduleMutation.mutate()}>{scheduleMutation.isPending?"Сохраняем…":"Сохранить расписание"}</button>
     {job?.last_error_code?<small className="error-text">Последняя ошибка: {job.last_error_code}</small>:null}
     {previewMutation.isError||startMutation.isError||scheduleMutation.isError?<small className="error-text" role="alert">Операция не выполнена. Обновите предпросмотр и проверьте версию кабинета.</small>:null}
-    {state.isError?<small className="error-text">Не удалось загрузить состояние импорта.</small>:null}
+    {state.isError?<div className="bootstrap-error"><small className="error-text">Не удалось загрузить состояние импорта.</small><button type="button" className="button ghost" onClick={()=>void state.refetch()}>Повторить</button></div>:null}
   </fieldset>;
 }

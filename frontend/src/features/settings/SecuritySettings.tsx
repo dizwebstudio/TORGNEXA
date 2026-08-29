@@ -2,6 +2,8 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
 import {useAuth} from "../../auth/AuthProvider";
 import {ErrorBlock, LoadingBlock} from "../../components/ApiState";
+import {StatusBadge} from "../../components/StatusBadge";
+import {auditActionLabel,auditResourceLabel,humanizeTechnicalValue} from "../../components/labels";
 
 type Configuration={provider:string;issuer:string;client_id:string;configuration_status:string;configuration_source:string;provider_health:string};
 type Session={session_ref:string;user_ref:string;status:"active"|"revoked";client_kind:string;authenticated_at:string;first_seen_at:string;last_seen_at:string;expires_at:string;revoked_at?:string;current:boolean};
@@ -14,7 +16,7 @@ const page=<T,>(value:unknown):Page<T>=>{const data=record(value);if(!Array.isAr
 const configuration=(value:unknown):Configuration=>record(value) as Configuration;
 const date=(value:string)=>new Intl.DateTimeFormat("ru-RU",{dateStyle:"short",timeStyle:"short"}).format(new Date(value));
 const client:Record<string,string>={browser:"Браузер",mobile:"Мобильное устройство",api:"API-клиент",unknown:"Не определён"};
-const action:Record<string,string>={"settings.workspace.updated":"Профиль workspace изменён","settings.member.invited":"Участник приглашён","settings.member.updated":"Доступ участника изменён","settings.security.session_revoked":"Сессия отозвана","settings.identity_provider.draft_saved":"Черновик провайдера входа сохранён","settings.identity_provider.validate":"Провайдер входа проверен","settings.identity_provider.validation_failed":"Проверка провайдера входа отклонена","settings.identity_provider.activate":"Провайдер входа активирован","settings.identity_provider.rollback":"Конфигурация провайдера входа откачена","settings.identity_provider.disable":"Провайдер входа отключён"};
+const configurationSourceLabels:Record<string,string>={runtime:"Конфигурация приложения",database:"Сохранённая конфигурация",default:"Значения по умолчанию"};
 
 export function SecuritySettings(){
  const api=useApi(),auth=useAuth(),cache=useQueryClient();
@@ -30,18 +32,18 @@ export function SecuritySettings(){
  });
  if(!canRead)return null;
  if(query.isPending)return <section className="panel settings-card security-settings"><LoadingBlock/></section>;
- if(query.isError||!query.data)return <section className="panel settings-card security-settings"><ErrorBlock>Не удалось загрузить сведения о безопасности.</ErrorBlock></section>;
+ if(query.isError||!query.data)return <section className="panel settings-card security-settings"><ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить сведения о безопасности.</ErrorBlock></section>;
  const data=query.data;
  return <section className="panel settings-card security-settings">
-  <div className="settings-card-heading"><div><p className="eyebrow">Безопасность настроек</p><h2>Сессии, входы и изменения</h2></div><span className="status status-active">Tenant scoped</span></div>
-  <div className="security-config"><div><span>Конфигурация</span><strong>{data.config.configuration_status==="configured"?"Настроена":"Не настроена"}</strong><small>{data.config.configuration_source==="runtime"?"Из runtime-конфигурации":data.config.configuration_source}</small></div><div><span>Провайдер</span><strong>OIDC · {data.config.client_id}</strong><small>{data.config.issuer}</small></div><div><span>Состояние провайдера</span><strong>Не проверялось</strong><small>Это состояние конфигурации, а не внешняя health-проверка.</small></div></div>
+  <div className="settings-card-heading"><div><p className="eyebrow">Безопасность настроек</p><h2>Сессии, входы и изменения</h2></div><span className="status status-active">Контур рабочего пространства</span></div>
+  <div className="security-config"><div><span>Конфигурация</span><strong>{data.config.configuration_status==="configured"?"Настроена":"Не настроена"}</strong><small>{configurationSourceLabels[data.config.configuration_source]??humanizeTechnicalValue(data.config.configuration_source)}</small></div><div><span>Провайдер</span><strong>OIDC · {data.config.client_id}</strong><small>{data.config.issuer}</small></div><div><span>Состояние провайдера</span><strong>Не проверялось</strong><small>Это состояние конфигурации, а не внешняя проверка доступности.</small></div></div>
   <div className="settings-card-heading security-subhead"><div><p className="eyebrow">Активные сессии</p><h3>Доступ к API TORGNEXA</h3></div><button className="button ghost" onClick={()=>void auth.manageAccount()}>Сессии Keycloak</button></div>
   <p className="settings-note">Отзыв блокирует последующие запросы этой сессии в TORGNEXA. Для текущей сессии интерфейс также выполнит выход из Keycloak; остальными SSO-сессиями управляйте в кабинете провайдера.</p>
   {data.sessions.items.length===0?<p className="settings-copy">Сессий пока нет.</p>:<div className="table-wrap"><table><thead><tr><th>Сессия</th><th>Клиент</th><th>Последняя активность</th><th>Срок</th><th>Статус</th><th></th></tr></thead><tbody>{data.sessions.items.map(item=><tr key={item.session_ref}><td><strong>{item.current?"Текущая сессия":"Сессия"}</strong><br/><span className="mono">{item.session_ref.slice(0,12)} · user {item.user_ref}</span></td><td>{client[item.client_kind]??item.client_kind}</td><td>{date(item.last_seen_at)}</td><td>{date(item.expires_at)}</td><td><span className={`status status-${item.status}`}>{item.status==="active"?"Активна":"Отозвана"}</span></td><td>{item.status==="active"&&canWrite?<button className="button danger compact" disabled={revoke.isPending} onClick={()=>revoke.mutate(item)}>Отозвать</button>:null}</td></tr>)}</tbody></table></div>}
   {revoke.isError?<ErrorBlock>Не удалось отозвать сессию.</ErrorBlock>:null}
   <div className="security-columns">
    <div><div className="security-subhead"><p className="eyebrow">История входов</p><h3>События, замеченные TORGNEXA</h3></div><p className="settings-note">Это не полный журнал Keycloak: запись появляется при первом подтверждённом запросе с OIDC-сессией.</p><div className="security-timeline">{data.logins.items.map(item=><article key={item.id}><strong>{item.event_type==="session_observed"?"Сессия впервые замечена":"Сессия отозвана"}</strong><span>{client[item.client_kind]??item.client_kind} · {date(item.occurred_at)}</span><small className="mono">{item.session_ref.slice(0,12)}</small></article>)}</div></div>
-   <div><div className="security-subhead"><p className="eyebrow">Журнал настроек</p><h3>Actor и correlation evidence</h3></div><p className="settings-note">SIEM получает эти записи асинхронно и не участвует в commit бизнес-операции.</p><div className="security-timeline">{data.audit.items.map(item=><article key={item.id}><strong>{action[item.action]??item.action}</strong><span>{item.resource_type} · {date(item.created_at)} · {item.risk}</span><small className="mono">actor {item.actor_id} · correlation {item.correlation_id}</small></article>)}</div></div>
+   <div><div className="security-subhead"><p className="eyebrow">Журнал настроек</p><h3>Субъект и связь операции</h3></div><p className="settings-note">Система мониторинга получает эти записи асинхронно и не участвует в фиксации бизнес-операции.</p><div className="security-timeline">{data.audit.items.map(item=><article key={item.id}><strong>{auditActionLabel(item.action)}</strong><span>{auditResourceLabel(item.resource_type)} · {date(item.created_at)} · <StatusBadge value={item.risk}/></span><small className="mono">Субъект: {item.actor_id} · операция: {item.correlation_id}</small></article>)}</div></div>
   </div>
  </section>
 }

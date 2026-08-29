@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "connector_id": "shopify",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/shopify/conformance-report.json"
+  },
+  "docker_protocol_double": {
+    "status": "pass",
+    "checked_at": "2026-08-29",
+    "compose": "docker-compose.shopify-test.yml",
+    "api_version": "2026-07",
+    "endpoint": "http://127.0.0.1:18001/admin/api/2026-07",
+    "sku": "TORGNEXA-SHOPIFY-001",
+    "checks": [
+      "unauthorized_access_rejected",
+      "shop_health_and_api_version",
+      "active_locations_read",
+      "product_variant_inventory_item_mapping",
+      "product_detail_read",
+      "variant_detail_read",
+      "inventory_level_read",
+      "orders_and_refunds_read",
+      "product_title_body_status_write",
+      "variant_price_write",
+      "inventory_level_write",
+      "read_after_write_reconciliation",
+      "automatic_cleanup_restore"
+    ],
+    "result": "pass",
+    "scope": "Shopify Admin REST protocol shapes and reconciliation only; not a Shopify merchant store"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "SHOPIFY_BASE_URL",
+      "SHOPIFY_API_TOKEN",
+      "SHOPIFY_TEST_SKU",
+      "SHOPIFY_ALLOW_WRITES"
+    ],
+    "requirement": "Shopify Partner/Dev Dashboard development store, installed app token, scopes and synthetic fixture"
+  },
+  "smoke_script": "scripts/shopify-smoke.sh",
+  "reason_code": "shopify_dev_store_not_configured"
+}

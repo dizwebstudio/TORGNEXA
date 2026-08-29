@@ -12,8 +12,11 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/core/userprofile"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
@@ -42,11 +45,32 @@ type oidcClaims struct {
 	} `json:"realm_access"`
 	OrganizationID string `json:"organization_id"`
 	WorkspaceID    string `json:"workspace_id"`
+	Username       string `json:"preferred_username"`
+	Email          string `json:"email"`
+	GivenName      string `json:"given_name"`
+	FamilyName     string `json:"family_name"`
+	PictureURL     string `json:"picture"`
+	Birthdate      string `json:"birthdate"`
+	JobTitle       string `json:"job_title"`
+	Position       string `json:"position"`
+	Title          string `json:"title"`
+	Department     string `json:"department"`
+	PhoneNumber    string `json:"phone_number"`
 }
 
 type userInfoClaims struct {
-	Subject string `json:"sub"`
-	Email   string `json:"email"`
+	Subject     string `json:"sub"`
+	Username    string `json:"preferred_username"`
+	Email       string `json:"email"`
+	GivenName   string `json:"given_name"`
+	FamilyName  string `json:"family_name"`
+	PictureURL  string `json:"picture"`
+	Birthdate   string `json:"birthdate"`
+	JobTitle    string `json:"job_title"`
+	Position    string `json:"position"`
+	Title       string `json:"title"`
+	Department  string `json:"department"`
+	PhoneNumber string `json:"phone_number"`
 }
 
 type workspaceMembershipStore interface {
@@ -160,7 +184,82 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if authenticator.sessions == nil || authenticator.sessions.Observe(ctx, scope, securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}) != nil {
 		return Principal{}, ErrUnauthenticated
 	}
-	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: strings.ToLower(strings.TrimSpace(info.Email)), Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+	profile := profileFromOIDCClaims(claims, info, subjectRef)
+	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: profile.Email, Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+}
+
+func profileFromOIDCClaims(claims oidcClaims, info userInfoClaims, subjectRef string) userprofile.Identity {
+	profile := userprofile.Identity{
+		SubjectRef:  subjectRef,
+		Username:    firstProfileClaim(info.Username, claims.Username, 128),
+		Email:       strings.ToLower(firstProfileClaim(info.Email, claims.Email, 254)),
+		GivenName:   firstProfileClaim(info.GivenName, claims.GivenName, 160),
+		FamilyName:  firstProfileClaim(info.FamilyName, claims.FamilyName, 160),
+		PictureURL:  profilePictureClaim(info.PictureURL, claims.PictureURL),
+		Birthdate:   profileBirthdateClaim(info.Birthdate, claims.Birthdate),
+		JobTitle:    firstProfileClaim(info.JobTitle, claims.JobTitle, 160),
+		Department:  firstProfileClaim(info.Department, claims.Department, 160),
+		PhoneNumber: firstProfileClaim(info.PhoneNumber, claims.PhoneNumber, 64),
+	}
+	if profile.JobTitle == "" {
+		profile.JobTitle = firstProfileClaim(info.Position, claims.Position, 160)
+	}
+	if profile.JobTitle == "" {
+		profile.JobTitle = firstProfileClaim(info.Title, claims.Title, 160)
+	}
+	if !profile.Valid() {
+		// An invalid optional claim must not invalidate an otherwise valid OIDC
+		// session. Each optional value is independently bounded above.
+		profile = userprofile.Identity{
+			SubjectRef:  subjectRef,
+			Username:    safeProfileClaim(profile.Username, 128),
+			Email:       strings.ToLower(safeProfileClaim(profile.Email, 254)),
+			GivenName:   safeProfileClaim(profile.GivenName, 160),
+			FamilyName:  safeProfileClaim(profile.FamilyName, 160),
+			PictureURL:  profilePictureClaim(profile.PictureURL, ""),
+			Birthdate:   profileBirthdateClaim(profile.Birthdate, ""),
+			JobTitle:    safeProfileClaim(profile.JobTitle, 160),
+			Department:  safeProfileClaim(profile.Department, 160),
+			PhoneNumber: safeProfileClaim(profile.PhoneNumber, 64),
+		}
+	}
+	return profile
+}
+
+func firstProfileClaim(primary, fallback string, maximum int) string {
+	if value := safeProfileClaim(primary, maximum); value != "" {
+		return value
+	}
+	return safeProfileClaim(fallback, maximum)
+}
+
+func safeProfileClaim(value string, maximum int) string {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maximum || !utf8.ValidString(value) {
+		return ""
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return ""
+		}
+	}
+	return value
+}
+
+func profilePictureClaim(primary, fallback string) string {
+	value := firstProfileClaim(primary, fallback, 2048)
+	if strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "/") {
+		return value
+	}
+	return ""
+}
+
+func profileBirthdateClaim(primary, fallback string) string {
+	value := firstProfileClaim(primary, fallback, 32)
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return ""
+	}
+	return value
 }
 
 func identityReference(issuer, value string) string {
@@ -244,9 +343,10 @@ func (authorizer roleAuthorizer) Authorize(ctx context.Context, principal Princi
 		return ErrUnauthorized
 	}
 	role := member.Role
-	readPermission := permission == "connectors.accounts.read" || permission == "products.read" || permission == "orders.read" || permission == "stock.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "settings.workspace.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read" || permission == "settings.ai_governance.read"
+	readPermission := permission == "connectors.accounts.read" || permission == "products.read" || permission == "orders.read" || permission == "stock.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "settings.workspace.read" || permission == "settings.profile.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read" || permission == "settings.ai_governance.read"
 	operatorPermission := permission == "orders.demo.write" || permission == "orders.status.write" || permission == "ai.analyze" || permission == "connectors.replay.run" || permission == "profitability.scenarios.write"
-	if role == "admin" || (operatorPermission && (role == "manager" || role == "operator")) || (readPermission && (role == "manager" || role == "operator" || role == "viewer")) {
+	selfServicePermission := permission == "settings.profile.write"
+	if role == "admin" || (operatorPermission && (role == "manager" || role == "operator")) || (selfServicePermission && (role == "manager" || role == "operator" || role == "viewer")) || (readPermission && (role == "manager" || role == "operator" || role == "viewer")) {
 		return nil
 	}
 	return ErrUnauthorized

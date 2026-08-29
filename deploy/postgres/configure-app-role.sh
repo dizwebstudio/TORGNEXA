@@ -19,6 +19,7 @@ GRANT USAGE ON SCHEMA public TO torgnexa_app;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO torgnexa_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO torgnexa_app;
 GRANT DELETE ON TABLE demo_dataset_tombstones TO torgnexa_app;
+GRANT DELETE ON TABLE catalog_product_images TO torgnexa_app;
 GRANT EXECUTE ON FUNCTION claim_connector_sync_jobs(text,text,integer,integer) TO torgnexa_app;
 
 -- Preserve append/evidence semantics even if a trigger is accidentally changed.
@@ -37,6 +38,7 @@ REVOKE UPDATE ON TABLE
 FROM torgnexa_app;
 REVOKE DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM torgnexa_app;
 GRANT DELETE ON TABLE demo_dataset_tombstones TO torgnexa_app;
+GRANT DELETE ON TABLE catalog_product_images TO torgnexa_app;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE torgnexa IN SCHEMA public GRANT SELECT, INSERT, UPDATE ON TABLES TO torgnexa_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE torgnexa IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO torgnexa_app;

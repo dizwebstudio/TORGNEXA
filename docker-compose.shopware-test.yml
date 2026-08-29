@@ -1,0 +1,12 @@
+services:
+  shopware:
+    # Disposable Shopware 6.7 fixture. Shopware documents Docker as the
+    # recommended development path; this all-in-one community image keeps the
+    # qualification stack small enough to run without a MariaDB/OpenSearch
+    # project checkout. It must never be used for production data.
+    image: dockware/shopware:6.7.2.2
+    restart: "no"
+    ports:
+      - "127.0.0.1:18005:80"
+    environment:
+      PHP_VERSION: "8.3"

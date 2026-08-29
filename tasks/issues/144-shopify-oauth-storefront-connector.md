@@ -1,6 +1,6 @@
 # Task 144 — Shopify OAuth storefront connector
 
-Status: Repository implementation complete
+Status: Repository implementation complete; Docker protocol qualification passed; external Dev Store qualification blocked
 
 ## Problem
 
@@ -82,10 +82,14 @@ is per-merchant (`{shop}.myshopify.com`), which the host-owned OAuth runtime
 - Live-merchant qualification: unverifiable without a real Shopify
   partner/development store and OAuth app, same limitation already
   documented for SBP/Robokassa.
-- The Task-064 conformance suite's `sandbox_isolation` check could not be
-  exercised in this repository's execution environment because it cannot
-  create unprivileged Linux user namespaces (`unshare --user` returns
-  `Operation not permitted`); this is an environment constraint shared by
-  every connector's Task-029 sandbox probe, not a Shopify-specific gap.
-  `docs/connectors/shopify/conformance-report.json` records the genuine
-  12/13 result rather than a fabricated pass.
+- Docker qualification: Shopify has no official self-hosted Docker store, so
+  the stateful protocol double in `docker-compose.shopify-test.yml` passed
+  Admin REST API `2026-07` contract smoke on 2026-08-29, including reads,
+  product/price/inventory writes, read-after-write and automatic cleanup.
+- External Dev Store qualification remains blocked until a Shopify Partner/Dev
+  Dashboard development store, installed app token, required scopes and a
+  synthetic SKU are supplied. The protocol-double result is not a merchant
+  store certification.
+- The canonical Task-064 report is 13/13 PASS, including the shared
+  `sandbox_isolation` check. Qualification status is tracked in
+  `docs/connectors/shopify/live-qualification-status.json`.

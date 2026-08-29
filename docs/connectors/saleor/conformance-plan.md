@@ -1,5 +1,15 @@
 # Conformance plan
 
-Run the mandatory Task-064 13-check Connector SDK suite with synthetic credentials, tenant-isolation probes, retry/error normalization, idempotency/replay and Linux sandbox isolation. Production credentials are forbidden in the harness.
+Run the mandatory Task-064 13-check Connector SDK suite with synthetic credentials,
+tenant-isolation probes, retry/error normalization, idempotency/replay and Linux
+sandbox isolation. Production credentials are forbidden in the harness.
 
-12 of 13 checks pass in the current execution environment; `sandbox_isolation` cannot be exercised here because this environment cannot create unprivileged Linux user namespaces (`unshare --user` returns `Operation not permitted`), which the Task-029 sandbox probe requires regardless of connector. This is an environment constraint, not a Saleor-specific defect -- the same probe exercises the shared emulator, not any Saleor code path. Re-run in an environment with user namespaces enabled to obtain a full pass.
+The canonical report is **13/13 PASS** (`conformance-report.json`), including
+the shared `sandbox_isolation` probe. This report certifies the Connector SDK
+boundary only; it does not certify a particular Saleor installation.
+
+The separate credentialed store gate is documented in
+`docker-live-qualification.md`: the disposable official Saleor Platform Docker
+stack passed read, product/price/stock write, read-after-write and cleanup smoke
+on 2026-08-29. External merchant staging remains a separate gate and is still
+blocked until an operator supplies a non-production endpoint and App token.

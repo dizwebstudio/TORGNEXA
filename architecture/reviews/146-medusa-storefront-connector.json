@@ -98,7 +98,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "Provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/medusa/conformance-report.json records this genuine result rather than a fabricated pass."
+      "evidence": "Provider tests and the canonical Task-064 report pass all 13 SDK checks with synthetic credentials. The repository DTC Starter Docker smoke also passed on 2026-08-29 for catalog, product/price/inventory read-after-write and automatic restoration via scripts/medusa-smoke.sh; external live qualification remains a separate gate requiring a non-production Medusa v2 store, secret API key and synthetic SKU."
     }
   ],
   "provider": {

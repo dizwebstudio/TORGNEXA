@@ -1,0 +1,80 @@
+name: torgnexa-saleor-test
+
+x-saleor-env: &saleor-env
+  DATABASE_URL: postgres://saleor:saleor@db:5432/saleor
+  CACHE_URL: redis://cache:6379/0
+  CELERY_BROKER_URL: redis://cache:6379/1
+  DEFAULT_CHANNEL_SLUG: default-channel
+  DEFAULT_FROM_EMAIL: noreply@example.test
+  EMAIL_URL: smtp://127.0.0.1:1025
+  SECRET_KEY: saleor-local-only
+  ALLOWED_HOSTS: localhost,127.0.0.1,api
+  DASHBOARD_URL: http://127.0.0.1:19001/
+  HTTP_IP_FILTER_ENABLED: "False"
+  HTTP_IP_FILTER_ALLOW_LOOPBACK_IPS: "True"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: saleor
+      POSTGRES_USER: saleor
+      POSTGRES_PASSWORD: saleor
+    volumes:
+      - saleor-test-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saleor -d saleor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  cache:
+    image: valkey/valkey:8.1-alpine
+    volumes:
+      - saleor-test-cache:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  bootstrap:
+    image: ghcr.io/saleor/saleor:3.23
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment: *saleor-env
+    volumes:
+      - saleor-test-media:/app/media
+    command:
+      - sh
+      - -lc
+      - python3 manage.py migrate --noinput && python3 manage.py populatedb --createsuperuser
+    restart: "no"
+
+  api:
+    image: ghcr.io/saleor/saleor:3.23
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment: *saleor-env
+    volumes:
+      - saleor-test-media:/app/media
+    ports:
+      - "${SALEOR_HTTP_PORT:-18000}:8000"
+    command: ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c 'import urllib.request; r=urllib.request.urlopen("http://127.0.0.1:8000/", timeout=3); raise SystemExit(0 if r.status < 500 else 1)'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  saleor-test-db:
+  saleor-test-cache:
+  saleor-test-media:

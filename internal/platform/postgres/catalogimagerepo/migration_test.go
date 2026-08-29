@@ -18,3 +18,19 @@ func TestMigrationEnforcesTenantAndHTTPSImageReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestDemoImagePathIsLimitedToBundledSVGAssets(t *testing.T) {
+	for _, path := range []string{"/demo-images/demo-01.svg", "/demo-images/demo-26.svg"} {
+		if !validImage(Image{URL: path}) {
+			t.Fatalf("bundled demo image %q was rejected", path)
+		}
+	}
+	for _, path := range []string{"/demo-images/demo-.svg", "/demo-images/demo-1.png", "/demo-images/../secret.svg"} {
+		if validImage(Image{URL: path}) {
+			t.Fatalf("invalid demo image path %q was accepted", path)
+		}
+	}
+	if !validImage(Image{URL: "https://cdn.example.test/image.svg"}) {
+		t.Fatal("external HTTPS image was rejected")
+	}
+}

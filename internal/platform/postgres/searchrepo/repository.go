@@ -155,34 +155,33 @@ type demoCatalogProduct struct {
 	ImageAlt    string
 }
 
-// demoCatalogProducts is intentionally provider-neutral. The remote images
-// are public Unsplash CDN URLs so a fresh workspace has a useful visual
-// catalog without copying third-party binaries into the repository.
+// demoCatalogProducts is intentionally provider-neutral. Images point to the
+// frontend's bundled demo assets so the visual catalog also works offline.
 var demoCatalogProducts = []demoCatalogProduct{
-	{"DEMO-PRODUCT", "Умные наушники AirBeat X5", "Беспроводные наушники с активным шумоподавлением, прозрачным режимом и автономностью до 32 часов. Подходят для работы, дороги и музыки каждый день.", "https://images.unsplash.com/photo-1578517580179-b517dc10c833?auto=format&fit=crop&w=900&q=80", "Чёрные беспроводные наушники на столе"},
-	{"DEMO-PRODUCT-001", "Портативная колонка SoundGo Mini", "Компактная Bluetooth-колонка с чистым вокалом, защитой от брызг и ремешком для переноски. Заряда хватает на целый день прогулок.", "https://images.unsplash.com/photo-1548611716-f156c633d514?auto=format&fit=crop&w=900&q=80", "Портативная колонка и рабочие аксессуары"},
-	{"DEMO-PRODUCT-002", "Камера Pocket Snap", "Лёгкая цифровая камера для быстрых кадров в поездках и на прогулках. Автофокус и вспышка помогают получить хороший снимок без долгих настроек.", "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=900&q=80", "Компактная камера на столе"},
-	{"DEMO-PRODUCT-003", "Клавиатура Keyline 75", "Механическая клавиатура компактного формата с тихими переключателями, подсветкой и съёмным кабелем USB-C. Удобна для офиса и домашнего рабочего места.", "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80", "Клавиатура на рабочем столе"},
-	{"DEMO-PRODUCT-004", "Пауэрбанк Volt 10 000", "Тонкий внешний аккумулятор на 10 000 мА·ч с двумя выходами и индикатором заряда. Помещается в карман и поддерживает повседневные поездки.", "https://images.unsplash.com/photo-1609592424521-7c2f0f3c1c0b?auto=format&fit=crop&w=900&q=80", "Внешний аккумулятор и кабель"},
-	{"DEMO-PRODUCT-005", "Рюкзак Urban Daypack", "Городской рюкзак с отделением для ноутбука 15,6 дюйма, мягкой спинкой и карманом быстрого доступа. Объём 18 литров подходит для работы и коротких поездок.", "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=80", "Чёрный городской рюкзак"},
-	{"DEMO-PRODUCT-006", "Кроссовки City Run", "Универсальные кроссовки с амортизирующей подошвой и дышащим верхом. Рассчитаны на прогулки по городу, лёгкие пробежки и активный день.", "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80", "Красные спортивные кроссовки"},
-	{"DEMO-PRODUCT-007", "Смарт-часы Pulse S2", "Часы с мониторингом активности, уведомлениями смартфона и ярким дисплеем. Корпус защищён от брызг, ремешок легко заменить под свой стиль.", "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80", "Наручные часы на светлом фоне"},
-	{"DEMO-PRODUCT-008", "Очки Northline Classic", "Солнцезащитные очки в универсальной оправе с поляризационными линзами. Лаконичная форма подходит для города, путешествий и отдыха на природе.", "https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=900&q=80", "Солнцезащитные очки"},
-	{"DEMO-PRODUCT-009", "Термобутылка Steel 750", "Стальная бутылка объёмом 750 мл сохраняет температуру напитка и не впитывает запахи. Герметичная крышка подходит для офиса, спорта и дороги.", "https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=900&q=80", "Многоразовая металлическая бутылка"},
-	{"DEMO-PRODUCT-010", "Чашка Mono Ceramic", "Керамическая чашка объёмом 350 мл с матовой глазурью и удобной ручкой. Минималистичный дизайн хорошо смотрится дома и в офисной кухне.", "https://images.unsplash.com/photo-1514228742587-6b1558fcf93a?auto=format&fit=crop&w=900&q=80", "Керамическая чашка с кофе"},
-	{"DEMO-PRODUCT-011", "Настольная лампа Halo", "Настольная лампа с мягким рассеянным светом и регулировкой наклона. Подходит для чтения, видеозвонков и вечерней работы за столом.", "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=80", "Настольная лампа в интерьере"},
-	{"DEMO-PRODUCT-012", "Мышь Flow Silent", "Беспроводная мышь с бесшумными кнопками, точным сенсором и двумя режимами подключения. Эргономичная форма рассчитана на долгую работу.", "https://images.unsplash.com/photo-1527814050087-3793815479db?auto=format&fit=crop&w=900&q=80", "Компьютерная мышь на столе"},
-	{"DEMO-PRODUCT-013", "Ежедневник Paper Grid", "Недатированный ежедневник в твёрдой обложке: планирование недели, заметки и трекер привычек. Плотная бумага подходит для ручки и карандаша.", "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=900&q=80", "Открытый блокнот и ручка"},
-	{"DEMO-PRODUCT-014", "Свеча Cedar & Amber", "Ароматическая свеча в стеклянном стакане с нотами кедра, янтаря и сухих трав. Даёт тёплый ненавязчивый аромат для домашнего вечера.", "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=900&q=80", "Ароматическая свеча"},
-	{"DEMO-PRODUCT-015", "Крем для рук Soft Repair", "Увлажняющий крем для рук с лёгкой текстурой и нейтральным ароматом. Быстро впитывается, смягчает кожу и удобен для ежедневного ухода.", "https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&w=900&q=80", "Флакон косметического средства"},
-	{"DEMO-PRODUCT-016", "Парфюмерный набор Weekend", "Набор из двух мини-флаконов для поездок и знакомства с ароматами коллекции. Компактный формат удобно брать в ручную кладь или сумку.", "https://images.unsplash.com/photo-1547887538-e3a2f32cb1cc?auto=format&fit=crop&w=900&q=80", "Флакон парфюма"},
-	{"DEMO-PRODUCT-017", "Футболка Basic Cotton", "Базовая футболка из мягкого хлопка плотностью 180 г/м². Прямой крой и спокойный оттенок легко сочетаются с повседневным гардеробом.", "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80", "Сложенная хлопковая футболка"},
-	{"DEMO-PRODUCT-018", "Кошелёк Slim Card", "Компактный кошелёк для карт и нескольких купюр из износостойкого материала. Тонкий профиль не создаёт лишнего объёма в кармане.", "https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=900&q=80", "Кожаный кошелёк"},
-	{"DEMO-PRODUCT-019", "Камера Lens One", "Зеркальная камера для тех, кто хочет больше контроля над светом и глубиной резкости. Подходит для предметной съёмки, портретов и путешествий.", "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80", "Фотокамера с объективом"},
-	{"DEMO-PRODUCT-020", "Растение Mini Green", "Неприхотливое комнатное растение в керамическом кашпо. Компактный размер подходит для рабочего стола, полки или небольшого подоконника.", "https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=900&q=80", "Зелёное комнатное растение"},
-	{"DEMO-PRODUCT-021", "Плед Soft Home", "Мягкий плед с фактурной вязкой для дивана, кресла или поездки за город. Сдержанный цвет легко вписывается в современный интерьер.", "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?auto=format&fit=crop&w=900&q=80", "Мягкий плед в интерьере"},
-	{"DEMO-PRODUCT-022", "Органайзер Desk Tray", "Лоток для кабелей, блокнотов и мелких аксессуаров. Помогает держать рабочую поверхность в порядке и быстро находить нужные вещи.", "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=900&q=80", "Органайзер с канцелярией"},
-	{"DEMO-PRODUCT-023", "Кресло Lounge Fold", "Складное кресло с широкой спинкой и мягким сиденьем. Легко переносится между комнатами, балконом и зоной отдыха.", "https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80", "Кресло в светлом интерьере"},
+	{"DEMO-PRODUCT", "Умные наушники AirBeat X5", "Беспроводные наушники с активным шумоподавлением, прозрачным режимом и автономностью до 32 часов. Подходят для работы, дороги и музыки каждый день.", "/demo-images/demo-01.svg", "Чёрные беспроводные наушники на столе"},
+	{"DEMO-PRODUCT-001", "Портативная колонка SoundGo Mini", "Компактная Bluetooth-колонка с чистым вокалом, защитой от брызг и ремешком для переноски. Заряда хватает на целый день прогулок.", "/demo-images/demo-02.svg", "Портативная колонка и рабочие аксессуары"},
+	{"DEMO-PRODUCT-002", "Камера Pocket Snap", "Лёгкая цифровая камера для быстрых кадров в поездках и на прогулках. Автофокус и вспышка помогают получить хороший снимок без долгих настроек.", "/demo-images/demo-03.svg", "Компактная камера на столе"},
+	{"DEMO-PRODUCT-003", "Клавиатура Keyline 75", "Механическая клавиатура компактного формата с тихими переключателями, подсветкой и съёмным кабелем USB-C. Удобна для офиса и домашнего рабочего места.", "/demo-images/demo-04.svg", "Клавиатура на рабочем столе"},
+	{"DEMO-PRODUCT-004", "Пауэрбанк Volt 10 000", "Тонкий внешний аккумулятор на 10 000 мА·ч с двумя выходами и индикатором заряда. Помещается в карман и поддерживает повседневные поездки.", "/demo-images/demo-05.svg", "Внешний аккумулятор и кабель"},
+	{"DEMO-PRODUCT-005", "Рюкзак Urban Daypack", "Городской рюкзак с отделением для ноутбука 15,6 дюйма, мягкой спинкой и карманом быстрого доступа. Объём 18 литров подходит для работы и коротких поездок.", "/demo-images/demo-06.svg", "Чёрный городской рюкзак"},
+	{"DEMO-PRODUCT-006", "Кроссовки City Run", "Универсальные кроссовки с амортизирующей подошвой и дышащим верхом. Рассчитаны на прогулки по городу, лёгкие пробежки и активный день.", "/demo-images/demo-07.svg", "Красные спортивные кроссовки"},
+	{"DEMO-PRODUCT-007", "Смарт-часы Pulse S2", "Часы с мониторингом активности, уведомлениями смартфона и ярким дисплеем. Корпус защищён от брызг, ремешок легко заменить под свой стиль.", "/demo-images/demo-08.svg", "Наручные часы на светлом фоне"},
+	{"DEMO-PRODUCT-008", "Очки Northline Classic", "Солнцезащитные очки в универсальной оправе с поляризационными линзами. Лаконичная форма подходит для города, путешествий и отдыха на природе.", "/demo-images/demo-09.svg", "Солнцезащитные очки"},
+	{"DEMO-PRODUCT-009", "Термобутылка Steel 750", "Стальная бутылка объёмом 750 мл сохраняет температуру напитка и не впитывает запахи. Герметичная крышка подходит для офиса, спорта и дороги.", "/demo-images/demo-10.svg", "Многоразовая металлическая бутылка"},
+	{"DEMO-PRODUCT-010", "Чашка Mono Ceramic", "Керамическая чашка объёмом 350 мл с матовой глазурью и удобной ручкой. Минималистичный дизайн хорошо смотрится дома и в офисной кухне.", "/demo-images/demo-11.svg", "Керамическая чашка с кофе"},
+	{"DEMO-PRODUCT-011", "Настольная лампа Halo", "Настольная лампа с мягким рассеянным светом и регулировкой наклона. Подходит для чтения, видеозвонков и вечерней работы за столом.", "/demo-images/demo-12.svg", "Настольная лампа в интерьере"},
+	{"DEMO-PRODUCT-012", "Мышь Flow Silent", "Беспроводная мышь с бесшумными кнопками, точным сенсором и двумя режимами подключения. Эргономичная форма рассчитана на долгую работу.", "/demo-images/demo-13.svg", "Компьютерная мышь на столе"},
+	{"DEMO-PRODUCT-013", "Ежедневник Paper Grid", "Недатированный ежедневник в твёрдой обложке: планирование недели, заметки и трекер привычек. Плотная бумага подходит для ручки и карандаша.", "/demo-images/demo-14.svg", "Открытый блокнот и ручка"},
+	{"DEMO-PRODUCT-014", "Свеча Cedar & Amber", "Ароматическая свеча в стеклянном стакане с нотами кедра, янтаря и сухих трав. Даёт тёплый ненавязчивый аромат для домашнего вечера.", "/demo-images/demo-15.svg", "Ароматическая свеча"},
+	{"DEMO-PRODUCT-015", "Крем для рук Soft Repair", "Увлажняющий крем для рук с лёгкой текстурой и нейтральным ароматом. Быстро впитывается, смягчает кожу и удобен для ежедневного ухода.", "/demo-images/demo-16.svg", "Флакон косметического средства"},
+	{"DEMO-PRODUCT-016", "Парфюмерный набор Weekend", "Набор из двух мини-флаконов для поездок и знакомства с ароматами коллекции. Компактный формат удобно брать в ручную кладь или сумку.", "/demo-images/demo-17.svg", "Флакон парфюма"},
+	{"DEMO-PRODUCT-017", "Футболка Basic Cotton", "Базовая футболка из мягкого хлопка плотностью 180 г/м². Прямой крой и спокойный оттенок легко сочетается с повседневным гардеробом.", "/demo-images/demo-18.svg", "Сложенная хлопковая футболка"},
+	{"DEMO-PRODUCT-018", "Кошелёк Slim Card", "Компактный кошелёк для карт и нескольких купюр из износостойкого материала. Тонкий профиль не создаёт лишнего объёма в кармане.", "/demo-images/demo-19.svg", "Кожаный кошелёк"},
+	{"DEMO-PRODUCT-019", "Камера Lens One", "Зеркальная камера для тех, кто хочет больше контроля над светом и глубиной резкости. Подходит для предметной съёмки, портретов и путешествий.", "/demo-images/demo-20.svg", "Фотокамера с объективом"},
+	{"DEMO-PRODUCT-020", "Растение Mini Green", "Неприхотливое комнатное растение в керамическом кашпо. Компактный размер подходит для рабочего стола, полки или небольшого подоконника.", "/demo-images/demo-21.svg", "Зелёное комнатное растение"},
+	{"DEMO-PRODUCT-021", "Плед Soft Home", "Мягкий плед с фактурной вязкой для дивана, кресла или поездки за город. Сдержанный цвет легко вписывается в современный интерьер.", "/demo-images/demo-22.svg", "Мягкий плед в интерьере"},
+	{"DEMO-PRODUCT-022", "Органайзер Desk Tray", "Лоток для кабелей, блокнотов и мелких аксессуаров. Помогает держать рабочую поверхность в порядке и быстро находить нужные вещи.", "/demo-images/demo-23.svg", "Органайзер с канцелярией"},
+	{"DEMO-PRODUCT-023", "Кресло Lounge Fold", "Складное кресло с широкой спинкой и мягким сиденьем. Легко переносится между комнатами, балконом и зоной отдыха.", "/demo-images/demo-24.svg", "Кресло в светлом интерьере"},
 }
 
 type demoCatalogStatusProduct struct {
@@ -193,8 +192,8 @@ type demoCatalogStatusProduct struct {
 // visual catalog. They deliberately have no active offers, so they cannot
 // accidentally become orderable or reserve stock.
 var demoCatalogStatusProducts = []demoCatalogStatusProduct{
-	{"DEMO-PRODUCT-STATUS-DRAFT", "DEMO-STATUS-DRAFT", "Статус-пример · Черновик", "Карточка товара в работе: описание и изображение уже подготовлены, но предложение ещё не опубликовано.", "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=900&q=80", "Рабочее место с блокнотом", "draft"},
-	{"DEMO-PRODUCT-STATUS-ARCHIVED", "DEMO-STATUS-ARCHIVED", "Статус-пример · Архив", "Архивная карточка для демонстрации истории каталога. Товар больше не предлагается к продаже.", "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80", "Камера с объективом на столе", "archived"},
+	{"DEMO-PRODUCT-STATUS-DRAFT", "DEMO-STATUS-DRAFT", "Статус-пример · Черновик", "Карточка товара в работе: описание и изображение уже подготовлены, но предложение ещё не опубликовано.", "/demo-images/demo-25.svg", "Рабочее место с блокнотом", "draft"},
+	{"DEMO-PRODUCT-STATUS-ARCHIVED", "DEMO-STATUS-ARCHIVED", "Статус-пример · Архив", "Архивная карточка для демонстрации истории каталога. Товар больше не предлагается к продаже.", "/demo-images/demo-26.svg", "Камера с объективом на столе", "archived"},
 }
 
 type OrderDetail struct {
@@ -426,6 +425,9 @@ func seedDemoCatalog(ctx context.Context, tx *sql.Tx, org, ws, primaryProductID 
 		if imageID == "" {
 			return errors.New("search repository: random demo product image identifier failed")
 		}
+		if _, err := tx.ExecContext(ctx, `UPDATE catalog_product_images SET url=$4,alt_text=$5,version=version+1,updated_at=$6 WHERE organization_id=$1 AND workspace_id=$2 AND id=(SELECT id FROM catalog_product_images WHERE organization_id=$1 AND workspace_id=$2 AND product_id=$3 AND position=0 ORDER BY id LIMIT 1) AND url<>$4`, org, ws, productID, item.ImageURL, item.ImageAlt, stamp); err != nil {
+			return fmt.Errorf("search repository: refresh demo product image %s: %w", item.Code, err)
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_product_images(id,organization_id,workspace_id,product_id,url,alt_text,position) VALUES($1,$2,$3,$4,$5,$6,0) ON CONFLICT(organization_id,workspace_id,product_id,url) DO NOTHING`, imageID, org, ws, productID, item.ImageURL, item.ImageAlt); err != nil {
 			return fmt.Errorf("search repository: insert demo product image %s: %w", item.Code, err)
 		}
@@ -478,6 +480,13 @@ func seedDemoCatalogStatusProducts(ctx context.Context, tx *sql.Tx, org, ws stri
 		imageID := randomUUIDv7()
 		if imageID == "" {
 			return errors.New("search repository: random demo status product image identifier failed")
+		}
+		statusProductID := ""
+		if err := tx.QueryRowContext(ctx, `SELECT id FROM products WHERE organization_id=$1 AND workspace_id=$2 AND code=$3`, org, ws, item.Code).Scan(&statusProductID); err != nil {
+			return fmt.Errorf("search repository: find demo status image product %s: %w", item.Code, err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE catalog_product_images SET url=$4,alt_text=$5,version=version+1,updated_at=$6 WHERE organization_id=$1 AND workspace_id=$2 AND id=(SELECT id FROM catalog_product_images WHERE organization_id=$1 AND workspace_id=$2 AND product_id=$3 AND position=0 ORDER BY id LIMIT 1) AND url<>$4`, org, ws, statusProductID, item.ImageURL, item.ImageAlt, stamp); err != nil {
+			return fmt.Errorf("search repository: refresh demo status product image %s: %w", item.Code, err)
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_product_images(id,organization_id,workspace_id,product_id,url,alt_text,position) VALUES($1,$2,$3,(SELECT id FROM products WHERE organization_id=$2 AND workspace_id=$3 AND code=$4),$5,$6,0) ON CONFLICT(organization_id,workspace_id,product_id,url) DO NOTHING`, imageID, org, ws, item.Code, item.ImageURL, item.ImageAlt); err != nil {
 			return fmt.Errorf("search repository: insert demo status product image %s: %w", item.Code, err)

@@ -1,0 +1,18 @@
+name: torgnexa-shopify-test
+
+services:
+  protocol-double:
+    image: python:3.13-alpine
+    environment:
+      SHOPIFY_MOCK_TOKEN: shopify-local-token
+      SHOPIFY_MOCK_PORT: 8080
+    volumes:
+      - ./scripts/shopify-mock-server.py:/app/shopify-mock-server.py:ro
+    command: ["python3", "/app/shopify-mock-server.py"]
+    ports:
+      - "${SHOPIFY_HTTP_PORT:-18001}:8080"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

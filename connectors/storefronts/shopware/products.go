@@ -21,10 +21,7 @@ func (connector *Connector) listTopLevelProducts(ctx context.Context, configurat
 	if err != nil {
 		return nil, 0, err
 	}
-	var page_ struct {
-		Data  []shopwareProduct `json:"data"`
-		Total int               `json:"total"`
-	}
+	var page_ shopwareSearchPage[shopwareProduct]
 	if json.Unmarshal(response.Body, &page_) != nil || len(page_.Data) > limit {
 		return nil, 0, ErrInvalidResponse
 	}
@@ -39,10 +36,7 @@ func (connector *Connector) listVariants(ctx context.Context, configuration Conf
 		if err != nil {
 			return nil, err
 		}
-		var result struct {
-			Data  []shopwareProduct `json:"data"`
-			Total int               `json:"total"`
-		}
+		var result shopwareSearchPage[shopwareProduct]
 		if json.Unmarshal(response.Body, &result) != nil || len(result.Data) > 100 {
 			return nil, ErrInvalidResponse
 		}

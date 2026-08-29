@@ -32,13 +32,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 513
+- docs: 522
 - adrs: 114
-- tasks: 163
+- tasks: 164
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2779
+- total source files (excluding local secrets/build/dependency/cache trees): 2830
 
 
 ## Connector category layout
@@ -1525,9 +1525,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `deploy/postgres/legacy_pre_v1_catalog.tsv`
 - `deploy/postgres/migrate.sh`
 - `deploy/postgres/rebaseline-pre-v1.sh`
+- `docker-compose.medusa-test.yml`
 - `docker-compose.opencart-test.yml`
 - `docker-compose.prestashop-test.yml`
 - `docker-compose.production.yml`
+- `docker-compose.saleor-test.yml`
+- `docker-compose.shopify-test.yml`
 - `docker-compose.woocommerce-test.yml`
 - `docker-compose.yml`
 - `docker/opencart-test/Dockerfile`
@@ -1763,6 +1766,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/magento/capability-audit.md`
 - `docs/connectors/magento/conformance-plan.md`
 - `docs/connectors/magento/conformance-report.json`
+- `docs/connectors/magento/docker-live-qualification.md`
+- `docs/connectors/magento/live-qualification-status.json`
 - `docs/connectors/magento/reconciliation.md`
 - `docs/connectors/magento/spec.md`
 - `docs/connectors/magnit-market/README.md`
@@ -1782,6 +1787,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/medusa/capability-audit.md`
 - `docs/connectors/medusa/conformance-plan.md`
 - `docs/connectors/medusa/conformance-report.json`
+- `docs/connectors/medusa/docker-live-qualification.md`
+- `docs/connectors/medusa/live-qualification-status.json`
 - `docs/connectors/medusa/reconciliation.md`
 - `docs/connectors/medusa/spec.md`
 - `docs/connectors/megamarket/README.md`
@@ -1893,6 +1900,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/saleor/capability-audit.md`
 - `docs/connectors/saleor/conformance-plan.md`
 - `docs/connectors/saleor/conformance-report.json`
+- `docs/connectors/saleor/docker-live-qualification.md`
+- `docs/connectors/saleor/live-qualification-status.json`
 - `docs/connectors/saleor/reconciliation.md`
 - `docs/connectors/saleor/spec.md`
 - `docs/connectors/sbp/README.md`
@@ -1905,6 +1914,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/shopify/capability-audit.md`
 - `docs/connectors/shopify/conformance-plan.md`
 - `docs/connectors/shopify/conformance-report.json`
+- `docs/connectors/shopify/docker-live-qualification.md`
+- `docs/connectors/shopify/live-qualification-status.json`
 - `docs/connectors/shopify/reconciliation.md`
 - `docs/connectors/shopify/spec.md`
 - `docs/connectors/shopware/README.md`
@@ -2002,6 +2013,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/migrations/000021-notifications.md`
 - `docs/migrations/000022-ai-provider-gemini-grok.md`
 - `docs/migrations/000022-upload-quarantine-foundation.md`
+- `docs/migrations/000023-offline-demo-product-images.md`
 - `docs/migrations/000023-upload-security-pipeline.md`
 - `docs/migrations/000024-sync-engine.md`
 - `docs/migrations/000025-reconciliation.md`
@@ -2123,6 +2135,33 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/connector-logos/yandexgpt.svg`
 - `frontend/public/connector-logos/yookassa.svg`
 - `frontend/public/connector-logos/youtube.svg`
+- `frontend/public/demo-images/demo-01.svg`
+- `frontend/public/demo-images/demo-02.svg`
+- `frontend/public/demo-images/demo-03.svg`
+- `frontend/public/demo-images/demo-04.svg`
+- `frontend/public/demo-images/demo-05.svg`
+- `frontend/public/demo-images/demo-06.svg`
+- `frontend/public/demo-images/demo-07.svg`
+- `frontend/public/demo-images/demo-08.svg`
+- `frontend/public/demo-images/demo-09.svg`
+- `frontend/public/demo-images/demo-10.svg`
+- `frontend/public/demo-images/demo-11.svg`
+- `frontend/public/demo-images/demo-12.svg`
+- `frontend/public/demo-images/demo-13.svg`
+- `frontend/public/demo-images/demo-14.svg`
+- `frontend/public/demo-images/demo-15.svg`
+- `frontend/public/demo-images/demo-16.svg`
+- `frontend/public/demo-images/demo-17.svg`
+- `frontend/public/demo-images/demo-18.svg`
+- `frontend/public/demo-images/demo-19.svg`
+- `frontend/public/demo-images/demo-20.svg`
+- `frontend/public/demo-images/demo-21.svg`
+- `frontend/public/demo-images/demo-22.svg`
+- `frontend/public/demo-images/demo-23.svg`
+- `frontend/public/demo-images/demo-24.svg`
+- `frontend/public/demo-images/demo-25.svg`
+- `frontend/public/demo-images/demo-26.svg`
+- `frontend/public/demo-images/demo-avatar.svg`
 - `frontend/public/docs/documentation.png`
 - `frontend/public/docs/integration-connection.png`
 - `frontend/public/docs/integrations.png`
@@ -2164,11 +2203,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/components/Skeleton.tsx`
 - `frontend/src/components/StatusBadge.tsx`
 - `frontend/src/components/Toast.tsx`
+- `frontend/src/components/UserAvatar.tsx`
 - `frontend/src/components/icon-names.ts`
 - `frontend/src/components/labels.ts`
 - `frontend/src/components/quantity.ts`
 - `frontend/src/components/useFocusTrap.ts`
 - `frontend/src/env.d.ts`
+- `frontend/src/features/DemoDatasetButton.tsx`
 - `frontend/src/features/catalog/ProductList.tsx`
 - `frontend/src/features/demoDataset.ts`
 - `frontend/src/features/notifications/NotificationList.tsx`
@@ -2735,6 +2776,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000020_ai_provider_claude.sql`
 - `migrations/000021_ai_provider_local_runtime.sql`
 - `migrations/000022_ai_provider_gemini_grok.sql`
+- `migrations/000023_offline_demo_product_images.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2852,6 +2894,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-trust-control-postgres.sh`
 - `scripts/check.sh`
 - `scripts/community-demo-member.sql`
+- `scripts/community-e2e.mjs`
+- `scripts/community-e2e.sh`
 - `scripts/cscart-smoke.sh`
 - `scripts/dzen-content-transformer-test.py`
 - `scripts/dzen-content-transformer.py`
@@ -2864,6 +2908,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/generate-release-sboms.sh`
 - `scripts/init-community-env.sh`
 - `scripts/install-security-tools.sh`
+- `scripts/magento-smoke.sh`
+- `scripts/medusa-docker/medusa-config.ts`
+- `scripts/medusa-smoke.sh`
 - `scripts/opencart-smoke.sh`
 - `scripts/p4_common.py`
 - `scripts/p4_hosting_rules.py`
@@ -2877,7 +2924,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/prestashop-smoke.sh`
 - `scripts/promote-github-release.sh`
 - `scripts/runtime-load.py`
+- `scripts/saleor-smoke.sh`
 - `scripts/scan-supply-chain.sh`
+- `scripts/shopify-mock-server.py`
+- `scripts/shopify-smoke.sh`
 - `scripts/stage-github-release.sh`
 - `scripts/verify-action-pins.sh`
 - `scripts/verify-release-evidence-external.sh`
@@ -3074,6 +3124,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/159-gemini-grok-ai-providers.md`
 - `tasks/issues/160-prestashop-commerce-sync-runtime.md`
 - `tasks/issues/161-commerce-product-event-runtime-route.md`
+- `tasks/issues/162-authorized-community-browser-e2e.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

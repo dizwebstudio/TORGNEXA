@@ -1,5 +1,5 @@
 import type {AuthAdapter} from "./auth-adapter";
-import type {AuthSession} from "./session-model";
+import type {AuthSession, UserProfile} from "./session-model";
 import {sessionExpired, sessionNeedsRefresh} from "./session-model";
 import {accountConsoleURL} from "./oidc-urls";
 
@@ -7,6 +7,17 @@ interface TokenClaims {
   sub?: string;
   name?: string;
   preferred_username?: string;
+  email?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  birthdate?: string;
+  job_title?: string;
+  position?: string;
+  title?: string;
+  department?: string;
+  phone_number?: string;
+  locale?: string;
   exp?: number;
   iss?: string;
   realm_access?: {roles?: string[]};
@@ -32,10 +43,10 @@ class TokenEndpointError extends Error {
 const silentErrors = new Set(["login_required", "interaction_required", "consent_required", "session_expired"]);
 
 const roleCapabilities: Readonly<Record<string, readonly string[]>> = {
-  admin: ["operations.realtime.read", "products.read", "products.write", "orders.read", "orders.status.write", "stock.read", "stock.write", "connectors.read", "connectors.accounts.read", "connectors.accounts.write", "connectors.replay.run", "sync.read", "sync.write", "approvals.read", "approvals.write", "compliance.read", "notifications.read", "reports.read", "audit.read", "settings.read", "settings.members.read", "settings.members.write", "settings.security.read", "settings.security.write", "settings.security.posture.read", "settings.security.evidence.read", "settings.identity_providers.read", "settings.identity_providers.write", "settings.ai_providers.read", "settings.ai_providers.write", "settings.ai_governance.read", "settings.ai_governance.write", "settings.mcp_accounts.read", "settings.mcp_accounts.write", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "webhooks.write", "plugins.read", "settlements.read", "fx.read", "cloud.subscription.read", "privacy.requests.write"],
-  manager: ["operations.realtime.read", "products.read", "orders.read", "orders.status.write", "stock.read", "connectors.read", "connectors.replay.run", "sync.read", "approvals.read", "compliance.read", "notifications.read", "reports.read", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "plugins.read", "settlements.read", "fx.read"],
-  operator: ["operations.realtime.read", "products.read", "orders.read", "orders.status.write", "stock.read", "connectors.read", "connectors.replay.run", "sync.read", "notifications.read", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "plugins.read"],
-  viewer: ["operations.realtime.read", "products.read", "orders.read", "stock.read", "notifications.read", "reports.read", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "counterparties.read", "settlements.read", "fx.read"],
+  admin: ["operations.realtime.read", "products.read", "products.write", "orders.read", "orders.status.write", "stock.read", "stock.write", "connectors.read", "connectors.accounts.read", "connectors.accounts.write", "connectors.replay.run", "sync.read", "sync.write", "approvals.read", "approvals.write", "compliance.read", "notifications.read", "reports.read", "audit.read", "settings.read", "settings.profile.read", "settings.profile.write", "settings.members.read", "settings.members.write", "settings.security.read", "settings.security.write", "settings.security.posture.read", "settings.security.evidence.read", "settings.identity_providers.read", "settings.identity_providers.write", "settings.ai_providers.read", "settings.ai_providers.write", "settings.ai_governance.read", "settings.ai_governance.write", "settings.mcp_accounts.read", "settings.mcp_accounts.write", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "webhooks.write", "plugins.read", "settlements.read", "fx.read", "cloud.subscription.read", "privacy.requests.write"],
+  manager: ["operations.realtime.read", "products.read", "orders.read", "orders.status.write", "stock.read", "connectors.read", "connectors.replay.run", "sync.read", "sync.write", "approvals.read", "compliance.read", "notifications.read", "reports.read", "settings.profile.read", "settings.profile.write", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "plugins.read", "settlements.read", "fx.read"],
+  operator: ["operations.realtime.read", "products.read", "orders.read", "orders.status.write", "stock.read", "connectors.read", "connectors.replay.run", "sync.read", "notifications.read", "settings.profile.read", "settings.profile.write", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "ai.analyze", "profitability.scenarios.write", "counterparties.read", "webhooks.read", "plugins.read"],
+  viewer: ["operations.realtime.read", "products.read", "orders.read", "stock.read", "notifications.read", "reports.read", "settings.profile.read", "settings.profile.write", "settings.ai_providers.read", "settings.ai_governance.read", "settings.mcp_accounts.read", "counterparties.read", "settlements.read", "fx.read"],
 };
 
 function base64url(bytes: Uint8Array): string {
@@ -67,6 +78,22 @@ function decodeClaims(token: string): TokenClaims {
 function capabilitiesFor(claims: TokenClaims): string[] {
   const roles = claims.realm_access?.roles ?? [];
   return [...new Set(roles.flatMap((role) => roleCapabilities[role] ?? []))].sort();
+}
+
+function profileFor(claims: TokenClaims): UserProfile | undefined {
+  const profile: UserProfile = {
+    username: claims.preferred_username,
+    email: claims.email,
+    givenName: claims.given_name,
+    familyName: claims.family_name,
+    picture: claims.picture,
+    birthdate: claims.birthdate,
+    jobTitle: claims.job_title || claims.position || claims.title,
+    department: claims.department,
+    phoneNumber: claims.phone_number,
+    locale: claims.locale,
+  };
+  return Object.values(profile).some(Boolean) ? profile : undefined;
 }
 
 async function waitForCallback(popup: Window, origin: string, state: string): Promise<string> {
@@ -186,6 +213,7 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
       capabilities: capabilitiesFor(claims),
       roles: [...new Set(claims.realm_access?.roles ?? [])].sort(),
       expiresAt,
+      profile: profileFor(claims),
     };
     refreshToken = nextRefreshToken;
     return session;

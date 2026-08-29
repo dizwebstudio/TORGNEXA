@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/core/userprofile"
 	"github.com/torgnexa/torgnexa/internal/platform/securityedge"
 )
 
@@ -28,6 +29,7 @@ type Principal struct {
 	SessionRef     string
 	SubjectRef     string
 	Email          string
+	Profile        userprofile.Identity
 	Roles          []string
 	OrganizationID string
 	WorkspaceID    string

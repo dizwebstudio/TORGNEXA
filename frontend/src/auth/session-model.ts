@@ -1,3 +1,16 @@
+export interface UserProfile {
+  readonly username?: string;
+  readonly email?: string;
+  readonly givenName?: string;
+  readonly familyName?: string;
+  readonly picture?: string;
+  readonly birthdate?: string;
+  readonly jobTitle?: string;
+  readonly department?: string;
+  readonly phoneNumber?: string;
+  readonly locale?: string;
+}
+
 export interface AuthSession {
   readonly subject: string;
   readonly displayName: string;
@@ -5,6 +18,7 @@ export interface AuthSession {
   readonly capabilities: readonly string[];
   readonly roles?: readonly string[];
   readonly expiresAt?: string;
+  readonly profile?: UserProfile;
 }
 
 export interface PublicSession {
@@ -13,6 +27,7 @@ export interface PublicSession {
   readonly capabilities: readonly string[];
   readonly roles: readonly string[];
   readonly expiresAt?: string;
+  readonly profile?: UserProfile;
 }
 
 const capabilityPattern = /^[a-z][a-z0-9._:-]{1,127}$/;
@@ -40,6 +55,31 @@ export function safeDisplayName(value: string, subject: string, roles: readonly 
   return "Пользователь TORGNEXA";
 }
 
+function boundedProfileValue(value: string | undefined, maximum: number): string | undefined {
+  if (value === undefined) return undefined;
+  const candidate = value.trim();
+  if (candidate.length > maximum) throw new Error("invalid profile value");
+  return candidate || undefined;
+}
+
+function normalizeProfile(input?: UserProfile): UserProfile | undefined {
+  if (!input) return undefined;
+  const picture = boundedProfileValue(input.picture, 1024);
+  const profile: UserProfile = {
+    username: boundedProfileValue(input.username, 128),
+    email: boundedProfileValue(input.email, 254),
+    givenName: boundedProfileValue(input.givenName, 160),
+    familyName: boundedProfileValue(input.familyName, 160),
+    picture: picture && /^(?:https?:\/\/|\/)[^\s]{1,1024}$/.test(picture) ? picture : undefined,
+    birthdate: boundedProfileValue(input.birthdate, 32),
+    jobTitle: boundedProfileValue(input.jobTitle, 160),
+    department: boundedProfileValue(input.department, 160),
+    phoneNumber: boundedProfileValue(input.phoneNumber, 64),
+    locale: boundedProfileValue(input.locale, 32),
+  };
+  return Object.values(profile).some(Boolean) ? profile : undefined;
+}
+
 export function normalizeSession(input: AuthSession): AuthSession {
   const subject = input.subject.trim();
   const accessToken = input.accessToken.trim();
@@ -65,7 +105,7 @@ export function normalizeSession(input: AuthSession): AuthSession {
     expiresAt = parsed.toISOString();
   }
 
-  return {subject, displayName, accessToken, capabilities, roles, expiresAt};
+  return {subject, displayName, accessToken, capabilities, roles, expiresAt, profile: normalizeProfile(input.profile)};
 }
 
 export function publicSession(session: AuthSession): PublicSession {
@@ -75,6 +115,7 @@ export function publicSession(session: AuthSession): PublicSession {
     capabilities: [...session.capabilities],
     roles: [...(session.roles ?? [])],
     expiresAt: session.expiresAt,
+    profile: session.profile ? {...session.profile} : undefined,
   };
 }
 

@@ -35,10 +35,7 @@ func (connector *Connector) ReadOrders(ctx context.Context, account sdk.Account,
 		if callErr != nil {
 			return callErr
 		}
-		var result struct {
-			Data  []shopwareOrder `json:"data"`
-			Total int             `json:"total"`
-		}
+		var result shopwareSearchPage[shopwareOrder]
 		if json.Unmarshal(response.Body, &result) != nil || len(result.Data) > request.Limit {
 			return ErrInvalidResponse
 		}

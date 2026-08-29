@@ -30,7 +30,7 @@ export function AskAIPanel({reportTitle,report}:{reportTitle:string;report:Repor
  if(!canAnalyze)return null;
  return <section className="drawer-section ask-ai-panel">
   <h3><Icon name="activity"/> Спросить ИИ об этом отчёте</h3>
-  {!canListAccounts||accounts.isError?<p className="settings-note">Не удалось загрузить список провайдеров ИИ.</p>:enabled.length===0?<p className="settings-note">Нет включённых провайдеров ИИ. Добавьте аккаунт в разделе «Настройки → Провайдеры ИИ».</p>:<>
+  {!canListAccounts?<p className="settings-note">Нет доступа к списку провайдеров ИИ.</p>:accounts.isError?<ErrorBlock retry={()=>void accounts.refetch()}>Не удалось загрузить список провайдеров ИИ.</ErrorBlock>:enabled.length===0?<p className="settings-note">Нет включённых провайдеров ИИ. Добавьте аккаунт в разделе «Настройки → Провайдеры ИИ».</p>:<>
    <div className="settings-grid">
     <label className="field"><span>Провайдер ИИ</span><select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Выберите аккаунт…</option>{enabled.map(account=><option value={account.id} key={account.id}>{account.label} · {providerLabels[account.provider]??account.provider}</option>)}</select></label>
     <label className="field"><span>Вопрос (необязательно)</span><input value={question} maxLength={2000} placeholder="Что выросло сильнее всего за период?" onChange={e=>setQuestion(e.target.value)}/></label>

@@ -473,6 +473,46 @@
       },
       "backfill": null,
       "sha256": "45da4146d803a61db2938af55e5b4a1600377cd9621f2be3bc776512542b4ef5"
+    },
+    {
+      "version": 23,
+      "name": "offline_demo_product_images",
+      "file": "000023_offline_demo_product_images.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [22],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "c4b1e1a7a91752a95d14f26713976bef4d9204fa1f02e1da8b1f51dd45b5e249"
+    },
+    {
+      "version": 24,
+      "name": "user_profiles",
+      "file": "000024_user_profiles.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [23],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "f803f01cd08a9d06b8c10595a78a0c43366bd560ff497ae6e33ed200422e391b"
     }
   ]
 }

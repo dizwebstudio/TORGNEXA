@@ -15,6 +15,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Task `158` is repository-complete: «Долями» is visible in Payments as an mTLS/basic health-only surface; payment mutations and webhooks remain qualification-gated.
 - Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
 - Task `161` is repository-complete: `commerce-sync` now consumes canonical product change events, invokes admitted ProductWriter routes with provider-native status translation, and persists product mappings only after validated remote receipts.
+- Task `162` is repository-complete: the Community deployment now has a repeatable authenticated Chrome E2E that reconciles the Keycloak demo member and verifies catalog, product images, orders and order thumbnails through the rendered browser UI.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -659,6 +660,27 @@ agnostic; operators connect an already-running local server.
 - live model availability still requires an operator-provided local service and
   model; TORGNEXA does not download weights or auto-deploy model servers.
 
+## Phase 25.5 — Medusa v2 storefront qualification
+
+`146`
+
+Task 146 adds the Medusa v2 Connector SDK implementation and catalog card. The
+canonical deterministic report is 13/13, while a real Docker/live store is a
+separate gate. `scripts/medusa-smoke.sh` exercises the Admin REST API with a
+secret API key and is documented in
+`docs/connectors/medusa/docker-live-qualification.md`.
+
+### Gate RUNTIME-146
+
+- a non-production Medusa v2 DTC Starter/Compose project, secret API key and
+  synthetic SKU are required;
+- reads cover catalog, variants/prices, inventory locations and optional
+  orders/returns; writes are explicit and restore original values;
+- the repository DTC Starter Docker smoke passed on 2026-08-29 with
+  read-after-write reconciliation and automatic restoration; an external
+  staging endpoint remains a separate live gate, and product creation/webhook
+  receipt stay fail-closed.
+
 ## Phase 26 — 1С-Битрикс storefront connector
 
 `152`
@@ -731,6 +753,53 @@ unsupported inventory, prices, orders and webhooks remain unavailable.
   documented in `docs/connectors/cs-cart/docker-live-qualification.md` and
   implemented by `scripts/cscart-smoke.sh`; until it passes, the provider is
   repository-qualified only (SDK 13/13), not live-qualified.
+
+## Phase 27.25 — Shopify storefront qualification
+
+`144`
+
+Task 144 admits Shopify through the host-owned per-tenant OAuth runtime. Shopify
+has no official self-hosted Docker store, so the reproducible local gate is a
+stateful Admin REST protocol double rather than a fake merchant deployment.
+The double passed on 2026-08-29 against the pinned Admin REST API `2026-07`:
+auth rejection, health/version, catalog, locations, variant/inventory mapping,
+orders/refunds, product/price/inventory writes, read-after-write and cleanup.
+
+### Gate RUNTIME-144
+
+- run `docker-compose.shopify-test.yml` with `scripts/shopify-smoke.sh` for
+  protocol qualification; it never contacts Shopify or accepts production
+  credentials;
+- a real Shopify Dev Store, installed app token, required scopes and a
+  synthetic SKU are still required for external qualification, using the same
+  smoke script over HTTPS;
+- product creation and webhook receipt remain fail-closed, and order
+  cancel/close/reopen writes are excluded from the smoke because they do not
+  have a safe complete rollback in the generic test contract;
+- status is tracked in `docs/connectors/shopify/live-qualification-status.json`.
+
+## Phase 27.5 — Saleor storefront qualification
+
+`154`
+
+Task 154 adds the self-hosted Saleor GraphQL connector and its qualification
+split. The canonical Connector SDK report is 13/13 PASS. A disposable official
+Saleor Platform Docker stack was then credential-smoke-tested on 2026-08-29:
+catalog/detail reads, channel/warehouse resolution, product/name/publication,
+price and stock writes, read-after-write reconciliation and cleanup all passed
+for SKU `111223580`.
+
+### Gate RUNTIME-154
+
+- the reproducible stack is
+  `docker-compose.saleor-test.yml` with `scripts/saleor-smoke.sh` and the
+  procedure in `docs/connectors/saleor/docker-live-qualification.md`;
+- product creation and webhook receipt remain fail-closed because the current
+  Connector SDK contract cannot carry Saleor's required product type or its
+  detached JWS signature;
+- external merchant staging remains a separate gate requiring an HTTPS
+  endpoint, scoped App token and synthetic channel/warehouse/SKU. The status is
+  tracked in `docs/connectors/saleor/live-qualification-status.json`.
 
 ## Phase 28 — «Почта России» logistics connector
 
@@ -828,3 +897,27 @@ existing offer-mapping and PrestaShop-only route.
   unchanged;
 - Go tests/vet, contract and architecture checks pass before release
   qualification.
+
+## Phase 32 — Authorized Community browser E2E
+
+`162`
+
+Task 162 closes the local browser-verification gap. The Community workflow now
+reconciles a synthetic Keycloak user and workspace membership, then uses a
+clean Chrome profile to complete the real authorization-code flow and exercise
+the catalog, product-card image view, orders and order thumbnails. The runner
+uses only Node built-ins and Chrome DevTools Protocol, so the frontend lockfile
+and JavaScript supply-chain graph remain unchanged.
+
+### Gate RUNTIME-162
+
+- `make community-e2e` bootstraps the local demo identity before opening the
+  browser;
+- anonymous access cannot satisfy the test: the browser must complete the
+  Keycloak login and render the authenticated shell;
+- catalog rows, a product-card main image, the image tab and order list/detail
+  thumbnails are checked as loaded DOM media;
+- order actions remain visible for the seeded pending order; after the
+  idempotent demo setup, the browser assertions do not mutate demo state;
+- browser profiles, tokens, cookies and tenant selectors are not persisted;
+- repository frontend checks remain independent from the runtime E2E.

@@ -31,6 +31,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/userprofilerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
@@ -70,6 +71,7 @@ type productionRouteDependencies struct {
 	identityProviders  securitysettings.IdentityProviderStore
 	identityPolicy     *securitysettings.ProviderURLPolicy
 	identityValidator  securitysettings.ProviderValidator
+	profiles           *userprofilerepo.Repository
 	settlements        *settlementrepo.Repository
 	social             *socialrepo.Repository
 	payments           *paymentsrepo.Repository
@@ -79,6 +81,7 @@ type productionRouteDependencies struct {
 	uploads            *uploads.Service
 	uploadStatus       uploadStatusReader
 	uploadAccess       uploadReleaseGate
+	uploadEvidence     uploadEvidenceReader
 	uploadContent      uploads.ReleaseReader
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
@@ -119,6 +122,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newMCPAgentPolicyRoutes(deps.mcpAccounts, deps.agentGovernance, deps.agentGovernance, deps.auditService)...)
 	routes = append(routes, newTrustControlRoutes(deps.trustControl)...)
 	routes = append(routes, newUploadReadRoutes(deps.uploadStatus, deps.uploadAccess, deps.uploadContent)...)
+	routes = append(routes, newUserProfileRoutes(profileAPI{profiles: deps.profiles, audit: deps.auditService, uploads: deps.uploads, uploadStatus: deps.uploadStatus, uploadAccess: deps.uploadAccess, uploadEvidence: deps.uploadEvidence})...)
 	routes = append(routes, newReservedContractRoutes(deps, capabilityGuard)...)
 	return routes
 }

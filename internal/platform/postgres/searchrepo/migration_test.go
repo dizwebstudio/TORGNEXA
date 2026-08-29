@@ -100,8 +100,8 @@ func TestDemoCatalogContainsTwentyFourVisualProducts(t *testing.T) {
 		if item.Code == "" || item.Title == "" || item.Description == "" || item.ImageAlt == "" {
 			t.Fatalf("demo product %q is incomplete", item.Code)
 		}
-		if !strings.HasPrefix(item.ImageURL, "https://images.unsplash.com/") {
-			t.Fatalf("demo product %q does not use an HTTPS Unsplash image", item.Code)
+		if !strings.HasPrefix(item.ImageURL, "/demo-images/demo-") || !strings.HasSuffix(item.ImageURL, ".svg") {
+			t.Fatalf("demo product %q does not use a bundled offline image", item.Code)
 		}
 		if _, exists := seen[item.Code]; exists {
 			t.Fatalf("duplicate demo product code %q", item.Code)
@@ -136,8 +136,8 @@ func TestDemoStatusExamplesCoverVisibleLifecycleStatuses(t *testing.T) {
 		if item.Code == "" || item.SKU == "" || item.Title == "" || item.Description == "" || item.ImageAlt == "" {
 			t.Fatalf("demo status product %q is incomplete", item.Code)
 		}
-		if !strings.HasPrefix(item.ImageURL, "https://images.unsplash.com/") {
-			t.Fatalf("demo status product %q does not use an HTTPS Unsplash image", item.Code)
+		if !strings.HasPrefix(item.ImageURL, "/demo-images/demo-") || !strings.HasSuffix(item.ImageURL, ".svg") {
+			t.Fatalf("demo status product %q does not use a bundled offline image", item.Code)
 		}
 		catalogStatuses[item.Status] = true
 	}

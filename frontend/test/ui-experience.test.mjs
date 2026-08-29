@@ -27,6 +27,8 @@ test("dashboard is operational and includes onboarding and orchestration state",
   assert.match(dashboard, /Требуют человека/);
   assert.match(dashboard, /Первый запуск/);
   assert.match(dashboard, /Оркестрация Commerce/);
+  assert.match(dashboard, /DemoDatasetButton/);
+  assert.match(dashboard, /Заполнить рабочий контур/);
 });
 
 test("data table provides search sort pagination columns selection and bookmarkable views without browser persistence", () => {
@@ -127,8 +129,23 @@ test("AI provider settings keep form controls aligned and separated", () => {
   assert.match(css, /\.ai-provider-form-actions \{ margin-top: 14px; \}/);
 });
 
+test("profile card presents OIDC identity details and an offline demo avatar", () => {
+  const settings = read("pages/SettingsPage.tsx");
+  const model = read("auth/session-model.ts");
+  const adapter = read("auth/keycloak-adapter.ts");
+  const avatar = read("components/UserAvatar.tsx");
+  const css = read("styles.css");
+  for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "Профильные данные приходят из Keycloak"]) assert.match(settings, new RegExp(token));
+  for (const token of ["jobTitle", "department", "birthdate", "phoneNumber", "picture"]) { assert.match(model, new RegExp(token)); assert.match(adapter, new RegExp(token)); }
+  assert.match(avatar, /demo-avatar\.svg/);
+  assert.match(css, /\.profile-hero/);
+  assert.match(css, /\.profile-facts/);
+});
+
 test("catalog product creation starts from a real product card", () => {
   const catalog = read("features/catalog/ProductList.tsx");
+  const demoButton = read("features/DemoDatasetButton.tsx");
+  const demoCache = read("features/demoDataset.ts");
   const css = read("styles.css");
   for (const token of ["product-create-card", "Карточка товара", "product-create-card-tabs", "Создать карточку", "product-create-description"]) assert.ok(catalog.includes(token), token);
   for (const token of [".product-create-card-header", ".product-create-card-tabs", ".product-create-form", ".product-create-card-footer"]) assert.ok(css.includes(token), token);
@@ -142,12 +159,22 @@ test("catalog product creation starts from a real product card", () => {
   assert.match(catalog, /role="tablist"/);
   assert.match(catalog, /type="button" role="tab"/);
   assert.match(catalog, /api\.createProductImage\(\{productId:productID/);
-  assert.match(catalog, /Заполнить демо-каталог/);
-  assert.match(catalog, /createDemoOrders/);
+  assert.doesNotMatch(catalog, /Заполнить демо-каталог/);
+  assert.doesNotMatch(catalog, /createDemoOrders/);
+  assert.match(demoButton, /Заполнить весь демо-контур/);
+  assert.match(demoButton, /demo-dataset:all/);
+  assert.match(demoCache, /cache\.invalidateQueries\(\)/);
   assert.match(catalog, /catalog-product-thumbnail/);
   assert.match(catalog, /image_url/);
   for (const token of [".product-create-image-form", ".product-create-image-preview", ".product-create-image-empty"]) assert.ok(css.includes(token), token);
   for (const token of [".catalog-product-cell", ".catalog-product-thumbnail", ".catalog-product-copy"]) assert.ok(css.includes(token), token);
+});
+
+test("read errors always expose retry and catalog offer mutations report failures", () => {
+  const apiState = read("components/ApiState.tsx");
+  const catalog = read("features/catalog/ProductList.tsx");
+  assert.match(apiState, /window\.location\.reload/);
+  for (const token of ["Не удалось добавить предложение", "Не удалось сохранить предложение", "Не удалось добавить цену", "Не удалось изменить цену", "Не удалось назначить категорию", "Не удалось создать категорию"]) assert.match(catalog, new RegExp(token));
 });
 
 test("visual system includes dark mode mobile labels focus and reduced motion", () => {
@@ -165,8 +192,26 @@ test("technical status values are localized in badges", () => {
 
 test("connector capabilities are presented in Russian", () => {
   const settings = read("features/settings/IntegrationCatalog.tsx");
+  const labels = read("components/labels.ts");
   for (const token of ["Просмотр товаров", "Управление кабинетами интеграций", "Просмотр политик ИИ", "Управление участниками рабочего пространства", "Просмотр состояния безопасности"]) assert.match(settings, new RegExp(token));
   assert.doesNotMatch(settings, /Получать данные ·/);
+  for (const token of ["ai.completion.generate", "Генерация ответов ИИ", "payments.webhooks", "Получение уведомлений о платежах", "social.post.buttons", "Интерактивные кнопки публикаций"]) assert.match(labels, new RegExp(token));
+});
+
+test("audit, security and documentation technical values are localized for operators", () => {
+  const audit = read("pages/AuditPage.tsx");
+  const security = read("features/settings/SecuritySettings.tsx");
+  const trust = read("features/settings/TrustControlSettings.tsx");
+  const providers = read("features/settings/AIProviderSettings.tsx");
+  const docs = read("pages/PublicDocumentationPage.tsx");
+  assert.match(audit, /auditActionLabel\(item\.action\)/);
+  assert.match(audit, /auditResourceLabel\(item\.resource_type\)/);
+  assert.match(audit, /auditSourceLabel\(item\.source\)/);
+  for (const token of ["auditActionLabel", "auditResourceLabel", "Субъект и связь операции"]) assert.match(security, new RegExp(token));
+  for (const token of ["Свидетельства безопасности", "Маржинальная прибыль", "Безопасная предварительная проверка", "Сервис не запускается при ошибке проверки"]) assert.match(trust, new RegExp(token));
+  for (const token of ["Идентификатор папки", "Адрес API"]) assert.match(providers, new RegExp(token));
+  for (const token of ["права", "учётные данные", "рабочее пространство", "возможности манифеста"]) assert.match(docs, new RegExp(token));
+  assert.doesNotMatch(trust, />[^<]*(Contribution profit|Marketplace fee|Security Evidence|Connector Replay Lab|Synthetic fixture)[^<]*</);
 });
 
 test("storefront connector logos use official marks and brand palettes", () => {
@@ -230,6 +275,24 @@ test("orders show product card thumbnails in list and detail", () => {
   assert.match(image, /URL\.createObjectURL/);
   assert.match(css, /\.order-product-cell/);
   assert.match(css, /\.line-item \.order-product-thumbnail/);
+});
+
+test("product images support deletion, failed-load state and offline demo assets", () => {
+  const catalog = read("features/catalog/ProductList.tsx");
+  const image = read("components/ProductImage.tsx");
+  const css = read("styles.css");
+  const seed = readRoot("internal/platform/postgres/searchrepo/repository.go");
+  const demoAsset = readRoot("frontend/public/demo-images/demo-01.svg");
+  assert.match(catalog, /deleteProductImage/);
+  assert.match(catalog, /Удалить/);
+  assert.match(catalog, /window\.confirm/);
+  assert.match(image, /Изображение не загрузилось/);
+  assert.match(image, /onError/);
+  assert.match(image, /query\.isError/);
+  assert.match(css, /\.image-placeholder-failed/);
+  assert.match(seed, /\/demo-images\/demo-01\.svg/);
+  assert.match(seed, /\/demo-images\/demo-26\.svg/);
+  assert.match(demoAsset, /<svg/);
 });
 
 test("task 120 realtime is an authenticated SSE invalidation channel", () => {
@@ -324,6 +387,17 @@ test("community browser checks have a synthetic Keycloak user and upload scanner
   assert.match(helper, /add-roles/);
   assert.match(helper, /community-demo-member\.sql/);
   assert.match(readRoot("scripts/community-demo-member.sql"), /demo_subject/);
+});
+
+test("authorized community e2e covers catalog orders and product images", () => {
+  const runner = readRoot("scripts/community-e2e.mjs");
+  const wrapper = readRoot("scripts/community-e2e.sh");
+  const makefile = readRoot("Makefile");
+  for (const token of ["Keycloak realm", "TORGNEXA_DEMO_PASSWORD", "google-chrome", "Runtime.evaluate", "profile-card", "профиль пользователя", "catalog-product-thumbnail", "catalog-primary-image", "catalog-image-editor", "order-product-thumbnail", "Подтвердить заказ"]) assert.match(runner, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), token);
+  assert.match(runner, /user-data-dir=/);
+  assert.match(runner, /Page\.captureScreenshot/);
+  assert.match(wrapper, /ensure-community-demo-user\.sh/);
+  assert.match(makefile, /community-e2e: community-up/);
 });
 
 test("task 120 command palette searches server-side and opens entities directly", () => {

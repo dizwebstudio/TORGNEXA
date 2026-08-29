@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "c553429d319160d151b2698cf78587ee795039b1b16015826fb7d9199f484580",
+    "sha256": "9ec4d1b8b70f21967bb215359e187b487a029678325456e90a55024ab14e11ff",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -163,6 +163,11 @@
       "operation_id": "deleteDemoOrders",
       "method": "DELETE",
       "path": "/orders/demo"
+    },
+    {
+      "operation_id": "deleteProductImage",
+      "method": "DELETE",
+      "path": "/products/{product_id}/images/{image_id}"
     },
     {
       "operation_id": "disableAIProviderAccount",

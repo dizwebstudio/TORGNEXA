@@ -1,6 +1,6 @@
 # Task 154 — Saleor storefront connector
 
-Status: Repository implementation complete
+Status: Repository implementation complete; Docker qualification passed; external live qualification blocked
 
 ## Problem
 
@@ -82,13 +82,16 @@ different storefront connector in this repository so far.
   StatusRemoteID (publication) write through one variant's row is shared
   with every sibling variant under the same parent product — a real,
   documented side effect, not an oversight.
-- Live-instance qualification: unverifiable without a real self-hosted
-  Saleor deployment and App credential, same limitation already documented
-  for SBP/Robokassa/Shopify/Medusa/Shopware/Magento.
-- The Task-064 conformance suite's `sandbox_isolation` check could not be
-  exercised in this repository's execution environment because it cannot
-  create unprivileged Linux user namespaces (`unshare --user` returns
-  `Operation not permitted`); this is an environment constraint shared by
-  every connector's Task-029 sandbox probe, not a Saleor-specific gap.
-  `docs/connectors/saleor/conformance-report.json` records the genuine
-  12/13 result rather than a fabricated pass.
+- Docker qualification: the disposable official Saleor Platform stack passed
+  on 2026-08-29 using `scripts/saleor-smoke.sh` (SKU `111223580`, channel
+  `default-channel`, warehouse `default`). The smoke covered unauthorized
+  GraphQL handling, product/channel/warehouse reads, product/price/stock writes,
+  read-after-write reconciliation and automatic cleanup.
+- External live-instance qualification remains blocked without a real
+  self-hosted Saleor deployment, dedicated App credential and operator-selected
+  synthetic SKU/channel/warehouse; the Docker result is not a merchant-staging
+  certification.
+- The canonical Task-064 report is 13/13 PASS, including the shared
+  `sandbox_isolation` check. This report and the Docker/live split are recorded
+  in `docs/connectors/saleor/conformance-plan.md` and
+  `docs/connectors/saleor/live-qualification-status.json`.

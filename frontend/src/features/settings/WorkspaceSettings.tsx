@@ -18,7 +18,7 @@ function CloudSubscriptionCard(){
  const query=useQuery({queryKey:["settings","cloud-subscription"],queryFn:async()=>decodeSubscription((await api.getCloudSubscription()).body),enabled:canRead,staleTime:30_000});
  if(!canRead)return null;
  if(query.isPending)return <LoadingBlock/>;
- if(query.isError)return <ErrorBlock>Не удалось загрузить состояние подписки.</ErrorBlock>;
+ if(query.isError)return <ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить состояние подписки.</ErrorBlock>;
  return <section className="panel settings-card">
   <div className="settings-card-heading"><div><p className="eyebrow">Тариф</p><h2>Подписка</h2></div><StatusBadge value={query.data.mode==="community"?"Community":"Cloud"}/></div>
   {query.data.subscription?<dl className="settings-facts">
@@ -49,13 +49,13 @@ export function WorkspaceSettings() {
     return api.updateWorkspaceSettings({idempotencyKey: `workspace:${query.data.organization_version}:${query.data.workspace_version}`, body: {organization_name: organizationName.trim(), workspace_name: workspaceName.trim(), organization_version: query.data.organization_version, workspace_version: query.data.workspace_version}});
   }, onSuccess: async () => { await cache.invalidateQueries({queryKey: ["settings", "workspace"]}); }});
   if (query.isPending) return <LoadingBlock />;
-  if (query.isError) return <ErrorBlock>Не удалось загрузить настройки workspace.</ErrorBlock>;
+  if (query.isError) return <ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить настройки рабочего пространства.</ErrorBlock>;
   return <>
   <section className="panel settings-card">
     <div className="settings-card-heading"><div><p className="eyebrow">Организация</p><h2>Рабочее пространство</h2></div><StatusBadge value={labelFor(query.data.workspace_status,workspaceStatusLabels)}/></div>
     <div className="settings-form">
       <label className="field"><span>Название организации</span><input value={organizationName} maxLength={200} autoComplete="organization" onChange={(event: {target: {value: string}}) => setOrganizationName(event.target.value)} /></label>
-      <label className="field"><span>Название workspace</span><input value={workspaceName} maxLength={200} autoComplete="off" onChange={(event: {target: {value: string}}) => setWorkspaceName(event.target.value)} /></label>
+      <label className="field"><span>Название рабочего пространства</span><input value={workspaceName} maxLength={200} autoComplete="off" onChange={(event: {target: {value: string}}) => setWorkspaceName(event.target.value)} /></label>
     </div>
     {mutation.isError ? <ErrorBlock>Настройки изменились параллельно или не прошли проверку. Обновите данные и повторите.</ErrorBlock> : null}
     <button className="button primary" disabled={mutation.isPending || !organizationName.trim() || !workspaceName.trim()} onClick={() => mutation.mutate()}>Сохранить настройки</button>

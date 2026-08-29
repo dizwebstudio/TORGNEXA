@@ -28,10 +28,7 @@ func (connector *Connector) fetchStock(ctx context.Context, configuration Config
 		return 0, err
 	}
 	var value struct {
-		Data struct {
-			ID    string `json:"id"`
-			Stock int64  `json:"stock"`
-		} `json:"data"`
+		Data shopwareProduct `json:"data"`
 	}
 	if json.Unmarshal(response.Body, &value) != nil || value.Data.ID != productID || value.Data.Stock < 0 {
 		return 0, ErrInvalidResponse

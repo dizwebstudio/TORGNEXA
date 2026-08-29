@@ -16,8 +16,10 @@ import (
 // apiVersion is a fixed, pinned Shopify Admin REST API release
 // (https://shopify.dev/docs/api/usage/versioning). Bumping it is a
 // deliberate, reviewed change, not something a merchant's runtime config
-// can influence.
-const apiVersion = "2025-01"
+// can influence. 2026-07 is the current stable release at the time of this
+// qualification; Shopify falls forward when an inaccessible version is used,
+// but the connector must not silently rely on that compatibility behavior.
+const apiVersion = "2026-07"
 
 const maxBodyBytes = 16 << 20
 

@@ -116,6 +116,17 @@ inventory, price and order operations reuse the existing host-mediated SDK
 boundary; unsupported mutations remain fail-closed. The runtime inventory is
 18 generic integrations, 23 separate-surface providers and 14 planned entries.
 
+## Shopify storefront qualification
+
+Task 144's Shopify Admin REST connector is pinned to the current stable API
+version `2026-07`. Since Shopify has no official self-hosted Docker store, the
+local stateful protocol double and smoke script qualify request/response shapes,
+writes and reconciliation only; a Shopify Dev Store with an installed app,
+scoped token and synthetic SKU remains required for external live qualification.
+Shopify marks REST legacy for new apps, so a future GraphQL Admin API migration
+must be handled as a separately scoped compatibility task rather than hidden in
+this qualification.
+
 ## Почта России logistics connector
 
 Task 155 adds «Почта России» to the separate Delivery surface with encrypted

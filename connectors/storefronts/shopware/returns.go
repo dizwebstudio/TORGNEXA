@@ -37,14 +37,11 @@ func (connector *Connector) ReadReturns(ctx context.Context, account sdk.Account
 		if marshalErr != nil {
 			return marshalErr
 		}
-		response, callErr := connector.call(ctx, configuration, account.ID, credential, "POST", "/search/order_transaction_capture_refund", nil, body)
+		response, callErr := connector.call(ctx, configuration, account.ID, credential, "POST", "/search/order-transaction-capture-refund", nil, body)
 		if callErr != nil {
 			return callErr
 		}
-		var result struct {
-			Data  []shopwareRefund `json:"data"`
-			Total int              `json:"total"`
-		}
+		var result shopwareSearchPage[shopwareRefund]
 		if json.Unmarshal(response.Body, &result) != nil || len(result.Data) > query.Limit {
 			return ErrInvalidResponse
 		}

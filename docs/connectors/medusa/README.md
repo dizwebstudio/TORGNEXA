@@ -1,5 +1,19 @@
-# Medusa
+# Medusa v2
 
-Storefront connector. Self-hosted, admin API key, Medusa v2 Admin REST API for products/inventory/prices/orders/returns. Product create and webhook receipt are unsupported by design (see capability-audit.md).
+Коннектор для self-hosted Medusa v2. Секретный API key передаётся как raw
+token в `Authorization: Basic <token>`; это не пара логин/пароль и не bearer.
+В runtime сейчас маршрутизируются только `products.read` и `products.write`;
+остальные операции доступны на уровне Connector SDK, но не заявляются как
+generic worker-синхронизация.
 
-Official documentation: https://docs.medusajs.com/api/admin
+Создание товара и входящие webhook намеренно не поддерживаются (см.
+[capability-audit.md](capability-audit.md)). Для проверки нужен заранее
+созданный синтетический SKU. Изолированный Docker-стенд и пошаговая credentialed
+проверка описаны в [docker-live-qualification.md](docker-live-qualification.md);
+[scripts/medusa-smoke.sh](../../../scripts/medusa-smoke.sh) проверяет конкретный
+Admin REST endpoint отдельно от SDK-конформанса. На 2026-08-29 Docker smoke
+для DTC Starter прошёл с read-after-write по товару, цене и остатку; внешний
+staging endpoint ещё требует собственные credentials.
+
+Официальные материалы: [Medusa v2 Admin API](https://docs.medusajs.com/api/admin),
+[установка через Docker](https://docs.medusajs.com/learn/installation/docker).

@@ -18,10 +18,27 @@ import {settingsTabs, type SettingsTabID} from "../features/settings/settings-ta
 import {Page} from "./Page";
 import {capabilityGroupFor, capabilityLabels, roleLabels, type CapabilityGroupID} from "../components/labels";
 import {Icon, type IconName} from "../components/Icon";
+import type {AuthSession, UserProfile} from "../auth/session-model";
+import {UserAvatar} from "../components/UserAvatar";
 
 function formatExpiry(value?: string): string {
   if (!value) return "Срок не передан провайдером";
   return new Intl.DateTimeFormat("ru-RU", {dateStyle: "medium", timeStyle: "short"}).format(new Date(value));
+}
+
+const demoProfile: UserProfile = {username: "demo", email: "demo@local.torgnexa", givenName: "Демо", familyName: "Оператор", picture: "/demo-images/demo-avatar.svg", birthdate: "1988-04-17", jobTitle: "Старший операционный менеджер", department: "Коммерческие операции", phoneNumber: "+7 (495) 555-01-42", locale: "ru"};
+
+function profileForDisplay(session: AuthSession): UserProfile {
+  const profile = session.profile ?? {};
+  if (profile.username?.toLowerCase() !== "demo") return profile;
+  const claimed = Object.fromEntries(Object.entries(profile).filter(([, value]) => value !== undefined && value !== ""));
+  return {...demoProfile, ...claimed};
+}
+
+function formatBirthdate(value?: string): string {
+  if (!value) return "Не указана в профиле OIDC";
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00Z`) : new Date(value);
+  return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat("ru-RU", {dateStyle: "long", timeZone: "UTC"}).format(parsed) : value;
 }
 
 const accessGroups: readonly {id: CapabilityGroupID; title: string; description: string; icon: IconName}[] = [
@@ -57,6 +74,9 @@ export function SettingsPage() {
   const isAdmin = session.roles?.includes("admin") ?? false;
   const roles = session.roles?.length ? session.roles : [];
   const capabilities = [...new Set(session.capabilities)];
+  const profile = profileForDisplay(session);
+  const primaryRole = roles.find((role) => roleLabels[role]) ?? roles[0];
+  const roleTitle = primaryRole ? roleLabels[primaryRole] ?? primaryRole : "Участник рабочего пространства";
   const groupedCapabilities = accessGroups.map((group) => ({...group, items: capabilities.filter((capability) => capabilityGroupFor(capability) === group.id)})).filter((group) => group.items.length > 0);
   const deleteDemo = useMutation({mutationFn:async()=>api.createApprovalRequest({idempotencyKey:crypto.randomUUID(),body:{action:"demo.dataset.delete",resource_type:"demo_dataset",resource_id:"",risk:"write_sensitive"}}),onSuccess:async()=>{await Promise.all([queryClient.invalidateQueries({queryKey:["approvals"]}),queryClient.invalidateQueries({queryKey:["audit"]})]);}});
 
@@ -67,11 +87,17 @@ export function SettingsPage() {
     </div>
     <div id="settings-panel-general" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-general" tabIndex={0} hidden={activeTab !== "general"}>
       <div className="settings-grid">
-      <section className="panel settings-card">
-        <div className="settings-card-heading"><div><p className="eyebrow">Профиль</p><h2>{session.displayName}</h2></div><span className="avatar settings-avatar">{session.displayName.slice(0, 1).toUpperCase()}</span></div>
-        <dl className="settings-facts">
+      <section className="panel settings-card profile-card">
+        <div className="profile-hero"><UserAvatar session={session} profile={profile} className="settings-avatar"/><div className="profile-hero-copy"><p className="eyebrow">Профиль пользователя</p><h2>{session.displayName}</h2><p className="profile-title">{profile.jobTitle ?? roleTitle}</p><div className="profile-badges"><span>{roleTitle}</span><span>{profile.username ? `@${profile.username}` : "OIDC-профиль"}</span></div></div></div>
+        <dl className="settings-facts profile-facts">
+          <div><dt>Должность</dt><dd>{profile.jobTitle ?? roleTitle}</dd></div>
+          <div><dt>Подразделение</dt><dd>{profile.department ?? "Не указано в профиле OIDC"}</dd></div>
+          <div><dt>Электронная почта</dt><dd>{profile.email ?? "Не указана в профиле OIDC"}</dd></div>
+          <div><dt>Телефон</dt><dd>{profile.phoneNumber ?? "Не указан в профиле OIDC"}</dd></div>
+          <div><dt>Дата рождения</dt><dd>{formatBirthdate(profile.birthdate)}</dd></div>
           <div><dt>Сессия действует до</dt><dd>{formatExpiry(session.expiresAt)}</dd></div>
         </dl>
+        <p className="settings-note profile-source-note">Профильные данные приходят из Keycloak и не сохраняются в TORGNEXA. Изменить фото и личные данные можно в кабинете учётной записи.</p>
       </section>
       <section className="panel settings-card">
         <p className="eyebrow">Безопасность</p>
@@ -82,9 +108,9 @@ export function SettingsPage() {
       </section>
       </div>
       <section className="panel settings-card settings-access-card">
-      <div className="settings-access-heading"><div><p className="eyebrow">УПРАВЛЕНИЕ ДОСТУПОМ</p><h2>Роли и права</h2><p className="settings-copy">Доступ собран из ролей текущего workspace и проверяется сервером при каждом действии.</p></div><span className="settings-access-source"><span className="settings-access-source-dot"/>Единый вход</span></div>
+      <div className="settings-access-heading"><div><p className="eyebrow">УПРАВЛЕНИЕ ДОСТУПОМ</p><h2>Роли и права</h2><p className="settings-copy">Доступ собран из ролей текущего рабочего пространства и проверяется сервером при каждом действии.</p></div><span className="settings-access-source"><span className="settings-access-source-dot"/>Единый вход</span></div>
       <div className="settings-access-summary" aria-label="Сводка доступа"><div><strong>{roles.length}</strong><span>ролей назначено</span></div><div><strong>{capabilities.length}</strong><span>прав доступно</span></div><div><strong>OIDC</strong><span>источник авторизации</span></div></div>
-      <div className="settings-access-roles"><div className="settings-access-section-heading"><div><h3>Роли workspace</h3><span>Набор полномочий, выданный вашей учётной записи</span></div></div><div className="settings-role-list">{roles.length ? roles.map((role) => <span className="settings-role-card" title={role} key={role}><span className="settings-role-icon"><Icon name="check" size={14}/></span><span><strong>{roleLabels[role] ?? role}</strong><small>{role === "admin" ? "Полный доступ" : "Назначенная роль"}</small></span></span>) : <span className="settings-empty-access">Роли не переданы провайдером</span>}</div></div>
+      <div className="settings-access-roles"><div className="settings-access-section-heading"><div><h3>Роли рабочего пространства</h3><span>Набор полномочий, выданный вашей учётной записи</span></div></div><div className="settings-role-list">{roles.length ? roles.map((role) => <span className="settings-role-card" title={role} key={role}><span className="settings-role-icon"><Icon name="check" size={14}/></span><span><strong>{roleLabels[role] ?? role}</strong><small>{role === "admin" ? "Полный доступ" : "Назначенная роль"}</small></span></span>) : <span className="settings-empty-access">Роли не переданы провайдером</span>}</div></div>
       <div className="settings-access-divider"/>
       <div className="settings-access-section-heading settings-capabilities-heading"><div><h3>Разрешения</h3><span>Что можно просматривать и изменять в рабочем контуре</span></div><button type="button" className="button ghost compact-action" onClick={() => setShowTechnicalAccess((value) => !value)}>{showTechnicalAccess ? "Скрыть коды" : "Показать технические коды"}</button></div>
       <div className="settings-capability-groups">{groupedCapabilities.map((group) => <section className="settings-capability-group" key={group.id}><header><span className="settings-capability-icon"><Icon name={group.icon} size={16}/></span><div><h4>{group.title}</h4><small>{group.description}</small></div><b>{group.items.length}</b></header><div className="settings-capability-list">{group.items.map((capability) => <div className="settings-capability-item" title={capability} key={capability}><span className="settings-capability-check"><Icon name="check" size={13}/></span><span><strong>{capabilityLabels[capability] ?? capability}</strong>{showTechnicalAccess ? <code>{capability}</code> : null}</span></div>)}</div></section>)}</div>

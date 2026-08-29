@@ -63,8 +63,8 @@ type imageInput struct {
 }
 
 // resolveImageURL returns the stored URL for an image write: either the
-// caller's own https:// URL, or — when upload_id is set instead — the
-// content path of an upload this exact tenant has already had released.
+// caller's HTTPS or bundled demo URL, or — when upload_id is set instead —
+// the content path of an upload this exact tenant has already had released.
 // Exactly one of url/upload_id must be present; ResolveReleased fails
 // closed on anything else (wrong tenant, not yet scanned, rejected).
 func (a catalogAPI) resolveImageURL(ctx context.Context, scope tenancy.Scope, in imageInput) (string, error) {
@@ -93,6 +93,7 @@ func newCatalogRoutes(a catalogAPI) []ProtectedRoute {
 		{Method: http.MethodGet, Path: ProductSearchPath + "/", PathPrefix: true, Permission: "products.read", Handler: http.HandlerFunc(a.productSubroute)},
 		{Method: http.MethodPost, Path: ProductSearchPath + "/", PathPrefix: true, Permission: "products.write", Handler: http.HandlerFunc(a.productSubroute)},
 		{Method: http.MethodPatch, Path: ProductSearchPath + "/", PathPrefix: true, Permission: "products.write", Handler: http.HandlerFunc(a.productSubroute)},
+		{Method: http.MethodDelete, Path: ProductSearchPath + "/", PathPrefix: true, Permission: "products.write", Handler: http.HandlerFunc(a.productSubroute)},
 	}
 }
 
@@ -273,6 +274,19 @@ func (a catalogAPI) productSubroute(w http.ResponseWriter, r *http.Request) {
 			}
 			v, e := a.images.Create(r.Context(), mustScope(r), catalogimagerepo.Image{ID: newApprovalID(), ProductID: pid.String(), URL: url, AltText: in.AltText, Position: in.Position})
 			writeCatalogResult(w, 201, v, e)
+			return
+		}
+		if len(parts) == 3 && r.Method == http.MethodDelete {
+			if strings.TrimSpace(r.Header.Get("Idempotency-Key")) == "" {
+				writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+				return
+			}
+			e := a.images.Delete(r.Context(), mustScope(r), pid.String(), parts[2])
+			if e != nil {
+				writeCatalogResult(w, 0, nil, e)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		if len(parts) == 3 && r.Method == http.MethodPatch {

@@ -19,6 +19,20 @@ type shopwareProductDetail struct {
 	Description   string `json:"description"`
 }
 
+func (product *shopwareProductDetail) UnmarshalJSON(data []byte) error {
+	type plain shopwareProductDetail
+	var value plain
+	var id string
+	if err := unmarshalResource(data, &value, &id); err != nil {
+		return err
+	}
+	*product = shopwareProductDetail(value)
+	if product.ID == "" {
+		product.ID = id
+	}
+	return nil
+}
+
 func (connector *Connector) fetchProductDetail(ctx context.Context, configuration Configuration, accountID string, credential credentials, productID string) (shopwareProductDetail, error) {
 	response, err := connector.call(ctx, configuration, accountID, credential, "GET", "/product/"+productID, nil, nil)
 	if err != nil {
@@ -114,10 +128,7 @@ func (connector *Connector) WritePrice(ctx context.Context, account sdk.Account,
 				return "", false, e
 			}
 			var value struct {
-				Data struct {
-					ID    string          `json:"id"`
-					Price []shopwarePrice `json:"price"`
-				} `json:"data"`
+				Data shopwareProduct `json:"data"`
 			}
 			if json.Unmarshal(response.Body, &value) != nil || value.Data.ID != request.VariantRemoteID {
 				return "", false, ErrInvalidResponse
@@ -159,9 +170,7 @@ func (connector *Connector) fetchOrderStatus(ctx context.Context, configuration 
 	if err != nil {
 		return "", err
 	}
-	var result struct {
-		Data []shopwareOrder `json:"data"`
-	}
+	var result shopwareSearchPage[shopwareOrder]
 	if json.Unmarshal(response.Body, &result) != nil || len(result.Data) != 1 || result.Data[0].StateMachineState == nil || !validRemoteText(result.Data[0].StateMachineState.TechnicalName, 64) {
 		return "", ErrInvalidResponse
 	}

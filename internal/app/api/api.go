@@ -54,6 +54,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/uploadrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/userprofilerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/webhookrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reporting"
 	"github.com/torgnexa/torgnexa/internal/platform/retention"
@@ -162,6 +163,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	tenantRepository, err := tenancyrepo.New(db)
 	if err != nil {
 		return newRuntimeError("tenancy_repository_startup_failed", err)
+	}
+	profileRepository, err := userprofilerepo.New(db)
+	if err != nil {
+		return newRuntimeError("user_profile_repository_startup_failed", err)
 	}
 	settingsSecurityRepository, err := securitysettingsrepo.New(db)
 	if err != nil {
@@ -378,7 +383,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
-		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadContent: quarantineStore,
+		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
 		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository,
 	}
 	routes := newProductionRoutes(routeDeps)

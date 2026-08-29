@@ -1,0 +1,77 @@
+name: torgnexa-medusa-test
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: medusa-dtc-test
+      POSTGRES_USER: medusa
+      POSTGRES_PASSWORD: medusa-local-only
+    volumes:
+      - medusa-test-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medusa -d medusa-dtc-test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - medusa-test-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  medusa:
+    image: node:20-alpine
+    working_dir: /server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      # The hostname `postgres` makes Medusa's default config assume a remote
+      # database and enable TLS. The disposable local Postgres container does
+      # not expose TLS, so use Medusa's documented opt-out query parameter.
+      DATABASE_URL: postgres://medusa:medusa-local-only@postgres:5432/medusa-dtc-test?ssl_mode=disable
+      REDIS_URL: redis://redis:6379
+      STORE_CORS: http://127.0.0.1:19000
+      ADMIN_CORS: http://127.0.0.1:19000
+      AUTH_CORS: http://127.0.0.1:19000
+      JWT_SECRET: medusa-local-jwt-only
+      COOKIE_SECRET: medusa-local-cookie-only
+      PORT: 9000
+    volumes:
+      - ${MEDUSA_PROJECT_DIR:?Set MEDUSA_PROJECT_DIR to a Medusa v2 DTC Starter checkout}:/server
+      - ./scripts/medusa-docker/medusa-config.ts:/server/apps/backend/medusa-config.ts:ro
+      - medusa-test-node-modules:/server/node_modules
+      - medusa-test-backend-node-modules:/server/apps/backend/node_modules
+      - medusa-test-pnpm-store:/root/.local/share/pnpm/store
+    ports:
+      - "${MEDUSA_HTTP_PORT:-19000}:9000"
+    command:
+      - sh
+      - -lc
+      - >-
+        apk add --no-cache libc6-compat python3 make g++ >/dev/null &&
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm --filter @dtc/backend exec medusa db:migrate &&
+        pnpm --filter @dtc/backend dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  medusa-test-postgres:
+  medusa-test-redis:
+  medusa-test-node-modules:
+  medusa-test-backend-node-modules:
+  medusa-test-pnpm-store:

@@ -33,6 +33,13 @@
       "emailVerified": true,
       "firstName": "Демо",
       "lastName": "Оператор",
+      "attributes": {
+        "picture": ["/demo-images/demo-avatar.svg"],
+        "birthdate": ["1988-04-17"],
+        "job_title": ["Старший операционный менеджер"],
+        "department": ["Коммерческие операции"],
+        "phone_number": ["+7 (495) 555-01-42"]
+      },
       "credentials": [
         {
           "type": "password",
@@ -63,7 +70,14 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {"name": "picture", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "picture", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "picture", "jsonType.label": "String"}},
+        {"name": "birthdate", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "birthdate", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "birthdate", "jsonType.label": "String"}},
+        {"name": "job_title", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "job_title", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "job_title", "jsonType.label": "String"}},
+        {"name": "department", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "department", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "department", "jsonType.label": "String"}},
+        {"name": "phone_number", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "phone_number", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "phone_number", "jsonType.label": "String"}}
+      ]
     },
     {
       "clientId": "torgnexa-api",

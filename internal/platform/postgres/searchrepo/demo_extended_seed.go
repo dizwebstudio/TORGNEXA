@@ -2,6 +2,7 @@ package searchrepo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"time"
@@ -38,26 +39,24 @@ type demoConnectorCapability struct {
 }
 
 type demoConnectorAccount struct {
-	id, provider, family, secretReference string
-	capabilities                          []demoConnectorCapability
+	id, provider, family string
+	capabilities         []demoConnectorCapability
 }
 
 var demoConnectorAccounts = []demoConnectorAccount{
 	{
-		id:              "demo-ozon-main",
-		provider:        "ozon",
-		family:          "marketplace",
-		secretReference: "sec:v1:11111111111111111111111111111111",
+		id:       "demo-ozon-main",
+		provider: "ozon",
+		family:   "marketplace",
 		capabilities: []demoConnectorCapability{
 			{name: "inventory.read", direction: "read", risk: "read"},
 			{name: "products.read", direction: "read", risk: "read"},
 		},
 	},
 	{
-		id:              "demo-yookassa-main",
-		provider:        "yookassa",
-		family:          "payment",
-		secretReference: "sec:v1:22222222222222222222222222222222",
+		id:       "demo-yookassa-main",
+		provider: "yookassa",
+		family:   "payment",
 		capabilities: []demoConnectorCapability{
 			{name: "payments.create", direction: "write", risk: "write_sensitive", approvalRequired: true},
 			{name: "payments.reconcile", direction: "read", risk: "read"},
@@ -78,12 +77,16 @@ var demoConnectorAccounts = []demoConnectorAccount{
 
 func seedDemoConnectorAccounts(ctx context.Context, tx *sql.Tx, org, ws string, stamp time.Time) error {
 	for _, account := range demoConnectorAccounts {
-		if account.secretReference != "" {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO secret_references(reference,organization_id,workspace_id,class,status,current_version,created_at,updated_at) VALUES($1,$2,$3,'connector_token','active',1,$4,$4) ON CONFLICT(reference) DO NOTHING`, account.secretReference, org, ws, stamp); err != nil {
+		secretReference := ""
+		if account.family != "fx" {
+			secretReference = demoSecretReference(org, ws, account.id)
+		}
+		if secretReference != "" {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO secret_references(reference,organization_id,workspace_id,class,status,current_version,created_at,updated_at) VALUES($1,$2,$3,'connector_token','active',1,$4,$4) ON CONFLICT(reference) DO NOTHING`, secretReference, org, ws, stamp); err != nil {
 				return fmt.Errorf("search repository: insert demo secret reference %s: %w", account.id, err)
 			}
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO connector_accounts(id,organization_id,workspace_id,family,provider,status,secret_reference,version,health_status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'disabled',$6,1,'unknown',$7,$7) ON CONFLICT(organization_id,workspace_id,id) DO NOTHING`, account.id, org, ws, account.family, account.provider, nullableDemoString(account.secretReference), stamp); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO connector_accounts(id,organization_id,workspace_id,family,provider,status,secret_reference,version,health_status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'disabled',$6,1,'unknown',$7,$7) ON CONFLICT(organization_id,workspace_id,id) DO NOTHING`, account.id, org, ws, account.family, account.provider, nullableDemoString(secretReference), stamp); err != nil {
 			return fmt.Errorf("search repository: insert demo connector account %s: %w", account.id, err)
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE connector_accounts SET status='active',health_status='healthy',health_reason_code=NULL,health_checked_at=$4,version=version+1,updated_at=$4 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=1 AND status='disabled'`, org, ws, account.id, stamp); err != nil {
@@ -110,6 +113,11 @@ func seedDemoConnectorAccounts(ctx context.Context, tx *sql.Tx, org, ws string, 
 		}
 	}
 	return nil
+}
+
+func demoSecretReference(org, ws, accountID string) string {
+	digest := sha256.Sum256([]byte(org + "\x00" + ws + "\x00" + accountID))
+	return fmt.Sprintf("sec:v1:%x", digest[:16])
 }
 
 func nullableDemoString(value string) any {
@@ -264,10 +272,10 @@ func seedDemoApprovals(ctx context.Context, tx *sql.Tx, org, ws, requesterID, pr
 		}
 	}
 	decisionScopes := `["approvals.write"]`
-	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) VALUES('demo-approval-decision-approved',$1,$2,'demo-approval-approved',1,'demo-reviewer','approve',$3::jsonb,'Демонстрационное согласование пройдено.', $4) ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-2*time.Hour)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT 'demo-approval-decision-approved',$1,$2,'demo-approval-approved',1,'demo-reviewer','approve',$3::jsonb,'Демонстрационное согласование пройдено.', $4 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-approved' AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-decision-approved') ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-2*time.Hour)); err != nil {
 		return fmt.Errorf("search repository: insert demo approval decision: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) VALUES('demo-approval-decision-rejected',$1,$2,'demo-approval-rejected',1,'demo-reviewer','reject',$3::jsonb,'Демонстрационный запрос отклонён для показа истории решений.', $4) ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-5*time.Hour)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT 'demo-approval-decision-rejected',$1,$2,'demo-approval-rejected',1,'demo-reviewer','reject',$3::jsonb,'Демонстрационный запрос отклонён для показа истории решений.', $4 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-rejected' AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-decision-rejected') ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-5*time.Hour)); err != nil {
 		return fmt.Errorf("search repository: insert demo rejected decision: %w", err)
 	}
 	for _, request := range requests {

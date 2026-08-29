@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "connector_id": "saleor",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/saleor/conformance-report.json"
+  },
+  "docker_store": {
+    "status": "pass",
+    "checked_at": "2026-08-29T10:44:17Z",
+    "compose": "docker-compose.saleor-test.yml",
+    "image": "ghcr.io/saleor/saleor:3.23",
+    "endpoint": "http://127.0.0.1:18000/graphql/",
+    "sku": "111223580",
+    "channel": "default-channel",
+    "warehouse": "default",
+    "checks": [
+      "unauthorized_graphql_errors",
+      "product_variants_read",
+      "variant_product_mapping",
+      "channel_price_read",
+      "warehouse_stock_read",
+      "channel_and_warehouse_resolution",
+      "product_sku_name_publication_write",
+      "price_write",
+      "stock_write",
+      "read_after_write_reconciliation",
+      "automatic_cleanup_restore"
+    ],
+    "result": "pass"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "SALEOR_GRAPHQL_URL",
+      "SALEOR_API_TOKEN",
+      "SALEOR_TEST_SKU",
+      "SALEOR_CHANNEL",
+      "SALEOR_WAREHOUSE"
+    ]
+  },
+  "smoke_script": "scripts/saleor-smoke.sh",
+  "reason_code": "external_non_production_endpoint_not_configured"
+}

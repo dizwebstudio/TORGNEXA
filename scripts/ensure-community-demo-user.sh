@@ -23,12 +23,20 @@ for attempt in $(seq 1 30); do
         -s enabled=true \
         -s email=demo@local.torgnexa \
         -s emailVerified=true \
-        -s firstName=Demo \
-        -s lastName=Operator >/dev/null
+        -s firstName=Демо \
+        -s lastName=Оператор >/dev/null
       user_id=$("$kcadm" get users -r torgnexa -q username=demo --fields id --format csv --noquotes | sed -n "1p" | tr -d "\r")
     fi
     [ -n "$user_id" ]
     "$kcadm" set-password -r torgnexa --userid "$user_id" --new-password "$TORGNEXA_DEMO_PASSWORD"
+    "$kcadm" update "users/$user_id" -r torgnexa \
+      -s firstName=Демо \
+      -s lastName=Оператор \
+      -s "attributes.picture=/demo-images/demo-avatar.svg" \
+      -s "attributes.birthdate=1988-04-17" \
+      -s "attributes.job_title=Старший операционный менеджер" \
+      -s "attributes.department=Коммерческие операции" \
+      -s "attributes.phone_number=+7 (495) 555-01-42" >/dev/null
     "$kcadm" add-roles -r torgnexa --uusername demo --rolename admin >/dev/null 2>&1 || true
     printf "%s\n" "$user_id"
   '); then

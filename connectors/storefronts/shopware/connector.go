@@ -238,12 +238,7 @@ func (connector *Connector) currencyID(ctx context.Context, configuration Config
 	if err != nil {
 		return "", err
 	}
-	var page struct {
-		Data []struct {
-			ID      string `json:"id"`
-			IsoCode string `json:"isoCode"`
-		} `json:"data"`
-	}
+	var page shopwareSearchPage[shopwareCurrency]
 	if json.Unmarshal(response.Body, &page) != nil {
 		return "", ErrInvalidResponse
 	}

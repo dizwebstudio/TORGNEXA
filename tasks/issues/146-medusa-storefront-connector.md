@@ -1,6 +1,6 @@
 # Task 146 — Medusa storefront connector
 
-Status: Repository implementation complete
+Status: Repository implementation complete; live qualification blocked
 
 ## Problem
 
@@ -62,13 +62,10 @@ self-hosted headless commerce engine.
   payment capture, etc. as distinct sub-resources with their own request
   shapes, not a settable `order.status` field; only the one unambiguous
   single-call transition (`POST /admin/orders/{id}/cancel`) is supported.
-- Live-instance qualification: unverifiable without a real self-hosted
-  Medusa deployment and admin API key, same limitation already documented
-  for SBP/Robokassa/Shopify.
-- The Task-064 conformance suite's `sandbox_isolation` check could not be
-  exercised in this repository's execution environment because it cannot
-  create unprivileged Linux user namespaces (`unshare --user` returns
-  `Operation not permitted`); this is an environment constraint shared by
-  every connector's Task-029 sandbox probe, not a Medusa-specific gap.
-  `docs/connectors/medusa/conformance-report.json` records the genuine
-  12/13 result rather than a fabricated pass.
+- Live-instance qualification requires a real self-hosted Medusa v2 deployment
+  and secret API key. The executable gate is `scripts/medusa-smoke.sh`,
+  documented in `docs/connectors/medusa/docker-live-qualification.md`.
+- The canonical Task-064 report records 13/13 SDK checks. This deterministic
+  suite is not a live-store qualification. The repository DTC Starter Docker
+  smoke passed on 2026-08-29; external live status remains blocked until a
+  separate non-production endpoint is supplied and passes the same smoke.

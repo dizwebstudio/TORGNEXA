@@ -202,7 +202,7 @@ v = json.load(open(sys.argv[1], encoding="utf-8"))
 print(json.dumps({"product": {"sku": sys.argv[2], "name": v["_smoke_name"], "status": v["status"], "custom_attributes": [{"attribute_code": "description", "value": v["_smoke_description"]}]}}, separators=(",", ":")))
 PY
 )"
-  request product_update PUT "$encoded_sku" "$update"
+  request product_update PUT "products/$encoded_sku" "$update"
   assert_status product_update 200
   changed_product=1
   request product_after GET "products/$encoded_sku"
@@ -234,7 +234,7 @@ import json, sys
 print('{"product":{"sku":' + json.dumps(sys.argv[1]) + ',"price":' + sys.argv[2] + '}}')
 PY
 )"
-  request price_update PUT "$encoded_sku" "$price_body"
+  request price_update PUT "products/$encoded_sku" "$price_body"
   assert_status price_update 200
   changed_price=1
   request price_after GET "products/$encoded_sku"
@@ -259,7 +259,7 @@ import json, sys
 print(json.dumps({"stockItem": {"qty": int(sys.argv[1]), "is_in_stock": int(sys.argv[1]) > 0}}, separators=(",", ":")))
 PY
 )"
-  request inventory_update PUT "$encoded_sku/stockItems/$(cat "$tmp/item-id")" "$stock_body"
+  request inventory_update PUT "products/$encoded_sku/stockItems/$(cat "$tmp/item-id")" "$stock_body"
   assert_status inventory_update 200
   changed_stock=1
   request inventory_after GET "stockItems/$encoded_sku"

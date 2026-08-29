@@ -97,7 +97,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "Provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/saleor/conformance-report.json records this genuine result rather than a fabricated pass."
+      "evidence": "Provider tests, go build/vet/test and the canonical Task-064 conformance report pass 13 of 13 checks, including sandbox_isolation. A disposable official Saleor Platform Docker stack passed credentialed GraphQL smoke on 2026-08-29 (product/channel/warehouse reads, product/price/stock writes, read-after-write and cleanup); external merchant staging remains a separate blocked gate documented in docs/connectors/saleor/live-qualification-status.json."
     }
   ],
   "provider": {
