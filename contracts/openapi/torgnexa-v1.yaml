@@ -1408,6 +1408,76 @@ paths:
         - {name: request_id, in: path, required: true, schema: {type: string}}
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
       responses: {'200': {description: Approved exact operation executed once and request completed}, '409': {description: Approved matching request required}}
+  /workflows:
+    get:
+      operationId: listWorkflows
+      security: [{bearerAuth: []}]
+      parameters: [{name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}]
+      responses:
+        '200': {description: Tenant-scoped workflow heads, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowPage'}}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks workflows.read}
+    post:
+      operationId: createWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowCreate'}}}}
+      responses:
+        '201': {description: Draft workflow created}
+        '400': {description: Invalid bounded workflow definition}
+        '409': {description: Idempotency or identity conflict}
+  /workflows:validate:
+    post:
+      operationId: validateWorkflow
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowDefinition'}}}}
+      responses: {'200': {description: Deterministic validation result}, '400': {description: Invalid graph, action or limit}}
+  /workflows:publish:
+    post:
+      operationId: publishWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowPublish'}}}}
+      responses: {'200': {description: Immutable published version}, '400': {description: Invalid definition}, '409': {description: Optimistic version conflict}}
+  /workflows:pause:
+    post:
+      operationId: pauseWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowStatusChange'}}}}
+      responses: {'200': {description: Workflow paused}, '409': {description: State or version conflict}}
+  /workflows:archive:
+    post:
+      operationId: archiveWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowStatusChange'}}}}
+      responses: {'200': {description: Workflow archived}, '409': {description: State or version conflict}}
+  /workflows:run:
+    post:
+      operationId: runWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowRunCreate'}}}}
+      responses: {'202': {description: Idempotently queued workflow run}, '400': {description: Invalid run request}, '409': {description: Duplicate identity conflict}}
+  /workflows/{workflow_id}:
+    get:
+      operationId: getWorkflow
+      security: [{bearerAuth: []}]
+      parameters: [{name: workflow_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses: {'200': {description: Tenant-scoped workflow head}, '404': {description: Workflow not found}}
+  /workflow-runs:
+    get:
+      operationId: listWorkflowRuns
+      security: [{bearerAuth: []}]
+      parameters: [{name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}]
+      responses: {'200': {description: Recent bounded workflow runs, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowRunPage'}}}}}
+  /workflow-runs/{run_id}:
+    get:
+      operationId: getWorkflowRun
+      security: [{bearerAuth: []}]
+      parameters: [{name: run_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses: {'200': {description: Workflow run state}, '404': {description: Run not found}}
   /settlements:
     get:
       operationId: listSettlementEntries
@@ -1898,6 +1968,118 @@ components:
     SortableID:
       type: string
       pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'
+    WorkflowTrigger:
+      type: object
+      additionalProperties: false
+      required: [kind, enabled]
+      properties:
+        kind: {type: string, enum: [event, schedule]}
+        event_type: {type: string, maxLength: 160, pattern: '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.v[1-9][0-9]{0,2}$'}
+        interval_minutes: {type: integer, minimum: 1, maximum: 10080}
+        enabled: {type: boolean}
+        next_run_at: {type: string, format: date-time}
+    WorkflowNode:
+      type: object
+      additionalProperties: false
+      required: [id, kind]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        kind: {type: string, enum: [condition, action, delay, approval]}
+        action: {type: string, enum: [notification.create, reconciliation.run, approval.request, sync.dry_run]}
+        config: {type: object, additionalProperties: true, maxProperties: 32}
+    WorkflowEdge:
+      type: object
+      additionalProperties: false
+      required: [from, to]
+      properties:
+        from: {type: string, minLength: 1, maxLength: 128}
+        to: {type: string, minLength: 1, maxLength: 128}
+        condition: {type: string, enum: [always, 'true', 'false']}
+    WorkflowDefinition:
+      type: object
+      additionalProperties: false
+      required: [name, trigger, nodes, edges]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        description: {type: string, maxLength: 4000}
+        trigger: {$ref: '#/components/schemas/WorkflowTrigger'}
+        nodes: {type: array, minItems: 1, maxItems: 64, items: {$ref: '#/components/schemas/WorkflowNode'}}
+        edges: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/WorkflowEdge'}}
+    WorkflowCreate:
+      type: object
+      additionalProperties: false
+      required: [definition]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        definition: {$ref: '#/components/schemas/WorkflowDefinition'}
+    WorkflowPublish:
+      type: object
+      additionalProperties: false
+      required: [workflow_id, expected_version, definition]
+      properties:
+        workflow_id: {type: string, minLength: 1, maxLength: 128}
+        expected_version: {type: integer, minimum: 1}
+        definition: {$ref: '#/components/schemas/WorkflowDefinition'}
+    WorkflowStatusChange:
+      type: object
+      additionalProperties: false
+      required: [workflow_id, expected_version]
+      properties:
+        workflow_id: {type: string, minLength: 1, maxLength: 128}
+        expected_version: {type: integer, minimum: 1}
+    WorkflowRunCreate:
+      type: object
+      additionalProperties: false
+      required: [workflow_id, workflow_version]
+      properties:
+        workflow_id: {type: string, minLength: 1, maxLength: 128}
+        workflow_version: {type: integer, minimum: 1}
+        trigger_ref: {type: string, maxLength: 256}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    Workflow:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, name, status, current_version, version, created_at, updated_at]
+      properties:
+        id: {type: string}
+        organization_id: {type: string}
+        workspace_id: {type: string}
+        name: {type: string}
+        description: {type: string}
+        status: {type: string, enum: [draft, published, paused, archived]}
+        current_version: {type: integer, minimum: 1}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    WorkflowPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/Workflow'}}
+    WorkflowRun:
+      type: object
+      additionalProperties: false
+      required: [id, workflow_id, workflow_version, trigger_kind, status, attempt_count, available_at, version]
+      properties:
+        id: {type: string}
+        workflow_id: {type: string}
+        workflow_version: {type: integer, minimum: 1}
+        trigger_kind: {type: string, enum: [event, schedule]}
+        trigger_ref: {type: string}
+        status: {type: string, enum: [queued, running, waiting_approval, waiting_retry, completed, failed, cancelled]}
+        attempt_count: {type: integer, minimum: 0, maximum: 64}
+        available_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        last_error_code: {type: string, maxLength: 64}
+        version: {type: integer, minimum: 1}
+    WorkflowRunPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WorkflowRun'}}
     SocialChannel:
       type: object
       additionalProperties: false

@@ -9,7 +9,7 @@ import (
 
 func validDefinition() Definition {
 	return Definition{
-		Name: "Уведомить об изменении",
+		Name:    "Уведомить об изменении",
 		Trigger: Trigger{Kind: TriggerEvent, EventType: "commerce.catalog.product_changed.v1"},
 		Nodes: []Node{
 			{ID: "condition", Kind: NodeCondition, Config: json.RawMessage(`{"key":"status"}`)},

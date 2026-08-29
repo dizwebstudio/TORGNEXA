@@ -15,6 +15,8 @@ TORGNEXA is an open-source/self-hosted, API-first commerce and distribution oper
 - Chestny ZNAK, UKEP, MChD, EDO, KKT/OFD, VetIS/Mercury, EGAIS and Product Compliance;
 - bidirectional sync, scheduled/on-demand reconciliation, import/export;
 - REST, signed webhooks, n8n node/triggers, MCP/OpenClaw;
+- bounded workflow automations with event/schedule triggers, typed conditions,
+  notifications, reconciliation, dry-run and approval actions;
 - legal-entity/counterparty master data, privacy/data governance, approvals, audit/lineage, secrets, upload security, enterprise IAM/SIEM, Cloud billing, SMS, security-edge, conformance, SRE and upgrade controls.
 
 ## Non-goals for Core

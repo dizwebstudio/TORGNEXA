@@ -12,6 +12,14 @@ Integration: ERP, government/compliance including EGAIS, EDO/signing, payments/r
 
 State correctness: Transactional Outbox -> Kafka, idempotent Inbox consumers, bidirectional Sync Engine, Reconciliation Engine and provider-authoritative status rules.
 
+Workflow automation is a bounded declarative DAG on top of the same primitives:
+PostgreSQL owns definitions, immutable versions, runs, leases and evidence;
+EventBus/Inbox supplies event triggers; the existing scheduler owns time
+dispatch; worker adapters are typed and capability/policy/approval gated. Raw
+payloads, secrets and arbitrary code are never part of a workflow definition or
+run state. See `adr/0116-workflow-automation-builder.md` and
+`docs/55-workflow-automation.md`.
+
 Cross-cutting: tenancy, Enterprise IAM federation/provisioning, RBAC/ABAC, approval workflow, privacy/data governance, audit/lineage/SIEM export, secrets, notification center, Cloud billing/entitlements, search, schema registry, connector conformance, plugin isolation/governance, security edge, SLO/observability, backup/DR and upgrade migrations.
 
 ## Extension rule

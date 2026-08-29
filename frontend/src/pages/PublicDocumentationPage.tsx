@@ -69,6 +69,135 @@ function documentationPageForId(id: DocumentationSectionId) {
   return documentationPageById.get(id)!;
 }
 
+type DocumentationGuide = {
+  audience: string;
+  before: string;
+  outcome: string;
+  next?: {id: DocumentationSectionId; label: string};
+};
+
+const documentationGuides: Record<DocumentationSectionId, DocumentationGuide> = {
+  interface: {
+    audience: "Для нового пользователя или сотрудника поддержки",
+    before: "Учётная запись и приглашение в рабочее пространство",
+    outcome: "Вы войдёте, проверите рабочий контекст и найдёте нужный раздел",
+    next: {id: "integrations", label: "Подключить первую интеграцию"},
+  },
+  overview: {
+    audience: "Для руководителя и оператора",
+    before: "Доступ к рабочему пространству",
+    outcome: "Вы поймёте, где видны показатели, задачи и состояние сервисов",
+    next: {id: "catalog-orders", label: "Перейти к каталогу и заказам"},
+  },
+  "catalog-orders": {
+    audience: "Для контент-менеджера и оператора заказов",
+    before: "Каталог и источник данных, с которым вы работаете",
+    outcome: "Вы обновите товар, найдёте заказ и избежите повторной операции",
+    next: {id: "inventory-incidents", label: "Проверить остатки"},
+  },
+  "inventory-incidents": {
+    audience: "Для склада и fulfillment-команды",
+    before: "Подключённый источник остатков и складские правила",
+    outcome: "Вы отличите доступный остаток от резерва и разберёте инцидент",
+    next: {id: "sync", label: "Настроить обмен данными"},
+  },
+  integrations: {
+    audience: "Для администратора или интеграционного специалиста",
+    before: "Доступ провайдера, API/OAuth и нужные права",
+    outcome: "Кабинет проверен, возможности ограничены, импорт готов к запуску",
+    next: {id: "sync", label: "Настроить синхронизацию"},
+  },
+  social: {
+    audience: "Для контент-команды",
+    before: "Подключённый канал публикации и права на размещение",
+    outcome: "Вы подготовите публикацию, запланируете её и проверите результат",
+    next: {id: "monitoring", label: "Проверить доставку и аудит"},
+  },
+  sync: {
+    audience: "Для оператора обмена и интеграций",
+    before: "Активный кабинет и разрешённое направление обмена",
+    outcome: "Вы запустите импорт, прочитаете сверку и поймёте причину расхождения",
+    next: {id: "monitoring", label: "Настроить контроль ошибок"},
+  },
+  "master-data": {
+    audience: "Для финансовой и ERP-команды",
+    before: "Единые юридические лица, договоры и валютные правила",
+    outcome: "Вы сохраните справочники и свяжете финансовые операции без дублей",
+    next: {id: "control", label: "Настроить согласования"},
+  },
+  control: {
+    audience: "Для approver и специалиста по compliance",
+    before: "Роли, политика операции и исходные документы",
+    outcome: "Вы проведёте чувствительную операцию через проверку и согласование",
+    next: {id: "monitoring", label: "Проверить историю действий"},
+  },
+  monitoring: {
+    audience: "Для операционной команды и поддержки",
+    before: "Настроенные каналы уведомлений и доступ к аудиту",
+    outcome: "Вы увидите ошибку вовремя, найдёте отчёт и подтвердите действие",
+    next: {id: "troubleshooting", label: "Разобрать проблему"},
+  },
+  settings: {
+    audience: "Для администратора рабочего пространства",
+    before: "Права администратора и согласованные настройки",
+    outcome: "Вы настроите роли, вход, уведомления, AI и интеграции",
+    next: {id: "security", label: "Проверить безопасность"},
+  },
+  automation: {
+    audience: "Для администратора платформы и разработчика",
+    before: "Понятная задача автоматизации и минимальные права",
+    outcome: "Вы подключите расширение, не превращая AI или MCP в обход контроля",
+    next: {id: "developer", label: "Открыть API и расширения"},
+  },
+  developer: {
+    audience: "Для backend- и integration-разработчика",
+    before: "Версия API, схема данных и тестовый рабочий контур",
+    outcome: "Вы спроектируете вызовы, webhooks и повторяемые операции",
+    next: {id: "security", label: "Проверить границы доступа"},
+  },
+  security: {
+    audience: "Для администратора и специалиста по безопасности",
+    before: "Модель ролей, доверенные адреса и процедура ротации",
+    outcome: "Вы проверите default deny, секреты, tenant-контекст и аудит",
+    next: {id: "operations", label: "Перейти к эксплуатации"},
+  },
+  environment: {
+    audience: "Для администратора Community-развёртывания",
+    before: "Сервер, Docker и безопасное место для секретов",
+    outcome: "Вы заполните .env, проверите конфигурацию и запустите контур",
+    next: {id: "operations", label: "Проверить работу контура"},
+  },
+  operations: {
+    audience: "Для release- и ops-инженера",
+    before: "Резервная копия, точный тег и план восстановления",
+    outcome: "Вы обновите Community безопасно и подтвердите доступность сервисов",
+    next: {id: "troubleshooting", label: "Открыть диагностику"},
+  },
+  troubleshooting: {
+    audience: "Для любого пользователя и первой линии поддержки",
+    before: "Симптом, время ошибки и рабочее пространство",
+    outcome: "Вы определите слой проблемы и соберёте безопасное свидетельство",
+  },
+};
+
+export const troubleshootingFaq = [
+  {question: "Слишком часто появляется экран входа", answer: "Access token должен обновляться автоматически. Проверьте доступность /oidc/silent-callback.html, Web Origins и политику встраивания провайдера. Повторный вход ожидаем после окончания SSO-сессии, выхода или отзыва."},
+  {question: "Раздел отсутствует в меню", answer: "Проверьте разрешения пользователя и текущее рабочее пространство. Скрытие пункта — следствие правил доступа, а не удаление данных."},
+  {question: "Не удалось загрузить данные", answer: "Проверьте API health и сессию. Ответ 403 означает отсутствие разрешения, 409 — конфликт версии, 429 — превышение лимита."},
+  {question: "Интеграция не активируется", answer: "Откройте карточку площадки и проверьте учётные данные, параметры OAuth, разрешения и проверку доступности."},
+  {question: "Синхронизация не запускается", answer: "Убедитесь, что кабинет активен, политика создана, направление поддерживается, а предыдущий запуск не требует решения оператора."},
+  {question: "Секрет случайно раскрыт", answer: "Немедленно отзовите его у провайдера, выполните ротацию и проверьте аудит. Удаления текста из UI недостаточно."},
+] as const;
+
+const documentationGlossary = [
+  ["Кабинет", "Сохранённая связь TORGNEXA с одной внешней системой. В одном рабочем пространстве может быть несколько кабинетов."],
+  ["Возможность", "Конкретное действие, которое разрешено карточке: например, чтение товаров или запись цены."],
+  ["Проверка доступности", "Реальный безопасный запрос к официальному API. Он подтверждает доступ, но сам по себе не включает обмен данными."],
+  ["ATP", "Доступный остаток: физическое количество за вычетом резерва, карантина и уже распределённых единиц."],
+  ["Сверка", "Сравнение состояния TORGNEXA и внешней системы с перечнем расхождений, которые нужно решить."],
+  ["Idempotency key", "Ключ повторяемости. Он помогает безопасно повторить запрос, не создав вторую операцию."],
+] as const;
+
 const DocumentationSectionContext = createContext<DocumentationSectionId | undefined>(undefined);
 
 function DocumentationMetadata({page}: {page: {path: string; heading: string; title: string; description: string}}) {
@@ -103,29 +232,41 @@ function DocumentationMetadata({page}: {page: {path: string; heading: string; ti
       {"@type": "ListItem", position: 2, name: "Документация", item: `${window.location.origin}/docs`},
     ];
     if (page.path !== "/docs") breadcrumbItems.push({"@type": "ListItem", position: 3, name: page.heading, item: canonical});
+    const structuredDataGraph: Array<Record<string, unknown>> = [
+      {
+        "@type": "TechArticle",
+        "@id": `${canonical}#article`,
+        headline: page.title,
+        description: page.description,
+        inLanguage: "ru-RU",
+        url: canonical,
+        mainEntityOfPage: canonical,
+        isPartOf: {"@type": "TechArticle", "@id": `${window.location.origin}/docs#article`, url: `${window.location.origin}/docs`, name: docsTitle},
+        publisher: {"@type": "Organization", name: "TORGNEXA"},
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${canonical}#breadcrumb`,
+        itemListElement: breadcrumbItems,
+      },
+    ];
+    if (page.path === "/docs/troubleshooting") {
+      structuredDataGraph.push({
+        "@type": "FAQPage",
+        "@id": `${canonical}#faq`,
+        mainEntity: troubleshootingFaq.map(({question, answer}) => ({
+          "@type": "Question",
+          name: question,
+          acceptedAnswer: {"@type": "Answer", text: answer},
+        })),
+      });
+    }
     const structuredData = document.createElement("script");
     structuredData.type = "application/ld+json";
     structuredData.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "TechArticle",
-      "@graph": [
-        {
-          "@type": "TechArticle",
-          "@id": `${canonical}#article`,
-          headline: page.title,
-          description: page.description,
-          inLanguage: "ru-RU",
-          url: canonical,
-          mainEntityOfPage: canonical,
-          isPartOf: {"@type": "TechArticle", "@id": `${window.location.origin}/docs#article`, url: `${window.location.origin}/docs`, name: docsTitle},
-          publisher: {"@type": "Organization", name: "TORGNEXA"},
-        },
-        {
-          "@type": "BreadcrumbList",
-          "@id": `${canonical}#breadcrumb`,
-          itemListElement: breadcrumbItems,
-        },
-      ],
+      "@graph": structuredDataGraph,
     });
     document.head.appendChild(structuredData);
 
@@ -252,8 +393,8 @@ function OpenCartDockerGuide() {
       <tr><td>Order <code>9001</code></td><td>одна строка кофе</td><td>Список, статус и повторное чтение заказа</td></tr>
     </tbody></table></div>
     <Callout title="Только локальная проверка" tone="warning">Адрес <code>127.0.0.1:8095</code>, токен Bearer <code>torgnexa-demo-bridge-token-2026</code> и пароли MariaDB — синтетические значения для теста. Не публикуйте порт и не переносите эти учётные данные в рабочую среду.</Callout>
-    <figure><img src="/docs/opencart-smoke.png" alt="Страница документации TORGNEXA с инструкцией OpenCart Docker smoke-test"/><figcaption>Инструкция доступна в публичной документации: команды, ожидаемые проверки и очистка тестового стека.</figcaption></figure>
-    <figure><img src="/docs/opencart-store.png" alt="Демо-магазин OpenCart с синтетическими товарами TORGNEXA"/><figcaption>Демо-магазин после seed: три синтетических товара видны через обычный поиск OpenCart.</figcaption></figure>
+    <DocsScreenshot src="/docs/opencart-smoke.png" width={1265} height={712} alt="Страница документации TORGNEXA с инструкцией OpenCart Docker smoke-test" caption="Инструкция доступна в публичной документации: команды, ожидаемые проверки и очистка тестового стека."/>
+    <DocsScreenshot src="/docs/opencart-store.png" width={1265} height={712} alt="Демо-магазин OpenCart с синтетическими товарами TORGNEXA" caption="Демо-магазин после seed: три синтетических товара видны через обычный поиск OpenCart."/>
     <p>Полный текст, список endpoint-проверок и совместимость со схемой OpenCart 4.1 находятся в <code>docs/connectors/opencart/docker-smoke.md</code>.</p>
   </div>;
 }
@@ -274,8 +415,8 @@ function WooCommerceDockerGuide() {
       <tr><td>Синтетический заказ</td><td>две единицы кофе</td><td>Список и изменение статуса заказа</td></tr>
     </tbody></table></div>
     <Callout title="Только локальная проверка" tone="warning">Порты <code>8096</code>/<code>8446</code>, самоподписанный TLS-сертификат, ключ и секрет потребителя, а также пароли MariaDB — синтетические значения. Не публикуйте их и не переносите в рабочую среду.</Callout>
-    <figure><img src="/docs/woocommerce-guide.png" alt="Страница документации TORGNEXA с инструкцией WooCommerce Docker smoke-test"/><figcaption>Инструкция запуска, проверки и очистки WooCommerce-стенда.</figcaption></figure>
-    <figure><img src="/docs/woocommerce-store.png" alt="Демо-магазин WooCommerce с синтетическими товарами TORGNEXA"/><figcaption>Демо-витрина WooCommerce после загрузки синтетических товаров.</figcaption></figure>
+    <DocsScreenshot src="/docs/woocommerce-guide.png" width={1265} height={712} alt="Страница документации TORGNEXA с инструкцией WooCommerce Docker smoke-test" caption="Инструкция запуска, проверки и очистки WooCommerce-стенда."/>
+    <DocsScreenshot src="/docs/woocommerce-store.png" width={1265} height={1212} alt="Демо-магазин WooCommerce с синтетическими товарами TORGNEXA" caption="Демо-витрина WooCommerce после загрузки синтетических товаров."/>
     <p>Полный текст и ограничения квалификации находятся в <code>docs/connectors/woocommerce/docker-smoke.md</code>. Рабочий процесс TORGNEXA сейчас маршрутизирует только сущность <code>products</code>; дополнительные REST-возможности не расширяют среду автоматически.</p>
   </div>;
 }
@@ -296,8 +437,8 @@ function PrestaShopDockerGuide() {
       <tr><td><code>StockAvailable</code></td><td>quantity 37 после smoke</td><td>Авторитетный остаток PrestaShop и XML PATCH</td></tr>
     </tbody></table></div>
     <Callout title="Только локальная проверка" tone="warning">Порт <code>8097</code>, ключ API <code>0123456789abcdef0123456789abcdef</code> и пароли MariaDB — синтетические значения. Не публикуйте адрес и не переносите эти учётные данные в рабочую среду.</Callout>
-    <figure><img src="/docs/prestashop-guide.png" alt="Страница документации TORGNEXA с инструкцией PrestaShop Webservice smoke-test"/><figcaption>Инструкция запуска, проверки официального Webservice API и очистки стенда.</figcaption></figure>
-    <figure><img src="/docs/prestashop-store.png" alt="Демо-магазин PrestaShop с синтетическими товарами TORGNEXA"/><figcaption>Демо-витрина PrestaShop после seed: синтетические товары доступны через обычный storefront.</figcaption></figure>
+    <DocsScreenshot src="/docs/prestashop-guide.png" width={1265} height={712} alt="Страница документации TORGNEXA с инструкцией PrestaShop Webservice smoke-test" caption="Инструкция запуска, проверки официального Webservice API и очистки стенда."/>
+    <DocsScreenshot src="/docs/prestashop-store.png" width={1265} height={712} alt="Демо-магазин PrestaShop с синтетическими товарами TORGNEXA" caption="Демо-витрина PrestaShop после seed: синтетические товары доступны через обычный storefront."/>
     <p>Полный список запросов, ограничения ключа и формат официальных JSON/XML ответов находятся в <code>docs/connectors/prestashop/docker-smoke.md</code>. Рабочий процесс TORGNEXA по-прежнему маршрутизирует только сущность <code>products</code>; возможности манифеста не превращаются в автоматическую синхронизацию.</p>
   </div>;
 }
@@ -498,6 +639,28 @@ function FeatureGrid({items}: {items: readonly (readonly [string, string])[]}) {
   return <div className="docs-feature-grid">{items.map(([title, copy]) => <article key={title}><h3>{title}</h3><p>{copy}</p></article>)}</div>;
 }
 
+function DocumentationPageGuide({guide}: {guide: DocumentationGuide}) {
+  return <section className="docs-page-guide" aria-labelledby="docs-guide-title">
+    <div className="docs-guide-heading"><p className="eyebrow">КОРОТКО</p><h2 id="docs-guide-title">Как пройти этот раздел</h2><p>Сначала проверьте исходные условия, затем выполните действия по порядку. Так проще отличить настройку от результата проверки.</p></div>
+    <div className="docs-guide-grid">
+      <article><span>Для кого</span><strong>{guide.audience}</strong></article>
+      <article><span>Перед началом</span><strong>{guide.before}</strong></article>
+      <article><span>В результате</span><strong>{guide.outcome}</strong></article>
+    </div>
+    {guide.next ? <a className="docs-next-step" href={documentationPathFor(guide.next.id)}><span>Следующий шаг</span><strong>{guide.next.label}</strong><span aria-hidden="true">→</span></a> : <p className="docs-guide-finish"><strong>Если результат другой</strong><span>Откройте симптом ниже и зафиксируйте время, рабочее пространство и идентификатор операции.</span></p>}
+  </section>;
+}
+
+function DocumentationGlossary() {
+  return <div className="docs-glossary" aria-label="Короткий словарь терминов">
+    {documentationGlossary.map(([term, explanation]) => <article key={term}><h3>{term}</h3><p>{explanation}</p></article>)}
+  </div>;
+}
+
+function DocsScreenshot({src, alt, caption, width, height}: {src: string; alt: string; caption: string; width: number; height: number}) {
+  return <figure className="docs-screenshot"><img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async"/><figcaption>{caption}</figcaption></figure>;
+}
+
 function EnvironmentTables() {
   return <div className="docs-env-groups">{environmentGroups.map((group) => <div className="docs-env-group" key={group.title}>
     <h3>{group.title}</h3>
@@ -510,6 +673,7 @@ function EnvironmentTables() {
 export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationSectionId} = {}) {
   const activeSection = sectionId ?? (typeof window === "undefined" ? undefined : documentationSectionIdForPath(window.location.pathname));
   const activePage = activeSection ? documentationPageForId(activeSection) : undefined;
+  const activeGuide = activeSection ? documentationGuides[activeSection] : undefined;
   const page = activePage ?? {path: "/docs", title: docsTitle, description: docsDescription, heading: "Документация TORGNEXA"};
   return <div className="docs-shell">
     <DocumentationMetadata page={page}/>
@@ -520,12 +684,15 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
     <div className="docs-layout">
       <nav className="docs-toc" aria-label="Разделы документации"><strong><a href="/docs" aria-current={!activeSection ? "page" : undefined}>Содержание</a></strong>{documentationNavigation.map(group => <div className="docs-toc-group" key={group.title}><span>{group.title}</span>{group.items.map(([id, label]) => <a key={id} href={documentationPathFor(id)} aria-current={activeSection === id ? "page" : undefined}>{label}</a>)}</div>)}</nav>
       <main className="docs-content">
-        {activePage ? <section className="docs-subpage-intro">
-          <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><a href="/docs">Документация</a><span aria-hidden="true">›</span><span>{activePage.heading}</span></nav>
-          <div className="docs-version"><span>Руководство пользователя</span><span>Тематический раздел</span></div>
-          <h1>{activePage.heading}</h1>
-          <p className="docs-lead">{activePage.description}</p>
-        </section> : <section className="docs-hero" id="start">
+        {activePage && activeGuide ? <>
+          <section className="docs-subpage-intro">
+            <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><a href="/docs">Документация</a><span aria-hidden="true">›</span><span>{activePage.heading}</span></nav>
+            <div className="docs-version"><span>Руководство пользователя</span><span>Тематический раздел</span></div>
+            <h1>{activePage.heading}</h1>
+            <p className="docs-lead">{activePage.description}</p>
+          </section>
+          <DocumentationPageGuide guide={activeGuide}/>
+        </> : <section className="docs-hero" id="start">
           <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><span>Документация</span></nav>
           <div className="docs-version"><span>Руководство пользователя</span><span>Текущий интерфейс</span></div>
           <h1>Документация TORGNEXA</h1>
@@ -543,7 +710,8 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             <li><strong>Проверьте рабочий контекст</strong><span>В верхней панели отображаются организация и рабочее пространство, полученные из проверенной сессии.</span></li>
             <li><strong>Начните с «Обзора»</strong><span>Интерфейс покажет доступные шаги и проблемы, требующие внимания.</span></li>
           </ol>
-          <figure><img src="/docs/login.png" alt="Экран входа TORGNEXA с кнопкой «Войти»"/><figcaption>Публичный экран входа: одна понятная кнопка «Войти» и ссылка на это руководство.</figcaption></figure>
+          <DocsScreenshot src="/docs/login.png" width={1280} height={720} alt="Экран входа TORGNEXA с кнопкой «Войти»" caption="Публичный экран входа: одна понятная кнопка «Войти» и ссылка на это руководство."/>
+          <DocsScreenshot src="/docs/mobile.png" width={415} height={830} alt="Мобильная версия интерфейса TORGNEXA с компактной навигацией" caption="На узком экране навигация сворачивается, а таблицы и пошаговые карточки остаются прокручиваемыми."/>
           <Callout title="Сессия обновляется автоматически" tone="success">Короткий access token продлевается в фоне. Повторный вход нужен после завершения SSO-сессии, явного выхода или отзыва сессии администратором.</Callout>
           <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Раздел</th><th>Адрес</th><th>Назначение</th></tr></thead><tbody>{routes.map(([label, path, description]) => <tr key={path}><td><strong>{label}</strong></td><td><code>{path}</code></td><td>{description}</td></tr>)}</tbody></table></div>
           <p>Левая навигация показывает только разделы, разрешённые вашей роли. Отсутствующий пункт обычно означает, что разрешение не выдано; это не удаляет данные.</p>
@@ -558,6 +726,9 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             ["Центр активности", "Непрочитанные события и ожидающие согласования собраны в верхней панели."],
             ["Быстрый поиск", "Cmd/Ctrl+K открывает разрешённые разделы и ищет товары и заказы через серверные API."],
           ]}/>
+          <h3>Словарь без лишнего жаргона</h3>
+          <p>В документации встречаются технические слова, которые описывают реальные проверки и ограничения. Ниже — короткий перевод на язык ежедневной работы.</p>
+          <DocumentationGlossary/>
           <p>Тема, плотность таблиц и мобильное меню сохраняются в интерфейсе без превращения браузера в источник бизнес-состояния. Плашка состояния подключения показывает только состояние SSE-канала инвалидаций: данные всё равно перечитываются обычными API с проверкой прав.</p>
           <Callout title="Данные не появились сразу?">После подключения кабинета сначала запустите первоначальный импорт в «Синхронизации». Пустой обзор до импорта не означает потерю данных.</Callout>
         </DocSection>
@@ -599,10 +770,10 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             ["Пробный запуск", "Перед импортом доступна предварительная проверка: она считает политики, чтение и запись, но не меняет внешний сервис."],
           ]}/>
           <RuntimeMatrix/>
-          <figure><img src="/docs/integrations.png" alt="Раздел «Интеграции» TORGNEXA с карточками подключения"/><figcaption>Экран каталога: карточка провайдера ведёт к подключению кабинета и проверке доступа.</figcaption></figure>
+          <DocsScreenshot src="/docs/integrations.png" width={1265} height={791} alt="Раздел «Интеграции» TORGNEXA с карточками подключения" caption="Экран каталога: карточка провайдера ведёт к подключению кабинета и проверке доступа."/>
           <IntegrationConnectionGuide/>
           <IntegrationQualificationGuides/>
-          <figure><img src="/docs/integration-connection.png" alt="Пошаговое подключение кабинета интеграции TORGNEXA"/><figcaption>Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта.</figcaption></figure>
+          <DocsScreenshot src="/docs/integration-connection.png" width={1265} height={791} alt="Пошаговое подключение кабинета интеграции TORGNEXA" caption="Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта."/>
           <p>Для OAuth-подключения нажмите «Войти». Токен доступа обновляется сервером автоматически до истечения срока. Повторный вход требуется только если площадка отозвала доступ, отклонила токен обновления или не выдала его; карточка кабинета покажет «Войти снова».</p>
           <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур ограничен товарами и явно указанными направлениями синхронизации. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>
           <Callout title="Боевые учётные данные" tone="warning">Не используйте боевые ключи в тестовом контуре. Выдавайте минимальные права, а при раскрытии немедленно отзывайте ключ у провайдера и выполняйте его ротацию.</Callout>
@@ -725,14 +896,9 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
 
         <DocSection id="troubleshooting" title="Решение проблем" intro="Начните с симптома, затем проверяйте ближайшую границу: сессию, права, API или внешний коннектор.">
           <dl className="docs-faq">
-            <div><dt>Слишком часто появляется экран входа</dt><dd>Access token должен обновляться автоматически. Проверьте доступность <code>/oidc/silent-callback.html</code>, Web Origins и политику встраивания провайдера. Повторный вход ожидаем после окончания SSO-сессии, выхода или отзыва.</dd></div>
-            <div><dt>Раздел отсутствует в меню</dt><dd>Проверьте разрешения пользователя и текущее рабочее пространство. Скрытие пункта — следствие правил доступа, а не удаление данных.</dd></div>
-            <div><dt>Не удалось загрузить данные</dt><dd>Проверьте API health и сессию. Ответ 403 означает отсутствие разрешения, 409 — конфликт версии, 429 — превышение лимита.</dd></div>
-            <div><dt>Интеграция не активируется</dt><dd>Откройте карточку площадки и проверьте учётные данные, параметры OAuth, разрешения и проверку доступности.</dd></div>
-            <div><dt>Синхронизация не запускается</dt><dd>Убедитесь, что кабинет активен, политика создана, направление поддерживается, а предыдущий запуск не требует решения оператора.</dd></div>
-            <div><dt>Секрет случайно раскрыт</dt><dd>Немедленно отзовите его у провайдера, выполните ротацию и проверьте аудит. Удаления текста из UI недостаточно.</dd></div>
+            {troubleshootingFaq.map(({question, answer}) => <div key={question}><dt>{question}</dt><dd>{answer}</dd></div>)}
           </dl>
-          <figure><img src="/docs/documentation.png" alt="Публичная документация TORGNEXA"/><figcaption>Руководство доступно до входа и адаптируется под настольный и мобильный экран.</figcaption></figure>
+          <DocsScreenshot src="/docs/documentation.png" width={1265} height={791} alt="Публичная документация TORGNEXA" caption="Руководство доступно до входа и адаптируется под настольный и мобильный экран."/>
         </DocSection>
         </DocumentationSectionContext.Provider>
       </main>

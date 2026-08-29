@@ -29,6 +29,7 @@ const ssrModulePath = resolve(ssrRoot, "docs-entry.js");
 const ssrModule = await import(pathToFileURL(ssrModulePath).href);
 if (typeof ssrModule.renderDocumentation !== "function") throw new Error("SSR docs entry does not export renderDocumentation");
 if (!Array.isArray(ssrModule.documentationPages) || ssrModule.documentationPages.length < 10) throw new Error("SSR docs entry has too few documentation pages");
+if (!Array.isArray(ssrModule.troubleshootingFaq) || ssrModule.troubleshootingFaq.length < 3) throw new Error("SSR docs entry has no troubleshooting FAQ");
 
 const siteURL = publicURL();
 const rootPage = {
@@ -46,26 +47,38 @@ function structuredDataFor(page, canonical) {
     {"@type": "ListItem", position: 2, name: "Документация", item: docsURL()},
   ];
   if (page.path !== "/docs") breadcrumbs.push({"@type": "ListItem", position: 3, name: page.heading, item: canonical});
+  const graph = [
+    {
+      "@type": "TechArticle",
+      "@id": `${canonical}#article`,
+      headline: page.title,
+      description: page.description,
+      inLanguage: "ru-RU",
+      url: canonical,
+      mainEntityOfPage: canonical,
+      isPartOf: {"@type": "TechArticle", "@id": `${docsURL()}#article`, url: docsURL(), name: rootPage.title},
+      publisher: {"@type": "Organization", name: "TORGNEXA"},
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${canonical}#breadcrumb`,
+      itemListElement: breadcrumbs,
+    },
+  ];
+  if (page.path === "/docs/troubleshooting") {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${canonical}#faq`,
+      mainEntity: ssrModule.troubleshootingFaq.map(({question, answer}) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: {"@type": "Answer", text: answer},
+      })),
+    });
+  }
   return {
     "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "TechArticle",
-        "@id": `${canonical}#article`,
-        headline: page.title,
-        description: page.description,
-        inLanguage: "ru-RU",
-        url: canonical,
-        mainEntityOfPage: canonical,
-        isPartOf: {"@type": "TechArticle", "@id": `${docsURL()}#article`, url: docsURL(), name: rootPage.title},
-        publisher: {"@type": "Organization", name: "TORGNEXA"},
-      },
-      {
-        "@type": "BreadcrumbList",
-        "@id": `${canonical}#breadcrumb`,
-        itemListElement: breadcrumbs,
-      },
-    ],
+    "@graph": graph,
   };
 }
 

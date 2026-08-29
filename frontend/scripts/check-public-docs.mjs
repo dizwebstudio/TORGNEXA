@@ -50,6 +50,9 @@ checks.push(
   [pages.every(({url, html}) => html.includes(`<link rel="canonical" href="${url}" />`)), "every page has a self-referencing canonical URL"],
   [pages.every(({html}) => html.includes('type="application/ld+json"') && html.includes("BreadcrumbList")), "every page has article and breadcrumb JSON-LD"],
   [pages.every(({html}) => !html.includes("/src/main.tsx") && !html.includes('type="module"')), "public HTML does not require the SPA module"],
+  [pages.filter(({url}) => url !== canonical).every(({html}) => html.includes('class="docs-page-guide"')), "every topical page has a short reader orientation"],
+  [pages.some(({url, html}) => url.endsWith("/troubleshooting") && html.includes("FAQPage") && html.includes("Question")), "troubleshooting page has FAQ JSON-LD"],
+  [pages.every(({html}) => [...html.matchAll(/<img\b[^>]*>/g)].every(([tag]) => tag.includes("alt=") && tag.includes("width=") && tag.includes("height=") && tag.includes('loading="lazy"') && tag.includes('decoding="async"'))), "every documentation screenshot has accessible dimensions and lazy loading"],
   [pages.some(({url, html}) => url.endsWith("/integrations") && html.includes("Пошаговое подключение") && html.includes("Долями")), "integration page has current connection guidance"],
 );
 

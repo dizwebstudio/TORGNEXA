@@ -553,6 +553,26 @@
       },
       "backfill": null,
       "sha256": "42a5623ec462660676ef6729f9edce7e5c511756d86b260e3996401ee1f7b491"
+    },
+    {
+      "version": 27,
+      "name": "workflow_automation",
+      "file": "000027_workflow_automation.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [26],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "27ee40f801eca625bd4ddaa60bb6a91cccf9413bf93b7b04b2a4431d67124b03"
     }
   ]
 }

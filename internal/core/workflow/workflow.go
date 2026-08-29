@@ -21,11 +21,11 @@ import (
 )
 
 var (
-	ErrInvalid       = errors.New("workflow: invalid value")
-	ErrInvalidState  = errors.New("workflow: invalid state transition")
-	ErrConflict      = errors.New("workflow: optimistic version conflict")
-	ErrNotFound      = errors.New("workflow: not found")
-	ErrGraphCycle    = errors.New("workflow: graph contains a cycle")
+	ErrInvalid          = errors.New("workflow: invalid value")
+	ErrInvalidState     = errors.New("workflow: invalid state transition")
+	ErrConflict         = errors.New("workflow: optimistic version conflict")
+	ErrNotFound         = errors.New("workflow: not found")
+	ErrGraphCycle       = errors.New("workflow: graph contains a cycle")
 	ErrGraphUnreachable = errors.New("workflow: graph contains unreachable node")
 )
 
@@ -41,11 +41,11 @@ const (
 )
 
 var (
-	idPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
-	namePattern       = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._:/()\-]{0,119}$`)
-	eventTypePattern  = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.v[1-9][0-9]{0,2}$`)
-	keyPattern        = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,63}$`)
-	conditionPattern  = regexp.MustCompile(`^(always|true|false)$`)
+	idPattern        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+	namePattern      = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._:/()\-]{0,119}$`)
+	eventTypePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.v[1-9][0-9]{0,2}$`)
+	keyPattern       = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,63}$`)
+	conditionPattern = regexp.MustCompile(`^(always|true|false)$`)
 )
 
 // Scope is the mandatory organization/workspace boundary for workflow data.
@@ -61,7 +61,9 @@ func ParseScope(organizationID, workspaceID string) (Scope, error) {
 
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
-func (s Scope) Valid() bool            { return idPattern.MatchString(s.organizationID) && idPattern.MatchString(s.workspaceID) }
+func (s Scope) Valid() bool {
+	return idPattern.MatchString(s.organizationID) && idPattern.MatchString(s.workspaceID)
+}
 
 // DefinitionStatus is the immutable-version lifecycle of a workflow head.
 type DefinitionStatus string
@@ -89,11 +91,11 @@ func (k TriggerKind) Valid() bool { return k == TriggerEvent || k == TriggerSche
 
 // Trigger is a typed event or bounded periodic trigger.
 type Trigger struct {
-	Kind             TriggerKind `json:"kind"`
-	EventType        string      `json:"event_type,omitempty"`
-	IntervalMinutes  int         `json:"interval_minutes,omitempty"`
-	Enabled          bool        `json:"enabled"`
-	NextRunAt        *time.Time  `json:"next_run_at,omitempty"`
+	Kind            TriggerKind `json:"kind"`
+	EventType       string      `json:"event_type,omitempty"`
+	IntervalMinutes int         `json:"interval_minutes,omitempty"`
+	Enabled         bool        `json:"enabled"`
+	NextRunAt       *time.Time  `json:"next_run_at,omitempty"`
 }
 
 func (t Trigger) Validate() error {
@@ -136,10 +138,10 @@ func (k NodeKind) Valid() bool {
 // Node is deliberately declarative. Config is a bounded JSON object consumed
 // by a registered typed adapter, never evaluated as code.
 type Node struct {
-	ID         string          `json:"id"`
-	Kind       NodeKind       `json:"kind"`
-	Action     string          `json:"action,omitempty"`
-	Config     json.RawMessage `json:"config,omitempty"`
+	ID     string          `json:"id"`
+	Kind   NodeKind        `json:"kind"`
+	Action string          `json:"action,omitempty"`
+	Config json.RawMessage `json:"config,omitempty"`
 }
 
 func (n Node) Validate() error {
@@ -181,11 +183,11 @@ func (e Edge) Validate() error {
 // Definition is the mutable draft submitted by an operator. Publishing
 // creates an immutable Version and its deterministic plan digest.
 type Definition struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	Trigger     Trigger   `json:"trigger"`
-	Nodes       []Node    `json:"nodes"`
-	Edges       []Edge    `json:"edges"`
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	Trigger     Trigger `json:"trigger"`
+	Nodes       []Node  `json:"nodes"`
+	Edges       []Edge  `json:"edges"`
 }
 
 func (d Definition) Validate() error {
@@ -218,16 +220,16 @@ func (d Definition) Validate() error {
 
 // Workflow is the current tenant-scoped definition head.
 type Workflow struct {
-	ID              string           `json:"id"`
-	OrganizationID  string           `json:"organization_id"`
-	WorkspaceID     string           `json:"workspace_id"`
-	Name            string           `json:"name"`
-	Description     string           `json:"description,omitempty"`
-	Status          DefinitionStatus `json:"status"`
-	CurrentVersion  int64            `json:"current_version"`
-	Version         int64            `json:"version"`
-	CreatedAt       time.Time        `json:"created_at"`
-	UpdatedAt       time.Time        `json:"updated_at"`
+	ID             string           `json:"id"`
+	OrganizationID string           `json:"organization_id"`
+	WorkspaceID    string           `json:"workspace_id"`
+	Name           string           `json:"name"`
+	Description    string           `json:"description,omitempty"`
+	Status         DefinitionStatus `json:"status"`
+	CurrentVersion int64            `json:"current_version"`
+	Version        int64            `json:"version"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
 }
 
 func (w Workflow) Validate() error {
@@ -240,14 +242,14 @@ func (w Workflow) Validate() error {
 // WorkflowVersion is immutable after publication. Draft versions may be
 // replaced by creating a new version, never by mutating this value in place.
 type WorkflowVersion struct {
-	ID             string    `json:"id"`
-	WorkflowID     string    `json:"workflow_id"`
-	OrganizationID string    `json:"organization_id"`
-	WorkspaceID    string    `json:"workspace_id"`
-	Version        int64     `json:"version"`
+	ID             string     `json:"id"`
+	WorkflowID     string     `json:"workflow_id"`
+	OrganizationID string     `json:"organization_id"`
+	WorkspaceID    string     `json:"workspace_id"`
+	Version        int64      `json:"version"`
 	Definition     Definition `json:"definition"`
-	PlanDigest     string    `json:"plan_digest"`
-	CreatedAt      time.Time `json:"created_at"`
+	PlanDigest     string     `json:"plan_digest"`
+	CreatedAt      time.Time  `json:"created_at"`
 	PublishedAt    *time.Time `json:"published_at,omitempty"`
 }
 
@@ -263,8 +265,8 @@ func (v WorkflowVersion) Validate() error {
 
 // Plan is the deterministic topological execution plan for a definition.
 type Plan struct {
-	NodeIDs    []string `json:"node_ids"`
-	Digest     string   `json:"digest"`
+	NodeIDs []string `json:"node_ids"`
+	Digest  string   `json:"digest"`
 }
 
 // Compile validates and deterministically compiles a definition.
@@ -440,22 +442,33 @@ func (s StepStatus) Valid() bool {
 // Run is a tenant-scoped execution. TriggerRef is an opaque event or manual
 // reference; the raw event payload is never stored in this model.
 type Run struct {
-	ID              string    `json:"id"`
-	OrganizationID  string    `json:"organization_id"`
-	WorkspaceID     string    `json:"workspace_id"`
-	WorkflowID      string    `json:"workflow_id"`
-	WorkflowVersion int64     `json:"workflow_version"`
+	ID              string      `json:"id"`
+	OrganizationID  string      `json:"organization_id"`
+	WorkspaceID     string      `json:"workspace_id"`
+	WorkflowID      string      `json:"workflow_id"`
+	WorkflowVersion int64       `json:"workflow_version"`
 	TriggerKind     TriggerKind `json:"trigger_kind"`
-	TriggerRef      string    `json:"trigger_ref,omitempty"`
-	IdempotencyKey  string    `json:"idempotency_key"`
-	InputDigest     string    `json:"input_digest"`
-	Status          RunStatus `json:"status"`
-	AttemptCount    int       `json:"attempt_count"`
-	AvailableAt     time.Time `json:"available_at"`
-	StartedAt       *time.Time `json:"started_at,omitempty"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
-	LastErrorCode   string    `json:"last_error_code,omitempty"`
-	Version         int64     `json:"version"`
+	TriggerRef      string      `json:"trigger_ref,omitempty"`
+	IdempotencyKey  string      `json:"idempotency_key"`
+	InputDigest     string      `json:"input_digest"`
+	Status          RunStatus   `json:"status"`
+	AttemptCount    int         `json:"attempt_count"`
+	AvailableAt     time.Time   `json:"available_at"`
+	StartedAt       *time.Time  `json:"started_at,omitempty"`
+	CompletedAt     *time.Time  `json:"completed_at,omitempty"`
+	LastErrorCode   string      `json:"last_error_code,omitempty"`
+	Version         int64       `json:"version"`
+}
+
+// RunRequest is the bounded command used to enqueue a run.
+type RunRequest struct {
+	ID              string
+	WorkflowID      string
+	WorkflowVersion int64
+	TriggerKind     TriggerKind
+	TriggerRef      string
+	IdempotencyKey  string
+	InputDigest     string
 }
 
 func (r Run) Validate() error {

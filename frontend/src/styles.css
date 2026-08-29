@@ -810,6 +810,21 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
   linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--brand-soft) 72%,var(--surface)))!important; }
 .docs-subpage-intro { min-height:250px; display:flex; flex-direction:column; justify-content:center; background:linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--brand-soft) 72%,var(--surface)))!important; }
 .docs-subpage-intro h1 { max-width:720px; margin:16px 0 12px; font-size:clamp(34px,4.5vw,52px); line-height:1.06; letter-spacing:-.04em; }
+.docs-page-guide { display:grid; gap:18px; padding:24px 28px!important; border-color:color-mix(in srgb,var(--brand) 22%,var(--border))!important; background:linear-gradient(145deg,color-mix(in srgb,var(--brand-soft) 62%,var(--surface)),var(--surface))!important; }
+.docs-guide-heading .eyebrow { margin:0 0 7px; color:var(--brand); font-size:10px; font-weight:800; letter-spacing:.12em; }
+.docs-guide-heading h2 { margin:0; font-size:22px; letter-spacing:-.02em; }
+.docs-guide-heading p:not(.eyebrow) { max-width:720px; margin:7px 0 0; font-size:14px; }
+.docs-guide-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.docs-guide-grid article { display:grid; gap:7px; min-width:0; padding:15px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.docs-guide-grid span,.docs-next-step>span:first-child { color:var(--text-muted); font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+.docs-guide-grid strong { font-size:14px; line-height:1.45; }
+.docs-next-step { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px 15px; border:1px solid color-mix(in srgb,var(--brand) 24%,var(--border)); border-radius:12px; color:var(--text); text-decoration:none; background:var(--surface); }
+.docs-next-step:hover { border-color:var(--brand); }
+.docs-next-step strong { color:var(--brand); font-size:14px; }
+.docs-next-step>span:last-child { color:var(--brand); font-size:20px; line-height:1; }
+.docs-guide-finish { display:grid; gap:3px; margin:0; padding:13px 15px; border-radius:12px; background:var(--surface); }
+.docs-guide-finish span { color:var(--text-muted); font-size:13px; }
+.docs-screenshot img { height:auto; background:var(--surface-soft); }
 .docs-hero h1 { max-width:720px; margin:16px 0 12px; font-size:clamp(38px,5vw,60px); line-height:1.04; letter-spacing:-.045em; }
 .docs-breadcrumbs { display:flex; align-items:center; gap:7px; margin-bottom:14px; color:var(--text-muted); font-size:12px; }
 .docs-breadcrumbs a { color:var(--brand); font-weight:750; text-decoration:none; }
@@ -843,6 +858,10 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .docs-feature-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:18px 0; }
 .docs-feature-grid article { padding:18px; border:1px solid var(--border); border-radius:14px; background:var(--surface-soft); }
 .docs-feature-grid p { margin:0; }
+.docs-glossary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:18px 0 22px; }
+.docs-glossary article { min-width:0; padding:15px; border:1px solid var(--border); border-radius:12px; background:var(--surface-soft); }
+.docs-glossary h3 { margin-bottom:5px; font-size:14px; }
+.docs-glossary p { margin:0; font-size:13px; line-height:1.55; }
 .docs-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
 .docs-split>div { padding:20px; border:1px solid var(--border); border-radius:14px; }
 .docs-split ul { margin-bottom:0; }
@@ -926,7 +945,7 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 
 @media (max-width: 900px) {
   .docs-layout { grid-template-columns:200px minmax(0,1fr); gap:24px; padding-inline:20px; }
-  .docs-steps.compact,.docs-feature-grid,.docs-split { grid-template-columns:1fr; }
+  .docs-steps.compact,.docs-feature-grid,.docs-split,.docs-guide-grid,.docs-glossary { grid-template-columns:1fr; }
   .docs-reading-paths { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .docs-definition-grid { grid-template-columns:1fr; }
   .docs-runtime-groups { grid-template-columns:1fr; }

@@ -272,6 +272,36 @@ func TestBitrixOrderRuntimeAdmissionRequiresExplicitStatusMap(t *testing.T) {
 	}
 }
 
+func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+	cases := map[string]map[string]string{
+		"magento":     {"cancelled": "canceled"},
+		"medusa":      {"cancelled": "canceled"},
+		"saleor":      {"cancelled": "CANCELED"},
+		"shopify":     {"cancelled": "cancelled"},
+		"shopware":    {"cancelled": "cancelled"},
+		"woocommerce": {"pending": "pending", "confirmed": "on-hold", "processing": "processing", "fulfilled": "completed", "cancelled": "cancelled"},
+	}
+	for connectorID, statuses := range cases {
+		account := supportTestAccount(t, connectorID)
+		if !registry.SupportsOrderStatusWrite(account) || !SupportsCapability(connectorID, "orders.status.write") || !SupportsSync(connectorID, "orders", "outbound") {
+			t.Fatalf("%s order status write support is not admitted", connectorID)
+		}
+		if _, err := registry.OrderStatusWriter(context.Background(), account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s order status writer unavailable: %v", connectorID, err)
+		}
+		for canonical, expected := range statuses {
+			if got, ok := registry.OrderStatus(context.Background(), account, canonical, load); !ok || got != expected {
+				t.Fatalf("%s status %q = %q, %v; want %q, true", connectorID, canonical, got, ok, expected)
+			}
+		}
+		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", load); connectorID != "woocommerce" && ok {
+			t.Fatalf("%s exposed an unsupported non-cancel status transition", connectorID)
+		}
+	}
+}
+
 func TestHealthOnlyCatalogProvidersResolveProbeConnector(t *testing.T) {
 	registry := New()
 	for _, connectorID := range []string{"auto-ru", "avito", "chestny-znak", "cian", "diadoc", "egais", "instagram", "lamoda", "mvideo", "odnoklassniki", "rutube", "saby-edo", "threads", "vetis-mercury", "vk", "youtube"} {

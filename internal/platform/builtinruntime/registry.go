@@ -87,6 +87,17 @@ type ProductReader interface {
 	Read(context.Context, sdk.PageRequest) (ProductPage, error)
 }
 
+// PriceReader resolves an admitted provider-native price read surface. The
+// returned SDK reader keeps remote variant identities and exact money values;
+// no provider-specific shape crosses into the worker.
+type PriceReader = sdk.PriceReader
+
+// InventoryReader resolves an admitted provider-native inventory read
+// surface. Location discovery and stock reads remain separate so callers
+// cannot silently treat an aggregate marketplace balance as a warehouse
+// allocation.
+type InventoryReader = sdk.InventoryReader
+
 // OrderReader is the provider-neutral order read surface admitted by the
 // production registry. The registry normalizes configured provider statuses
 // before handing the page to the worker.
@@ -260,6 +271,151 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 	}
 }
 
+// PriceReader resolves first-party connectors with an executable prices.read
+// adapter. It intentionally does not imply an inbound sync route: callers
+// must use SupportsSync for that stronger worker guarantee.
+func (r *Registry) PriceReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (PriceReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "prices.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "magnit-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil), nil
+	case "yandex-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
+	case "woocommerce":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// InventoryReader resolves first-party connectors with an executable
+// inventory.read adapter. Aggregate marketplace locations are exposed only
+// when the connector itself provides that explicit boundary.
+func (r *Registry) InventoryReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (InventoryReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "inventory.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
+	case "magnit-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil), nil
+	case "megamarket":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return megamarket.New(megamarketHTTP{r.http}, megamarketConfigSource{load: load}, nil), nil
+	case "yandex-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	case "magento":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "medusa":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
+	case "saleor":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	case "shopify":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "shopware":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "woocommerce":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 // OrderReader resolves an admitted storefront order reader. Provider status
 // identifiers are translated at this composition boundary; the worker only
 // sees the canonical order lifecycle vocabulary.
@@ -378,14 +534,15 @@ func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status 
 		return "", false
 	}
 	if account.ConnectorID != "bitrix" {
-		return map[string]map[string]string{
-			"magento":   {"cancelled": "canceled"},
-			"medusa":    {"cancelled": "canceled"},
-			"saleor":    {"cancelled": "CANCELED"},
-			"shopify":   {"cancelled": "cancelled"},
-			"shopware":  {"cancelled": "cancelled"},
+		value, ok := map[string]map[string]string{
+			"magento":     {"cancelled": "canceled"},
+			"medusa":      {"cancelled": "canceled"},
+			"saleor":      {"cancelled": "CANCELED"},
+			"shopify":     {"cancelled": "cancelled"},
+			"shopware":    {"cancelled": "cancelled"},
 			"woocommerce": {"pending": "pending", "confirmed": "on-hold", "processing": "processing", "fulfilled": "completed", "cancelled": "cancelled"},
 		}[account.ConnectorID][status]
+		return value, ok
 	}
 	if load == nil {
 		return "", false

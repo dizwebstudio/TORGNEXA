@@ -32,6 +32,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/userprofilerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/workflowrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
@@ -86,6 +87,7 @@ type productionRouteDependencies struct {
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
 	aiRegistry         *builtinruntime.Registry
+	workflows          *workflowrepo.Repository
 	mcpAccounts        *mcpaccountsrepo.Repository
 	agentGovernance    *agentgovernancerepo.Repository
 	runtimePosture     *runtimeposture.Inspector
@@ -121,6 +123,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newMCPAccountRoutes(deps.mcpAccounts, deps.auditService)...)
 	routes = append(routes, newMCPAgentPolicyRoutes(deps.mcpAccounts, deps.agentGovernance, deps.agentGovernance, deps.auditService)...)
 	routes = append(routes, newTrustControlRoutes(deps.trustControl)...)
+	routes = append(routes, newWorkflowRoutes(deps.workflows)...)
 	routes = append(routes, newUploadReadRoutes(deps.uploadStatus, deps.uploadAccess, deps.uploadContent)...)
 	routes = append(routes, newUserProfileRoutes(profileAPI{profiles: deps.profiles, audit: deps.auditService, uploads: deps.uploads, uploadStatus: deps.uploadStatus, uploadAccess: deps.uploadAccess, uploadEvidence: deps.uploadEvidence, privacy: deps.privacy})...)
 	routes = append(routes, newReservedContractRoutes(deps, capabilityGuard)...)
