@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 )
 
 const RealtimePath = "/api/v1/realtime"
@@ -16,6 +19,24 @@ type realtimeEvent struct {
 	Reason string `json:"reason"`
 	Cursor string `json:"cursor,omitempty"`
 	At     string `json:"at"`
+}
+
+// latestAuditReader is an optional fast path for the realtime stream. The
+// normal audit list endpoint must decode complete summaries, while the SSE
+// invalidation channel only needs the newest opaque ID.
+type latestAuditReader interface {
+	LatestID(context.Context, tenancy.Scope) (string, error)
+}
+
+func latestAuditID(ctx context.Context, repository auditReader, scope tenancy.Scope) (string, error) {
+	if fast, ok := repository.(latestAuditReader); ok {
+		return fast.LatestID(ctx, scope)
+	}
+	rows, _, err := repository.List(ctx, scope, 1, "")
+	if err != nil || len(rows) == 0 {
+		return "", err
+	}
+	return rows[0].ID, nil
 }
 
 func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
@@ -48,8 +69,8 @@ func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
 		}
 
 		latest := ""
-		if rows, _, err := repository.List(r.Context(), scope, 1, ""); err == nil && len(rows) == 1 {
-			latest = rows[0].ID
+		if id, err := latestAuditID(r.Context(), repository, scope); err == nil {
+			latest = id
 		}
 		if !write("ready", realtimeEvent{Reason: "connected", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
 			return
@@ -64,11 +85,11 @@ func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
 			case <-r.Context().Done():
 				return
 			case <-poll.C:
-				rows, _, err := repository.List(r.Context(), scope, 1, "")
-				if err != nil || len(rows) == 0 || rows[0].ID == latest {
+				id, err := latestAuditID(r.Context(), repository, scope)
+				if err != nil || id == "" || id == latest {
 					continue
 				}
-				latest = rows[0].ID
+				latest = id
 				if !write("invalidate", realtimeEvent{Reason: "audit", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
 					return
 				}

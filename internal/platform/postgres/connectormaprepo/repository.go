@@ -15,7 +15,7 @@ import (
 const applyScopeStatement = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
 const mappingSelect = `SELECT organization_id, workspace_id, connector_account_id, entity_type, local_entity_id, remote_id, version, created_at, updated_at FROM connector_entity_mappings`
 
-var entityTypePattern = regexp.MustCompile(`^(product|offer|order|brand|category|attribute|legal_entity|individual_entrepreneur|branch|counterparty|bank_account|contract|authority_reference)$`)
+var entityTypePattern = regexp.MustCompile(`^(product|offer|order|warehouse|brand|category|attribute|legal_entity|individual_entrepreneur|branch|counterparty|bank_account|contract|authority_reference)$`)
 var localIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 
 type Repository struct{ database *sql.DB }

@@ -24,6 +24,20 @@ func TestRepositoryWritesAuditAndOutboxInSameTransaction(t *testing.T) {
 	}
 }
 
+func TestFailoverOptimisticUpsertsEvaluateExistingRows(t *testing.T) {
+	_, src, _, _ := runtime.Caller(0)
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(src), "failover.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(b)
+	for _, table := range []string{"warehouse_operational_state", "warehouse_failover_routes"} {
+		if !strings.Contains(text, "EXISTS (SELECT 1 FROM "+table) {
+			t.Fatalf("%s optimistic upsert must materialize an existing-row candidate", table)
+		}
+	}
+}
+
 func TestWireQuantityMirrorsSharedPrimitive(t *testing.T) {
 	d, err := inventory.ParseDecimal("12.345")
 	if err != nil {

@@ -4,6 +4,7 @@ package userprofilerepo
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -26,6 +27,7 @@ type Repository struct {
 
 var _ interface {
 	Ensure(context.Context, tenancy.Scope, userprofile.Identity) (userprofile.Profile, error)
+	Get(context.Context, tenancy.Scope, string) (userprofile.Profile, error)
 	Update(context.Context, tenancy.Scope, userprofile.Update) (userprofile.Profile, error)
 } = (*Repository)(nil)
 
@@ -66,6 +68,40 @@ func (repository *Repository) Ensure(ctx context.Context, scope tenancy.Scope, i
 			return fmt.Errorf("read profile: %w", scanErr)
 		}
 		if !profile.Valid() || profile.OrganizationID != scope.OrganizationID() || profile.WorkspaceID != scope.WorkspaceID() || profile.SubjectRef != identity.SubjectRef {
+			return userprofile.ErrInvalid
+		}
+		return nil
+	})
+	return profile, err
+}
+
+// Get returns a tenant-scoped profile without creating or changing it. It is
+// used by administrative workspace views after the membership boundary has
+// resolved the opaque subject reference.
+func (repository *Repository) Get(ctx context.Context, scope tenancy.Scope, subjectRef string) (userprofile.Profile, error) {
+	if ctx == nil || !scope.Valid() || len(subjectRef) != 64 {
+		return userprofile.Profile{}, userprofile.ErrInvalid
+	}
+	if _, err := hex.DecodeString(subjectRef); err != nil {
+		return userprofile.Profile{}, userprofile.ErrInvalid
+	}
+	if repository == nil || repository.database == nil {
+		return userprofile.Profile{}, errors.New("user profile repository: repository is not initialized")
+	}
+	var profile userprofile.Profile
+	err := repository.withTransaction(ctx, scope, true, func(tx *sql.Tx) error {
+		if err := applyScope(ctx, tx, scope); err != nil {
+			return err
+		}
+		var err error
+		profile, err = scanProfile(tx.QueryRowContext(ctx, `SELECT `+profileColumns+` FROM user_profiles WHERE organization_id=$1 AND workspace_id=$2 AND subject_ref=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), subjectRef))
+		if errors.Is(err, sql.ErrNoRows) {
+			return userprofile.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read profile: %w", err)
+		}
+		if !profile.Valid() || profile.OrganizationID != scope.OrganizationID() || profile.WorkspaceID != scope.WorkspaceID() || profile.SubjectRef != subjectRef {
 			return userprofile.ErrInvalid
 		}
 		return nil

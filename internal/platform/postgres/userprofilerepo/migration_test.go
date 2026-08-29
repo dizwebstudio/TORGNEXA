@@ -18,6 +18,7 @@ func TestUserProfileMigrationKeepsIdentityTenantAndAvatarEvidenceBoundaries(t *t
 		"force row level security",
 		"user_profiles_picture_upload_fk",
 		"user_profiles_guard_update",
+		"app.privacy_execution",
 		"user_profiles_no_delete",
 		"insert into migration_history",
 	} {

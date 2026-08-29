@@ -470,7 +470,7 @@ func supervise(ctx context.Context, logger *slog.Logger, components []component)
 			}
 			return fail("worker_component_stopped", fmt.Errorf("component %s stopped unexpectedly", r.name))
 		}
-		logger.Error("worker component failed", "event", "worker.component_failed", "component", r.name)
+		logger.Error("worker component failed", "event", "worker.component_failed", "component", r.name, "error", r.err)
 		return fail("worker_component_failed", fmt.Errorf("component %s: %w", r.name, r.err))
 	}
 }
@@ -787,6 +787,12 @@ func uploadErrorCode(err error) string {
 		return "scanner_unavailable"
 	case errors.Is(err, uploads.ErrStorage):
 		return "storage_unavailable"
+	case errors.Is(err, uploads.ErrInvalid):
+		return "invalid_pipeline_state"
+	case errors.Is(err, uploads.ErrConflict):
+		return "pipeline_conflict"
+	case errors.Is(err, uploads.ErrNotFound):
+		return "upload_not_found"
 	default:
 		return "pipeline_failed"
 	}

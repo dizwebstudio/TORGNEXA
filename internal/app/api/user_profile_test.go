@@ -14,6 +14,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/core/userprofile"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
+	"github.com/torgnexa/torgnexa/internal/platform/retention"
 	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 )
 
@@ -25,6 +26,13 @@ type profileStoreStub struct {
 }
 
 func (store *profileStoreStub) Ensure(context.Context, tenancy.Scope, userprofile.Identity) (userprofile.Profile, error) {
+	if store.ensureErr != nil {
+		return userprofile.Profile{}, store.ensureErr
+	}
+	return store.profile, nil
+}
+
+func (store *profileStoreStub) Get(context.Context, tenancy.Scope, string) (userprofile.Profile, error) {
 	if store.ensureErr != nil {
 		return userprofile.Profile{}, store.ensureErr
 	}
@@ -60,6 +68,15 @@ type profileUploadReceiverStub struct{ called bool }
 func (stub *profileUploadReceiverStub) ReceiveWithID(context.Context, tenancy.Scope, uploads.ID, uploads.Metadata, io.Reader, uploads.Mutation) (uploads.Record, error) {
 	stub.called = true
 	return uploads.Record{ID: "upl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", State: uploads.StateQuarantined}, nil
+}
+
+type profilePrivacyStub struct {
+	spec retention.SubjectRequestSpec
+}
+
+func (stub *profilePrivacyStub) CreateSubjectRequest(_ context.Context, _ tenancy.Scope, spec retention.SubjectRequestSpec) (retention.Job, error) {
+	stub.spec = spec
+	return retention.Job{ID: spec.JobID, Action: retention.ActionExport, Status: retention.StatusPending}, nil
 }
 
 func profileRequest(t *testing.T, method, target string, body io.Reader, principal Principal, scope tenancy.Scope) *http.Request {
@@ -99,6 +116,15 @@ func TestUserProfileGetReturnsTenantScopedProfileWithoutRawSubject(t *testing.T)
 	}
 	if body["username"] != "demo" || body["email"] != "demo@example.test" || body["subject_ref"] != nil {
 		t.Fatalf("unexpected profile response: %#v", body)
+	}
+}
+
+func TestUserProfileViewUsesIdentityProviderPictureWhenNoUploadExists(t *testing.T) {
+	_, principal, profile := profileFixture(t)
+	principal.Profile.PictureURL = "https://id.example.test/avatar.png"
+	view := (profileAPI{}).view(principal, profile)
+	if view.PictureURL != principal.Profile.PictureURL || view.PictureSource != "identity_provider" {
+		t.Fatalf("unexpected identity-provider picture projection: %#v", view)
 	}
 }
 
@@ -143,5 +169,22 @@ func TestImageOnlyUploadReceiverRejectsNonImageFilenameBeforeStorage(t *testing.
 	_, err = receiver.ReceiveWithID(context.Background(), validTestScope(t), "upl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", uploads.Metadata{OriginalFilename: "avatar.png", DeclaredMediaType: "image/png", DeclaredSizeBytes: 1}, strings.NewReader("x"), uploads.Mutation{})
 	if err != nil || !stub.called {
 		t.Fatalf("image upload was not delegated: err=%v called=%v", err, stub.called)
+	}
+}
+
+func TestUserProfilePrivacyRequestUsesOpaqueCurrentSubject(t *testing.T) {
+	scope, principal, profile := profileFixture(t)
+	privacy := &profilePrivacyStub{}
+	api := profileAPI{profiles: &profileStoreStub{profile: profile}, privacy: privacy}
+	request := profileRequest(t, http.MethodPost, CurrentUserProfilePrivacyPath, strings.NewReader(`{"request_type":"export"}`), principal, scope)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "profile-export-1")
+	recorder := httptest.NewRecorder()
+	api.requestPrivacy(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if privacy.spec.Subject.Kind != "user_profile" || privacy.spec.Subject.OpaqueID != principal.SubjectRef || privacy.spec.Type != retention.RequestExport {
+		t.Fatalf("unexpected privacy subject: %#v", privacy.spec)
 	}
 }

@@ -30,6 +30,7 @@ const (
 	commerceProductsEntity         = "products"
 	commercePricesEntity           = "prices"
 	commerceInventoryEntity        = "inventory"
+	commerceOrdersEntity           = "orders"
 )
 
 type eventOnlyReconciliationSource struct{}
@@ -52,6 +53,8 @@ type commerceWriteRuntime interface {
 	productWriter(tenancy.Scope, sdk.Account, sdk.Runtime) (sdk.ProductWriter, error)
 	priceWriter(tenancy.Scope, sdk.Account, sdk.Runtime) (sdk.PriceWriter, error)
 	inventoryWriter(tenancy.Scope, sdk.Account, sdk.Runtime) (sdk.InventoryWriter, error)
+	orderStatusWriter(tenancy.Scope, sdk.Account, sdk.Runtime) (sdk.OrderStatusWriter, error)
+	orderStatus(tenancy.Scope, sdk.Account, string) (string, bool)
 }
 
 type commerceWriteRuntimeFactory func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error)
@@ -98,10 +101,17 @@ func (r *commerceWriteRoute) Handle(ctx context.Context, delivery eventbus.Deliv
 		}
 		return r.routeProduct(ctx, scope, delivery.Event, productPayload)
 	}
+	if entity == commerceOrdersEntity {
+		var orderPayload commerceOrderEvent
+		if err := decodeCommerceEvent(delivery.Event.Data, &orderPayload); err != nil || orderPayload.OrderID != delivery.Event.EntityID || orderPayload.Version < 1 || !isCanonicalOrderStatus(orderPayload.Status) || orderPayload.Change != "status_changed" {
+			return eventbus.Permanent("commerce_sync_invalid_payload")
+		}
+		return r.routeOrderStatus(ctx, scope, delivery.Event, orderPayload)
+	}
 	var payload commercePriceEvent
 	if entity == commerceInventoryEntity {
 		var inventoryPayload commerceInventoryEvent
-		if err := decodeCommerceEvent(delivery.Event.Data, &inventoryPayload); err != nil || inventoryPayload.PositionID != delivery.Event.EntityID || inventoryPayload.OfferID == "" || inventoryPayload.Version < 1 {
+		if err := decodeCommerceEvent(delivery.Event.Data, &inventoryPayload); err != nil || inventoryPayload.PositionID != delivery.Event.EntityID || inventoryPayload.OfferID == "" || inventoryPayload.WarehouseID == "" || inventoryPayload.Version < 1 {
 			return eventbus.Permanent("commerce_sync_invalid_payload")
 		}
 		return r.routeInventory(ctx, scope, delivery.Event, inventoryPayload)
@@ -138,6 +148,13 @@ type commerceInventoryEvent struct {
 	Reason      string          `json:"reason,omitempty"`
 }
 
+type commerceOrderEvent struct {
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
+	Version int64  `json:"version"`
+	Change  string `json:"change"`
+}
+
 func (r *commerceWriteRoute) routePrice(ctx context.Context, scope tenancy.Scope, event eventbus.Event, payload commercePriceEvent) error {
 	value, err := moneyToMajor(payload.Amount)
 	if err != nil {
@@ -162,11 +179,39 @@ func (r *commerceWriteRoute) routeInventory(ctx context.Context, scope tenancy.S
 		return eventbus.Permanent("commerce_sync_invalid_inventory")
 	}
 	return r.route(ctx, scope, event, commerceInventoryEntity, payload.PositionID, "offer", payload.OfferID, payload.Version, false, func(account sdk.Account, runtime sdk.Runtime, policy syncengine.Policy, remoteID string) (sdk.CommerceWriteReceipt, error) {
+		warehouse, mappingErr := r.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, "warehouse", payload.WarehouseID)
+		if errors.Is(mappingErr, sdk.ErrMappingNotFound) {
+			return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+		}
+		if mappingErr != nil {
+			return sdk.CommerceWriteReceipt{}, mappingErr
+		}
+		if warehouse.RemoteID == "" {
+			return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+		}
 		writer, err := r.registry.inventoryWriter(scope, account, runtime)
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}
-		receipt, err := writer.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{VariantRemoteID: remoteID, Quantity: quantity, IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
+		receipt, err := writer.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{VariantRemoteID: remoteID, LocationRemoteID: warehouse.RemoteID, Quantity: quantity, IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
+		if err != nil {
+			return sdk.CommerceWriteReceipt{}, err
+		}
+		return receipt, receipt.Validate()
+	})
+}
+
+func (r *commerceWriteRoute) routeOrderStatus(ctx context.Context, scope tenancy.Scope, event eventbus.Event, payload commerceOrderEvent) error {
+	return r.route(ctx, scope, event, commerceOrdersEntity, payload.OrderID, "order", payload.OrderID, payload.Version, false, func(account sdk.Account, runtime sdk.Runtime, policy syncengine.Policy, remoteID string) (sdk.CommerceWriteReceipt, error) {
+		status, ok := r.registry.orderStatus(scope, account, payload.Status)
+		if !ok {
+			return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+		}
+		writer, err := r.registry.orderStatusWriter(scope, account, runtime)
+		if err != nil {
+			return sdk.CommerceWriteReceipt{}, err
+		}
+		receipt, err := writer.WriteOrderStatus(ctx, account, runtime, sdk.OrderStatusWriteRequest{OrderRemoteID: remoteID, StatusRemoteID: status, IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}
@@ -400,14 +445,25 @@ func commerceWriteEntity(typ eventbus.EventType) (string, bool) {
 		return commercePricesEntity, true
 	case "commerce.inventory.position_changed.v1":
 		return commerceInventoryEntity, true
+	case "commerce.orders.order_changed.v1":
+		return commerceOrdersEntity, true
 	default:
 		return "", false
 	}
 }
 
+func isCanonicalOrderStatus(status string) bool {
+	switch status {
+	case "pending", "confirmed", "processing", "fulfilled", "cancelled":
+		return true
+	default:
+		return false
+	}
+}
+
 func commerceSyncIdempotencyKey(policyID, eventID string) string {
 	sum := sha256.Sum256([]byte(policyID + "\x00" + eventID))
-	return "prestasync_" + hex.EncodeToString(sum[:16])
+	return "commercesync_" + hex.EncodeToString(sum[:16])
 }
 
 func moneyToMajor(value domain.Money) (string, error) {

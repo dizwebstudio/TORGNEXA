@@ -38,6 +38,30 @@ type fakeReader struct {
 	commitErr error
 }
 
+type replayingReader struct {
+	message        Message
+	reads          int
+	commits        int
+	firstCommitErr error
+}
+
+func (r *replayingReader) Read(ctx context.Context) (Message, error) {
+	if r.reads < 2 {
+		r.reads++
+		return r.message, nil
+	}
+	<-ctx.Done()
+	return Message{}, ctx.Err()
+}
+
+func (r *replayingReader) Commit(_ context.Context, _ Message) error {
+	r.commits++
+	if r.commits == 1 {
+		return r.firstCommitErr
+	}
+	return nil
+}
+
 func (f *fakeReader) Read(context.Context) (Message, error) {
 	if f.readErr != nil {
 		return Message{}, f.readErr
@@ -116,7 +140,7 @@ func publishedMessage(t *testing.T, event eventbus.Event) Message {
 	return producer.messages[0]
 }
 
-func newTestConsumer(t *testing.T, reader *fakeReader, producer *fakeProducer, clock Clock, maxAttempts uint16) *Consumer {
+func newTestConsumer(t *testing.T, reader Reader, producer *fakeProducer, clock Clock, maxAttempts uint16) *Consumer {
 	t.Helper()
 	consumer, err := NewConsumer(reader, producer, []string{"commerce.orders.events.v1"}, RetryPolicy{
 		MaxAttempts: maxAttempts, InitialBackoff: time.Second, MaxBackoff: 8 * time.Second,
@@ -224,6 +248,29 @@ func TestConsumerSuccessCommitsWithoutRepublish(t *testing.T) {
 	}
 	if called != 1 || len(reader.committed) != 1 || len(producer.messages) != 0 {
 		t.Fatalf("called=%d committed=%d produced=%d", called, len(reader.committed), len(producer.messages))
+	}
+}
+
+func TestConsumerRunRetriesCommitFailureWithoutStoppingWorker(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 8, 9, 10, 0, 0, 0, time.UTC)}
+	message := publishedMessage(t, sampleEvent(t))
+	reader := &replayingReader{message: message, firstCommitErr: errors.New("broker temporarily unavailable")}
+	consumer := newTestConsumer(t, reader, validProducer(), clock, 3)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	err := consumer.Run(ctx, func(_ context.Context, _ eventbus.Delivery) error {
+		calls++
+		if calls == 2 {
+			cancel()
+		}
+		return nil
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("run error=%v", err)
+	}
+	if calls != 2 || reader.commits != 2 || len(clock.sleeps) != 1 {
+		t.Fatalf("calls=%d commits=%d sleeps=%d", calls, reader.commits, len(clock.sleeps))
 	}
 }
 

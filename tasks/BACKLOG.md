@@ -154,6 +154,103 @@ Built-in providers are organized under one family-derived category level:
 inventory and catalog generators enforce this layout while retaining stable
 provider IDs and the `docs/connectors/<provider>` documentation paths.
 
+## Workflow automation builder
+
+Task 163 is the planned provider-neutral automation builder. It is decomposed
+into ten bounded subtasks: ADR/action catalog; canonical immutable workflow
+versions; schema-backed DSL/compiler; tenant-scoped PostgreSQL state; EventBus
+and durable schedule triggers; execution/retry/approval state machine; typed
+safe action adapters; REST/OpenAPI and operator UI; quotas/observability/recovery;
+and load/chaos/Compose qualification. The first vertical slice is deliberately
+limited to notification, reconciliation, approval and dry-run actions. It
+must reuse EventBus/Outbox/Inbox, Task-017 approval, existing connector ports
+and the PostgreSQL scheduler. Arbitrary code/SQL/HTTP, provider branches,
+unbounded loops and secret/payload persistence are explicitly excluded. See
+`tasks/issues/163-workflow-automation-builder.md`.
+
+## Возвраты, отмены и refunds
+
+Task 164 is the planned provider-neutral returns/cancellations/refunds contour.
+It extends the existing `payments.Refund` and refund API instead of creating a
+second payment state machine, and connects order cancellation, partial line
+returns, shipment/carrier operations, receipt/inspection, WMS ledger,
+fiscalization, settlement and payment reconciliation. The decomposition has
+twelve bounded subtasks: ADR/policy matrix; canonical state machines and
+invariants; cross-domain orchestration; PostgreSQL/RLS/evidence; events,
+Outbox/Inbox and verified webhooks; cancellation worker; return logistics and
+WMS disposition; refund/fiscal/reconciliation runtime; REST/OpenAPI/UI;
+connector qualification; security/observability/quotas/recovery; and tests,
+Compose, load/chaos and documentation. Unknown external outcomes, duplicate
+delivery and crash-after-remote-acceptance are first-class cases; blind retry,
+silent ledger rewrites and unqualified connector capabilities are forbidden.
+See `tasks/issues/164-returns-cancellations-refunds.md`.
+
+## Прогноз остатков и автопополнение
+
+Task 165 is the planned extension of Task 053 from a basic advisory formula to
+an explainable forecast and guarded replenishment runtime. It adds forecast
+horizons/intervals, data-quality gates, projected stockout/overstock risk,
+supplier/MOQ/case-pack and budget/capacity policies, plus three explicit modes:
+`recommendation_only` (default), idempotent `draft_po` and narrowly qualified
+`auto_submit`. The decomposition has thirteen subtasks covering ADR and policy,
+domain contracts, input normalization, deterministic forecast baselines,
+projection/scenarios, reorder optimization, PostgreSQL/RLS/lineage, scheduled
+worker, procurement execution, REST/UI/MCP boundaries, connector qualification,
+security/observability/quotas and Compose/load/chaos qualification. Forecasts
+never become inventory truth; PO submission never bypasses the existing
+procurement lifecycle or approval, and stale/ambiguous/unqualified inputs fail
+closed. See `tasks/issues/165-stock-forecast-auto-replenishment.md`.
+
+## Центр качества публикации товаров
+
+Task 166 is the planned provider-neutral publication preflight and quality
+center. It adds target-specific readiness for Product/Offer against each
+connector account, deterministic score and rule evidence, hard blockers and
+warnings, compliance/capability/freshness checks, remediation and post-publish
+drift. The decomposition has thirteen subtasks: ADR/governance; immutable
+quality model and snapshots; versioned declarative connector profiles; catalog/
+PIM/price/stock/media/compliance snapshot assembly; rule engine and score;
+pre-publication gate in `commerce-sync`; event/scheduler worker; PostgreSQL/RLS/
+lineage; REST/OpenAPI/UI; safe remediation and approval; connector qualification;
+security/observability/quotas; and tests, Compose, screenshots and docs. Task
+082's compliance guard remains mandatory, quality never edits Product truth, and
+unsupported/stale/unknown profiles fail closed. See
+`tasks/issues/166-product-publication-quality-center.md`.
+
+## Юнит-экономика по каналам
+
+Task 167 is the planned provider-neutral factual channel unit-economics
+contour. It extends the current `profitability-v1` what-if scenario and the
+three basic reports with reproducible actuals by channel, store, order and
+Offer/SKU. The decomposition has eighteen subtasks covering accounting
+definitions and bases, channel identity/attribution, exact metric contracts,
+source fact normalization, historical COGS, deterministic allocation,
+settlement/payment deduplication, advertising/promotions, returns/refunds,
+FX, immutable calculation runs, ClickHouse projections, PostgreSQL/RLS/
+lineage/retention, durable workers, REST/OpenAPI/exports, the operator UI,
+security/observability/quotas and full Compose/test/documentation evidence.
+The ledger and canonical commerce facts remain authoritative; payout is not
+revenue, missing facts are never zero-filled, and mixed currencies require
+Task-089b conversion evidence. Settlement corrections remain append-only and
+AI/MCP/n8n cannot change financial facts. See
+`tasks/issues/167-channel-unit-economics.md`.
+
+## Единый центр состояния интеграций
+
+Task 168 is the planned provider-neutral integration state center. It composes
+account lifecycle, credential/configuration class, truthful runtime stage,
+capability grants, health/freshness/rate limits, OAuth reauthorization,
+sync/retry/DLQ, reconciliation drift, webhooks, notifications and separate
+AI/Finance/Delivery/CRM surfaces into one permission-aware read model. The
+decomposition has eighteen subtasks covering status vocabulary and reducer,
+bulk source adapters, derived snapshots/RLS/lineage/retention, canonical
+events/worker/realtime invalidation, REST/OpenAPI, responsive UI, safe
+idempotent operator actions, security/SLO/quotas and complete Compose/test/
+documentation evidence. The center performs no remote probe on GET, never
+stores secrets and cannot authorize an operation; manifest/health-only/SDK-only
+evidence remains fail-closed. See
+`tasks/issues/168-integration-state-center.md`.
+
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.
 

@@ -17,6 +17,9 @@ with the synthetic `demo` workspace member before reading commerce data.
 - catalog verification with a loaded product thumbnail and main product image;
 - product-card image tab verification;
 - orders verification with a loaded product thumbnail in the list and detail;
+- administrator editing of the demo workspace member profile with restoration
+  of the synthetic values;
+- current-user privacy export request accepted by the durable workflow queue;
 - failure screenshot written outside the repository for diagnosis;
 - documented `make community-e2e` workflow.
 
@@ -34,5 +37,9 @@ Run `make community-e2e` after the Community stack is available. The target
 reconciles the Keycloak demo account and workspace membership, opens a clean
 Chrome profile, signs in through the visible Keycloak form, then verifies the
 catalog, product images, orders and order actions through the rendered UI.
+It also edits and restores the demo member profile and submits a non-destructive
+privacy export request from the authenticated Settings screen. Destructive
+privacy deletion is intentionally not run by the repeatable check because it
+would disable the synthetic account needed by the remaining assertions.
 Repository-only frontend validation remains covered by
 `./scripts/check-frontend-shell.sh`.

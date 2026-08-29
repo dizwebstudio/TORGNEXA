@@ -8,9 +8,11 @@ current host bridge:
 |---|---|---|
 | `products.read` | admitted | `catalog.product.list`, page cursor and response validation |
 | `products.write` | admitted | idempotent `xmlId` lookup, `catalog.product.add/update`, read-after-write verification |
-| `inventory.read`, `inventory.write` | not admitted | no worker inventory entity bridge |
-| `prices.read`, `prices.write` | not admitted | no worker prices entity bridge |
-| `orders.read`, `orders.status.write` | not admitted | no worker order entity bridge |
+| `inventory.read` | adapter-ready, runtime not admitted | SDK adapter reads active warehouses through `catalog.store.list` and integer balances through `catalog.storeproduct.list`; the generic worker still needs an inventory reconciliation source bridge |
+| `inventory.write` | admitted for outbound sync | absolute integer quantities become idempotent `S` (stock receipt) or `D` (write-off) documents with `catalog.document.add`, `catalog.document.element.add`, `catalog.document.conduct` and read-after-write verification |
+| `prices.read` | not admitted | generic inbound price reconciliation is not yet wired |
+| `prices.write` | admitted | `catalog.price.list` lookup by configured `price_type_id`, then `catalog.price.add/update` with read-after-write verification |
+| `orders.read`, `orders.status.write` | adapter-ready, runtime not admitted | SDK adapter uses `sale.order.list`, `sale.basketitem.list`, `sale.order.get` and `sale.order.update` with read-after-write reconciliation; the generic worker still needs an order entity source/status bridge |
 
 The REST module and webhook must be enabled on the self-hosted site. A
 Bitrix24 cloud portal is not substituted for a 1С-Битрикс site: the existing
@@ -21,4 +23,3 @@ does not guess an information-block, property mapping, tax settings or price
 model. Complex offers/variants and custom property synchronization are outside
 the generic product contract. No browser automation, scraping, private
 endpoints or unverified webhook receipt is used.
-

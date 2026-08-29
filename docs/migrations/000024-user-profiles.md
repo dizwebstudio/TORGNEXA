@@ -13,3 +13,11 @@ and privacy policies.
 
 Row-level security, immutable identity fields, optimistic version checks and
 append-only audit records protect cross-workspace access and profile changes.
+
+The durable privacy workflow also recognizes `user_profile` subjects. Export
+creates an encrypted artifact containing the profile projection, restriction
+disables the workspace membership, and deletion/anonymization clears the
+profile fields, detaches the avatar and disables the membership. Provider
+identity fields may be cleared only inside the retention worker's explicit
+`app.privacy_execution` transaction flag; ordinary application updates cannot
+change them.

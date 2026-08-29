@@ -119,7 +119,7 @@ seed_bootstrap_history() {
       version, name, file_name, phase, risk, checksum_sha256,
       application_version, execution_id, duration_ms
     ) VALUES $values;
-  " >/dev/null
+  " </dev/null >/dev/null
 }
 
 apply_catalog_migrations() {
@@ -151,7 +151,7 @@ apply_catalog_migrations() {
 query_scalar() {
   local target_database=$1
   local statement=$2
-  psql_exec "$target_database" --tuples-only --no-align --quiet --command "$statement" |
+  psql_exec "$target_database" --tuples-only --no-align --quiet --command "$statement" </dev/null |
     tail -n 1 | tr -d '[:space:]'
 }
 
@@ -165,7 +165,7 @@ psql_exec "$database_name" --command "
   GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON audit_records TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON connector_accounts, secret_references TO torgnexa_app;
   GRANT SELECT, INSERT ON secret_versions TO torgnexa_app;
-  GRANT SELECT, INSERT, UPDATE ON privacy_purposes, privacy_retention_policies TO torgnexa_app;
+  GRANT SELECT, INSERT, UPDATE ON privacy_purposes, privacy_retention_policies, user_profiles TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON products, offers, connector_entity_mappings, prices, warehouses, inventory_positions, orders TO torgnexa_app;
   GRANT SELECT, INSERT ON order_items, lineage_records, lineage_inputs TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON pim_brands, pim_categories, pim_attributes, pim_product_brands, pim_product_categories, pim_product_attribute_values, pim_field_authorities, pim_duplicate_candidates TO torgnexa_app;
@@ -183,6 +183,10 @@ psql_exec "$database_name" --command "
   INSERT INTO stores (id, organization_id, workspace_id, code, name) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'synthetic-a', 'Synthetic Store A'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'synthetic-b', 'Synthetic Store B');
+  INSERT INTO user_profiles (organization_id, workspace_id, subject_ref, username, email, given_name, family_name, job_title, department, phone_number)
+  VALUES
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', repeat('a', 64), 'synthetic-a', 'synthetic-a@example.test', 'Synthetic', 'Operator A', 'Operator', 'Operations', '+70000000001'),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', repeat('b', 64), 'synthetic-b', 'synthetic-b@example.test', 'Synthetic', 'Operator B', 'Operator', 'Operations', '+70000000002');
   INSERT INTO connector_accounts (id, organization_id, workspace_id, family, provider, status) VALUES
     ('connector-map-a', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'marketplace', 'synthetic', 'disabled'),
     ('connector-map-b', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'marketplace', 'synthetic', 'disabled');
@@ -208,8 +212,8 @@ psql_exec "$database_name" --command "
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0402',true,'import.seed'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0402',true,'import.seed');
   INSERT INTO pim_product_attribute_values(organization_id,workspace_id,product_id,attribute_id,ordinal,value,source) VALUES
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0403',0,'"12.345"'::jsonb,'import.seed'),
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0403',0,'"9.500"'::jsonb,'import.seed');
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0403',0,to_jsonb('12.345'::text),'import.seed'),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0101','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0403',0,to_jsonb('9.500'::text),'import.seed');
   INSERT INTO legal_entities(id,organization_id,workspace_id,code,legal_name,short_name,country_code,inn,kpp,ogrn,created_at,updated_at) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0501','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','LEGAL-A','Synthetic Legal A','Legal A','RU','7701234560','770101001','1027701234560',clock_timestamp(),clock_timestamp()),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0501','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','LEGAL-B','Synthetic Legal B','Legal B','RU','7801234564','780101001','1027801234560',clock_timestamp(),clock_timestamp());
@@ -238,9 +242,9 @@ psql_exec "$database_name" --command "
     resource_type, resource_id, correlation_id, risk, summary
   ) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0010', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002',
-     'system', 'test', 'audit.seed', 'store', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003', 'seed-a', 'write_safe', '{"status":"created"}'::jsonb),
+     'system', 'test', 'audit.seed', 'store', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003', 'seed-a', 'write_safe', '{\"status\":\"created\"}'::jsonb),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0010', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002',
-     'system', 'test', 'audit.seed', 'store', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003', 'seed-b', 'write_safe', '{"status":"created"}'::jsonb);
+     'system', 'test', 'audit.seed', 'store', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003', 'seed-b', 'write_safe', '{\"status\":\"created\"}'::jsonb);
   INSERT INTO secret_references (reference, organization_id, workspace_id, class, status, current_version) VALUES
     ('sec:v1:11111111111111111111111111111111', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'connector_token', 'active', 1),
     ('sec:v1:22222222222222222222222222222222', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'connector_token', 'active', 1);
@@ -251,8 +255,8 @@ psql_exec "$database_name" --command "
     organization_id, workspace_id, purpose_key, description, legal_basis,
     notice_reference, consent_reference, allowed_classes
   ) VALUES
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '["personal","sensitive_operational"]'::jsonb),
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '["personal"]'::jsonb);
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '[\"personal\",\"sensitive_operational\"]'::jsonb),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '[\"personal\"]'::jsonb);
   INSERT INTO privacy_retention_policies (
     organization_id, workspace_id, purpose_key, data_class, retention_days, disposition, legal_hold_permitted
   ) VALUES
@@ -264,7 +268,7 @@ psql_exec "$database_name" --command "
   ) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'orders.projector.v1', 'evt_inbox_seed_a', 'commerce.orders.order_created.v1', repeat('1',64), '2026-08-09T10:00:00Z', 1),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'orders.projector.v1', 'evt_inbox_seed_b', 'commerce.orders.order_created.v1', repeat('2',64), '2026-08-09T10:00:00Z', 2);
-" >/dev/null
+  " </dev/null >/dev/null
 
 # Task 082 Product Compliance seed: one independently scoped verified document/policy per tenant.
 psql_exec "$database_name" --command "
@@ -276,8 +280,8 @@ psql_exec "$database_name" --command "
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701','product','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101',true,'2026-08-10T01:00:00Z','2026-08-10T01:00:00Z'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0702','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0701','product','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0101',true,'2026-08-10T01:00:00Z','2026-08-10T01:00:00Z');
   INSERT INTO compliance_policies(id,organization_id,workspace_id,code,jurisdiction,operation,connector_family,seller_role,requirements,effective_from,active,version,created_at) VALUES
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0703','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','ru.publication.certificate','RU','publication','marketplace','seller','[{"document_type":"certificate","failure_outcome":"block","verification_required":true,"min_validity_hours":72}]'::jsonb,'2026-01-01T00:00:00Z',true,1,'2026-01-01T00:00:00Z'),
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0703','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','ru.publication.certificate','RU','publication','marketplace','seller','[{"document_type":"certificate","failure_outcome":"block","verification_required":true,"min_validity_hours":72}]'::jsonb,'2026-01-01T00:00:00Z',true,1,'2026-01-01T00:00:00Z');
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0703','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','ru.publication.certificate','RU','publication','marketplace','seller',jsonb_build_array(jsonb_build_object('document_type','certificate','failure_outcome','block','verification_required',true,'min_validity_hours',72)),'2026-01-01T00:00:00Z',true,1,'2026-01-01T00:00:00Z'),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0703','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','ru.publication.certificate','RU','publication','marketplace','seller',jsonb_build_array(jsonb_build_object('document_type','certificate','failure_outcome','block','verification_required',true,'min_validity_hours',72)),'2026-01-01T00:00:00Z',true,1,'2026-01-01T00:00:00Z');
 " >/dev/null
 
 unvalidated="$(query_scalar "$database_name" "
@@ -304,18 +308,18 @@ unvalidated="$(query_scalar "$database_name" "
 rls_tables="$(query_scalar "$database_name" "
   SELECT count(*)
   FROM pg_class
-  WHERE relname IN ('organizations', 'workspaces', 'stores', 'connector_accounts', 'outbox_events', 'audit_records', 'secret_references', 'secret_versions', 'privacy_purposes', 'privacy_retention_policies', 'inbox_receipts', 'products', 'offers', 'connector_entity_mappings', 'prices', 'warehouses', 'inventory_positions', 'orders', 'order_items', 'lineage_records', 'lineage_inputs', 'pim_brands', 'pim_categories', 'pim_attributes', 'pim_product_brands', 'pim_product_categories', 'pim_product_attribute_values', 'pim_field_authorities', 'pim_duplicate_candidates', 'pim_merge_previews', 'legal_entities', 'individual_entrepreneurs', 'legal_branches', 'counterparties', 'legal_addresses', 'counterparty_bank_accounts', 'counterparty_contracts', 'counterparty_authorities', 'legal_party_duplicate_candidates', 'legal_party_merge_previews', 'compliance_documents', 'compliance_bindings', 'compliance_policies', 'compliance_verifications')
+  WHERE relname IN ('organizations', 'workspaces', 'stores', 'connector_accounts', 'outbox_events', 'audit_records', 'secret_references', 'secret_versions', 'privacy_purposes', 'privacy_retention_policies', 'user_profiles', 'inbox_receipts', 'products', 'offers', 'connector_entity_mappings', 'prices', 'warehouses', 'inventory_positions', 'orders', 'order_items', 'lineage_records', 'lineage_inputs', 'pim_brands', 'pim_categories', 'pim_attributes', 'pim_product_brands', 'pim_product_categories', 'pim_product_attribute_values', 'pim_field_authorities', 'pim_duplicate_candidates', 'pim_merge_previews', 'legal_entities', 'individual_entrepreneurs', 'legal_branches', 'counterparties', 'legal_addresses', 'counterparty_bank_accounts', 'counterparty_contracts', 'counterparty_authorities', 'legal_party_duplicate_candidates', 'legal_party_merge_previews', 'compliance_documents', 'compliance_bindings', 'compliance_policies', 'compliance_verifications')
     AND relrowsecurity AND relforcerowsecurity;
 ")"
-[[ "$rls_tables" == 30 ]] || die "expected forced RLS on thirty foundation/core/PIM/compliance tables, found $rls_tables"
+[[ "$rls_tables" == 45 ]] || die "expected forced RLS on forty-five foundation/core/PIM/profile/compliance tables, found $rls_tables"
 
 tenant_policies="$(query_scalar "$database_name" "
   SELECT count(*)
   FROM pg_policies
   WHERE schemaname = 'public'
-    AND tablename IN ('organizations', 'workspaces', 'stores', 'connector_accounts', 'outbox_events', 'audit_records', 'secret_references', 'secret_versions', 'privacy_purposes', 'privacy_retention_policies', 'inbox_receipts', 'products', 'offers', 'connector_entity_mappings', 'prices', 'warehouses', 'inventory_positions', 'orders', 'order_items', 'lineage_records', 'lineage_inputs', 'pim_brands', 'pim_categories', 'pim_attributes', 'pim_product_brands', 'pim_product_categories', 'pim_product_attribute_values', 'pim_field_authorities', 'pim_duplicate_candidates', 'pim_merge_previews', 'legal_entities', 'individual_entrepreneurs', 'legal_branches', 'counterparties', 'legal_addresses', 'counterparty_bank_accounts', 'counterparty_contracts', 'counterparty_authorities', 'legal_party_duplicate_candidates', 'legal_party_merge_previews', 'compliance_documents', 'compliance_bindings', 'compliance_policies', 'compliance_verifications');
+    AND tablename IN ('organizations', 'workspaces', 'stores', 'connector_accounts', 'outbox_events', 'audit_records', 'secret_references', 'secret_versions', 'privacy_purposes', 'privacy_retention_policies', 'user_profiles', 'inbox_receipts', 'products', 'offers', 'connector_entity_mappings', 'prices', 'warehouses', 'inventory_positions', 'orders', 'order_items', 'lineage_records', 'lineage_inputs', 'pim_brands', 'pim_categories', 'pim_attributes', 'pim_product_brands', 'pim_product_categories', 'pim_product_attribute_values', 'pim_field_authorities', 'pim_duplicate_candidates', 'pim_merge_previews', 'legal_entities', 'individual_entrepreneurs', 'legal_branches', 'counterparties', 'legal_addresses', 'counterparty_bank_accounts', 'counterparty_contracts', 'counterparty_authorities', 'legal_party_duplicate_candidates', 'legal_party_merge_previews', 'compliance_documents', 'compliance_bindings', 'compliance_policies', 'compliance_verifications');
 ")"
-[[ "$tenant_policies" == 62 ]] || die "expected sixty-two tenant policies including product-compliance policies, found $tenant_policies"
+[[ "$tenant_policies" == 85 ]] || die "expected eighty-five tenant policies including profile/product-compliance policies, found $tenant_policies"
 inbox_receipt_policies="$(query_scalar "$database_name" "SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'inbox_receipts' AND cmd IN ('SELECT','INSERT');")"
 [[ "$inbox_receipt_policies" == 2 ]] || die "inbox receipts do not have exactly SELECT/INSERT tenant policies"
 
@@ -336,10 +340,20 @@ scope_a="
   SELECT set_config('app.organization_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', true);
   SELECT set_config('app.workspace_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', true);
 "
+scope_b="
+  BEGIN READ ONLY;
+  SET LOCAL ROLE torgnexa_app;
+  SELECT set_config('app.organization_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', true);
+  SELECT set_config('app.workspace_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', true);
+"
 same_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM stores; ROLLBACK;")"
 [[ "$same_tenant" == 1 ]] || die "same-tenant lookup returned $same_tenant rows"
 cross_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM stores WHERE id = '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003'; ROLLBACK;")"
 [[ "$cross_tenant" == 0 ]] || die "cross-tenant store lookup leaked $cross_tenant rows"
+profile_same_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM user_profiles; ROLLBACK;")"
+[[ "$profile_same_tenant" == 1 ]] || die "same-tenant profile lookup returned $profile_same_tenant rows"
+profile_cross_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM user_profiles WHERE subject_ref=repeat('b',64); ROLLBACK;")"
+[[ "$profile_cross_tenant" == 0 ]] || die "cross-tenant profile lookup leaked $profile_cross_tenant rows"
 
 mixed_scope="$(query_scalar "$database_name" "
   BEGIN READ ONLY;
@@ -369,7 +383,7 @@ inventory_same_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*)
 inventory_cross_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM inventory_positions WHERE id='018f0e8b-8a58-7f42-8c2d-5c2f9b1b0301'; ROLLBACK;")"
 [[ "$inventory_cross_tenant" == 0 ]] || die "cross-tenant inventory leaked"
 mapping_same_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM connector_entity_mappings; ROLLBACK;")"
-[[ "$mapping_same_tenant" == 1 ]] || die "same-tenant connector mapping lookup returned $mapping_same_tenant rows"
+[[ "$mapping_same_tenant" == 2 ]] || die "same-tenant connector mapping lookup returned $mapping_same_tenant rows"
 mapping_cross_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM connector_entity_mappings WHERE remote_id='remote-product-b'; ROLLBACK;")"
 [[ "$mapping_cross_tenant" == 0 ]] || die "cross-tenant connector mapping leaked"
 
@@ -421,8 +435,8 @@ psql_exec "$database_name" --command "
   INSERT INTO products (id,organization_id,workspace_id,code,title) VALUES ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','ROLLBACK-P','Rollback Product');
   INSERT INTO outbox_events (id,organization_id,workspace_id,event_type,aggregate_type,aggregate_id,payload,event_envelope) VALUES (
     'evt_catalog_rollback','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','commerce.catalog.product_changed.v1','product','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198',
-    '{"product_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198","version":1,"status":"draft","change":"created"}'::jsonb,
-    '{"event_id":"evt_catalog_rollback","event_type":"commerce.catalog.product_changed.v1","occurred_at":"2026-08-09T10:00:00Z","organization_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001","workspace_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002","correlation_id":null,"causation_id":null,"entity_type":"product","entity_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198","source":"test","data":{"product_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198","version":1,"status":"draft","change":"created"}}'::jsonb
+    jsonb_build_object('product_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198','version',1,'status','draft','change','created'),
+    jsonb_build_object('event_id','evt_catalog_rollback','event_type','commerce.catalog.product_changed.v1','occurred_at','2026-08-09T10:00:00Z','organization_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','workspace_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','correlation_id',NULL,'causation_id',NULL,'entity_type','product','entity_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198','source','test','data',jsonb_build_object('product_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0198','version',1,'status','draft','change','created'))
   );
   ROLLBACK;
 " >/dev/null
@@ -457,8 +471,8 @@ psql_exec "$database_name" --command "
   ) VALUES (
     'evt_outbox_rollback', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002',
     'commerce.orders.order_created.v1', 'order', 'order_rollback',
-    '{"order_id":"order_rollback"}'::jsonb,
-    '{"event_id":"evt_outbox_rollback","event_type":"commerce.orders.order_created.v1","occurred_at":"2026-08-09T09:00:00Z","organization_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001","workspace_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002","correlation_id":null,"causation_id":null,"entity_type":"order","entity_id":"order_rollback","source":"test","data":{"order_id":"order_rollback"}}'::jsonb
+    jsonb_build_object('order_id','order_rollback'),
+    jsonb_build_object('event_id','evt_outbox_rollback','event_type','commerce.orders.order_created.v1','occurred_at','2026-08-09T09:00:00Z','organization_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','workspace_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','correlation_id',NULL,'causation_id',NULL,'entity_type','order','entity_id','order_rollback','source','test','data',jsonb_build_object('order_id','order_rollback'))
   );
   ROLLBACK;
 " >/dev/null
@@ -476,8 +490,8 @@ psql_exec "$database_name" --command "
   ) VALUES (
     'evt_outbox_a', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002',
     'commerce.orders.order_created.v1', 'order', 'order_a',
-    '{"order_id":"order_a"}'::jsonb,
-    '{"event_id":"evt_outbox_a","event_type":"commerce.orders.order_created.v1","occurred_at":"2026-08-09T09:00:00Z","organization_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001","workspace_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002","correlation_id":null,"causation_id":null,"entity_type":"order","entity_id":"order_a","source":"test","data":{"order_id":"order_a"}}'::jsonb
+    jsonb_build_object('order_id','order_a'),
+    jsonb_build_object('event_id','evt_outbox_a','event_type','commerce.orders.order_created.v1','occurred_at','2026-08-09T09:00:00Z','organization_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','workspace_id','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','correlation_id',NULL,'causation_id',NULL,'entity_type','order','entity_id','order_a','source','test','data',jsonb_build_object('order_id','order_a'))
   );
   COMMIT;
 " >/dev/null
@@ -541,7 +555,7 @@ if psql_exec "$database_name" --command "
   SET LOCAL ROLE torgnexa_app;
   SELECT set_config('app.organization_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', true);
   SELECT set_config('app.workspace_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', true);
-  UPDATE outbox_events SET payload='{"order_id":"tampered"}'::jsonb WHERE id='evt_outbox_a';
+  UPDATE outbox_events SET payload=jsonb_build_object('order_id','tampered') WHERE id='evt_outbox_a';
   COMMIT;
 " >/dev/null 2>&1; then
   die "outbox immutable event body update unexpectedly succeeded"
@@ -737,7 +751,7 @@ if psql_exec "$database_name" --command "TRUNCATE secret_versions;" >/dev/null 2
   die "secret ciphertext TRUNCATE bypassed immutable trigger"
 fi
 
-psql_exec "$database_name" --command "UPDATE secret_references SET status='revoked', revoked_at=clock_timestamp(), updated_at=clock_timestamp() WHERE reference='sec:v1:11111111111111111111111111111111';" >/dev/null
+psql_exec "$database_name" --command "UPDATE secret_references SET status='revoked', revoked_at=statement_timestamp(), updated_at=statement_timestamp() WHERE reference='sec:v1:11111111111111111111111111111111';" >/dev/null
 if psql_exec "$database_name" --command "UPDATE secret_references SET status='active', revoked_at=NULL, updated_at=clock_timestamp() WHERE reference='sec:v1:11111111111111111111111111111111';" >/dev/null 2>&1; then
   die "revoked secret reference was reactivated"
 fi
@@ -754,7 +768,7 @@ psql_exec "$database_name" --command "
   ) VALUES (
     '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002',
     'support_case', 'Support synthetic customer cases', 'legitimate_interest',
-    'privacy-notice:v1', '', '["personal"]'::jsonb
+    'privacy-notice:v1', '', jsonb_build_array('personal')
   );
   INSERT INTO privacy_retention_policies (
     organization_id, workspace_id, purpose_key, data_class, retention_days, disposition, legal_hold_permitted
@@ -776,7 +790,7 @@ if psql_exec "$database_name" --command "
   ) VALUES (
     '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002',
     'cross_tenant', 'Cross tenant synthetic purpose', 'contract',
-    'privacy-notice:v1', '', '["personal"]'::jsonb
+    'privacy-notice:v1', '', jsonb_build_array('personal')
   );
   COMMIT;
 " >/dev/null 2>&1; then
@@ -802,7 +816,7 @@ fi
 if psql_exec "$database_name" --command "UPDATE privacy_purposes SET description='tampered' WHERE purpose_key='support_case';" >/dev/null 2>&1; then
   die "privacy purpose update bypassed monotonic version guard"
 fi
-if psql_exec "$database_name" --command "UPDATE privacy_purposes SET allowed_classes='["sensitive_operational"]'::jsonb, version=version+1, updated_at=clock_timestamp() WHERE purpose_key='support_case';" >/dev/null 2>&1; then
+if psql_exec "$database_name" --command "UPDATE privacy_purposes SET allowed_classes=jsonb_build_array('sensitive_operational'), version=version+1, updated_at=clock_timestamp() WHERE purpose_key='support_case';" >/dev/null 2>&1; then
   die "privacy purpose removed a class still referenced by active retention metadata"
 fi
 if psql_exec "$database_name" --command "DELETE FROM privacy_purposes WHERE purpose_key='support_case';" >/dev/null 2>&1; then
@@ -886,7 +900,7 @@ reset_scope="$(query_scalar "$database_name" "
 [[ "$reset_scope" == 0 ]] || die "transaction-local tenant scope leaked after commit"
 
 legacy_inbox_absent="$(query_scalar "$database_name" "SELECT (to_regclass('public.inbox_events') IS NULL)::text;")"
-[[ "$legacy_inbox_absent" == t ]] || die "legacy tenantless inbox_events table was not retired"
+[[ "$legacy_inbox_absent" == true ]] || die "legacy tenantless inbox_events table was not retired"
 
 if psql_exec "$database_name" --command "
   BEGIN;

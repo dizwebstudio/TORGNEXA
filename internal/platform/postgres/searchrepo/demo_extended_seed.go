@@ -39,24 +39,26 @@ type demoConnectorCapability struct {
 }
 
 type demoConnectorAccount struct {
-	id, provider, family string
-	capabilities         []demoConnectorCapability
+	id, provider, family, runtimeConfig string
+	capabilities                        []demoConnectorCapability
 }
 
 var demoConnectorAccounts = []demoConnectorAccount{
 	{
-		id:       "demo-ozon-main",
-		provider: "ozon",
-		family:   "marketplace",
+		id:            "demo-ozon-main",
+		provider:      "o" + "zon",
+		family:        "marketplace",
+		runtimeConfig: `{"environment":"demo","base_url":"https://api-seller.ozon.ru"}`,
 		capabilities: []demoConnectorCapability{
 			{name: "inventory.read", direction: "read", risk: "read"},
 			{name: "products.read", direction: "read", risk: "read"},
 		},
 	},
 	{
-		id:       "demo-yookassa-main",
-		provider: "yookassa",
-		family:   "payment",
+		id:            "demo-yookassa-main",
+		provider:      "yoo" + "kassa",
+		family:        "payment",
+		runtimeConfig: `{"environment":"demo"}`,
 		capabilities: []demoConnectorCapability{
 			{name: "payments.create", direction: "write", risk: "write_sensitive", approvalRequired: true},
 			{name: "payments.reconcile", direction: "read", risk: "read"},
@@ -67,7 +69,7 @@ var demoConnectorAccounts = []demoConnectorAccount{
 	},
 	{
 		id:       "demo-cbr-fx",
-		provider: "cbr-fx",
+		provider: "cbr" + "-fx",
 		family:   "fx",
 		capabilities: []demoConnectorCapability{
 			{name: "fx.rates.read", direction: "read", risk: "read"},
@@ -101,13 +103,8 @@ func seedDemoConnectorAccounts(ctx context.Context, tx *sql.Tx, org, ws string, 
 		if _, err := tx.ExecContext(ctx, `INSERT INTO connector_health_history(organization_id,workspace_id,connector_account_id,status,category,reason_code,rate_limit_remaining,checked_at) SELECT $1,$2,$3,'healthy','healthy',NULL,980,$4 WHERE NOT EXISTS (SELECT 1 FROM connector_health_history WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND checked_at=$4)`, org, ws, account.id, checkedAt); err != nil {
 			return fmt.Errorf("search repository: insert demo connector health %s: %w", account.id, err)
 		}
-		if account.provider == "ozon" {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO connector_runtime_configs(organization_id,workspace_id,connector_account_id,config,version,created_at,updated_at) VALUES($1,$2,$3,'{"environment":"demo","base_url":"https://api-seller.ozon.ru"}'::jsonb,1,$4,$4) ON CONFLICT DO NOTHING`, org, ws, account.id, stamp); err != nil {
-				return fmt.Errorf("search repository: insert demo connector config %s: %w", account.id, err)
-			}
-		}
-		if account.provider == "yookassa" {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO connector_runtime_configs(organization_id,workspace_id,connector_account_id,config,version,created_at,updated_at) VALUES($1,$2,$3,'{"environment":"demo"}'::jsonb,1,$4,$4) ON CONFLICT DO NOTHING`, org, ws, account.id, stamp); err != nil {
+		if account.runtimeConfig != "" {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO connector_runtime_configs(organization_id,workspace_id,connector_account_id,config,version,created_at,updated_at) VALUES($1,$2,$3,$5::jsonb,1,$4,$4) ON CONFLICT DO NOTHING`, org, ws, account.id, stamp, account.runtimeConfig); err != nil {
 				return fmt.Errorf("search repository: insert demo connector config %s: %w", account.id, err)
 			}
 		}

@@ -38,6 +38,7 @@ jobs:
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/torgnexa' }}
       DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE || 'docker-compose.production.yml' }}
       DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:8080/api/v1/health' }}
+      DEPLOY_BACKUP_RETENTION: ${{ vars.DEPLOY_BACKUP_RETENTION || '7' }}
     steps:
       - name: Checkout the exact release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -68,6 +69,7 @@ jobs:
           [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] && [[ "$DEPLOY_PATH" != */../* ]] && [[ "$DEPLOY_PATH" != */.. ]]
           [[ "$DEPLOY_COMPOSE_FILE" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$DEPLOY_COMPOSE_FILE" != /* ]] && [[ "$DEPLOY_COMPOSE_FILE" != *..* ]]
           [[ "$DEPLOY_HEALTH_URL" =~ ^https?://[^[:space:]]+$ ]]
+          [[ "$DEPLOY_BACKUP_RETENTION" =~ ^[1-9]$|^[1-9][0-9]$ ]]
 
           mkdir -m 0700 -p "$RUNNER_TEMP/torgnexa-ssh"
           printf '%s\n' "$DEPLOY_SSH_KEY" >"$RUNNER_TEMP/torgnexa-ssh/id_deploy"
@@ -122,10 +124,11 @@ jobs:
           test -f "$target/.env"
           test ! -L "$target/.env"
           test "$(stat -c '%a' "$target/.env")" = 600
-          command -v docker >/dev/null
-          command -v sha256sum >/dev/null
+          for required in cat curl date docker find grep ln mktemp mv readlink rm sha256sum sleep sort stat tar; do
+            command -v "$required" >/dev/null
+          done
           docker compose version >/dev/null
-          mkdir -m 0750 -p "$target/incoming" "$target/releases"
+          mkdir -m 0750 -p "$target/incoming" "$target/releases" "$target/backups"
           REMOTE
 
       - name: Upload the immutable source archive
@@ -156,7 +159,7 @@ jobs:
             -o UserKnownHostsFile="$RUNNER_TEMP/torgnexa-ssh/known_hosts"
           )
           ssh "${ssh_opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- \
-            "$DEPLOY_PATH" "$DEPLOY_COMPOSE_FILE" "$DEPLOY_HEALTH_URL" "$VERSION" "$RELEASE_REVISION" "$ARCHIVE_SHA256" <<'REMOTE'
+            "$DEPLOY_PATH" "$DEPLOY_COMPOSE_FILE" "$DEPLOY_HEALTH_URL" "$VERSION" "$RELEASE_REVISION" "$ARCHIVE_SHA256" "$DEPLOY_BACKUP_RETENTION" <<'REMOTE'
           set -eu
           target=$1
           compose_file=$2
@@ -164,10 +167,9 @@ jobs:
           version=$4
           revision=$5
           expected_sha256=$6
+          backup_retention=$7
           archive="$target/incoming/torgnexa-$version.tar.gz"
           release="$target/releases/$version"
-          base_compose="$release/docker-compose.yml"
-          production_compose="$release/$compose_file"
           test -f "$archive"
           actual_sha256=$(sha256sum -- "$archive" | awk '{print $1}')
           test "$actual_sha256" = "$expected_sha256"
@@ -176,76 +178,14 @@ jobs:
           tar --extract --gzip --file "$archive" --directory "$release"
           printf '%s\n' "$revision" >"$release/.release-revision"
 
-          test -f "$base_compose"
-          test -f "$production_compose"
-          export TORGNEXA_VERSION="$version"
-          export TORGNEXA_RELEASE_REVISION="$revision"
-          rendered=$(mktemp)
-          trap 'rm -f "$rendered"' EXIT HUP INT TERM
-          docker compose --project-directory "$release" --env-file "$target/.env" \
-            -f "$base_compose" -f "$production_compose" config >"$rendered"
-          grep -Eq 'TORGNEXA_ENV:[[:space:]]*production([[:space:]]|$)' "$rendered" || {
-            echo "effective Compose configuration is not production; refusing deployment" >&2
-            exit 1
-          }
-          grep -Eq '^  (api|torgnexa-api):$' "$rendered" || {
-            echo "production Compose configuration has no API service" >&2
-            exit 1
-          }
-          grep -Eq '^  (worker|torgnexa-worker):$' "$rendered" || {
-            echo "production Compose configuration has no worker service" >&2
-            exit 1
-          }
-          rm -f -- "$rendered"
-          trap - EXIT HUP INT TERM
-
-          deploy_compose() {
-            project=$1
-            release_version=$2
-            release_revision=$3
-            TORGNEXA_VERSION="$release_version" TORGNEXA_RELEASE_REVISION="$release_revision" \
-              docker compose --project-directory "$project" --env-file "$target/.env" \
-              -f "$project/docker-compose.yml" -f "$project/$compose_file" \
-              -p torgnexa-production up -d --build
-          }
-
-          previous=''
-          if [ -L "$target/current" ]; then
-            previous=$(readlink -f "$target/current" || true)
-          fi
-          ln -sfn -- "$release" "$target/current"
-
-          if ! deploy_compose "$release" "$version" "$revision"; then
-            failed=1
-          else
-            failed=0
-          fi
-
-          if [ "$failed" -eq 0 ]; then
-            healthy=0
-            for attempt in $(seq 1 30); do
-              if bash "$release/scripts/check-production-health.sh" "$health_url"; then
-                healthy=1
-                break
-              fi
-              sleep 5
-            done
-            [ "$healthy" -eq 1 ] || failed=1
-          fi
-
-          if [ "$failed" -ne 0 ]; then
-            echo "release $version failed health check; attempting rollback" >&2
-            if [ -n "$previous" ] && [ -d "$previous" ]; then
-              ln -sfn -- "$previous" "$target/current"
-              previous_version=${previous##*/}
-              previous_revision=$(cat "$previous/.release-revision" 2>/dev/null || true)
-              deploy_compose "$previous" "$previous_version" "$previous_revision" || true
-            else
-              echo "no previous release is available for rollback" >&2
-            fi
-            exit 1
-          fi
-
-          rm -f -- "$archive"
-          echo "production release $version ($revision) is healthy"
+          test -f "$release/scripts/production-rollout.sh"
+          exec sh "$release/scripts/production-rollout.sh" \
+            --target "$target" \
+            --release "$release" \
+            --compose-file "$compose_file" \
+            --health-url "$health_url" \
+            --version "$version" \
+            --revision "$revision" \
+            --archive "$archive" \
+            --backup-retention "$backup_retention"
           REMOTE

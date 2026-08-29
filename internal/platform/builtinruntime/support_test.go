@@ -80,7 +80,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("Bitrix24 CRM runtime support is inaccurate: %+v", bitrix)
 	}
 	storefront, ok := SupportFor("bitrix")
-	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsSync("bitrix", "products", "bidirectional") || SupportsCapability("bitrix", "orders.read") {
+	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsCapability("bitrix", "prices.write") || !SupportsCapability("bitrix", "inventory.write") || !SupportsSync("bitrix", "products", "bidirectional") || !SupportsSync("bitrix", "prices", "outbound") || !SupportsSync("bitrix", "inventory", "outbound") || SupportsCapability("bitrix", "prices.read") || SupportsCapability("bitrix", "orders.read") {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
@@ -181,6 +181,40 @@ func TestPrestaShopCommerceWriteAdmissionIsExact(t *testing.T) {
 	}
 	if _, err := registry.PriceWriter(supportTestAccount(t, "wildberries"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted price writer resolved: %v", err)
+	}
+}
+
+func TestBitrixPriceWriterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "bitrix")
+	if !registry.SupportsPriceWrite(account) || !SupportsCapability("bitrix", "prices.write") || !SupportsSync("bitrix", "prices", "outbound") {
+		t.Fatal("1C-Bitrix price write runtime support is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1}`), nil
+	}
+	if _, err := registry.PriceWriter(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("1C-Bitrix price writer unavailable: %v", err)
+	}
+	if _, err := registry.PriceWriter(account, supportTestRuntime{}, nil); !errors.Is(err, ErrConfigurationNeeded) {
+		t.Fatalf("missing 1C-Bitrix runtime configuration returned %v", err)
+	}
+}
+
+func TestBitrixInventoryWriterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "bitrix")
+	if !registry.SupportsInventoryWrite(account) || !SupportsCapability("bitrix", "inventory.write") || !SupportsSync("bitrix", "inventory", "outbound") {
+		t.Fatal("1C-Bitrix inventory write runtime support is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1}`), nil
+	}
+	if _, err := registry.InventoryWriter(account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("1C-Bitrix inventory writer unavailable: %v", err)
+	}
+	if _, err := registry.InventoryWriter(account, supportTestRuntime{}, nil); !errors.Is(err, ErrConfigurationNeeded) {
+		t.Fatalf("missing 1C-Bitrix runtime configuration returned %v", err)
 	}
 }
 

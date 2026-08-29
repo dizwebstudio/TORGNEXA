@@ -223,6 +223,23 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks settings.profile.write}
         '409': {description: Profile version or idempotency conflict}
+  /me/profile/privacy-requests:
+    post:
+      operationId: createCurrentUserProfilePrivacyRequest
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CurrentUserProfilePrivacyRequest'}}}
+      responses:
+        '202':
+          description: Personal-data request accepted into the durable privacy workflow
+          content: {application/json: {schema: {$ref: '#/components/schemas/PrivacyRequestAccepted'}}}
+        '400': {description: Invalid privacy request or idempotency key}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks settings.profile.write}
+        '409': {description: Idempotency key conflict}
   /me/profile/avatar:
     post:
       operationId: uploadCurrentUserAvatar
@@ -574,6 +591,35 @@ paths:
         '200': {description: Role or status changed with append-only audit, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMember'}}}}
         '403': {description: Caller lacks settings.members.write}
         '409': {description: Version conflict or last active administrator protection}
+  /settings/members/{member_id}/profile:
+    get:
+      operationId: getWorkspaceMemberProfile
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: member_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200':
+          description: Profile of a resolved workspace member
+          content: {application/json: {schema: {$ref: '#/components/schemas/UserProfile'}}}
+        '403': {description: Caller lacks settings.members.read}
+        '404': {description: Member or profile not found}
+    patch:
+      operationId: updateWorkspaceMemberProfile
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: member_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/UserProfileUpdate'}}}
+      responses:
+        '200':
+          description: Updated profile of a workspace member
+          content: {application/json: {schema: {$ref: '#/components/schemas/UserProfile'}}}
+        '400': {description: Invalid profile values or version}
+        '403': {description: Caller lacks settings.members.write}
+        '404': {description: Member or profile not found}
+        '409': {description: Profile version or idempotency conflict}
   /health:
     get:
       operationId: getHealth
@@ -2749,6 +2795,12 @@ components:
       required: [version]
       properties:
         version: {type: integer, minimum: 1}
+    CurrentUserProfilePrivacyRequest:
+      type: object
+      additionalProperties: false
+      required: [request_type]
+      properties:
+        request_type: {type: string, enum: [access, export, deletion, restriction]}
     SettingsSecurityConfiguration:
       type: object
       additionalProperties: false

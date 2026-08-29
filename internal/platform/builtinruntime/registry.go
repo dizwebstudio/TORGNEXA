@@ -87,6 +87,13 @@ type ProductReader interface {
 	Read(context.Context, sdk.PageRequest) (ProductPage, error)
 }
 
+// OrderReader is the provider-neutral order read surface admitted by the
+// production registry. The registry normalizes configured provider statuses
+// before handing the page to the worker.
+type OrderReader interface {
+	sdk.OrderReader
+}
+
 // CRMReader is the provider-neutral CRM read surface admitted by the
 // production registry. It intentionally exposes only SDK contracts, not the
 // Bitrix24 implementation or transport.
@@ -251,6 +258,79 @@ func (r *Registry) ProductReader(account sdk.Account, runtime sdk.Runtime, load 
 	default:
 		return nil, ErrUnavailable
 	}
+}
+
+// OrderReader resolves an admitted storefront order reader. Provider status
+// identifiers are translated at this composition boundary; the worker only
+// sees the canonical order lifecycle vocabulary.
+func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (OrderReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "orders.read") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "bitrix" {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	canonical, err := configuration.OrderStatuses()
+	if err != nil {
+		return nil, ErrConfigurationNeeded
+	}
+	remoteToCanonical := make(map[string]string, len(canonical))
+	for local, remote := range canonical {
+		if _, exists := remoteToCanonical[remote]; exists {
+			return nil, ErrConfigurationNeeded
+		}
+		remoteToCanonical[remote] = local
+	}
+	return mappedOrderReader{value: bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), account: account, runtime: runtime, remoteToCanonical: remoteToCanonical}, nil
+}
+
+// OrderStatusWriter resolves the provider-native order status writer for an
+// admitted storefront account. The configured status map is required so a
+// canonical lifecycle transition cannot be guessed for a tenant's Bitrix
+// installation.
+func (r *Registry) OrderStatusWriter(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.OrderStatusWriter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "bitrix" {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := configuration.OrderStatuses(); err != nil {
+		return nil, ErrConfigurationNeeded
+	}
+	return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+}
+
+// OrderStatus returns the provider-native status identifier configured for a
+// canonical order lifecycle value.
+func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status string, load ConfigLoader) (string, bool) {
+	if r == nil || account.ConnectorID != "bitrix" || load == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
+		return "", false
+	}
+	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+	if err != nil {
+		return "", false
+	}
+	statuses, err := configuration.OrderStatuses()
+	if err != nil {
+		return "", false
+	}
+	value, ok := statuses[status]
+	return value, ok
 }
 
 func (r *Registry) ProductWriter(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.ProductWriter, error) {
@@ -662,6 +742,11 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 		return nil, ErrUnavailable
 	}
 	switch account.ConnectorID {
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
 	case "yandex-market":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -714,7 +799,7 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	// Keep the adapter-level admission stable for callers that use this port
 	// outside the generic sync route. The generated runtime-support contract
 	// separately controls which entities the production worker may route.
-	return account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop"
+	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop")
 }
 
 // InventoryWriter resolves first-party connectors with an executable
@@ -725,6 +810,11 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 		return nil, ErrUnavailable
 	}
 	switch account.ConnectorID {
+	case "bitrix":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
 	case "prestashop":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -748,6 +838,38 @@ type marketplaceReader struct {
 	value   sdk.ProductReader
 	account sdk.Account
 	runtime sdk.Runtime
+}
+
+type mappedOrderReader struct {
+	value            sdk.OrderReader
+	account          sdk.Account
+	runtime          sdk.Runtime
+	remoteToCanonical map[string]string
+}
+
+func (r mappedOrderReader) ReadOrders(ctx context.Context, request sdk.PageRequest) (sdk.OrderPage, error) {
+	if r.value == nil || request.Limit < 50 {
+		return sdk.OrderPage{}, sdk.ErrInvalidReadRequest
+	}
+	limit := request.Limit
+	if limit > 50 {
+		limit = 50
+	}
+	page, err := r.value.ReadOrders(ctx, r.account, r.runtime, sdk.PageRequest{Cursor: request.Cursor, Limit: limit})
+	if err != nil {
+		return sdk.OrderPage{}, err
+	}
+	for index := range page.Items {
+		canonical, ok := r.remoteToCanonical[page.Items[index].StatusRemoteID]
+		if !ok {
+			return sdk.OrderPage{}, ErrConfigurationNeeded
+		}
+		page.Items[index].StatusRemoteID = canonical
+		if page.Items[index].Validate() != nil {
+			return sdk.OrderPage{}, ErrConfigurationNeeded
+		}
+	}
+	return page, page.Validate(limit)
 }
 
 func (r marketplaceReader) Read(ctx context.Context, req sdk.PageRequest) (ProductPage, error) {
@@ -1037,11 +1159,13 @@ func (source bitrixStoreConfigSource) Resolve(ctx context.Context, account sdk.A
 		BasePath        string `json:"base_path"`
 		CatalogIblockID int64  `json:"catalog_iblock_id"`
 		StoreCurrency   string `json:"store_currency"`
+		PriceTypeID     int64  `json:"price_type_id"`
+		OrderStatuses   map[string]string `json:"order_statuses"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return bitrixstore.Configuration{}, bitrixstore.ErrInvalidConfiguration
 	}
-	configuration := bitrixstore.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, CatalogIblockID: value.CatalogIblockID, StoreCurrency: value.StoreCurrency}
+	configuration := bitrixstore.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, CatalogIblockID: value.CatalogIblockID, StoreCurrency: value.StoreCurrency, PriceTypeID: value.PriceTypeID, OrderStatusMapping: value.OrderStatuses}
 	if configuration.Validate() != nil {
 		return bitrixstore.Configuration{}, bitrixstore.ErrInvalidConfiguration
 	}

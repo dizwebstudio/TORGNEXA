@@ -1,0 +1,7 @@
+# Local P3 qualification overlay. This file is only consumed by
+# scripts/check-production-qualification.sh and must never be used for a
+# production deployment. The normal production rate limit remains unchanged.
+services:
+  api:
+    environment:
+      TORGNEXA_SECURITY_RATE_PER_MINUTE: "${TORGNEXA_QUALIFICATION_RATE_PER_MINUTE:-10000}"

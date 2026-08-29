@@ -68,6 +68,12 @@ The operator shell no longer treats bounded API pages as the complete tenant dat
 
 `GET /api/v1/realtime` is an authenticated SSE **invalidation** channel. Frames contain only liveness/change metadata. The browser invalidates TanStack Query data only for explicit `invalidate` frames and rereads the same capability-protected APIs used by normal navigation. `ready` and `heartbeat` frames report connection health only and never invalidate the query cache. This avoids duplicating authorization or business state in the streaming layer and prevents periodic refetch storms.
 
+Invalidation frames are coalesced for 150 ms in the browser. A worker batch can
+produce several audit records at once; one short debounce window turns that
+burst into one Query invalidation instead of a fan-out of identical refetches.
+The API side compares only the newest opaque audit ID through an indexed
+tenant lookup and never serializes the audit summary into SSE.
+
 `/incidents` composes warehouse incidents, open reconciliation drift, degraded connector accounts and pending approvals into one triage surface. `/catalog/{id}` and `/orders/{id}` are durable route-controlled drawers; incident rows also receive bookmarkable routes. `Ctrl/Cmd+K` sends product/order searches to server endpoints rather than searching a fixed browser sample.
 
 Reports use the dependency-free `AnalyticsChart` SVG primitive with 7/30/90-day presets, KPI summaries and accessible point labels. Dashboard order/GMV cards use the replay-safe reporting projection when the caller has `reports.read`; they no longer total the first 100 orders.

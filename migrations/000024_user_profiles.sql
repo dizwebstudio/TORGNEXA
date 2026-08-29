@@ -78,8 +78,11 @@ CREATE POLICY user_profiles_tenant_update ON user_profiles
 CREATE FUNCTION user_profiles_guard_update() RETURNS trigger
 LANGUAGE plpgsql
 AS 'BEGIN
-  IF NEW.organization_id<>OLD.organization_id OR NEW.workspace_id<>OLD.workspace_id OR NEW.subject_ref<>OLD.subject_ref OR NEW.username<>OLD.username OR NEW.email<>OLD.email OR NEW.created_at<>OLD.created_at THEN
+  IF NEW.organization_id<>OLD.organization_id OR NEW.workspace_id<>OLD.workspace_id OR NEW.subject_ref<>OLD.subject_ref OR NEW.created_at<>OLD.created_at THEN
     RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''user profile identity is provider-owned'';
+  END IF;
+  IF (NEW.username<>OLD.username OR NEW.email<>OLD.email) AND COALESCE(current_setting(''app.privacy_execution'', true), '''') <> ''on'' THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''user profile provider identity is immutable outside privacy execution'';
   END IF;
   IF NEW.version<>OLD.version+1 OR NEW.updated_at<OLD.updated_at THEN
     RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''user profile version/time must advance exactly once'';

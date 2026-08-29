@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "482c51244ff750dc611ff7ca0799d5f869a345376f037ff34f85589bdffc0177",
+    "sha256": "c493445d3af56c384d617dcd674702e3c440ca733aa039f649b34b5e3619138a",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -68,6 +68,11 @@
       "operation_id": "createConnectorAccount",
       "method": "POST",
       "path": "/connector-accounts"
+    },
+    {
+      "operation_id": "createCurrentUserProfilePrivacyRequest",
+      "method": "POST",
+      "path": "/me/profile/privacy-requests"
     },
     {
       "operation_id": "createDemoApproval",
@@ -343,6 +348,11 @@
       "operation_id": "getWebhookDeliveryHistory",
       "method": "GET",
       "path": "/webhook-deliveries/{delivery_id}/history"
+    },
+    {
+      "operation_id": "getWorkspaceMemberProfile",
+      "method": "GET",
+      "path": "/settings/members/{member_id}/profile"
     },
     {
       "operation_id": "getWorkspaceSettings",
@@ -713,6 +723,11 @@
       "operation_id": "updateWorkspaceMember",
       "method": "PATCH",
       "path": "/settings/members/{member_id}"
+    },
+    {
+      "operation_id": "updateWorkspaceMemberProfile",
+      "method": "PATCH",
+      "path": "/settings/members/{member_id}/profile"
     },
     {
       "operation_id": "updateWorkspaceSettings",

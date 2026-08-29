@@ -159,7 +159,7 @@ func seedTenant(ctx context.Context, db *sql.DB, scope tenancy.Scope) error {
 }
 
 func qualifyWarehouseIncident(ctx context.Context, db *sql.DB, scope tenancy.Scope) (coreinventory.WarehouseIncident, bool, bool, bool, bool, bool, bool, error) {
-	if err := seedWarehouseFixture(ctx, db, scope); err != nil {
+	if err := seedWarehouseFixture(ctx, db, scope, false); err != nil {
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
 	}
 	inventoryScope, err := coreinventory.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
@@ -171,15 +171,11 @@ func qualifyWarehouseIncident(ctx context.Context, db *sql.DB, scope tenancy.Sco
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
 	}
 	source := coreinventory.WarehouseID(qualWarehouseA)
-	state, err := repository.OperationalState(ctx, inventoryScope, source)
-	if err != nil {
+	if _, err := restoreQualificationSource(ctx, repository, inventoryScope, source); err != nil {
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
 	}
-	if state.Version > 0 && state.State != coreinventory.OperationalActive {
-		state, err = repository.SetOperationalState(ctx, inventoryScope, source, coreinventory.OperationalActive, "", state.Version)
-		if err != nil {
-			return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
-		}
+	if err := seedWarehouseFixture(ctx, db, scope, true); err != nil {
+		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
 	}
 	orderID, orderItemID, allocationID, err := seedQualificationOrder(ctx, db, scope)
 	if err != nil {
@@ -197,7 +193,7 @@ func qualifyWarehouseIncident(ctx context.Context, db *sql.DB, scope tenancy.Sco
 	mutation := coreinventory.Mutation{EventID: "p3-reserve-" + formatIDTime(at), AuditID: mustQualifierUUID(), ActorID: "runtime-qualifier", Source: "qualification", CorrelationID: "p3-reserve-" + formatIDTime(at), OccurredAt: at}
 	allocation, err := repository.ReserveOrderItem(ctx, inventoryScope, coreinventory.ReserveOrderItem{AllocationID: allocationID, OrderItemID: orderItemID, IdempotencyKey: "p3qual-" + formatIDTime(at), WarehouseID: source}, mutation)
 	if err != nil {
-		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
+		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, fmt.Errorf("reserve qualification order item: %w", err)
 	}
 	if allocation.OrderID != orderID || allocation.Status != coreinventory.FulfillmentReserved {
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, errors.New("source fulfillment allocation not reserved")
@@ -206,7 +202,7 @@ func qualifyWarehouseIncident(ctx context.Context, db *sql.DB, scope tenancy.Sco
 	if err != nil || sourceReservedAfterReserve <= beforeSourceReserved {
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, errors.New("source reservation did not increase")
 	}
-	if _, err := repository.SetOperationalState(ctx, inventoryScope, source, coreinventory.OperationalLost, "qualification_loss", state.Version); err != nil {
+	if err := markQualificationSourceLost(ctx, repository, inventoryScope, source); err != nil {
 		return coreinventory.WarehouseIncident{}, false, false, false, false, false, false, err
 	}
 	incidents, err := repository.ListWarehouseIncidents(ctx, inventoryScope, 20)
@@ -281,7 +277,52 @@ func qualifyWarehouseIncident(ctx context.Context, db *sql.DB, scope tenancy.Sco
 		nil
 }
 
-func seedWarehouseFixture(ctx context.Context, db *sql.DB, scope tenancy.Scope) error {
+func restoreQualificationSource(ctx context.Context, repository *inventoryrepo.Repository, scope coreinventory.Scope, source coreinventory.WarehouseID) (coreinventory.WarehouseOperationalState, error) {
+	var last coreinventory.WarehouseOperationalState
+	for attempt := 0; attempt < 5; attempt++ {
+		state, err := repository.OperationalState(ctx, scope, source)
+		if err != nil {
+			return coreinventory.WarehouseOperationalState{}, fmt.Errorf("read source operational state: %w", err)
+		}
+		last = state
+		if state.State == coreinventory.OperationalActive {
+			return state, nil
+		}
+		state, err = repository.SetOperationalState(ctx, scope, source, coreinventory.OperationalActive, "", state.Version)
+		if err == nil {
+			return state, nil
+		}
+		if !errors.Is(err, coreinventory.ErrConflict) || attempt == 4 {
+			return coreinventory.WarehouseOperationalState{}, fmt.Errorf("restore source operational state: %w (observed state=%s version=%d)", err, last.State, last.Version)
+		}
+		if err := sleep(ctx, 50*time.Millisecond); err != nil {
+			return coreinventory.WarehouseOperationalState{}, fmt.Errorf("restore source operational state retry: %w", err)
+		}
+	}
+	return coreinventory.WarehouseOperationalState{}, errors.New("restore source operational state: retry budget exhausted")
+}
+
+func markQualificationSourceLost(ctx context.Context, repository *inventoryrepo.Repository, scope coreinventory.Scope, source coreinventory.WarehouseID) error {
+	for attempt := 0; attempt < 5; attempt++ {
+		state, err := repository.OperationalState(ctx, scope, source)
+		if err != nil {
+			return fmt.Errorf("read source state before loss: %w", err)
+		}
+		_, err = repository.SetOperationalState(ctx, scope, source, coreinventory.OperationalLost, "qualification_loss", state.Version)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, coreinventory.ErrConflict) || attempt == 4 {
+			return fmt.Errorf("mark source operational lost: %w", err)
+		}
+		if err := sleep(ctx, 50*time.Millisecond); err != nil {
+			return fmt.Errorf("mark source operational lost retry: %w", err)
+		}
+	}
+	return errors.New("mark source operational lost: retry budget exhausted")
+}
+
+func seedWarehouseFixture(ctx context.Context, db *sql.DB, scope tenancy.Scope, includePositions bool) error {
 	return withScope(ctx, db, scope, func(tx *sql.Tx) error {
 		org, workspace := scope.OrganizationID().String(), scope.WorkspaceID().String()
 		statements := []struct {
@@ -307,6 +348,9 @@ func seedWarehouseFixture(ctx context.Context, db *sql.DB, scope tenancy.Scope) 
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE offers SET status='active',version=2,updated_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND status='draft' AND version=1`, org, workspace, qualOffer); err != nil {
 			return err
+		}
+		if !includePositions {
+			return nil
 		}
 		for _, fixture := range []struct {
 			id, warehouse string

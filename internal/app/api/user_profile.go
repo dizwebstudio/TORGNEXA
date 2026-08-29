@@ -17,13 +17,16 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/userprofile"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/userprofilerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/retention"
 	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 )
 
 const CurrentUserProfilePath = "/api/v1/me/profile"
+const CurrentUserProfilePrivacyPath = CurrentUserProfilePath + "/privacy-requests"
 
 type userProfileStore interface {
 	Ensure(context.Context, tenancy.Scope, userprofile.Identity) (userprofile.Profile, error)
+	Get(context.Context, tenancy.Scope, string) (userprofile.Profile, error)
 	Update(context.Context, tenancy.Scope, userprofile.Update) (userprofile.Profile, error)
 }
 
@@ -45,6 +48,10 @@ type profileUpdateInput struct {
 
 type profileAvatarDeleteInput struct {
 	Version int64 `json:"version"`
+}
+
+type profilePrivacyRequestInput struct {
+	RequestType retention.RequestType `json:"request_type"`
 }
 
 type profileView struct {
@@ -71,6 +78,7 @@ type profileAPI struct {
 	uploadStatus   uploadStatusReader
 	uploadAccess   uploadReleaseGate
 	uploadEvidence uploadEvidenceReader
+	privacy        privacyWorkflow
 }
 
 // newUserProfileRoutes registers the current-user profile and avatar surface.
@@ -82,6 +90,7 @@ func newUserProfileRoutes(api profileAPI) []ProtectedRoute {
 		{Method: http.MethodPatch, Path: CurrentUserProfilePath, Permission: "settings.profile.write", Handler: http.HandlerFunc(api.update)},
 		{Method: http.MethodPost, Path: CurrentUserProfilePath + "/avatar", Permission: "settings.profile.write", Handler: http.HandlerFunc(api.uploadAvatar)},
 		{Method: http.MethodDelete, Path: CurrentUserProfilePath + "/avatar", Permission: "settings.profile.write", Handler: http.HandlerFunc(api.deleteAvatar)},
+		{Method: http.MethodPost, Path: CurrentUserProfilePrivacyPath, Permission: "settings.profile.write", Handler: http.HandlerFunc(api.requestPrivacy)},
 	}
 }
 
@@ -194,6 +203,37 @@ func (api profileAPI) deleteAvatar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.view(principal, updated))
 }
 
+func (api profileAPI) requestPrivacy(w http.ResponseWriter, r *http.Request) {
+	scope, principal, ok := profileRequestContext(r)
+	if !ok || api.privacy == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	var input profilePrivacyRequestInput
+	if !validIdempotencyKey(key) || decodeStrictJSON(r, &input) != nil || (input.RequestType != retention.RequestAccess && input.RequestType != retention.RequestExport && input.RequestType != retention.RequestDeletion && input.RequestType != retention.RequestRestriction) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requestKey := "profile:" + key
+	requestID := stableID("prq_", 48, scope, requestKey)
+	jobID := stableID("prj_", 48, scope, requestKey)
+	job, err := api.privacy.CreateSubjectRequest(r.Context(), scope, retention.SubjectRequestSpec{RequestID: requestID, JobID: jobID, Type: input.RequestType, Subject: retention.SubjectRef{Kind: "user_profile", OpaqueID: principal.SubjectRef}})
+	if err != nil {
+		if errors.Is(err, retention.ErrInvalid) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		if errors.Is(err, retention.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"request_id": requestID, "job_id": job.ID, "action": job.Action, "status": job.Status, "created_at": job.CreatedAt})
+}
+
 func profileRequestContext(r *http.Request) (tenancy.Scope, Principal, bool) {
 	scope, scoped := ScopeFromContext(r.Context())
 	principal, identified := PrincipalFromContext(r.Context())
@@ -300,20 +340,25 @@ func changedProfileFields(before, after userprofile.Profile) []string {
 }
 
 func (api profileAPI) view(principal Principal, profile userprofile.Profile) profileView {
-	username, email := profile.Username, profile.Email
+	view := profileViewFromProfile(profile)
 	if principal.Profile.Username != "" {
-		username = principal.Profile.Username
+		view.Username = principal.Profile.Username
 	}
 	if principal.Profile.Email != "" {
-		email = principal.Profile.Email
+		view.Email = principal.Profile.Email
 	}
-	view := profileView{Username: username, Email: email, GivenName: profile.GivenName, FamilyName: profile.FamilyName, Birthdate: profile.Birthdate, JobTitle: profile.JobTitle, Department: profile.Department, PhoneNumber: profile.PhoneNumber, PictureUploadID: profile.PictureUploadID, Version: profile.Version, CreatedAt: profile.CreatedAt.Format(time.RFC3339), UpdatedAt: profile.UpdatedAt.Format(time.RFC3339)}
+	if profile.PictureUploadID == "" && principal.Profile.PictureURL != "" {
+		view.PictureURL = principal.Profile.PictureURL
+		view.PictureSource = "identity_provider"
+	}
+	return view
+}
+
+func profileViewFromProfile(profile userprofile.Profile) profileView {
+	view := profileView{Username: profile.Username, Email: profile.Email, GivenName: profile.GivenName, FamilyName: profile.FamilyName, Birthdate: profile.Birthdate, JobTitle: profile.JobTitle, Department: profile.Department, PhoneNumber: profile.PhoneNumber, PictureUploadID: profile.PictureUploadID, Version: profile.Version, CreatedAt: profile.CreatedAt.Format(time.RFC3339), UpdatedAt: profile.UpdatedAt.Format(time.RFC3339)}
 	if profile.PictureUploadID != "" {
 		view.PictureURL = uploads.ContentPath(uploads.ID(profile.PictureUploadID))
 		view.PictureSource = "uploaded"
-	} else if principal.Profile.PictureURL != "" {
-		view.PictureURL = principal.Profile.PictureURL
-		view.PictureSource = "identity_provider"
 	} else {
 		view.PictureSource = "none"
 	}

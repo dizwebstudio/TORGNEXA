@@ -15,6 +15,7 @@ const MembersSettingsPath = "/api/v1/settings/members"
 
 type memberSettingsAPI struct {
 	repository *tenancyrepo.Repository
+	profiles   userProfileStore
 	audit      auditCapturer
 }
 type memberInviteRequest struct {
@@ -39,13 +40,18 @@ type memberView struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-func newMemberSettingsRoutes(repository *tenancyrepo.Repository, auditService auditCapturer) []ProtectedRoute {
+func newMemberSettingsRoutes(repository *tenancyrepo.Repository, auditService auditCapturer, profileStore ...userProfileStore) []ProtectedRoute {
 	api := &memberSettingsAPI{repository: repository, audit: auditService}
-	return []ProtectedRoute{
+	if len(profileStore) > 0 {
+		api.profiles = profileStore[0]
+	}
+	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: MembersSettingsPath, Permission: "settings.members.read", Handler: http.HandlerFunc(api.list)},
 		{Method: http.MethodPost, Path: MembersSettingsPath, Permission: "settings.members.write", Handler: http.HandlerFunc(api.invite)},
 		{Method: http.MethodPatch, Path: MembersSettingsPath + "/", PathPrefix: true, Permission: "settings.members.write", Handler: http.HandlerFunc(api.update)},
 	}
+	routes = append(routes, ProtectedRoute{Method: http.MethodGet, Path: MembersSettingsPath + "/", PathPrefix: true, Permission: "settings.members.read", Handler: http.HandlerFunc(api.getProfile)})
+	return routes
 }
 
 func (a *memberSettingsAPI) list(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +117,10 @@ func (a *memberSettingsAPI) invite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *memberSettingsAPI) update(w http.ResponseWriter, r *http.Request) {
+	if a.profiles != nil && strings.HasSuffix(r.URL.Path, "/profile") {
+		a.updateProfile(w, r)
+		return
+	}
 	scope, ok := ScopeFromContext(r.Context())
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	id := strings.TrimPrefix(r.URL.Path, MembersSettingsPath+"/")
@@ -146,4 +156,88 @@ func (a *memberSettingsAPI) update(w http.ResponseWriter, r *http.Request) {
 
 func memberToView(m tenancyrepo.Member) memberView {
 	return memberView{ID: m.ID, Email: m.Email, DisplayName: m.DisplayName, OIDCSubject: m.OIDCSubject, Role: m.Role, Status: m.Status, Version: m.Version, InvitedAt: m.InvitedAt, UpdatedAt: m.UpdatedAt}
+}
+
+func (a *memberSettingsAPI) getProfile(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || a == nil || a.repository == nil || a.profiles == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	id, valid := memberProfileID(r.URL.Path)
+	if !valid {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	member, err := a.repository.GetMember(r.Context(), scope, id)
+	if err != nil || member.OIDCSubject == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	profile, err := a.profiles.Get(r.Context(), scope, member.OIDCSubject)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, profileViewFromProfile(profile))
+}
+
+func (a *memberSettingsAPI) updateProfile(w http.ResponseWriter, r *http.Request) {
+	scope, principal, ok := profileRequestContext(r)
+	if !ok || a.repository == nil || a.profiles == nil || a.audit == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	id, valid := memberProfileID(r.URL.Path)
+	if !valid {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !validIdempotencyKey(key) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+		return
+	}
+	var input profileUpdateInput
+	if decodeStrictJSON(r, &input) != nil || input.Version < 1 || input.PictureUploadID != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	member, err := a.repository.GetMember(r.Context(), scope, id)
+	if err != nil || member.OIDCSubject == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	current, err := a.profiles.Get(r.Context(), scope, member.OIDCSubject)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+	update := mergeProfileUpdate(current, input)
+	update.SubjectRef = current.SubjectRef
+	update.ExpectedVersion = input.Version
+	update.MutationKey = key
+	update.MutationHash = profileMutationHash(update)
+	updated, err := a.profiles.Update(r.Context(), scope, update)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+	changed := changedProfileFields(current, updated)
+	if len(changed) > 0 {
+		if _, auditErr := a.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.member.profile.updated", ResourceType: "user_profile", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"changed_fields": changed, "version": updated.Version}}); auditErr != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, profileViewFromProfile(updated))
+}
+
+func memberProfileID(path string) (string, bool) {
+	rest := strings.TrimPrefix(path, MembersSettingsPath+"/")
+	if rest == path || !strings.HasSuffix(rest, "/profile") {
+		return "", false
+	}
+	id := strings.TrimSuffix(rest, "/profile")
+	return id, id != "" && !strings.Contains(id, "/")
 }

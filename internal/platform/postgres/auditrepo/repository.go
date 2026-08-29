@@ -50,6 +50,36 @@ func (repository *Repository) ListSettings(ctx context.Context, scope tenancy.Sc
 	return repository.list(ctx, scope, limit, cursor, true)
 }
 
+// LatestID returns only the newest audit identifier for a tenant. Realtime
+// invalidation uses this narrow query instead of decoding a full audit row and
+// its JSON summary on every SSE polling tick.
+func (repository *Repository) LatestID(ctx context.Context, scope tenancy.Scope) (string, error) {
+	if ctx == nil || !scope.Valid() || repository == nil || repository.database == nil {
+		return "", audit.ErrInvalidRecord
+	}
+	tx, err := repository.database.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return "", fmt.Errorf("begin latest audit lookup: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var organizationID, workspaceID string
+	if err := tx.QueryRowContext(ctx, applyScopeStatement, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&organizationID, &workspaceID); err != nil {
+		return "", fmt.Errorf("apply tenant scope: %w", err)
+	}
+	var id string
+	err = tx.QueryRowContext(ctx, `SELECT id FROM audit_records WHERE organization_id=$1 AND workspace_id=$2 ORDER BY id DESC LIMIT 1`, organizationID, workspaceID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("query latest audit id: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit latest audit lookup: %w", err)
+	}
+	return id, nil
+}
+
 func (repository *Repository) list(ctx context.Context, scope tenancy.Scope, limit int, cursor string, settingsOnly bool) ([]audit.Record, string, error) {
 	if ctx == nil || !scope.Valid() || repository == nil || repository.database == nil || limit < 1 || limit > 200 {
 		return nil, "", audit.ErrInvalidRecord

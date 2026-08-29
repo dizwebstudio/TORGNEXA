@@ -18,6 +18,20 @@ func (s realtimeAuditStub) List(context.Context, tenancy.Scope, int, string) ([]
 	return s.rows, "", nil
 }
 
+type realtimeLatestAuditStub struct {
+	latest    string
+	listCalls int
+}
+
+func (s *realtimeLatestAuditStub) List(context.Context, tenancy.Scope, int, string) ([]audit.Record, string, error) {
+	s.listCalls++
+	return []audit.Record{{ID: s.latest}}, "", nil
+}
+
+func (s *realtimeLatestAuditStub) LatestID(context.Context, tenancy.Scope) (string, error) {
+	return s.latest, nil
+}
+
 type cancellingRecorder struct {
 	*httptest.ResponseRecorder
 	cancel context.CancelFunc
@@ -46,5 +60,21 @@ func TestRealtimeStreamIsMetadataOnlyAndTenantScoped(t *testing.T) {
 	}
 	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
 		t.Fatalf("content-type=%q", got)
+	}
+}
+
+func TestRealtimeStreamUsesLatestIDFastPath(t *testing.T) {
+	scope, err := tenancy.ParseScope("018f0000-0000-7000-8000-000000000001", "018f0000-0000-7000-8000-000000000002")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stub := &realtimeLatestAuditStub{latest: "018f0000-0000-7000-8000-000000000003"}
+	route := newRealtimeRoutes(stub)[0]
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	defer cancel()
+	rec := &cancellingRecorder{ResponseRecorder: httptest.NewRecorder(), cancel: cancel}
+	route.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, RealtimePath, nil).WithContext(ctx))
+	if stub.listCalls != 0 {
+		t.Fatalf("realtime fast path fell back to full audit list %d times", stub.listCalls)
 	}
 }

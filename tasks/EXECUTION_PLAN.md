@@ -16,6 +16,49 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
 - Task `161` is repository-complete: `commerce-sync` now consumes canonical product change events, invokes admitted ProductWriter routes with provider-native status translation, and persists product mappings only after validated remote receipts.
 - Task `162` is repository-complete: the Community deployment now has a repeatable authenticated Chrome E2E that reconciles the Keycloak demo member and verifies catalog, product images, orders and order thumbnails through the rendered browser UI.
+- Task `163` is planned: the Workflow Automation Builder is decomposed into
+  ten bounded subtasks covering the action catalog/ADR, immutable workflow
+  versions, schema-backed DSL/compiler, RLS persistence, EventBus and durable
+  schedule triggers, execution/retry/approval runtime, typed safe adapters,
+  REST/UI, quotas/observability/recovery and load/chaos/Compose qualification.
+- Task `164` is planned: Returns, cancellations and refunds are decomposed into
+  twelve bounded subtasks covering policy/state machines, order/payment/
+  fulfillment/WMS orchestration, RLS persistence, canonical events and
+  webhooks, cancellation and return workers, refund/fiscal/settlement
+  reconciliation, REST/UI, connector qualification, operations and Compose
+  release evidence. The existing payments refund lifecycle remains the single
+  mutation path; ambiguous external outcomes require reconciliation/manual
+  attention rather than blind retry.
+- Task `165` is planned: Stock forecasting and auto-replenishment are decomposed
+  into thirteen bounded subtasks covering deterministic forecasts, data-quality
+  gates, stock projections/risk, supplier/MOQ/budget optimization, RLS/lineage,
+  scheduler/worker, guarded draft/submit PO execution, REST/UI, connector
+  qualification, operations and Compose evidence. Task 053 remains the
+  advisory baseline; forecast never becomes inventory truth and `auto_submit`
+  cannot bypass procurement approval or the existing PO lifecycle.
+- Task `166` is planned: the Product Publication Quality Center is decomposed
+  into thirteen bounded subtasks covering target-specific readiness, immutable
+  snapshots, declarative connector profiles, catalog/PIM/media/price/stock and
+  compliance checks, deterministic score/rules, the `commerce-sync` preflight
+  gate, durable worker, RLS/lineage, REST/UI, safe remediation/approval,
+  connector qualification and Compose release evidence. Task 082 remains the
+  final compliance guard; stale, unknown or unsupported quality evidence fails
+  closed and never authorizes a remote write.
+- Task `167` is planned: channel unit economics is decomposed into eighteen
+  bounded subtasks covering accounting bases, channel identity, exact metric
+  contracts, normalized source facts, historical COGS, allocation conservation,
+  settlement/payment deduplication, ads/promotions, returns/refunds, sourced
+  FX, immutable calculation runs, ClickHouse projections, RLS/lineage,
+  worker/API/exports, operator UI, security/quotas and Compose qualification.
+  Missing facts never become zero, payout never becomes revenue, and every
+  cross-currency result requires Task-089b conversion evidence.
+- Task `168` is planned: the Unified Integration State Center is decomposed
+  into eighteen bounded subtasks covering multidimensional account/runtime/
+  credential/config/capability/health/sync/reconciliation state, bulk adapters,
+  deterministic reduction, derived snapshots/RLS/lineage, events/worker/SSE,
+  REST/OpenAPI, operator UI, idempotent actions, security/SLO/quotas and
+  Compose/test/documentation qualification. GET performs no remote probe and
+  manifest/health-only/SDK-only evidence never becomes executable green state.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -944,3 +987,316 @@ and JavaScript supply-chain graph remain unchanged.
   idempotent demo setup, the browser assertions do not mutate demo state;
 - browser profiles, tokens, cookies and tenant selectors are not persisted;
 - repository frontend checks remain independent from the runtime E2E.
+
+## Phase 33 — Workflow automation builder
+
+`163`
+
+Task 163 is planned as a provider-neutral automation builder on top of the
+existing EventBus/Transactional Outbox/Inbox, PostgreSQL scheduler, worker,
+approval and connector-port boundaries. The implementation is intentionally
+split into ten subtasks so that the first safe vertical slice can ship before
+the full visual builder:
+
+1. `163.1` ADR, scope and typed action catalog;
+2. `163.2` canonical workflow model and immutable version lifecycle;
+3. `163.3` Draft 2020-12 DSL schema, validation and deterministic compiler;
+4. `163.4` tenant-scoped PostgreSQL persistence, RLS and retention;
+5. `163.5` EventBus triggers, durable schedules, deduplication and leases;
+6. `163.6` execution state machine, conditions, retries and approvals;
+7. `163.7` typed safe action adapters and notification/reconciliation/dry-run
+   vertical slice;
+8. `163.8` REST/OpenAPI contracts and operator builder/run UI;
+9. `163.9` quotas, observability and operator recovery;
+10. `163.10` contract, security, load/chaos, Compose E2E and documentation
+    qualification.
+
+### Gate RUNTIME-163
+
+- workflow definitions are immutable after publish and every run is
+  tenant-scoped, idempotent and resumable;
+- no arbitrary code, SQL, shell, browser automation, unbounded loops or direct
+  provider/secret access can be represented by the DSL;
+- sensitive and legally-significant actions reuse Task-017 approval and all
+  side effects use existing capability, policy, audit and outbox boundaries;
+- duplicate events, worker crashes, lease loss, retryable/permanent failures,
+  approval expiry and connector outages have deterministic outcomes;
+- per-workspace limits prevent fan-out, memory, connection-pool and retry
+  storms on the small-VPS Compose profile;
+- API/UI expose only validated actions and current runtime capabilities;
+- full Go, contract, architecture, migration, frontend, conformance,
+  performance and deployment qualification checks pass before production
+  admission.
+
+## Phase 34 — Возвраты, отмены и refunds
+
+`164`
+
+Task 164 is planned as a provider-neutral operational contour for order
+cancellation, partial/full returns and payment refunds. It is explicitly
+separate from the immutable order snapshot and from payment, fulfillment,
+inventory, fiscal and settlement facts, while coordinating them through typed
+ports. The implementation is split into twelve subtasks:
+
+1. `164.1` ADR, terminology, lifecycle scope and policy/approval matrix;
+2. `164.2` canonical cancellation/return/refund contracts, allocations and
+   transition/invariant validators;
+3. `164.3` order-payment-fulfillment-inventory orchestration and compensation
+   contract;
+4. `164.4` tenant-scoped PostgreSQL schema, FORCE RLS, idempotency and
+   append-only evidence;
+5. `164.5` canonical events, Outbox/Inbox and verified provider webhooks;
+6. `164.6` durable cancellation worker with leases, retries and unknown-outcome
+   handling;
+7. `164.7` return authorization, logistics, receipt/inspection and WMS
+   disposition;
+8. `164.8` refund orchestration with fiscalization, settlement and bounded
+   reconciliation;
+9. `164.9` REST/OpenAPI and order/operator return/refund UI;
+10. `164.10` per-connector capability/runtime/conformance qualification;
+11. `164.11` security, metrics, quotas, alerts and recovery runbook;
+12. `164.12` unit/contract/RLS/API/worker tests, Docker/Compose E2E,
+    load/chaos, screenshots, docs and retained evidence.
+
+### Gate RUNTIME-164
+
+- cancellation, return and refund lifecycles are separate, versioned and
+  tenant-scoped; immutable order/payment/inventory/fiscal facts are never
+  silently rewritten;
+- full and partial line returns, multiple refunds and tax/shipping allocations
+  enforce exact money/quantity and no-over-refund/no-over-return invariants;
+- all external effects use capability ports, policy/approval, idempotency,
+  timeout and retry classification; accepted-but-unknown outcomes reconcile
+  without blind re-issue;
+- order, shipment, WMS, fiscal and settlement effects are independently
+  evidenced and replay-safe through Outbox/Inbox/webhook deduplication;
+- only connectors with current runtime route plus conformance and Docker/live
+  evidence expose cancellation/return/refund capabilities; others fail closed;
+- per-workspace limits keep refund/return bursts, webhook storms, memory,
+  connection pools and Kafka lag bounded on the small-VPS Compose topology;
+- Go, contract, architecture, migration, frontend, conformance, performance,
+  Compose E2E and documentation checks pass before production admission.
+
+## Phase 36 — Центр качества публикации товаров
+
+`166`
+
+Task 166 is planned as a provider-neutral preflight and operational quality
+center for Product/Offer publication. It evaluates the exact local snapshot
+against a connector-account publication profile, current capability, mapping,
+media release and Task-082 compliance evidence. It never becomes a second PIM,
+publication state machine or stock/compliance source of truth. The
+implementation is split into thirteen subtasks:
+
+1. `166.1` ADR, scope, severity, score and rule governance;
+2. `166.2` canonical quality model, immutable snapshots and gate receipts;
+3. `166.3` versioned declarative publication-profile/rule schema;
+4. `166.4` catalog/PIM/price/stock/media/compliance snapshot assembly;
+5. `166.5` deterministic rule engine, score and remediation hints;
+6. `166.6` `commerce-sync` pre-publication gate and compliance-guard composition;
+7. `166.7` EventBus triggers, scheduler, coalescing and quality worker;
+8. `166.8` PostgreSQL/RLS, lineage, retention and bounded indexes;
+9. `166.9` REST/OpenAPI, permissions and Product Quality Center UI;
+10. `166.10` safe remediation, bulk actions and Task-017 approvals;
+11. `166.11` connector profiles, remote preflight and runtime qualification;
+12. `166.12` security, observability, quotas, alerts and recovery runbook;
+13. `166.13` unit/property/contract/RLS tests, Docker/Compose E2E, load/chaos,
+    screenshots, documentation and retained evidence.
+
+### Gate RUNTIME-166
+
+- quality decisions are target-specific, tenant-scoped, versioned and bound to
+  exact product/offer/profile/rule/capability/compliance snapshots;
+- `ready`/`ready_with_warnings`, `blocked`, `approval_required`, `stale`,
+  `unsupported` and `unknown` are distinct; a numeric score never overrides a
+  hard blocker or missing authority;
+- rules cover canonical identity/content, PIM category/attributes,
+  localization, media release/security, price/stock semantics, mapping,
+  capability freshness and Task-082 compliance without duplicating its
+  evaluator;
+- `commerce-sync` and every future product writer make no remote call without
+  an exact valid quality receipt and still pass the final compliance guard;
+- remediation is typed/idempotent/optimistic, sensitive changes use Task-017
+  approval, and AI/MCP/n8n cannot auto-edit or bypass policy;
+- duplicate/out-of-order events, stale snapshots, profile changes, worker
+  crashes, remote validation rejection and connector outages produce no false
+  `published` state or duplicate side effect;
+- only connectors with current runtime route, profile and conformance plus
+  Docker/live evidence expose publication readiness; health-only/SDK-only
+  targets remain fail-closed;
+- per-workspace limits bound rule count, catalog scans, media/attribute size,
+  queue fan-out, remote calls, memory and DB/Kafka load on small-VPS Compose;
+- Go, contract, architecture, migration, frontend, conformance, performance,
+  Compose E2E and documentation checks pass before production admission.
+
+## Phase 37 — Юнит-экономика по каналам
+
+`167`
+
+Task 167 is planned as a provider-neutral factual unit-economics contour by
+channel, store, order and Offer/SKU. It extends the existing `profitability-v1`
+what-if scenario and reporting foundation with explicit accounting bases,
+immutable calculation runs, historical COGS, settlement/payment deduplication,
+advertising and return allocations, sourced FX and completeness evidence. The
+ledger and canonical commerce facts remain authoritative; ClickHouse is only a
+rebuildable projection. The implementation is split into eighteen subtasks:
+
+1. `167.1` ADR, terminology, accounting scope, bases and metric policy;
+2. `167.2` tenant-scoped channel identity, mapping and attribution resolution;
+3. `167.3` exact metric/sign/quality contracts and compatibility versions;
+4. `167.4` normalized Order/Settlement/Payment/Ads/Return/COGS/FX fact inputs;
+5. `167.5` historical COGS snapshot and inventory valuation policy;
+6. `167.6` deterministic shared-income/expense allocation with conservation;
+7. `167.7` settlement/payment deduplication and reconciliation evidence;
+8. `167.8` advertising, promotion and attribution-window accounting;
+9. `167.9` cancellation, return, refund, shipping and tax treatment;
+10. `167.10` cross-currency conversion, rounding and FX evidence;
+11. `167.11` pure calculation engine and immutable versioned runs;
+12. `167.12` ClickHouse schema, projections, replay/backfill and freshness;
+13. `167.13` PostgreSQL metadata, RLS, lineage, retention and migration;
+14. `167.14` Outbox/Inbox events, scheduler, worker, leases and recovery;
+15. `167.15` REST/OpenAPI, permissions, snapshot filters and exports;
+16. `167.16` operator UI for channel comparison and explainable drill-down;
+17. `167.17` security, privacy, observability, quotas and incident runbooks;
+18. `167.18` unit/property/contract/RLS/Compose/load tests, screenshots, docs
+    and retained release evidence.
+
+### Gate RUNTIME-167
+
+- every row is tenant-scoped and bound to a stable `channel_ref`, one explicit
+  `order_accrual`/`settlement`/`cash` basis, original/reporting currency,
+  formula/allocation/valuation/attribution versions and immutable input digest;
+- GMV, net revenue, COGS, fees, logistics, ads, refunds, compensation and
+  contribution metrics follow the approved sign/conservation policy; payout is
+  never counted as revenue and Order + settlement + Payment cannot double count;
+- `complete`, `partial`, `stale`, `unmatched`, `conflict`, `mixed_currency` and
+  `unsupported` remain distinct; missing COGS/FX/attribution is visible and is
+  never zero-filled;
+- returns/cancellations/refunds, adjustment chains and historical COGS are
+  replayable without mutating immutable Orders, Payments, Inventory or
+  SettlementEntry facts;
+- all cross-currency totals use persisted Task-089b conversion evidence and
+  final-output rounding only; stale/missing/ambiguous FX fails closed;
+- calculation snapshots are immutable, ClickHouse rebuildable, and duplicate,
+  late, out-of-order and corrected facts converge to one deterministic run;
+- API/OpenAPI/SDK/UI/export expose source, watermark, coverage, quality,
+  allocations and explanation for the exact selected run;
+- forced RLS, financial permissions, privacy/retention/legal-hold, audit/
+  lineage, no-secrets logging, bounded ranges/exports and per-workspace quotas
+  pass under concurrent rebuilds;
+- worker crash, lease loss, CH outage, DLQ replay, duplicate fee and late
+  settlement produce no false profit and no retry storm on small-VPS Compose;
+- only synthetic fixtures plus deterministic Compose/runtime evidence qualify
+  release; Go, contract, architecture, migration, frontend, conformance,
+  performance and documentation checks are green before production.
+
+## Phase 38 — Единый центр состояния интеграций
+
+`168`
+
+Task 168 is planned as a provider-neutral read model and operator triage center
+for the complete integration lifecycle. It composes account lifecycle,
+credential/configuration class, truthful runtime stage, capability grants,
+health/freshness/rate limits, OAuth reauthorization, sync/retry/DLQ,
+reconciliation, webhooks, notifications and separate AI/Finance/Delivery/CRM
+surfaces without making any of those projections a second source of truth.
+The implementation is split into eighteen subtasks:
+
+1. `168.1` ADR, scope, state vocabulary and reducer policy;
+2. `168.2` canonical status/evidence contracts and compatibility versioning;
+3. `168.3` tenant-scoped bulk source adapters and consistency boundary;
+4. `168.4` account lifecycle, credential class and runtime-config state;
+5. `168.5` truthful manifest/runtime-support/catalog projection;
+6. `168.6` capability grants, executable operation readiness and approvals;
+7. `168.7` health, freshness, rate-limit and failure normalization;
+8. `168.8` sync, worker, retry/DLQ and reconciliation dimensions;
+9. `168.9` OAuth reauthorization and security-posture links;
+10. `168.10` notification, issue and operator-action model;
+11. `168.11` deterministic aggregate reducer and snapshot consistency;
+12. `168.12` PostgreSQL derived metadata, RLS, lineage and retention;
+13. `168.13` canonical events, durable worker and metadata-only realtime;
+14. `168.14` permission-aware REST/OpenAPI read API and generated SDK;
+15. `168.15` responsive Integration State Center UI and deep links;
+16. `168.16` idempotent safe operator actions and remediation boundaries;
+17. `168.17` security, privacy, SLO, observability, quotas and runbooks;
+18. `168.18` unit/property/contract/RLS/Compose/load tests, screenshots, docs
+    and retained release evidence.
+
+### Gate RUNTIME-168
+
+- one read model preserves account, runtime, credentials/config class,
+  capability, health/freshness/rate-limit, sync/retry/DLQ, reconciliation,
+  webhook and separate-surface dimensions; the overall reducer never hides
+  secondary issues;
+- `healthy` requires fresh authoritative evidence for the selected operation;
+  health-only, separate-surface, unsupported, stale, blocked, unknown and
+  redacted states never become executable green status;
+- every row/snapshot is tenant-scoped, versioned, digest-bound and
+  permission-aware with source watermarks, age/TTL, reason code, visibility and
+  safe next action; no secret, raw provider error, token or PII is exposed;
+- manifest/runtime-support/qualification determines runtime stage while the
+  current account grant and host route determine executable capability;
+  manifest alone or a successful ping never authorizes a business operation;
+- GET performs no remote IO and cannot mutate source state; check, OAuth,
+  credential/config, sync, reconciliation, retry and approval actions reuse
+  existing idempotent API/worker/connector owners;
+- status transitions, notifications, Outbox/Inbox, worker leases, retries,
+  SSE invalidation and rebuilds are duplicate/out-of-order/crash/DLQ safe;
+  source outage yields partial/stale evidence, never false health;
+- API/OpenAPI/SDK/UI preserve tenant permissions, cursor/response limits,
+  URL filters, accessible responsive layout and Russian copy distinguishing
+  connection check from executable operation;
+- RLS, lineage, audit, retention/legal-hold, migration/backup, no-secrets
+  logging and small-VPS quotas pass under concurrent refresh/rebuild traffic;
+- all unit, contract, architecture, migration, frontend, conformance,
+  performance, Compose, screenshot, documentation and release-evidence checks
+  are green before production admission.
+
+## Phase 35 — Прогноз остатков и автопополнение
+
+`165`
+
+Task 165 is planned as a provider-neutral extension of Task 053. It turns the
+current velocity/lead-time/safety-stock recommendation into a versioned demand
+forecast, projected stockout/overstock risk and controlled replenishment plan,
+while keeping PostgreSQL/WMS ledger authoritative and ClickHouse analytical
+only. The implementation is split into thirteen subtasks:
+
+1. `165.1` ADR, terminology, operating modes and policy/approval matrix;
+2. `165.2` canonical planning contracts, forecast points and invariants;
+3. `165.3` input ingestion, normalization, watermarks and data-quality gates;
+4. `165.4` deterministic forecast baselines, intervals, backtesting and model
+   versioning;
+5. `165.5` projected stock, stockout/overstock risk and bounded scenarios;
+6. `165.6` reorder policy, supplier selection, MOQ/case-pack and budget/capacity
+   optimization;
+7. `165.7` PostgreSQL persistence, RLS, lineage, retention and indexes;
+8. `165.8` EventBus triggers, durable scheduler, coalescing and forecast worker;
+9. `165.9` idempotent draft PO and guarded auto-replenishment execution;
+10. `165.10` REST/OpenAPI, MCP/n8n boundary and operator forecast UI;
+11. `165.11` supplier/source connector capability and runtime qualification;
+12. `165.12` security, observability, quotas, kill switch and recovery;
+13. `165.13` unit/property/contract/RLS tests, Docker/Compose E2E, load/chaos,
+    screenshots, documentation and retained evidence.
+
+### Gate RUNTIME-165
+
+- forecast, projection, recommendation and PO execution are separate,
+  tenant-scoped, versioned facts; WMS ledger remains the only stock truth;
+- forecast inputs include freshness/quality evidence, exact money/quantity,
+  uncertainty and explainable algorithm/model/policy digests;
+- full and partial inbound, reservations, quarantine, returns/cancellations,
+  lead-time uncertainty, MOQ/case-pack, supplier validity, budget and capacity
+  enforce deterministic no-negative/no-over-order invariants;
+- `recommendation_only` is the default, `draft_po` is idempotent and
+  `auto_submit` is explicit, capped, approval-aware, kill-switchable and
+  available only with current connector runtime + conformance evidence;
+- PO creation/submission uses the existing procurement state machine and
+  Task-017 approval; timeout/unknown supplier outcomes reconcile without blind
+  re-issue or duplicate spend;
+- forecast/schedule workers use durable PostgreSQL leases, EventBus
+  Outbox/Inbox, deduplication, bounded catch-up and per-tenant backpressure;
+- API/UI/MCP/n8n expose only current capabilities and never persist secrets,
+  raw provider/model payloads or use AI as a privileged executor;
+- Go, contract, architecture, migration, frontend, conformance, performance,
+  Compose E2E and documentation checks pass before production admission.

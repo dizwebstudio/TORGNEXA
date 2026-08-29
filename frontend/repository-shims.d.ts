@@ -5,6 +5,8 @@ declare module "react" {
   export type Dispatch<T> = (value: T) => void;
   export interface RefObject<T> { current: T; }
   export const StrictMode: (props: {children?: ReactNode}) => unknown;
+  export const Suspense: (props: {fallback?: ReactNode; children?: ReactNode}) => unknown;
+  export function lazy<T extends (props: any) => unknown>(loader: () => Promise<{default: T}>): T;
   export interface Context<T> { Provider: (props: {value: T; children?: ReactNode}) => unknown; }
   export function createContext<T>(initial: T): Context<T>;
   export function useContext<T>(context: Context<T>): T;
@@ -26,7 +28,7 @@ declare module "react/jsx-runtime" {
     interface IntrinsicAttributes { key?: unknown; }
     interface UIEvent {
       preventDefault(): void;
-      target: { value: string; checked: boolean };
+      target: { value: string; checked: boolean; files?: FileList | null };
     }
     interface IntrinsicProps {
       [property: string]: unknown;
@@ -41,7 +43,7 @@ declare module "react-dom/client" {
   export function createRoot(container: Element | DocumentFragment): {render(node: unknown): void};
 }
 declare module "@tanstack/react-query" {
-  export class QueryClient { constructor(config?: unknown); invalidateQueries(input?: unknown): Promise<void>; }
+  export class QueryClient { constructor(config?: unknown); invalidateQueries(input?: unknown): Promise<void>; setQueryData(queryKey: readonly unknown[], data: unknown): void; }
   export function QueryClientProvider(props: {client: QueryClient; children?: unknown}): unknown;
   export function useQuery<T>(options: {queryKey: readonly unknown[]; queryFn: () => Promise<T>; staleTime?: number; gcTime?: number; enabled?: boolean; retry?: number | boolean; refetchOnWindowFocus?: boolean; refetchInterval?: number}): {isPending: boolean; isError: boolean; isFetching: boolean; data: T; refetch(): Promise<unknown>};
   export function useQueryClient(): QueryClient;

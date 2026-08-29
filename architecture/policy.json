@@ -115,6 +115,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/userprofile",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/platform/advertising",
       "kind": "platform_capability"
     },
@@ -460,6 +464,10 @@
     },
     {
       "path": "internal/platform/postgres/uploadrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/userprofilerepo",
       "kind": "infrastructure_adapter"
     },
     {

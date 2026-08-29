@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/catalog"
+	coreorders "github.com/torgnexa/torgnexa/internal/core/orders"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	builtins "github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
@@ -22,6 +23,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectormaprepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
@@ -32,6 +34,7 @@ type reconciliationActionExecutor struct {
 	accounts      *connectorrepo.Repository
 	mappings      *connectormaprepo.Repository
 	catalog       *catalogrepo.Repository
+	orders        *ordersrepo.Repository
 	approvals     *approvalrepo.Repository
 	notifications *notificationrepo.Repository
 	secrets       secrets.SecretProvider
@@ -39,11 +42,11 @@ type reconciliationActionExecutor struct {
 	registry      *runtimeRegistry
 }
 
-func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
-	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || refreshCoordinator == nil || registry == nil {
+func newReconciliationActionExecutor(syncRepo syncengine.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, orderRepository *ordersrepo.Repository, approvals *approvalrepo.Repository, notificationRepository *notificationrepo.Repository, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry) (*reconciliationActionExecutor, error) {
+	if syncRepo == nil || accounts == nil || mappings == nil || catalogRepository == nil || orderRepository == nil || approvals == nil || notificationRepository == nil || secretSource == nil || refreshCoordinator == nil || registry == nil {
 		return nil, errors.New("worker: reconciliation action dependencies required")
 	}
-	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, oauthRefresh: refreshCoordinator, registry: registry}, nil
+	return &reconciliationActionExecutor{syncRepo: syncRepo, accounts: accounts, mappings: mappings, catalog: catalogRepository, orders: orderRepository, approvals: approvals, notifications: notificationRepository, secrets: secretSource, oauthRefresh: refreshCoordinator, registry: registry}, nil
 }
 
 type actionContext struct {

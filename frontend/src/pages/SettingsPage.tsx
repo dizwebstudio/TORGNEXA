@@ -35,6 +35,11 @@ function profileForDisplay(session: AuthSession): UserProfile {
   return {...demoProfile, ...claimed};
 }
 
+function profileDisplayName(profile: UserProfile, fallback: string): string {
+  const fullName = [profile.givenName, profile.familyName].filter(Boolean).join(" ").trim();
+  return fullName || profile.username || fallback;
+}
+
 function formatBirthdate(value?: string): string {
   if (!value) return "Не указана в профиле OIDC";
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00Z`) : new Date(value);
@@ -118,15 +123,14 @@ export function SettingsPage() {
     };
   }, []);
   const session = auth.session;
-  if (!session) return null;
-  const isAdmin = session.roles?.includes("admin") ?? false;
-  const roles = session.roles?.length ? session.roles : [];
-  const capabilities = [...new Set(session.capabilities)];
+  const isAdmin = session?.roles?.includes("admin") ?? false;
+  const roles = session?.roles?.length ? session.roles : [];
+  const capabilities = [...new Set(session?.capabilities ?? [])];
   const canReadProfile = capabilities.includes("settings.profile.read");
   const canWriteProfile = capabilities.includes("settings.profile.write");
   const profileQuery = useQuery({queryKey: ["settings", "profile"], enabled: canReadProfile, queryFn: async () => decodeUserProfile((await api.getCurrentUserProfile()).body), staleTime: 30_000});
   const remoteProfile = profileQuery.data;
-  const sessionProfile = profileForDisplay(session);
+  const sessionProfile = session ? profileForDisplay(session) : {};
   const profile = remoteProfile ? {...sessionProfile, ...profileFromBackend(remoteProfile)} : sessionProfile;
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState<EditableUserProfile>({given_name: "", family_name: "", birthdate: "", job_title: "", department: "", phone_number: ""});
@@ -154,10 +158,12 @@ export function SettingsPage() {
     if (!remoteProfile) throw new Error("Профиль ещё загружается");
     return api.deleteCurrentUserAvatar({idempotencyKey: crypto.randomUUID(), body: {version: remoteProfile.version}});
   }, onSuccess: (response) => queryClient.setQueryData(["settings", "profile"], decodeUserProfile(response.body))});
+  const privacyRequest = useMutation({mutationFn: async (requestType: "access" | "export" | "deletion") => api.createCurrentUserProfilePrivacyRequest({idempotencyKey: crypto.randomUUID(), body: {request_type: requestType}})});
   const primaryRole = roles.find((role) => roleLabels[role]) ?? roles[0];
   const roleTitle = primaryRole ? roleLabels[primaryRole] ?? primaryRole : "Участник рабочего пространства";
   const groupedCapabilities = accessGroups.map((group) => ({...group, items: capabilities.filter((capability) => capabilityGroupFor(capability) === group.id)})).filter((group) => group.items.length > 0);
   const deleteDemo = useMutation({mutationFn:async()=>api.createApprovalRequest({idempotencyKey:crypto.randomUUID(),body:{action:"demo.dataset.delete",resource_type:"demo_dataset",resource_id:"",risk:"write_sensitive"}}),onSuccess:async()=>{await Promise.all([queryClient.invalidateQueries({queryKey:["approvals"]}),queryClient.invalidateQueries({queryKey:["audit"]})]);}});
+  if (!session) return null;
 
   return <Page eyebrow="УЧЁТНАЯ ЗАПИСЬ" title="Настройки" description="Профиль и безопасность текущей OIDC-сессии. Пароль остаётся у провайдера идентификации и никогда не передаётся TORGNEXA.">
     {auth.error ? <ErrorBlock>{auth.error}</ErrorBlock> : null}
@@ -167,7 +173,7 @@ export function SettingsPage() {
     <div id="settings-panel-general" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-general" tabIndex={0} hidden={activeTab !== "general"}>
       <div className="settings-grid">
       <section className="panel settings-card profile-card">
-        <div className="profile-hero"><UserAvatar session={session} profile={profile} className="settings-avatar"/><div className="profile-hero-copy"><p className="eyebrow">Профиль пользователя</p><h2>{session.displayName}</h2><p className="profile-title">{profile.jobTitle ?? roleTitle}</p><div className="profile-badges"><span>{roleTitle}</span><span>{profile.username ? `@${profile.username}` : "Профиль пользователя"}</span></div></div><div className="profile-hero-actions">{canWriteProfile && remoteProfile ? <button type="button" className="button ghost compact" onClick={() => setEditingProfile((value) => !value)}>{editingProfile ? "Закрыть" : "Изменить профиль"}</button> : null}</div></div>
+        <div className="profile-hero"><UserAvatar session={session} profile={profile} className="settings-avatar"/><div className="profile-hero-copy"><p className="eyebrow">Профиль пользователя</p><h2>{profileDisplayName(profile, session.displayName)}</h2><p className="profile-title">{profile.jobTitle ?? roleTitle}</p><div className="profile-badges"><span>{roleTitle}</span><span>{profile.username ? `@${profile.username}` : "Профиль пользователя"}</span></div></div><div className="profile-hero-actions">{canWriteProfile && remoteProfile ? <button type="button" className="button ghost compact" onClick={() => setEditingProfile((value) => !value)}>{editingProfile ? "Закрыть" : "Изменить профиль"}</button> : null}</div></div>
         {canWriteProfile && remoteProfile ? <div className="profile-avatar-actions"><input ref={avatarInput} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) avatarMutation.mutate(file); }}/><button type="button" className="button ghost compact" disabled={avatarMutation.isPending || removeAvatar.isPending} onClick={() => avatarInput.current?.click()}>{avatarMutation.isPending ? "Проверяем фото…" : "Загрузить фото"}</button>{remoteProfile.picture_source === "uploaded" ? <button type="button" className="button ghost compact" disabled={avatarMutation.isPending || removeAvatar.isPending} onClick={() => removeAvatar.mutate()}>Удалить фото</button> : null}<small>PNG, JPEG или GIF · до 5 МБ · фото проходит проверку безопасности</small></div> : null}
         {editingProfile && remoteProfile ? <form className="profile-editor" onSubmit={(event) => { event.preventDefault(); updateProfile.mutate(); }}><div className="settings-form"><label className="field"><span>Имя</span><input value={profileDraft.given_name} maxLength={160} autoComplete="given-name" onChange={(event) => setProfileDraft((current) => ({...current, given_name: event.target.value}))}/></label><label className="field"><span>Фамилия</span><input value={profileDraft.family_name} maxLength={160} autoComplete="family-name" onChange={(event) => setProfileDraft((current) => ({...current, family_name: event.target.value}))}/></label><label className="field"><span>Дата рождения</span><input type="date" value={profileDraft.birthdate} onChange={(event) => setProfileDraft((current) => ({...current, birthdate: event.target.value}))}/></label><label className="field"><span>Должность</span><input value={profileDraft.job_title} maxLength={160} autoComplete="organization-title" onChange={(event) => setProfileDraft((current) => ({...current, job_title: event.target.value}))}/></label><label className="field"><span>Отдел</span><input value={profileDraft.department} maxLength={160} autoComplete="organization" onChange={(event) => setProfileDraft((current) => ({...current, department: event.target.value}))}/></label><label className="field"><span>Телефон</span><input value={profileDraft.phone_number} maxLength={64} autoComplete="tel" onChange={(event) => setProfileDraft((current) => ({...current, phone_number: event.target.value}))}/></label></div><div className="profile-editor-actions"><button type="button" className="button ghost" onClick={() => { setProfileDraft(editableFromBackend(remoteProfile)); setEditingProfile(false); }}>Отмена</button><button type="submit" className="button primary" disabled={updateProfile.isPending}>{updateProfile.isPending ? "Сохраняем…" : "Сохранить профиль"}</button></div></form> : null}
         <dl className="settings-facts profile-facts">
@@ -179,6 +185,9 @@ export function SettingsPage() {
           <div><dt>Сессия действует до</dt><dd>{formatExpiry(session.expiresAt)}</dd></div>
         </dl>
         <p className="settings-note profile-source-note">Имя пользователя и электронная почта синхронизируются с Keycloak. Личные данные, фото, версии изменений и результаты проверки изображения хранятся в TORGNEXA в текущем рабочем пространстве.</p>
+        {canWriteProfile && remoteProfile ? <div className="profile-privacy-actions"><div><strong>Ваши данные</strong><small>Запрос на выгрузку или удаление проходит через защищённый privacy-workflow.</small></div><div className="profile-privacy-buttons"><button type="button" className="button ghost compact" disabled={privacyRequest.isPending} onClick={() => privacyRequest.mutate("export")}>Запросить выгрузку</button><button type="button" className="button danger compact" disabled={privacyRequest.isPending} onClick={() => { if (window.confirm("Создать запрос на удаление профиля и доступа к workspace?")) privacyRequest.mutate("deletion"); }}>Запросить удаление</button></div></div> : null}
+        {privacyRequest.isSuccess ? <p className="settings-note">Запрос принят и поставлен в очередь privacy-workflow.</p> : null}
+        {privacyRequest.isError ? <ErrorBlock retry={() => privacyRequest.reset()}>Не удалось создать запрос по персональным данным.</ErrorBlock> : null}
         {profileQuery.isError ? <ErrorBlock retry={() => void profileQuery.refetch()}>Не удалось загрузить сохранённый профиль.</ErrorBlock> : null}
         {updateProfile.isError ? <ErrorBlock retry={() => updateProfile.reset()}>Не удалось сохранить профиль. Обновите данные и повторите.</ErrorBlock> : null}
         {avatarMutation.isError ? <ErrorBlock retry={() => avatarMutation.reset()}>Не удалось загрузить фото. Проверьте формат, размер и результат проверки безопасности.</ErrorBlock> : null}

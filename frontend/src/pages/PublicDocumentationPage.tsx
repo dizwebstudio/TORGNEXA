@@ -1,4 +1,4 @@
-import type {ReactNode} from "react";
+import {useEffect, type ReactNode} from "react";
 import {connectorCatalog} from "../generated/connector-catalog";
 
 export const documentationSections = [
@@ -14,13 +14,76 @@ export const documentationSections = [
   ["control", "Согласования и документы"],
   ["monitoring", "Уведомления, отчёты и аудит"],
   ["settings", "Настройки"],
-  ["automation", "AI, MCP и плагины"],
+  ["automation", "Автоматизация и расширения"],
   ["developer", "API и расширения"],
   ["security", "Доступ и безопасность"],
   ["environment", "Переменные .env"],
   ["operations", "Эксплуатация"],
   ["troubleshooting", "Решение проблем"],
 ] as const;
+
+const documentationNavigation = [
+  {title: "Начало", items: [documentationSections[0], documentationSections[1], documentationSections[2]]},
+  {title: "Операционная работа", items: [documentationSections[3], documentationSections[4], documentationSections[5], documentationSections[6], documentationSections[7], documentationSections[8], documentationSections[9]]},
+  {title: "Администрирование и поддержка", items: [documentationSections[10], documentationSections[11], documentationSections[12], documentationSections[14], documentationSections[15], documentationSections[16], documentationSections[17]]},
+  {title: "Для разработчиков", items: [documentationSections[13]]},
+] as const;
+
+const docsTitle = "Документация TORGNEXA — интеграции, каталог и синхронизация";
+const docsDescription = "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, управление каталогом, заказами и синхронизацией.";
+
+function DocumentationMetadata() {
+  useEffect(() => {
+    const previousTitle = document.title;
+    const managed: Array<{element: HTMLMetaElement | HTMLLinkElement; previous: string | null; attribute: "content" | "href"; created: boolean}> = [];
+    const setHeadValue = (tag: "meta" | "link", selector: string, attribute: "content" | "href", value: string, attributes: Record<string, string>) => {
+      let element = document.head.querySelector(selector) as HTMLMetaElement | HTMLLinkElement | null;
+      const created = !element;
+      if (!element) {
+        element = document.createElement(tag) as HTMLMetaElement | HTMLLinkElement;
+        Object.entries(attributes).forEach(([name, attributeValue]) => element!.setAttribute(name, attributeValue));
+        document.head.appendChild(element);
+      }
+      managed.push({element, previous: element.getAttribute(attribute), attribute, created});
+      element.setAttribute(attribute, value);
+    };
+
+    document.title = docsTitle;
+    setHeadValue("meta", 'meta[name="description"]', "content", docsDescription, {name: "description"});
+    setHeadValue("meta", 'meta[property="og:title"]', "content", docsTitle, {property: "og:title"});
+    setHeadValue("meta", 'meta[property="og:description"]', "content", docsDescription, {property: "og:description"});
+    setHeadValue("meta", 'meta[property="og:type"]', "content", "article", {property: "og:type"});
+    setHeadValue("meta", 'meta[property="og:locale"]', "content", "ru_RU", {property: "og:locale"});
+    setHeadValue("meta", 'meta[property="og:url"]', "content", `${window.location.origin}/docs`, {property: "og:url"});
+    setHeadValue("meta", 'meta[name="twitter:card"]', "content", "summary", {name: "twitter:card"});
+    setHeadValue("link", 'link[rel="canonical"]', "href", `${window.location.origin}/docs`, {rel: "canonical"});
+
+    const structuredData = document.createElement("script");
+    structuredData.type = "application/ld+json";
+    structuredData.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      headline: docsTitle,
+      description: docsDescription,
+      inLanguage: "ru-RU",
+      url: `${window.location.origin}/docs`,
+      mainEntityOfPage: `${window.location.origin}/docs`,
+      publisher: {"@type": "Organization", name: "TORGNEXA"},
+    });
+    document.head.appendChild(structuredData);
+
+    return () => {
+      document.title = previousTitle;
+      managed.reverse().forEach(({element, previous, attribute, created}) => {
+        if (created) element.remove();
+        else if (previous === null) element.removeAttribute(attribute);
+        else element.setAttribute(attribute, previous);
+      });
+      structuredData.remove();
+    };
+  }, []);
+  return null;
+}
 
 type RuntimeEntry = (typeof connectorCatalog)[number];
 type RuntimeFilter = (entry: RuntimeEntry) => boolean;
@@ -87,7 +150,7 @@ function IntegrationConnectionGuide() {
 
     <h3>Рабочие шаблоны текущих карточек</h3>
     <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Карточка</th><th>Учётные данные</th><th>Параметры среды / результат проверки</th></tr></thead><tbody>
-      <tr><td><strong>1С-Битрикс</strong></td><td><code>{`{ user_id, webhook_code }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>catalog_iblock_id</code>, <code>store_currency</code>; товары read/write.</td></tr>
+      <tr><td><strong>1С-Битрикс</strong></td><td><code>{`{ user_id, webhook_code }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>catalog_iblock_id</code>, <code>store_currency</code>, <code>price_type_id</code>; товары read/write, регулярные цены на запись.</td></tr>
       <tr><td><strong>CS-Cart</strong></td><td><code>{`{ email, api_key }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>store_currency</code>; официальный REST API 2.0, товары read/write.</td></tr>
       <tr><td><strong>OpenCart</strong></td><td>Bearer token модуля TORGNEXA</td><td><code>store_host</code>, <code>base_path</code>, <code>store_currency</code>; сначала установите <code>torgnexa.ocmod.zip</code> — он добавляет <code>extension/torgnexa/api/*</code>, затем доступны товары read/write.</td></tr>
       <tr><td><strong>Shopify</strong></td><td>OAuth client JSON</td><td><code>shop_domain</code>, <code>store_currency</code>; OAuth с host-owned refresh, товары read/write.</td></tr>
@@ -95,16 +158,29 @@ function IntegrationConnectionGuide() {
       <tr><td><strong>Telegram / MAX</strong></td><td>Токен бота</td><td>Числовой <code>chat_id</code> в параметрах среды; рабочий сценарий — текстовые публикации, лимиты 4096 / 4000.</td></tr>
       <tr><td><strong>СДЭК / Деловые Линии / ПЭК / 5Post / Ozon Доставка / Почта России</strong></td><td>JSON учётных данных провайдера</td><td>Создание кабинета и официальная проверка доступности; отправления, тарифы и этикетки не включаются автоматически.</td></tr>
       <tr><td><strong>СБП / YooKassa / Robokassa</strong></td><td>JSON учётных данных провайдера</td><td>Отдельный раздел «Финансы»; разрешения различаются, возврат доступен только при <code>payments.refund</code>.</td></tr>
+      <tr><td><strong>Долями</strong></td><td>Логин/пароль и mTLS-сертификат</td><td>Платёжная карточка только для проверки доступности; Create, Commit, Cancel, Info, Refund и вебхуки пока не включены.</td></tr>
     </tbody></table></div>
     <Callout title="Не угадывайте формат JSON" tone="warning">Подсказка placeholder в drawer является частью контракта карточки. Если провайдер требует поля, которых нет в подсказке, сначала обновите manifest/connector spec и квалификацию, а не обходите форму произвольным payload.</Callout>
 
     <h3>Что означает «только проверка доступности»</h3>
-    <p>Lamoda, М.Видео, Auto.ru, Avito, CIAN, Chestny ZNAK, Diadoc, EGAIS, Instagram, Odnoklassniki, RUTUBE, Saby EDO, Threads, VetIS/Mercury, VK и YouTube сейчас можно подключить в своей категории, сохранить учётные данные и проверить официальный адрес API. Это подтверждает доступ к API, но не включает синхронизацию товаров, цены, остатки, заказы, публикацию, сообщения, ЭДО или регулируемую запись; рабочая связка появится только после отдельной квалификации.</p>
+    <p>«Долями», Lamoda, М.Видео, Auto.ru, Avito, CIAN, Chestny ZNAK, Diadoc, EGAIS, Instagram, Odnoklassniki, RUTUBE, Saby EDO, Threads, VetIS/Mercury, VK и YouTube сейчас можно подключить в своей категории, сохранить учётные данные и проверить официальный адрес API. Это подтверждает доступ к API, но не включает синхронизацию товаров, цены, остатки, заказы, публикацию, сообщения, ЭДО или регулируемую запись; рабочая связка появится только после отдельной квалификации.</p>
   </>;
 }
 
+function IntegrationQualificationGuides() {
+  return <div className="docs-qualification-guides">
+    <div className="docs-subsection-heading"><div><h3>Отдельные инструкции для storefront</h3><p>Эти стенды нужны для protocol smoke и qualification. Они не заменяют настройку рабочего кабинета и не должны получать боевые секреты.</p></div><span>6 инструкций</span></div>
+    <details id="opencart-smoke" className="docs-details"><summary><strong>OpenCart</strong><span>OCMOD bridge, каталог, цены, остатки и заказы</span><i aria-hidden="true">+</i></summary><OpenCartDockerGuide/></details>
+    <details id="woocommerce-smoke" className="docs-details"><summary><strong>WooCommerce</strong><span>REST API и проверка синтетической витрины</span><i aria-hidden="true">+</i></summary><WooCommerceDockerGuide/></details>
+    <details id="prestashop-smoke" className="docs-details"><summary><strong>PrestaShop</strong><span>Webservice API и проверка каталога</span><i aria-hidden="true">+</i></summary><PrestaShopDockerGuide/></details>
+    <details id="saleor-smoke" className="docs-details"><summary><strong>Saleor</strong><span>GraphQL API, channel и warehouse</span><i aria-hidden="true">+</i></summary><SaleorDockerGuide/></details>
+    <details id="shopify-smoke" className="docs-details"><summary><strong>Shopify</strong><span>Protocol smoke и Dev Store qualification</span><i aria-hidden="true">+</i></summary><ShopifyDockerGuide/></details>
+    <details id="shopware-smoke" className="docs-details"><summary><strong>Shopware 6</strong><span>Admin API и OAuth2 client credentials</span><i aria-hidden="true">+</i></summary><ShopwareDockerGuide/></details>
+  </div>;
+}
+
 function OpenCartDockerGuide() {
-  return <div className="docs-opencart-guide" id="opencart-smoke">
+  return <div className="docs-opencart-guide">
     <h3>OpenCart: проверка bridge в Docker Compose</h3>
     <p>Для проверки интеграции без внешнего магазина используйте изолированный стенд OpenCart 4.1.0.4 + MariaDB. Он собирается из <code>docker-compose.opencart-test.yml</code>, устанавливает модуль <code>torgnexa.ocmod.zip</code> из текущих исходников и загружает синтетические товары и заказ. Повторный запуск <code>up</code> с сохранённым томом восстанавливает конфигурацию и не запускает установку из командной строки заново. Рабочие ключи в стенд не попадают.</p>
     <ol className="docs-steps compact">
@@ -126,7 +202,7 @@ function OpenCartDockerGuide() {
 }
 
 function WooCommerceDockerGuide() {
-  return <div className="docs-opencart-guide" id="woocommerce-smoke">
+  return <div className="docs-opencart-guide">
     <h3>WooCommerce: проверка REST API в Docker Compose</h3>
     <p>Для проверки WooCommerce без внешнего магазина используйте изолированный стенд WordPress 6.8.2 + WooCommerce 9.8.5 + MariaDB. Он создаёт синтетический каталог, заказ и отдельную тестовую пару Consumer Key/Consumer Secret. REST-запросы идут по TLS с самоподписанным сертификатом только внутри локального стенда.</p>
     <ol className="docs-steps compact">
@@ -148,7 +224,7 @@ function WooCommerceDockerGuide() {
 }
 
 function PrestaShopDockerGuide() {
-  return <div className="docs-opencart-guide" id="prestashop-smoke">
+  return <div className="docs-opencart-guide">
     <h3>PrestaShop: проверка Webservice API в Docker Compose</h3>
     <p>Для проверки PrestaShop без внешнего магазина используйте изолированный стенд на официальном образе PrestaShop 8.1 + MariaDB. Скрипт инициализации включает штатный Webservice API, создаёт синтетические товары и ограниченный ключ API. Чтения идут через официальный вывод JSON, записи — через XML PATCH; рабочие учётные данные в стенд не попадают.</p>
     <ol className="docs-steps compact">
@@ -170,7 +246,7 @@ function PrestaShopDockerGuide() {
 }
 
 function SaleorDockerGuide() {
-  return <div className="docs-opencart-guide" id="saleor-smoke">
+  return <div className="docs-opencart-guide">
     <h3>Saleor: проверка GraphQL API в Docker Compose</h3>
     <p>Для проверки Saleor без внешнего магазина используйте изолированный официальный образ Saleor Platform 3.23, PostgreSQL и Valkey. Bootstrap выполняет миграции и загружает демо-каталог с локальным администратором; Dashboard, worker и storefront выключены, чтобы не перегружать небольшую VPS.</p>
     <ol className="docs-steps compact">
@@ -190,7 +266,7 @@ function SaleorDockerGuide() {
 }
 
 function ShopifyDockerGuide() {
-  return <div className="docs-opencart-guide" id="shopify-smoke">
+  return <div className="docs-opencart-guide">
     <h3>Shopify: protocol smoke и Dev Store qualification</h3>
     <p>Shopify — SaaS и не поставляет self-hosted Docker-магазин. Поэтому локальный Compose запускает только stateful protocol double для проверки Admin REST request/response shapes, авторизации, записей и reconciliation. Это не merchant store.</p>
     <ol className="docs-steps compact">
@@ -209,7 +285,7 @@ function ShopifyDockerGuide() {
 }
 
 function ShopwareDockerGuide() {
-  return <div className="docs-opencart-guide" id="shopware-smoke">
+  return <div className="docs-opencart-guide">
     <h3>Shopware 6: проверка Admin API в Docker Compose</h3>
     <p>Shopware использует Admin API под <code>/api/*</code> и OAuth2 <code>client_credentials</code> для Integration. Disposable Compose-стенд на loopback использует community-образ Dockware с демо-каталогом; это не production-магазин и не merchant staging.</p>
     <ol className="docs-steps compact">
@@ -294,6 +370,7 @@ const environmentGroups = [
       ["TORGNEXA_API_PORT", "8080", "REST API TORGNEXA."],
       ["TORGNEXA_MCP_PORT", "8090", "MCP transport."],
       ["TORGNEXA_FRONTEND_PORT", "5173", "Web-интерфейс TORGNEXA."],
+      ["TORGNEXA_PUBLIC_URL", "http://127.0.0.1:5173", "Публичный HTTPS-адрес для canonical, Open Graph и sitemap. В production замените на реальный домен."],
       ["TORGNEXA_DOCKER_NETWORK_MTU", "1376", "MTU внутренней Docker-сети. Увеличивайте только если путь до внешних API гарантированно поддерживает большее значение."],
     ],
   },
@@ -372,18 +449,21 @@ function EnvironmentTables() {
 
 export function PublicDocumentationPage() {
   return <div className="docs-shell">
+    <DocumentationMetadata/>
     <header className="docs-header">
       <a className="docs-brand" href="/"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Документация</small></span></a>
       <nav aria-label="Навигация документации"><a href="#start">Руководство</a><a className="docs-login-link" href="/">Войти</a></nav>
     </header>
     <div className="docs-layout">
-      <aside className="docs-toc" aria-label="Содержание"><strong>Содержание</strong>{documentationSections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</aside>
+      <nav className="docs-toc" aria-label="Разделы документации"><strong>Содержание</strong>{documentationNavigation.map(group => <div className="docs-toc-group" key={group.title}><span>{group.title}</span>{group.items.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div>)}</nav>
       <main className="docs-content">
         <section className="docs-hero" id="start">
+          <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><span>Документация</span></nav>
           <div className="docs-version"><span>Руководство пользователя</span><span>Текущий интерфейс</span></div>
-          <h1>Как работать в TORGNEXA</h1>
-          <p className="docs-lead">Актуальное руководство по ежедневной работе: от первого входа и подключения маркетплейса до сверки данных, согласований и контроля безопасности.</p>
-          <div className="docs-hero-actions"><a className="button primary" href="/">Войти в TORGNEXA</a><a className="button secondary" href="#interface">Изучить интерфейс</a></div>
+          <h1>Документация TORGNEXA</h1>
+          <p className="docs-lead">Понятное руководство для e-commerce-команд: как подключить маркетплейс, интернет-магазин, платежи или CRM, работать с каталогом и заказами и безопасно запускать синхронизацию.</p>
+          <div className="docs-hero-actions"><a className="button primary" href="/">Войти в TORGNEXA</a><a className="button secondary" href="#interface">С чего начать</a></div>
+          <div className="docs-reading-paths" aria-label="Сценарии чтения"><a href="#interface"><strong>Я впервые в TORGNEXA</strong><span>Вход, роли и навигация</span></a><a href="#integrations"><strong>Подключаю интеграцию</strong><span>Кабинет, проверка и импорт</span></a><a href="#environment"><strong>Разворачиваю Community</strong><span>.env, Docker и эксплуатация</span></a><a href="#developer"><strong>Интегрирую по API</strong><span>Контракты и расширения</span></a></div>
           <div className="docs-install-address"><span>Адрес локальной установки</span><code>http://127.0.0.1:5173</code></div>
         </section>
 
@@ -452,12 +532,7 @@ export function PublicDocumentationPage() {
           <RuntimeMatrix/>
           <figure><img src="/docs/integrations.png" alt="Раздел «Интеграции» TORGNEXA с карточками подключения"/><figcaption>Экран каталога: карточка провайдера ведёт к подключению кабинета и проверке доступа.</figcaption></figure>
           <IntegrationConnectionGuide/>
-          <OpenCartDockerGuide/>
-          <WooCommerceDockerGuide/>
-          <PrestaShopDockerGuide/>
-          <SaleorDockerGuide/>
-          <ShopifyDockerGuide/>
-          <ShopwareDockerGuide/>
+          <IntegrationQualificationGuides/>
           <figure><img src="/docs/integration-connection.png" alt="Пошаговое подключение кабинета интеграции TORGNEXA"/><figcaption>Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта.</figcaption></figure>
           <p>Для OAuth-подключения нажмите «Войти». Токен доступа обновляется сервером автоматически до истечения срока. Повторный вход требуется только если площадка отозвала доступ, отклонила токен обновления или не выдала его; карточка кабинета покажет «Войти снова».</p>
           <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур ограничен товарами и явно указанными направлениями синхронизации. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>
@@ -478,8 +553,8 @@ export function PublicDocumentationPage() {
 
         <DocSection id="master-data" title="Контрагенты и финансы" intro="Единые справочники не позволяют разным модулям создавать противоречивые версии одной сущности.">
           <div className="docs-split"><div><h3>Контрагенты</h3><p>Ищите юридическое лицо по каноническому справочнику и проверяйте его роли: покупатель, поставщик или партнёр. ERP, ЭДО, платежи и закупки ссылаются на эту запись.</p></div><div><h3>Финансы</h3><p>Вкладки «Расчёты», «Курсы валют» и «Платежи» показывают журнал продаж, комиссий, возвратов, выплат, официальные FX-факты и операции платёжных шлюзов. Конвертация использует сохранённый источник и точный курс; исправления оформляются корректирующими записями.</p></div></div>
-          <p>В текущей рабочей среде платёжные операции доступны для СБП, YooKassa и Robokassa: создание, статус и сверка. Возврат разрешается только шлюзам с правом <code>payments.refund</code>; у Robokassa возврат на уровне продавца намеренно не заявлен. Ozon Pay пока ограничен проверкой Seller API.</p>
-          <p>Для входящих уведомлений используйте <code>POST /api/v1/webhooks/payments/&#123;connector_id&#125;/&#123;organization_id&#125;/&#123;workspace_id&#125;/&#123;account_id&#125;</code>. Это публичный callback без пользовательской сессии: сервер проверяет активный платёжный кабинет, повторно подтверждает состояние у провайдера, записывает свидетельство и применяет переход ровно один раз. Провайдер получает унифицированный <code>200</code> при ошибке до проверки, а тело callback не считается источником статуса.</p>
+          <p>В текущей рабочей среде платёжные операции доступны для СБП, YooKassa и Robokassa: создание, статус и сверка. Возврат разрешается только шлюзам с правом <code>payments.refund</code>; у Robokassa возврат на уровне продавца намеренно не заявлен. Ozon Pay пока ограничен проверкой Seller API, а «Долями» — проверкой настроенного API endpoint; для «Долями» дополнительно требуется mTLS-сертификат.</p>
+          <p>Для входящих уведомлений используйте <code>POST /api/v1/webhooks/payments/&#123;connector_id&#125;/&#123;organization&#95;id&#125;/&#123;workspace&#95;id&#125;/&#123;account_id&#125;</code>. Это публичный callback без пользовательской сессии: сервер проверяет активный платёжный кабинет, повторно подтверждает состояние у провайдера, записывает свидетельство и применяет переход ровно один раз. Провайдер получает унифицированный <code>200</code> при ошибке до проверки, а тело callback не считается источником статуса.</p>
         </DocSection>
 
         <DocSection id="control" title="Согласования, сертификаты и документы" intro="Чувствительные и юридически значимые действия отделены от обычного редактирования данных.">
@@ -493,11 +568,22 @@ export function PublicDocumentationPage() {
         </DocSection>
 
         <DocSection id="monitoring" title="Уведомления, отчёты и аудит" intro="Три раздела отвечают за оперативную реакцию, анализ и доказуемость действий.">
-          <div className="docs-tab-guide"><article><strong>Уведомления</strong><span>Ошибки, предупреждения и системные события с признаком прочтения.</span></article><article><strong>Отчёты</strong><span>Периоды 7, 30 и 90 дней, поиск, графики, CSV/PDF и доступная AI-аналитика.</span></article><article><strong>Аудит</strong><span>Append-only история привилегированных изменений с субъектом, временем и результатом.</span></article><article><strong>Realtime</strong><span>SSE сообщает об изменениях и обновляет уже разрешённые запросы без копирования бизнес-данных.</span></article></div>
+          <div className="docs-tab-guide"><article><strong>Уведомления</strong><span>Ошибки, предупреждения и системные события с признаком прочтения.</span></article><article><strong>Отчёты</strong><span>Периоды 7, 30 и 90 дней, поиск, графики, CSV/PDF и доступная AI-аналитика.</span></article><article><strong>Аудит</strong><span>Append-only история привилегированных изменений с субъектом, временем и результатом.</span></article><article><strong>Realtime</strong><span>Аутентифицированный SSE передаёт только heartbeat и сигналы инвалидации; данные перечитываются обычными API.</span></article></div>
           <p>Экспорт отчёта сохраняет выбранные фильтры. PDF создаётся сервером и скачивается готовым файлом. Аналитические проекции могут обновляться с небольшой задержкой и не являются транзакционной истиной.</p>
+          <p>Поток <code>GET /api/v1/realtime</code> доступен только при разрешении <code>operations.realtime.read</code>. Browser coalesces burst-инвалидации в окне 150 мс и не помещает в SSE payload товары, заказы, аудит или PII; после сигнала интерфейс повторно запрашивает только разрешённые данные.</p>
         </DocSection>
 
         <DocSection id="settings" title="Настройки" intro="Настройки разделены на семь вкладок; состав доступных действий зависит от роли администратора.">
+          <FeatureGrid items={[
+            ["Профиль пользователя", "Имя, фамилия, дата рождения, должность, отдел и телефон редактируются версионно; username и email остаются данными провайдера входа."],
+            ["Фото профиля", "PNG, JPEG или GIF до 5 МБ проходят карантин и проверку безопасности до привязки к профилю."],
+            ["Команда workspace", "Администратор приглашает участников, назначает роли, блокирует доступ и открывает профиль участника без раскрытия OIDC subject в интерфейсе."],
+            ["Privacy workflow", "Запросы доступа, выгрузки и удаления ставятся в защищённую очередь и не выполняются скрытой браузерной операцией."],
+          ]}/>
+          <p>Во вкладке «Основные» текущий пользователь видит роль, рабочее пространство, срок сессии и профиль. Изменение личных полей использует optimistic version и ключ идемпотентности; конфликт версии означает, что сначала нужно перечитать профиль.</p>
+          <p>Кнопка «Загрузить фото» принимает только PNG, JPEG или GIF размером до 5 МБ. Файл сначала получает статус карантина, затем проходит MIME/размер/содержимое-проверки; к профилю привязывается только выпущенный файл. «Удалить фото» снимает связь, но не обходит журнал и проверку версии.</p>
+          <p>Блок «Пользователи и роли» доступен при <code>settings.members.read</code>. Пользователь с <code>settings.members.write</code> может пригласить участника с ролью viewer, operator, manager или admin, изменить роль/статус и открыть его профиль. Поля username и email у участника доступны только для чтения; изменение профиля и блокировка последнего активного администратора защищены серверными правами и проверкой версии.</p>
+          <p>Запрос «Выгрузка» или «Удаление» персональных данных создаётся с ключом идемпотентности и попадает в durable privacy-workflow. Удаление требует явного подтверждения; успешный ответ означает постановку запроса в очередь, а не мгновенное удаление.</p>
           <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Вкладка</th><th>Что находится внутри</th></tr></thead><tbody>
             <tr><td><strong>Основные</strong></td><td>Профиль, способы входа, роли, рабочее пространство, подписка, участники, сессии, интеграции и провайдеры ИИ.</td></tr>
             <tr><td><strong>Провайдеры входа</strong></td><td>Корпоративный OIDC, проверка обнаружения конфигурации, правила сопоставления и активация.</td></tr>
@@ -510,8 +596,8 @@ export function PublicDocumentationPage() {
           <Callout title="Конфликт версии" tone="warning">Если другой администратор сохранил запись раньше, обновите данные, проверьте изменения и повторите операцию.</Callout>
         </DocSection>
 
-        <DocSection id="automation" title="AI, MCP, webhooks и плагины" intro="Автоматизация получает только явно выданные возможности и никогда не обходит серверные проверки.">
-          <ul><li><strong>Провайдеры ИИ</strong> включают Claude, DeepSeek, GigaChat, Kimi, OpenAI-совместимый, Qwen, YandexGPT и локальные Ollama, LM Studio, Open WebUI. Локальные серверы уже должны быть запущены; TORGNEXA не скачивает модели, не включает потоковую выдачу и вызовы инструментов.</li><li><strong>Политика передачи данных ИИ</strong> ограничивает классы данных, провайдеров, моделей, размер запроса и месячный лимит. Предварительная проверка редактирует чувствительные фрагменты и не отправляет тестовый запрос наружу.</li><li><strong>MCP-аккаунт</strong> получает одноразовый токен Bearer и ограниченный набор инструментов. В базовой сборке без настроенной политики управления <code>tools/list</code> пуст, а <code>tools/call</code> отклоняется.</li><li><strong>Аварийная остановка</strong> блокирует всех MCP-агентов рабочего пространства до явного возобновления.</li><li><strong>Вебхук</strong> доставляет выбранные события на HTTPS-адрес с подписью, повторными попытками и очередью ошибок, историей попыток и ручным повтором по идентификатору доставки.</li><li><strong>Плагин</strong> показывает запрошенные права, классы секретов и сетевые адреса; просмотр каталога ничего не устанавливает.</li></ul>
+        <DocSection id="automation" title="Автоматизация и расширения" intro="ИИ, MCP, webhooks и плагины получают только явно выданные возможности и никогда не обходят серверные проверки.">
+          <ul><li><strong>Провайдеры ИИ</strong> включают Claude, DeepSeek, GigaChat, Google Gemini, Grok (xAI), Kimi, OpenAI-совместимый, Qwen, YandexGPT и локальные Ollama, LM Studio, Open WebUI. Gemini использует официальный <code>generateContent</code> с ключом <code>x-goog-api-key</code>, Grok — xAI Chat Completions с Bearer; локальные серверы уже должны быть запущены.</li><li><strong>Ограничения ИИ</strong> одинаковы для hosted и local providers: только bounded non-streaming text completion, без скачивания моделей и без вызовов инструментов из этого контура.</li><li><strong>Политика передачи данных ИИ</strong> ограничивает классы данных, провайдеров, моделей, размер запроса и месячный лимит. Предварительная проверка редактирует чувствительные фрагменты и не отправляет тестовый запрос наружу.</li><li><strong>MCP-аккаунт</strong> получает одноразовый токен Bearer и ограниченный набор инструментов. В базовой сборке без настроенной политики управления <code>tools/list</code> пуст, а <code>tools/call</code> отклоняется.</li><li><strong>Аварийная остановка</strong> блокирует всех MCP-агентов рабочего пространства до явного возобновления.</li><li><strong>Вебхук</strong> доставляет выбранные события на HTTPS-адрес с подписью, повторными попытками и очередью ошибок, историей попыток и ручным повтором по идентификатору доставки.</li><li><strong>Плагин</strong> показывает запрошенные права, классы секретов и сетевые адреса; просмотр каталога ничего не устанавливает.</li></ul>
           <Callout title="ИИ не является привилегированным обходом">Даже действительный токен не отменяет границу рабочего пространства, разрешения, лимит запросов, класс риска, политику и согласование.</Callout>
         </DocSection>
 
@@ -521,6 +607,7 @@ export function PublicDocumentationPage() {
             ["SDK", "OpenAPI генерирует поддерживаемые клиенты Go, TypeScript и Python с политикой совместимости."],
             ["Вебхуки", "Исходящие события подписываются, доставляются с повторными попытками и сохраняют неизменяемую историю попыток."],
             ["n8n и MCP", "n8n остаётся внешней интеграцией; MCP/OpenClaw получают только scoped-инструменты и governed доступ."],
+            ["Профиль и privacy", "Профиль, аватар и запросы персональных данных доступны через tenant-scoped API с версией и идемпотентностью."],
           ]}/>
           <pre><code>GET  /api/v1/health{`\n`}GET  /api/v1/products?limit=25&amp;q=SKU-42{`\n`}POST /api/v1/webhook-subscriptions{`\n`}POST /mcp</code></pre>
           <p>Для мутаций используйте idempotency key и обрабатывайте 401/403/409/429 явно. В событиях и webhook envelope не передавайте access token, приватные ключи, полные платёжные данные или лишние PII.</p>
@@ -561,6 +648,10 @@ export function PublicDocumentationPage() {
           <p>Для рабочей среды используйте защищённый ручной процесс SSH по точному тегу: GitHub Environment с проверяющим, закреплённый <code>known_hosts</code>, отдельный рабочий слой, TLS-шлюз, внешнее хранилище секретов и проверку доступности после переключения релиза. Community Compose остаётся локальным эталоном для одного узла и не превращается в HA- или CDN-топологию.</p>
           <ol><li>Подготовьте рабочий <code>.env</code> с правами <code>0600</code> и без идентификаторов разработки OIDC.</li><li>Проверьте резервное копирование, восстановление и откат до первого развёртывания.</li><li>Запустите только вручную одобренный точный тег и дождитесь проверки API.</li><li>При неуспешной проверке доступности вернитесь на предыдущий выпуск и сохраните свидетельство.</li></ol>
           <Callout title="Перед обновлением" tone="warning">Сделайте резервную копию, проверьте миграции и отрепетируйте восстановление. Один только факт создания backup не подтверждает его пригодность.</Callout>
+          <h3>Авторизованная проверка Community через браузер</h3>
+          <p>После запуска стека выполните <code>make community-e2e</code>. Проверка использует чистый браузерный профиль и синтетического пользователя <code>demo</code>, проходит настоящий authorization-code flow через Keycloak, проверяет каталог, изображения товара, заказы, редактирование и восстановление профиля участника, а также постановку privacy export-запроса в очередь.</p>
+          <pre><code>make community-up{`\n`}make community-e2e{`\n`}make community-down</code></pre>
+          <Callout title="E2E не удаляет демо-профиль" tone="info">Повторяемая проверка намеренно не запускает destructive deletion: после неё синтетическая учётная запись нужна для остальных assertions. При ошибке диагностический screenshot сохраняется вне репозитория.</Callout>
         </DocSection>
 
         <DocSection id="troubleshooting" title="Решение проблем" intro="Начните с симптома, затем проверяйте ближайшую границу: сессию, права, API или внешний коннектор.">

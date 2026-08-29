@@ -109,6 +109,7 @@ func (page *shopwareSearchPage[T]) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
 type shopwareStateMachineState struct {
 	TechnicalName string `json:"technicalName"`
 }
@@ -139,6 +140,7 @@ func (order *shopwareOrder) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
 type shopwareCalculatedPrice struct {
 	TotalPrice json.Number `json:"totalPrice"`
 }

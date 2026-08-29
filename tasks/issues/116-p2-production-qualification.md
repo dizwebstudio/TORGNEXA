@@ -30,6 +30,9 @@ Close the second production-readiness layer after Tasks 114-115: durable warehou
 - warehouse operations/failover incident API and regenerated public SDKs;
 - `/app/torgnexa-runtime-qualifier` in the application image;
 - `scripts/runtime-load.py` and `scripts/check-production-qualification.sh`;
+- qualification-only Compose overlay `docker-compose.qualification.yml`;
+- Kafka reader/consumer recovery with bounded backoff for broker fetch and
+  commit/retry failures;
 - `make production-qualification`;
 - Yandex Market `prices.write` adapter and conformance tests;
 - ADR-0091 and ARCH-116 review.
@@ -38,4 +41,11 @@ Close the second production-readiness layer after Tasks 114-115: durable warehou
 - `make architecture`, migrations, contracts, generated SDK, frontend and supply-chain gates remain green;
 - Yandex Market connector tests prove both campaign and business-wide price update paths and fail closed on invalid remote responses;
 - repository qualification command is reproducible and records deployment evidence under `qualification/evidence/<UTC timestamp>`;
+- the disposable qualification Compose project uses the explicit
+  `TORGNEXA_QUALIFICATION_RATE_PER_MINUTE` budget (default `10000`) for the
+  burst probe, so API availability is measured independently of the normal
+  production per-IP throttle; the deployment default is not changed;
+- Kafka/PostgreSQL restart drills wait for a fresh healthy container state and
+  a stable worker runtime before sending the next probe event, so a transient
+  broker reconnect cannot create a false timeout;
 - production release may claim runtime qualification only after that Docker gate passes on the exact release topology; repository completion alone does not manufacture deployment evidence.

@@ -32,13 +32,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 525
+- docs: 527
 - adrs: 114
-- tasks: 164
+- tasks: 170
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2843
+- total source files (excluding local secrets/build/dependency/cache trees): 2968
 
 
 ## Connector category layout
@@ -49,6 +49,99 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
   generators are synchronized with the categorized paths;
 - the provider ID remains the package boundary and generated catalog order is
   stable by ID.
+
+## Task 163 additions
+
+- planned decomposition for a provider-neutral Workflow Automation Builder;
+- ten bounded subtasks covering action catalog, immutable versions, DSL/compiler,
+  RLS persistence, EventBus/schedule dispatch, execution/approval runtime,
+  safe adapters, REST/UI, quotas/observability and qualification;
+- explicit exclusions for arbitrary code/SQL/HTTP, provider branches,
+  unbounded loops and secret/raw-payload persistence;
+- first vertical slice limited to notification, reconciliation, approval and
+  dry-run actions.
+
+## Task 164 additions
+
+- planned decomposition for provider-neutral order cancellations, full/partial
+  returns and payment refunds;
+- twelve bounded subtasks covering policy/state machines, cross-domain
+  orchestration, PostgreSQL/RLS/evidence, events/webhooks, cancellation and
+  return workers, refund/fiscal/settlement reconciliation, REST/UI,
+  connector qualification, operations and Compose qualification;
+- explicit extension of the existing `payments.Refund` path rather than a
+  second payment state machine, with unknown external outcomes, idempotency and
+  append-only financial/WMS evidence;
+- explicit exclusions for chargebacks/disputes, blind retries, silent ledger
+  rewrites and SDK-only or health-only connector capabilities.
+
+## Task 165 additions
+
+- planned extension of Task 053 from a simple advisory replenishment formula to
+  explainable stock/demand forecasts, projections and guarded auto-replenishment;
+- thirteen bounded subtasks covering ADR/policy, input quality, deterministic
+  forecast baselines and intervals, stockout/overstock scenarios, reorder and
+  supplier optimization, RLS/lineage, scheduler/worker, procurement execution,
+  REST/UI, connector qualification, operations and Compose/load/chaos evidence;
+- explicit modes `recommendation_only`, `draft_po` and narrowly qualified
+  `auto_submit`, with the existing procurement lifecycle, approval, idempotency
+  and kill-switch boundaries preserved;
+- explicit exclusions for forecast-as-stock-truth, unversioned ML/AI authority,
+  blind retries, unqualified suppliers and ClickHouse/cache/Kafka as
+  transactional truth.
+
+
+## Task 166 additions
+
+- planned provider-neutral Product Publication Quality Center with target-level
+  readiness, deterministic score, hard blockers/warnings and issue evidence;
+- thirteen bounded subtasks covering ADR/rule governance, immutable snapshots,
+  declarative connector profiles, catalog/PIM/price/stock/media/compliance
+  assembly, rule engine, `commerce-sync` preflight gate, durable worker,
+  PostgreSQL/RLS/lineage, REST/UI, remediation/approval, qualification,
+  observability and Compose/load/chaos evidence;
+- Task 082 compliance guard remains the final fail-closed boundary; quality
+  receipts are exact-version/digest matches and unsupported/stale/unknown
+  targets cannot publish;
+- explicit exclusions for provider branches, arbitrary code/regex/HTTP, AI
+  auto-edits, raw payload/secrets and quality score as an override of hard
+  policy or capability blockers.
+
+
+## Task 167 additions
+
+- planned provider-neutral factual unit economics by channel, extending the
+  existing `profitability-v1` scenario without making it a second ledger;
+- eighteen bounded subtasks covering accounting definitions/bases, channel
+  identity and attribution, exact metric contracts, source normalization,
+  historical COGS, allocation conservation, settlement/payment deduplication,
+  advertising/promotions, returns/refunds, FX evidence, immutable calculation
+  runs, ClickHouse projections, PostgreSQL/RLS/lineage/retention, worker/API/
+  exports, UI, security/quotas and Compose/test/documentation qualification;
+- explicit `complete`/`partial`/`stale`/`unmatched`/`conflict`/
+  `mixed_currency`/`unsupported` quality states; missing data is never silently
+  converted to zero, payout is never counted as revenue, and FX uses Task-089b
+  immutable conversion evidence;
+- append-only settlement/correction semantics, no provider branches or raw
+  payloads, and no AI/MCP/n8n authority over financial facts.
+
+
+## Task 168 additions
+
+- planned provider-neutral Unified Integration State Center combining account,
+  runtime stage, credential/config class, capabilities, health/freshness,
+  rate-limit, sync/retry/DLQ, reconciliation, webhook and separate-surface
+  evidence into one permission-aware read model;
+- eighteen bounded subtasks covering status vocabulary/reducer, bulk source
+  adapters, derived snapshots/RLS/lineage/retention, canonical events/worker/
+  realtime invalidation, REST/OpenAPI, operator UI, idempotent safe actions,
+  security/SLO/quotas and Compose/test/documentation qualification;
+- explicit distinction between `healthy`, `attention`, `blocked`, `stale`,
+  `disabled`, `unsupported`, `health_only` and `separate_surface`; missing or
+  redacted evidence never becomes green and GET performs no remote IO;
+- existing connector/health/sync/OAuth owners remain authoritative; no secrets,
+  raw provider errors, provider branches or center-side financial/commerce
+  mutations are introduced.
 
 
 ## Task 154 additions
@@ -1150,8 +1243,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/storefronts/bitrix/connector.go`
 - `connectors/storefronts/bitrix/connector_test.go`
 - `connectors/storefronts/bitrix/cursor.go`
+- `connectors/storefronts/bitrix/inventory.go`
+- `connectors/storefronts/bitrix/inventory_write.go`
 - `connectors/storefronts/bitrix/manifest.json`
+- `connectors/storefronts/bitrix/orders.go`
 - `connectors/storefronts/bitrix/presentation.json`
+- `connectors/storefronts/bitrix/prices.go`
 - `connectors/storefronts/bitrix/products.go`
 - `connectors/storefronts/bitrix/remote.go`
 - `connectors/storefronts/bitrix/write.go`
@@ -1529,6 +1626,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docker-compose.opencart-test.yml`
 - `docker-compose.prestashop-test.yml`
 - `docker-compose.production.yml`
+- `docker-compose.qualification.yml`
 - `docker-compose.saleor-test.yml`
 - `docker-compose.shopify-test.yml`
 - `docker-compose.shopware-test.yml`
@@ -2021,7 +2119,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/migrations/000024-sync-engine.md`
 - `docs/migrations/000024-user-profiles.md`
 - `docs/migrations/000025-reconciliation.md`
+- `docs/migrations/000025-upload-security-pg18-compat.md`
 - `docs/migrations/000026-ai-agent-governance.md`
+- `docs/migrations/000026-audit-realtime-lookup-index.md`
 - `docs/migrations/000027-social-core.md`
 - `docs/migrations/000055-connector-account-settings.md`
 - `docs/migrations/000056-demo-dataset-tombstone.md`
@@ -2072,6 +2172,110 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/security/js-supply-chain-locking.md`
 - `docs/security/production-api-security-composition.md`
 - `frontend/.gitignore`
+- `frontend/.prerender/connector-logos/README.md`
+- `frontend/.prerender/connector-logos/aliexpress-ru.svg`
+- `frontend/.prerender/connector-logos/auto-ru.svg`
+- `frontend/.prerender/connector-logos/avito.svg`
+- `frontend/.prerender/connector-logos/bitrix.svg`
+- `frontend/.prerender/connector-logos/bitrix24.svg`
+- `frontend/.prerender/connector-logos/cbr-fx.svg`
+- `frontend/.prerender/connector-logos/cdek.svg`
+- `frontend/.prerender/connector-logos/chestny-znak.svg`
+- `frontend/.prerender/connector-logos/cian.svg`
+- `frontend/.prerender/connector-logos/claude.svg`
+- `frontend/.prerender/connector-logos/cs-cart.svg`
+- `frontend/.prerender/connector-logos/deepseek.svg`
+- `frontend/.prerender/connector-logos/dellin.svg`
+- `frontend/.prerender/connector-logos/diadoc.svg`
+- `frontend/.prerender/connector-logos/dolyami.svg`
+- `frontend/.prerender/connector-logos/egais.svg`
+- `frontend/.prerender/connector-logos/fivepost.svg`
+- `frontend/.prerender/connector-logos/gemini.svg`
+- `frontend/.prerender/connector-logos/gigachat.svg`
+- `frontend/.prerender/connector-logos/grok.svg`
+- `frontend/.prerender/connector-logos/instagram.svg`
+- `frontend/.prerender/connector-logos/kimi.svg`
+- `frontend/.prerender/connector-logos/lamoda.svg`
+- `frontend/.prerender/connector-logos/lm-studio.svg`
+- `frontend/.prerender/connector-logos/magento.svg`
+- `frontend/.prerender/connector-logos/magnit-market.svg`
+- `frontend/.prerender/connector-logos/max-messenger.svg`
+- `frontend/.prerender/connector-logos/medusa.svg`
+- `frontend/.prerender/connector-logos/megamarket.svg`
+- `frontend/.prerender/connector-logos/moysklad.svg`
+- `frontend/.prerender/connector-logos/mvideo.svg`
+- `frontend/.prerender/connector-logos/odnoklassniki.svg`
+- `frontend/.prerender/connector-logos/ollama.svg`
+- `frontend/.prerender/connector-logos/onec.svg`
+- `frontend/.prerender/connector-logos/open-webui.svg`
+- `frontend/.prerender/connector-logos/openai-compatible.svg`
+- `frontend/.prerender/connector-logos/opencart.svg`
+- `frontend/.prerender/connector-logos/ozon-delivery.svg`
+- `frontend/.prerender/connector-logos/ozon-pay.svg`
+- `frontend/.prerender/connector-logos/ozon.svg`
+- `frontend/.prerender/connector-logos/pek.svg`
+- `frontend/.prerender/connector-logos/pochta-russia.svg`
+- `frontend/.prerender/connector-logos/prestashop.svg`
+- `frontend/.prerender/connector-logos/qwen.svg`
+- `frontend/.prerender/connector-logos/robokassa.svg`
+- `frontend/.prerender/connector-logos/rutube.svg`
+- `frontend/.prerender/connector-logos/saby-edo.svg`
+- `frontend/.prerender/connector-logos/saleor.svg`
+- `frontend/.prerender/connector-logos/sbp.svg`
+- `frontend/.prerender/connector-logos/shopify.svg`
+- `frontend/.prerender/connector-logos/shopware.svg`
+- `frontend/.prerender/connector-logos/telegram.svg`
+- `frontend/.prerender/connector-logos/threads.svg`
+- `frontend/.prerender/connector-logos/vetis-mercury.svg`
+- `frontend/.prerender/connector-logos/vk.svg`
+- `frontend/.prerender/connector-logos/wildberries.svg`
+- `frontend/.prerender/connector-logos/woocommerce.svg`
+- `frontend/.prerender/connector-logos/yandex-market.svg`
+- `frontend/.prerender/connector-logos/yandexgpt.svg`
+- `frontend/.prerender/connector-logos/yookassa.svg`
+- `frontend/.prerender/connector-logos/youtube.svg`
+- `frontend/.prerender/demo-images/demo-01.svg`
+- `frontend/.prerender/demo-images/demo-02.svg`
+- `frontend/.prerender/demo-images/demo-03.svg`
+- `frontend/.prerender/demo-images/demo-04.svg`
+- `frontend/.prerender/demo-images/demo-05.svg`
+- `frontend/.prerender/demo-images/demo-06.svg`
+- `frontend/.prerender/demo-images/demo-07.svg`
+- `frontend/.prerender/demo-images/demo-08.svg`
+- `frontend/.prerender/demo-images/demo-09.svg`
+- `frontend/.prerender/demo-images/demo-10.svg`
+- `frontend/.prerender/demo-images/demo-11.svg`
+- `frontend/.prerender/demo-images/demo-12.svg`
+- `frontend/.prerender/demo-images/demo-13.svg`
+- `frontend/.prerender/demo-images/demo-14.svg`
+- `frontend/.prerender/demo-images/demo-15.svg`
+- `frontend/.prerender/demo-images/demo-16.svg`
+- `frontend/.prerender/demo-images/demo-17.svg`
+- `frontend/.prerender/demo-images/demo-18.svg`
+- `frontend/.prerender/demo-images/demo-19.svg`
+- `frontend/.prerender/demo-images/demo-20.svg`
+- `frontend/.prerender/demo-images/demo-21.svg`
+- `frontend/.prerender/demo-images/demo-22.svg`
+- `frontend/.prerender/demo-images/demo-23.svg`
+- `frontend/.prerender/demo-images/demo-24.svg`
+- `frontend/.prerender/demo-images/demo-25.svg`
+- `frontend/.prerender/demo-images/demo-26.svg`
+- `frontend/.prerender/demo-images/demo-avatar.svg`
+- `frontend/.prerender/docs-entry.js`
+- `frontend/.prerender/docs-entry.js.map`
+- `frontend/.prerender/docs/documentation.png`
+- `frontend/.prerender/docs/integration-connection.png`
+- `frontend/.prerender/docs/integrations.png`
+- `frontend/.prerender/docs/login.png`
+- `frontend/.prerender/docs/mobile.png`
+- `frontend/.prerender/docs/opencart-smoke.png`
+- `frontend/.prerender/docs/opencart-store.png`
+- `frontend/.prerender/docs/prestashop-guide.png`
+- `frontend/.prerender/docs/prestashop-store.png`
+- `frontend/.prerender/docs/woocommerce-guide.png`
+- `frontend/.prerender/docs/woocommerce-store.png`
+- `frontend/.prerender/oidc/silent-callback.html`
+- `frontend/.prerender/robots.txt`
 - `frontend/Dockerfile.dev`
 - `frontend/Dockerfile.production`
 - `frontend/index.html`
@@ -2178,7 +2382,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/docs/woocommerce-guide.png`
 - `frontend/public/docs/woocommerce-store.png`
 - `frontend/public/oidc/silent-callback.html`
+- `frontend/public/robots.txt`
 - `frontend/repository-shims.d.ts`
+- `frontend/scripts/check-public-docs.mjs`
+- `frontend/scripts/prerender-docs.mjs`
+- `frontend/scripts/public-docs-config.mjs`
 - `frontend/serve.mjs`
 - `frontend/src/api/ApiProvider.tsx`
 - `frontend/src/api/client.ts`
@@ -2256,6 +2464,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/shell/AppShell.tsx`
 - `frontend/src/shell/navigation.ts`
 - `frontend/src/shell/useLocationPath.ts`
+- `frontend/src/ssr/docs-entry.tsx`
 - `frontend/src/styles.css`
 - `frontend/test/auth-retry.test.mjs`
 - `frontend/test/decoders.test.mjs`
@@ -2789,6 +2998,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000022_ai_provider_gemini_grok.sql`
 - `migrations/000023_offline_demo_product_images.sql`
 - `migrations/000024_user_profiles.sql`
+- `migrations/000025_upload_security_pg18_compat.sql`
+- `migrations/000026_audit_realtime_lookup_index.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2934,6 +3145,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/package-opencart-bridge.sh`
 - `scripts/package-release-evidence.sh`
 - `scripts/prestashop-smoke.sh`
+- `scripts/production-rollout.sh`
 - `scripts/promote-github-release.sh`
 - `scripts/runtime-load.py`
 - `scripts/saleor-smoke.sh`
@@ -3138,6 +3350,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/160-prestashop-commerce-sync-runtime.md`
 - `tasks/issues/161-commerce-product-event-runtime-route.md`
 - `tasks/issues/162-authorized-community-browser-e2e.md`
+- `tasks/issues/163-workflow-automation-builder.md`
+- `tasks/issues/164-returns-cancellations-refunds.md`
+- `tasks/issues/165-stock-forecast-auto-replenishment.md`
+- `tasks/issues/166-product-publication-quality-center.md`
+- `tasks/issues/167-channel-unit-economics.md`
+- `tasks/issues/168-integration-state-center.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

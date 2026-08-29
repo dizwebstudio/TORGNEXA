@@ -23,10 +23,12 @@ var bitrixBaseSegmentPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{1,64}$`)
 // required because 1C-Bitrix REST catalog.product.list requires iblockId in
 // every request; webhook credentials remain in SecretProvider.
 type Configuration struct {
-	StoreHost       string
-	BasePath        string
-	CatalogIblockID int64
-	StoreCurrency   string
+	StoreHost          string
+	BasePath           string
+	CatalogIblockID    int64
+	StoreCurrency      string
+	PriceTypeID        int64
+	OrderStatusMapping map[string]string
 }
 
 type ConfigurationSource interface {
@@ -64,8 +66,58 @@ func (configuration Configuration) Validate() error {
 func (configuration Configuration) apiBasePath() string { return configuration.BasePath }
 
 func (configuration Configuration) fingerprint(surface string) string {
-	digest := sha256.Sum256([]byte(surface + "\x00" + configuration.StoreHost + "\x00" + configuration.BasePath + "\x00" + intString(configuration.CatalogIblockID) + "\x00" + configuration.StoreCurrency))
+	digest := sha256.Sum256([]byte(surface + "\x00" + configuration.StoreHost + "\x00" + configuration.BasePath + "\x00" + intString(configuration.CatalogIblockID) + "\x00" + configuration.StoreCurrency + "\x00" + intString(configuration.PriceTypeID) + "\x00" + configuration.orderStatusFingerprint()))
 	return hex.EncodeToString(digest[:])
+}
+
+var canonicalOrderStatuses = [...]string{"pending", "confirmed", "processing", "fulfilled", "cancelled"}
+
+func (configuration Configuration) orderStatusFingerprint() string {
+	var builder strings.Builder
+	for _, status := range canonicalOrderStatuses {
+		builder.WriteString(status)
+		builder.WriteByte('=')
+		builder.WriteString(configuration.OrderStatusMapping[status])
+		builder.WriteByte('\x00')
+	}
+	return builder.String()
+}
+
+// OrderStatuses returns the configured canonical-to-Bitrix status mapping.
+// An order route must configure every canonical lifecycle state explicitly;
+// Bitrix installations may use different status identifiers.
+func (configuration Configuration) OrderStatuses() (map[string]string, error) {
+	if len(configuration.OrderStatusMapping) == 0 {
+		return nil, ErrInvalidConfiguration
+	}
+	if len(configuration.OrderStatusMapping) != len(canonicalOrderStatuses) {
+		return nil, ErrInvalidConfiguration
+	}
+	seen := make(map[string]struct{}, len(configuration.OrderStatusMapping))
+	result := make(map[string]string, len(configuration.OrderStatusMapping))
+	for _, canonical := range canonicalOrderStatuses {
+		remote, ok := configuration.OrderStatusMapping[canonical]
+		if !ok || !validRemoteText(remote, 64) {
+			return nil, ErrInvalidConfiguration
+		}
+		if _, duplicate := seen[remote]; duplicate {
+			return nil, ErrInvalidConfiguration
+		}
+		seen[remote] = struct{}{}
+		result[canonical] = remote
+	}
+	return result, nil
+}
+
+func reverseOrderStatuses(statuses map[string]string) (map[string]string, error) {
+	result := make(map[string]string, len(statuses))
+	for canonical, remote := range statuses {
+		if _, duplicate := result[remote]; duplicate {
+			return nil, ErrInvalidConfiguration
+		}
+		result[remote] = canonical
+	}
+	return result, nil
 }
 
 func intString(value int64) string {

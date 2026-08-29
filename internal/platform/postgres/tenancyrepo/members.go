@@ -96,6 +96,26 @@ func (r *Repository) ListMembers(ctx context.Context, scope tenancy.Scope, after
 	return out, err
 }
 
+// GetMember returns one tenant-scoped workspace member by its internal ID.
+// The opaque OIDC subject is returned only to the trusted application layer;
+// callers must never expose it as a user-facing identifier.
+func (r *Repository) GetMember(ctx context.Context, scope tenancy.Scope, id string) (Member, error) {
+	if id == "" || strings.ContainsAny(id, "/\r\n\x00") {
+		return Member{}, ErrMemberNotFound
+	}
+	var member Member
+	err := r.withScope(ctx, scope, func(q queryer) error {
+		return scanMember(q.QueryRowContext(ctx, `SELECT id,email,display_name,COALESCE(oidc_subject,''),role_code,status,invitation_key,version,invited_at,updated_at FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id), &member)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Member{}, ErrMemberNotFound
+	}
+	if err != nil {
+		return Member{}, fmt.Errorf("get workspace member: %w", err)
+	}
+	return member, nil
+}
+
 func (r *Repository) InviteMember(ctx context.Context, scope tenancy.Scope, member Member) (Member, error) {
 	member.Email = strings.ToLower(strings.TrimSpace(member.Email))
 	member.DisplayName = strings.TrimSpace(member.DisplayName)

@@ -512,7 +512,47 @@
         "contract_preconditions": []
       },
       "backfill": null,
-      "sha256": "f803f01cd08a9d06b8c10595a78a0c43366bd560ff497ae6e33ed200422e391b"
+      "sha256": "6ff212a560a4983530488dda82d52f90618fcbb1a511a607633f4a343ea6c86d"
+    },
+    {
+      "version": 25,
+      "name": "upload_security_pg18_compat",
+      "file": "000025_upload_security_pg18_compat.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [24],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "629ec56b90d4a38b97b9f26be85ef656365df5f04eb37dfcadee393bef5f1d85"
+    },
+    {
+      "version": 26,
+      "name": "audit_realtime_lookup_index",
+      "file": "000026_audit_realtime_lookup_index.sql",
+      "phase": "expand",
+      "risk": "low",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [25],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "42a5623ec462660676ef6729f9edce7e5c511756d86b260e3996401ee1f7b491"
     }
   ]
 }

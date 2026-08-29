@@ -265,6 +265,11 @@ type Consumer struct {
 	topics   []string
 }
 
+const (
+	consumerErrorInitialBackoff = 250 * time.Millisecond
+	consumerErrorMaxBackoff     = 5 * time.Second
+)
+
 func NewConsumer(reader Reader, producer Producer, baseTopics []string, policy RetryPolicy, clock Clock) (*Consumer, error) {
 	if reader == nil {
 		return nil, errors.New("Kafka reader is required")
@@ -306,6 +311,7 @@ func (c *Consumer) Run(ctx context.Context, handler eventbus.Handler) error {
 	if handler == nil {
 		return errors.New("event handler is required")
 	}
+	backoff := consumerErrorInitialBackoff
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -315,8 +321,22 @@ func (c *Consumer) Run(ctx context.Context, handler eventbus.Handler) error {
 			return errors.New("Kafka read failed")
 		}
 		if err := c.HandleOne(ctx, message, handler); err != nil {
-			return err
+			// A commit or retry/DLQ publish can fail while Kafka is recovering.
+			// Leave the source offset uncommitted and retry the read loop with
+			// bounded backoff; franz-go will redeliver the same record once the
+			// broker is available instead of taking the whole worker down.
+			if err := c.clock.Sleep(ctx, backoff); err != nil {
+				return err
+			}
+			if backoff < consumerErrorMaxBackoff {
+				backoff *= 2
+				if backoff > consumerErrorMaxBackoff {
+					backoff = consumerErrorMaxBackoff
+				}
+			}
+			continue
 		}
+		backoff = consumerErrorInitialBackoff
 	}
 }
 

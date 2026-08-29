@@ -71,13 +71,14 @@ type PriceWriter interface {
 }
 
 type InventoryWriteRequest struct {
-	VariantRemoteID string `json:"variant_remote_id"`
-	Quantity        int64  `json:"quantity"`
-	IdempotencyKey  string `json:"idempotency_key"`
+	VariantRemoteID  string `json:"variant_remote_id"`
+	LocationRemoteID string `json:"location_remote_id,omitempty"`
+	Quantity         int64  `json:"quantity"`
+	IdempotencyKey   string `json:"idempotency_key"`
 }
 
 func (request InventoryWriteRequest) Validate() error {
-	if !validRemoteID(request.VariantRemoteID) || request.Quantity < 0 || !validIdempotencyKey(request.IdempotencyKey) {
+	if !validRemoteID(request.VariantRemoteID) || !validOptionalRemoteID(request.LocationRemoteID) || request.Quantity < 0 || !validIdempotencyKey(request.IdempotencyKey) {
 		return ErrInvalidCommerceWrite
 	}
 	return nil
@@ -129,4 +130,8 @@ func validOptionalWriteText(value string, max int) bool {
 		}
 	}
 	return true
+}
+
+func validOptionalRemoteID(value string) bool {
+	return value == "" || validRemoteID(value)
 }

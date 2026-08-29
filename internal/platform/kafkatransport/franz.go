@@ -15,6 +15,11 @@ import (
 
 const maxRecordBytes = 16 << 20
 
+const (
+	readerInitialBackoff = 250 * time.Millisecond
+	readerMaxBackoff     = 5 * time.Second
+)
+
 type Producer struct{ client *kgo.Client }
 
 func NewProducer(brokers []string, clientID string) (*Producer, error) {
@@ -93,6 +98,7 @@ func (r *Reader) Read(ctx context.Context) (kafkaeventbus.Message, error) {
 	if ctx == nil || r == nil || r.client == nil {
 		return kafkaeventbus.Message{}, errors.New("kafka transport: invalid read")
 	}
+	backoff := readerInitialBackoff
 	for {
 		fetches := r.client.PollRecords(ctx, 1)
 		records := fetches.Records()
@@ -108,8 +114,33 @@ func (r *Reader) Read(ctx context.Context) (kafkaeventbus.Message, error) {
 			return kafkaeventbus.Message{}, err
 		}
 		if errs := fetches.Errors(); len(errs) > 0 {
-			return kafkaeventbus.Message{}, fmt.Errorf("kafka transport: fetch: %w", errs[0].Err)
+			// franz-go reports broker disconnects and leader/group-coordinator
+			// transitions as fetch errors. Keep the reader alive with bounded
+			// exponential backoff so a single-node broker restart does not make
+			// the worker abandon all consumers and rely on a process restart.
+			if err := sleepContext(ctx, backoff); err != nil {
+				return kafkaeventbus.Message{}, err
+			}
+			if backoff < readerMaxBackoff {
+				backoff *= 2
+				if backoff > readerMaxBackoff {
+					backoff = readerMaxBackoff
+				}
+			}
+			continue
 		}
+		backoff = readerInitialBackoff
+	}
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 

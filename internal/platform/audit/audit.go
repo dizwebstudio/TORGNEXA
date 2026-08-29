@@ -332,6 +332,20 @@ func sanitizeValue(value any, depth int, nodes *int) (any, error) {
 			output[index] = sanitized
 		}
 		return output, nil
+	case []string:
+		output := make([]any, len(typed))
+		for index, item := range typed {
+			(*nodes)++
+			if *nodes > maxSummaryNodes {
+				return nil, ErrInvalidSummary
+			}
+			sanitized, err := sanitizeValue(item, depth+1, nodes)
+			if err != nil {
+				return nil, err
+			}
+			output[index] = sanitized
+		}
+		return output, nil
 	default:
 		return nil, ErrInvalidSummary
 	}

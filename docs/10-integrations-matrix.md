@@ -27,7 +27,7 @@ those capabilities.
 | Connector | Working operations in Settings → Integrations | Product sync | Non-secret runtime config |
 |---|---|---|---|
 | AliExpress RU | product read | inbound | no |
-| 1С-Битрикс | product read/write | inbound + outbound | required |
+| 1С-Битрикс | product read/write; regular price write; inventory write via warehouse documents | products inbound + outbound; prices outbound; inventory outbound | required (`catalog_iblock_id`, `price_type_id`) |
 | Magnit Market | product read | inbound | required |
 | Megamarket | product read | inbound | required |
 | Medusa | product read/write | inbound + outbound | required |
@@ -45,9 +45,10 @@ those capabilities.
 | CS-Cart | product read/write | inbound + outbound | required |
 | Saleor | product read/write | inbound + outbound | required |
 
-The host registry contains additional SDK price-writer adapters, but only
-PrestaShop is currently admitted to the production `prices`/`inventory`
-worker route. A product, price or inventory domain event is consumed by the
+The host registry contains additional SDK price-writer adapters. PrestaShop
+and 1С-Битрикс are admitted to the production price worker route; PrestaShop
+and 1С-Битрикс are also admitted to the inventory route. Inventory events
+require an explicit tenant-scoped warehouse mapping. A product, price or inventory domain event is consumed by the
 dedicated `torgnexa.commerce-sync.v1` group, resolved through the tenant's
 enabled outbound policy and the corresponding `product` or `offer` mapping,
 sent with a deterministic idempotency key, and recorded in

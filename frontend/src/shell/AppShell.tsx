@@ -1,34 +1,38 @@
-import {useEffect,useMemo,useState} from "react";
+import {lazy,Suspense,useEffect,useMemo,useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "../auth/AuthProvider";
 import {useApi} from "../api/ApiProvider";
 import {allowedNavigation, canOpenPath, isKnownPath, routeForPath} from "./navigation";
 import {navigate, useLocationPath} from "./useLocationPath";
-import {DashboardPage} from "../pages/DashboardPage";
-import {CatalogPage} from "../pages/CatalogPage";
-import {OrdersPage} from "../pages/OrdersPage";
-import {NotificationsPage} from "../pages/NotificationsPage";
-import {InventoryPage} from "../pages/InventoryPage";
-import {CounterpartiesPage} from "../pages/CounterpartiesPage";
-import {FinancePage} from "../pages/FinancePage";
-import {CompliancePage} from "../pages/CompliancePage";
-import {SettingsPage} from "../pages/SettingsPage";
-import {ReportsPage} from "../pages/ReportsPage";
-import {AuditPage} from "../pages/AuditPage";
-import {SyncPage} from "../pages/SyncPage";
-import {ApprovalsPage} from "../pages/ApprovalsPage";
-import {IntegrationsPage} from "../pages/IntegrationsPage";
-import {SocialPage} from "../pages/SocialPage";
-import {PlaceholderPage} from "../pages/PlaceholderPage";
-import {IncidentCenterPage} from "../pages/IncidentCenterPage";
 import {useRealtimeInvalidation} from "../app/useRealtime";
-import {ConnectorOAuthCallbackPage} from "../pages/ConnectorOAuthCallbackPage";
 import {Icon} from "../components/Icon";
 import {CommandPalette} from "../components/CommandPalette";
 import {Drawer} from "../components/Drawer";
 import {StatusBadge} from "../components/StatusBadge";
 import {useUi} from "../app/UiProvider";
 import {UserAvatar} from "../components/UserAvatar";
+
+// Pages are loaded on demand so the initial shell remains small on low-bandwidth
+// VPS deployments. Each route keeps its own data/UI dependencies out of the
+// critical bundle until the operator actually opens it.
+const DashboardPage = lazy(() => import("../pages/DashboardPage").then(module => ({default: module.DashboardPage})));
+const CatalogPage = lazy(() => import("../pages/CatalogPage").then(module => ({default: module.CatalogPage})));
+const OrdersPage = lazy(() => import("../pages/OrdersPage").then(module => ({default: module.OrdersPage})));
+const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
+const InventoryPage = lazy(() => import("../pages/InventoryPage").then(module => ({default: module.InventoryPage})));
+const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then(module => ({default: module.CounterpartiesPage})));
+const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
+const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
+const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
+const ReportsPage = lazy(() => import("../pages/ReportsPage").then(module => ({default: module.ReportsPage})));
+const AuditPage = lazy(() => import("../pages/AuditPage").then(module => ({default: module.AuditPage})));
+const SyncPage = lazy(() => import("../pages/SyncPage").then(module => ({default: module.SyncPage})));
+const ApprovalsPage = lazy(() => import("../pages/ApprovalsPage").then(module => ({default: module.ApprovalsPage})));
+const IntegrationsPage = lazy(() => import("../pages/IntegrationsPage").then(module => ({default: module.IntegrationsPage})));
+const SocialPage = lazy(() => import("../pages/SocialPage").then(module => ({default: module.SocialPage})));
+const PlaceholderPage = lazy(() => import("../pages/PlaceholderPage").then(module => ({default: module.PlaceholderPage})));
+const IncidentCenterPage = lazy(() => import("../pages/IncidentCenterPage").then(module => ({default: module.IncidentCenterPage})));
+const ConnectorOAuthCallbackPage = lazy(() => import("../pages/ConnectorOAuthCallbackPage").then(module => ({default: module.ConnectorOAuthCallbackPage})));
 
 const realtimeLabels: Readonly<Record<string, string>> = {live: "Подключено", connecting: "Подключение…", offline: "Недоступно"};
 
@@ -78,7 +82,7 @@ export function AppShell() {
     </aside>
     <main className="main-column">
       <header className="topbar"><div className="topbar-context"><button className="mobile-menu" onClick={()=>setMobileOpen(v=>!v)} aria-label="Меню"><Icon name="menu"/></button><div><span className="workspace-label">TORGNEXA</span><strong>{current?.label??"Текущий контур"}</strong></div></div><div className="topbar-right"><button className="quick-search" onClick={()=>setCommandOpen(true)}><Icon name="search"/><span>Поиск и переход</span><kbd>⌘ K</kbd></button><button className="icon-button topbar-icon" onClick={()=>setActivityOpen(true)} aria-label="Центр активности"><Icon name="activity"/></button><button className={`icon-button topbar-icon ${compact?"active":""}`} onClick={toggleCompact} aria-label="Сменить плотность таблиц" title="Плотность интерфейса"><Icon name="columns"/></button><button className="icon-button topbar-icon" onClick={toggleTheme} aria-label="Сменить тему"><Icon name={theme==="dark"?"sun":"moon"}/></button><span className={`realtime-pill ${realtime}`} title={realtime==="live"?"Поток обновлений подключён":realtime==="connecting"?"Подключаем поток обновлений":"Поток обновлений временно недоступен"}><span/>{realtimeLabels[realtime]}</span><span className="security-pill"><span/>защищено</span></div></header>
-      <div className="content">{!knownPath?<section className="denied"><span className="denied-code">404</span><h1>Страница не найдена</h1><p>Такого раздела или вложенного маршрута нет.</p><button className="button primary" onClick={() => navigate("/")}>Вернуться в обзор</button></section>:allowed ? content(path) : <section className="denied"><span className="denied-code">403</span><h1>Раздел недоступен</h1><p>Для раздела «{current?.label??"текущего маршрута"}» не хватает прав.</p><button className="button primary" onClick={() => navigate("/")}>Вернуться в обзор</button></section>}</div>
+      <div className="content"><Suspense fallback={<section className="page-loading" aria-busy="true">Загрузка раздела…</section>}>{!knownPath?<section className="denied"><span className="denied-code">404</span><h1>Страница не найдена</h1><p>Такого раздела или вложенного маршрута нет.</p><button className="button primary" onClick={() => navigate("/")}>Вернуться в обзор</button></section>:allowed ? content(path) : <section className="denied"><span className="denied-code">403</span><h1>Раздел недоступен</h1><p>Для раздела «{current?.label??"текущего маршрута"}» не хватает прав.</p><button className="button primary" onClick={() => navigate("/")}>Вернуться в обзор</button></section>}</Suspense></div>
     </main>
     <CommandPalette open={commandOpen} onClose={()=>setCommandOpen(false)}/><ActivityCenter open={activityOpen} onClose={()=>setActivityOpen(false)}/>
   </div>;

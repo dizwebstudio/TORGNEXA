@@ -116,7 +116,9 @@ test("integration catalog groups every connector by an explicit runtime surface"
   assert.match(integrations, /certificate_pem, private_key_pem/);
   assert.match(generated, /surface: "marketplace"/);
   assert.match(generated, /healthOnly: true/);
-  assert.match(read("pages/PublicDocumentationPage.tsx"), /Lamoda/);
+  const docs = read("pages/PublicDocumentationPage.tsx");
+  for (const token of ["Lamoda", "Долями", "Google Gemini", "Grok (xAI)", "operations.realtime.read", "Профиль пользователя", "Фото профиля", "make community-e2e"]) assert.ok(docs.includes(token), token);
+  for (const token of ["docsTitle", "docsDescription", "application/ld+json", "canonical", "docs-reading-paths", "docs-details", "Автоматизация и расширения"]) assert.ok(docs.includes(token), token);
 });
 
 test("AI provider settings keep form controls aligned and separated", () => {
@@ -135,7 +137,9 @@ test("profile card presents stored profile details and an offline demo avatar", 
   const adapter = read("auth/keycloak-adapter.ts");
   const avatar = read("components/UserAvatar.tsx");
   const css = read("styles.css");
-  for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "хранятся в TORGNEXA", "getCurrentUserProfile", "uploadCurrentUserAvatar", "Изменить профиль", "Удалить фото"]) assert.match(settings, new RegExp(token));
+  for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "хранятся в TORGNEXA", "getCurrentUserProfile", "uploadCurrentUserAvatar", "createCurrentUserProfilePrivacyRequest", "profileDisplayName", "Изменить профиль", "Удалить фото", "Запросить выгрузку", "Запросить удаление"]) assert.match(settings, new RegExp(token));
+  const members = read("features/settings/MemberSettings.tsx");
+  for (const token of ["getWorkspaceMemberProfile", "updateWorkspaceMemberProfile", "Профиль", "Сохранить профиль"]) assert.match(members, new RegExp(token));
   for (const token of ["jobTitle", "department", "birthdate", "phoneNumber", "picture"]) { assert.match(model, new RegExp(token)); assert.match(adapter, new RegExp(token)); }
   assert.match(avatar, /demo-avatar\.svg/);
   assert.match(css, /\.profile-hero/);

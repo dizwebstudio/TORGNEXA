@@ -122,11 +122,13 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["products.read", "products.write"],
+      operationalCapabilities: ["inventory.write", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
+        {entityType: "prices", directions: ["outbound"]},
+        {entityType: "inventory", directions: ["outbound"]},
       ],
-      runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB"},
+      runtimeConfigTemplate: {"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1},
     },
   },
   {

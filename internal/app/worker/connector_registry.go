@@ -44,6 +44,13 @@ func (registry *runtimeRegistry) Source(ctx context.Context, scope tenancy.Scope
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
 	entity := strings.TrimSuffix(policy.EntityType, "s")
+	if entity == "order" {
+		reader, err := registry.orderReader(scope, account, runtime)
+		if err != nil {
+			return nil, err
+		}
+		return &orderReconciliationSource{database: registry.database, account: account, reader: reader, now: func() time.Time { return time.Now().UTC() }}, nil
+	}
 	if entity != "product" {
 		return nil, fmt.Errorf("%w: %s", ErrConnectorEntityUnsupported, policy.EntityType)
 	}
@@ -67,6 +74,17 @@ func (registry *runtimeRegistry) productReader(scope tenancy.Scope, account sdk.
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
 	reader, err := registry.builtins.ProductReader(account, runtime, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return reader, err
+}
+
+func (registry *runtimeRegistry) orderReader(scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.OrderReader, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	reader, err := registry.builtins.OrderReader(context.Background(), account, runtime, registry.configLoader(scope))
 	if errors.Is(err, builtins.ErrUnavailable) {
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
@@ -127,11 +145,36 @@ func (registry *runtimeRegistry) inventoryWriter(scope tenancy.Scope, account sd
 	return writer, err
 }
 
+func (registry *runtimeRegistry) orderStatusWriter(scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.OrderStatusWriter, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, reconciliation.ErrActionUnavailable
+	}
+	writer, err := registry.builtins.OrderStatusWriter(context.Background(), account, runtime, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, reconciliation.ErrActionUnavailable
+	}
+	return writer, err
+}
+
+func (registry *runtimeRegistry) orderStatus(scope tenancy.Scope, account sdk.Account, status string) (string, bool) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return "", false
+	}
+	return registry.builtins.OrderStatus(context.Background(), account, status, registry.configLoader(scope))
+}
+
 func (registry *runtimeRegistry) supportsInventoryWrite(account sdk.Account) bool {
 	if registry == nil || registry.builtins == nil {
 		return false
 	}
 	return registry.builtins.SupportsInventoryWrite(account)
+}
+
+func (registry *runtimeRegistry) supportsOrderStatusWrite(account sdk.Account) bool {
+	if registry == nil || registry.builtins == nil {
+		return false
+	}
+	return registry.builtins.SupportsOrderStatusWrite(account)
 }
 
 func (registry *runtimeRegistry) supportsSync(account sdk.Account, entityType, direction string) bool {
@@ -157,6 +200,138 @@ type productReconciliationSource struct {
 	account  sdk.Account
 	reader   builtins.ProductReader
 	now      func() time.Time
+}
+
+type orderReconciliationSource struct {
+	database *sql.DB
+	account  sdk.Account
+	reader   sdk.OrderReader
+	now      func() time.Time
+}
+
+func (source *orderReconciliationSource) Scan(ctx context.Context, scope tenancy.Scope, req reconciliation.ScanRequest) (reconciliation.ScanPage, error) {
+	if source == nil || source.database == nil || source.reader == nil || source.now == nil || !scope.Valid() || req.Validate() != nil {
+		return reconciliation.ScanPage{}, reconciliation.ErrInvalid
+	}
+	limit := req.Limit
+	if limit > 50 {
+		limit = 50
+	}
+	page, err := source.reader.ReadOrders(ctx, sdk.PageRequest{Cursor: req.Cursor, Limit: limit})
+	if err != nil {
+		return reconciliation.ScanPage{}, err
+	}
+	result := reconciliation.ScanPage{NextCursor: page.NextCursor, HasMore: page.NextCursor != "", RemoteObservedAt: source.now().UTC(), Subjects: make([]reconciliation.Subject, 0, len(page.Items))}
+	for _, remote := range page.Items {
+		subject, subjectErr := source.subject(ctx, scope, remote)
+		if subjectErr != nil {
+			return reconciliation.ScanPage{}, subjectErr
+		}
+		result.Subjects = append(result.Subjects, subject)
+		if remote.UpdatedAt.After(result.RemoteObservedAt) {
+			result.RemoteObservedAt = remote.UpdatedAt
+		}
+	}
+	if result.Validate(req.Limit) != nil {
+		return reconciliation.ScanPage{}, reconciliation.ErrInvalid
+	}
+	return result, nil
+}
+
+type localOrderSnapshot struct {
+	ID, Number, Status string
+	Version            int64
+}
+
+func (source *orderReconciliationSource) subject(ctx context.Context, scope tenancy.Scope, remote sdk.RemoteOrder) (reconciliation.Subject, error) {
+	mappingLocalID, mapped, err := source.mappingByRemote(ctx, scope, remote.RemoteID)
+	if err != nil {
+		return reconciliation.Subject{}, err
+	}
+	localPresent := false
+	var local localOrderSnapshot
+	if mapped {
+		local, localPresent, err = source.orderByID(ctx, scope, mappingLocalID)
+	} else if remote.ExternalID != "" {
+		local, localPresent, err = source.orderByNumber(ctx, scope, remote.ExternalID)
+	}
+	if err != nil {
+		return reconciliation.Subject{}, err
+	}
+	const fingerprint = "order-status-v1"
+	remoteRevision := remote.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	subject := reconciliation.Subject{RemoteID: remote.RemoteID, RemotePresent: true, RemoteFingerprint: digestText(fingerprint), RemoteStatus: remote.StatusRemoteID, RemoteRevision: remoteRevision, ObservedAt: source.now().UTC(), CanAutoMap: !mapped && localPresent}
+	if mapped {
+		subject.LocalEntityID = mappingLocalID
+		subject.MappingLocalCount = 1
+		subject.MappingRemoteCount = 1
+	}
+	if localPresent {
+		subject.LocalEntityID = local.ID
+		subject.LocalPresent = true
+		subject.LocalFingerprint = digestText(fingerprint)
+		subject.LocalStatus = local.Status
+		subject.LocalVersion = local.Version
+	}
+	if subject.Validate() != nil {
+		return reconciliation.Subject{}, reconciliation.ErrInvalid
+	}
+	return subject, nil
+}
+
+func digestText(value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(digest[:])
+}
+
+func (source *orderReconciliationSource) mappingByRemote(ctx context.Context, scope tenancy.Scope, remoteID string) (string, bool, error) {
+	var id string
+	err := source.readTx(ctx, scope, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT local_entity_id FROM connector_entity_mappings WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND entity_type='order' AND remote_id=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), source.account.ID, remoteID).Scan(&id)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return id, err == nil, err
+}
+
+func (source *orderReconciliationSource) orderByID(ctx context.Context, scope tenancy.Scope, id string) (localOrderSnapshot, bool, error) {
+	return source.orderLookup(ctx, scope, `id=$3`, id)
+}
+
+func (source *orderReconciliationSource) orderByNumber(ctx context.Context, scope tenancy.Scope, number string) (localOrderSnapshot, bool, error) {
+	return source.orderLookup(ctx, scope, `number=$3`, number)
+}
+
+func (source *orderReconciliationSource) orderLookup(ctx context.Context, scope tenancy.Scope, predicate, value string) (localOrderSnapshot, bool, error) {
+	var order localOrderSnapshot
+	statement := `SELECT id,number,status,version FROM orders WHERE organization_id=$1 AND workspace_id=$2 AND ` + predicate + ` LIMIT 1`
+	err := source.readTx(ctx, scope, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, statement, scope.OrganizationID().String(), scope.WorkspaceID().String(), value).Scan(&order.ID, &order.Number, &order.Status, &order.Version)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return localOrderSnapshot{}, false, nil
+	}
+	return order, err == nil, err
+}
+
+func (source *orderReconciliationSource) readTx(ctx context.Context, scope tenancy.Scope, fn func(*sql.Tx) error) error {
+	tx, err := source.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: true})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var organization, workspace string
+	if err := tx.QueryRowContext(ctx, `SELECT set_config('app.organization_id',$1,true),set_config('app.workspace_id',$2,true)`, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&organization, &workspace); err != nil {
+		return err
+	}
+	if organization != scope.OrganizationID().String() || workspace != scope.WorkspaceID().String() {
+		return tenancy.ErrInvalidScope
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (source *productReconciliationSource) Scan(ctx context.Context, scope tenancy.Scope, req reconciliation.ScanRequest) (reconciliation.ScanPage, error) {

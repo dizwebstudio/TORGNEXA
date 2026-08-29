@@ -36,6 +36,7 @@
         "product",
         "offer",
         "order",
+        "warehouse",
         "brand",
         "category",
         "attribute",

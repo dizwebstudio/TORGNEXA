@@ -5,7 +5,8 @@ COPY sdk/typescript ./sdk/typescript
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 RUN cd frontend && npm ci --ignore-scripts --no-audit --no-fund
 COPY frontend ./frontend
-RUN cd frontend && npm run build
+ARG TORGNEXA_PUBLIC_URL=http://127.0.0.1:5173
+RUN cd frontend && TORGNEXA_PUBLIC_URL="$TORGNEXA_PUBLIC_URL" npm run build
 
 FROM node:22.16.0-alpine3.21@sha256:9f3ae04faa4d2188825803bf890792f33cc39033c9241fc6bb201149470436ca AS runtime
 

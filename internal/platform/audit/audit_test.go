@@ -114,6 +114,20 @@ func TestSanitizeSummaryRejectsUnsupportedOrUnboundedData(t *testing.T) {
 	}
 }
 
+func TestSanitizeSummaryAcceptsStringSlices(t *testing.T) {
+	summary, err := SanitizeSummary(Summary{"changed_fields": []string{"given_name", "job_title"}})
+	if err != nil {
+		t.Fatalf("SanitizeSummary() error = %v", err)
+	}
+	encoded, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"changed_fields":["given_name","job_title"]}` {
+		t.Fatalf("unexpected sanitized string slice: %s", encoded)
+	}
+}
+
 func TestServiceCaptureBuildsSafeImmutableRecord(t *testing.T) {
 	t.Parallel()
 	scope := mustScope(t)

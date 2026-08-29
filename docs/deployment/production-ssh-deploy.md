@@ -33,6 +33,7 @@ Recommended environment variables (not secrets):
 | `DEPLOY_PATH` | `/opt/torgnexa` | Absolute directory owned by the deployment account. |
 | `DEPLOY_COMPOSE_FILE` | `docker-compose.production.yml` | Relative path to the production Compose overlay shipped in the release tag. `..` and absolute paths are rejected. |
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:8080/api/v1/health` | HTTP(S) endpoint reachable from the deployment host. |
+| `DEPLOY_BACKUP_RETENTION` | `7` | Number of pre-deployment PostgreSQL dumps to keep on the host. Must be from `1` to `99`. |
 
 ## Production application values
 
@@ -85,6 +86,22 @@ both API and worker services are present. It uploads the checked-out tag to
 `$DEPLOY_PATH/releases/$VERSION`, atomically switches `$DEPLOY_PATH/current`,
 then runs `docker compose ... up -d --build`. A failed startup or health check
 switches `current` back to the previous release and attempts to restart it.
+
+Before switching `current`, the rollout creates a PostgreSQL custom-format dump
+of the existing local `postgres` service in
+`$DEPLOY_PATH/backups/pre-deploy-<timestamp>-<version>.dump`. A SHA-256 sidecar
+and a small metadata file are written next to it. If an existing PostgreSQL
+container cannot be backed up, the rollout stops before changing the active
+release. The first deployment, when no previous stack exists, has no database
+to back up. An external PostgreSQL service remains operator-managed and must be
+backed up by its own tested procedure.
+
+After the new release passes its health check, the workflow removes old image
+IDs that were used by the TORGNEXA Compose project and are no longer referenced
+by its containers. It does not run a global `docker system prune` and never
+uses force removal. An image still referenced by another container is kept and
+reported as a warning. Backups are kept according to `DEPLOY_BACKUP_RETENTION`;
+copy them to storage outside the deployment node for disaster recovery.
 
 ## Running a deployment
 
