@@ -134,6 +134,8 @@ import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
 row = value.get("data", {})
 attrs = row.get("attributes", {}) if isinstance(row, dict) else {}
+if not attrs and isinstance(row, dict):
+    attrs = row
 actual = attrs.get(sys.argv[2], row.get(sys.argv[2]))
 if str(actual) != sys.argv[3]:
     raise SystemExit(f"Shopware {sys.argv[2]} mismatch: expected {sys.argv[3]!r}")
@@ -186,6 +188,8 @@ import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
 row = value.get("data", {})
 attrs = row.get("attributes", {}) if isinstance(row, dict) else {}
+if not attrs and isinstance(row, dict):
+    attrs = row
 if row.get("id") != sys.argv[3] or attrs.get("productNumber", row.get("productNumber")) != sys.argv[4]:
     raise SystemExit("Shopware product identity/SKU is invalid")
 if not attrs.get("name", row.get("name")) or not attrs.get("updatedAt", row.get("updatedAt")):
@@ -284,7 +288,11 @@ PY
   python3 - "$tmp/product_after_price.body" "$currency_id" "$new_price" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
-prices = value.get("data", {}).get("attributes", {}).get("price", [])
+row = value.get("data", {})
+attrs = row.get("attributes", {}) if isinstance(row, dict) else {}
+if not attrs and isinstance(row, dict):
+    attrs = row
+prices = attrs.get("price", []) or []
 from decimal import Decimal
 if not any(p.get("currencyId") == sys.argv[2] and Decimal(str(p.get("gross"))) == Decimal(sys.argv[3]) for p in prices):
     attrs = value.get("data", {}).get("attributes", {})

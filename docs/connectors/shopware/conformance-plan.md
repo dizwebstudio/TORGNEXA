@@ -2,4 +2,4 @@
 
 Run the mandatory Task-064 13-check Connector SDK suite with synthetic credentials, tenant-isolation probes, retry/error normalization, idempotency/replay and Linux sandbox isolation. Production credentials are forbidden in the harness.
 
-12 of 13 checks pass in the current execution environment; `sandbox_isolation` cannot be exercised here because this environment cannot create unprivileged Linux user namespaces (`unshare --user` returns `Operation not permitted`), which the Task-029 sandbox probe requires regardless of connector. This is an environment constraint, not a Shopware-specific defect — the same probe exercises the shared emulator, not any Shopware code path. Re-run in an environment with user namespaces enabled to obtain a full pass.
+All 13 of 13 checks pass in the current execution environment; the canonical result is recorded in [conformance-report.json](conformance-report.json). This SDK conformance result is separate from the credentialed Docker/live qualification in [docker-live-qualification.md](docker-live-qualification.md): a passing candidate does not imply that an arbitrary merchant endpoint or Integration credential is configured.

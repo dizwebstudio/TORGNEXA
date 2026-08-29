@@ -139,6 +139,41 @@ func TestReadProductsWithVariants(t *testing.T) {
 	}
 }
 
+func TestCurrentJSONAPIResourceAndPaginationShape(t *testing.T) {
+	var page shopwareSearchPage[shopwareProduct]
+	if err := json.Unmarshal([]byte(`{"data":[{"id":"p1","type":"product","attributes":{"productNumber":"SW-1","name":"Demo","active":true,"stock":7,"price":[{"currencyId":"eur","gross":12.34,"net":10.00}],"updatedAt":"2026-08-12T07:00:00+00:00"}}],"meta":{"total":9}}`), &page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 9 || len(page.Data) != 1 || page.Data[0].ID != "p1" || page.Data[0].ProductNumber != "SW-1" || page.Data[0].Stock != 7 || len(page.Data[0].Price) != 1 {
+		t.Fatalf("unexpected JSON:API page %#v", page)
+	}
+
+	var flat shopwareSearchPage[shopwareProduct]
+	if err := json.Unmarshal([]byte(`{"data":[{"id":"p2","productNumber":"SW-2","name":"Legacy","active":true,"stock":3,"updatedAt":"2026-08-12T07:00:00+00:00"}],"total":2}`), &flat); err != nil {
+		t.Fatal(err)
+	}
+	if flat.Total != 2 || len(flat.Data) != 1 || flat.Data[0].ID != "p2" || flat.Data[0].ProductNumber != "SW-2" {
+		t.Fatalf("unexpected flat page %#v", flat)
+	}
+}
+
+func TestCurrentJSONAPIProductDetailAndCurrencyShape(t *testing.T) {
+	var detail shopwareProductDetail
+	if err := json.Unmarshal([]byte(`{"id":"p1","type":"product","attributes":{"productNumber":"SW-1","name":"Demo","active":true,"description":"Description"}}`), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.ID != "p1" || detail.ProductNumber != "SW-1" || detail.Name != "Demo" || detail.Description != "Description" {
+		t.Fatalf("unexpected product detail %#v", detail)
+	}
+	var currency shopwareCurrency
+	if err := json.Unmarshal([]byte(`{"id":"eur-id","type":"currency","attributes":{"isoCode":"EUR"}}`), &currency); err != nil {
+		t.Fatal(err)
+	}
+	if currency.ID != "eur-id" || currency.IsoCode != "EUR" {
+		t.Fatalf("unexpected currency %#v", currency)
+	}
+}
+
 func TestWebhookIsUnsupported(t *testing.T) {
 	connector := New(scriptedTransport{}, testConfig{}, nil)
 	request := sdk.CommerceWebhookRequest{Signature: "0123456789abcdef", HeaderTopic: "order.updated", ExpectedTopic: "order.updated", Body: []byte(`{"id":1}`), ReceivedAt: time.Now().UTC()}

@@ -129,13 +129,13 @@ test("AI provider settings keep form controls aligned and separated", () => {
   assert.match(css, /\.ai-provider-form-actions \{ margin-top: 14px; \}/);
 });
 
-test("profile card presents OIDC identity details and an offline demo avatar", () => {
+test("profile card presents stored profile details and an offline demo avatar", () => {
   const settings = read("pages/SettingsPage.tsx");
   const model = read("auth/session-model.ts");
   const adapter = read("auth/keycloak-adapter.ts");
   const avatar = read("components/UserAvatar.tsx");
   const css = read("styles.css");
-  for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "Профильные данные приходят из Keycloak"]) assert.match(settings, new RegExp(token));
+  for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "хранятся в TORGNEXA", "getCurrentUserProfile", "uploadCurrentUserAvatar", "Изменить профиль", "Удалить фото"]) assert.match(settings, new RegExp(token));
   for (const token of ["jobTitle", "department", "birthdate", "phoneNumber", "picture"]) { assert.match(model, new RegExp(token)); assert.match(adapter, new RegExp(token)); }
   assert.match(avatar, /demo-avatar\.svg/);
   assert.match(css, /\.profile-hero/);

@@ -208,6 +208,26 @@ function ShopifyDockerGuide() {
   </div>;
 }
 
+function ShopwareDockerGuide() {
+  return <div className="docs-opencart-guide" id="shopware-smoke">
+    <h3>Shopware 6: проверка Admin API в Docker Compose</h3>
+    <p>Shopware использует Admin API под <code>/api/*</code> и OAuth2 <code>client_credentials</code> для Integration. Disposable Compose-стенд на loopback использует community-образ Dockware с демо-каталогом; это не production-магазин и не merchant staging.</p>
+    <ol className="docs-steps compact">
+      <li><strong>Запустите стенд</strong><span>Команды выполняются из корня репозитория. API будет доступен только на порту 18005.</span><pre><code>docker compose -f docker-compose.shopware-test.yml up -d; docker compose -f docker-compose.shopware-test.yml ps</code></pre></li>
+      <li><strong>Создайте временную Integration</strong><span>Выведите access key и secret внутри контейнера, сохраните их только в текущем shell и не коммитьте.</span><pre><code>{`docker compose -f docker-compose.shopware-test.yml exec -T shopware bash -lc 'cd /var/www/html && php bin/console integration:create --admin --no-interaction smoke-torgnexa'`}</code></pre></li>
+      <li><strong>Запустите credentialed smoke</strong><span>Проверяются OAuth, отказ без bearer, JSON:API/flat response mapping, каталог, EUR price, stock, orders, refunds, записи и read-after-write cleanup.</span><pre><code>{`SHOPWARE_BASE_URL=http://127.0.0.1:18005 SHOPWARE_ALLOW_HTTP=1 SHOPWARE_HOST_HEADER=localhost SHOPWARE_CLIENT_ID=... SHOPWARE_CLIENT_SECRET=... SHOPWARE_TEST_SKU=SWDEMO10002 SHOPWARE_STORE_CURRENCY=EUR SHOPWARE_ALLOW_WRITES=1 scripts/shopware-smoke.sh`}</code></pre></li>
+      <li><strong>Удалите стенд</strong><span>После проверки удалите только Shopware-контейнер и его disposable данные.</span><pre><code>docker compose -f docker-compose.shopware-test.yml down -v</code></pre></li>
+    </ol>
+    <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Демо-объект</th><th>Значение</th><th>Что подтверждает</th></tr></thead><tbody>
+      <tr><td><code>SWDEMO10002</code></td><td>EUR price, stock 10</td><td>catalog/detail, currency/price и inventory read</td></tr>
+      <tr><td><code>search/order</code></td><td>bounded read</td><td>orders и state-machine shape</td></tr>
+      <tr><td><code>order-transaction-capture-refund</code></td><td>bounded read</td><td>фактический public refunds route</td></tr>
+    </tbody></table></div>
+    <Callout title="Только локальная проверка" tone="warning">Порт <code>18005</code>, Integration key/secret и demo-данные синтетические. Dockware — community-supported image; для внешнего staging используйте HTTPS, scoped Integration и отдельный SKU. Product create, incoming webhooks и необратимая отмена заказа остаются закрыты.</Callout>
+    <p>Полная процедура и результат находятся в <code>docs/connectors/shopware/docker-live-qualification.md</code> и <code>docs/connectors/shopware/live-qualification-status.json</code>. Docker smoke прошёл 2026-08-29; merchant qualification требует отдельного endpoint.</p>
+  </div>;
+}
+
 const routes = [
   ["Обзор", "/", "Показатели, онбординг и состояние операционного контура"],
   ["Каталог", "/catalog", "Товары, предложения, категории и изображения"],
@@ -437,6 +457,7 @@ export function PublicDocumentationPage() {
           <PrestaShopDockerGuide/>
           <SaleorDockerGuide/>
           <ShopifyDockerGuide/>
+          <ShopwareDockerGuide/>
           <figure><img src="/docs/integration-connection.png" alt="Пошаговое подключение кабинета интеграции TORGNEXA"/><figcaption>Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта.</figcaption></figure>
           <p>Для OAuth-подключения нажмите «Войти». Токен доступа обновляется сервером автоматически до истечения срока. Повторный вход требуется только если площадка отозвала доступ, отклонила токен обновления или не выдала его; карточка кабинета покажет «Войти снова».</p>
           <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур ограничен товарами и явно указанными направлениями синхронизации. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>

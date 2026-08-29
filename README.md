@@ -1,106 +1,102 @@
 # TORGNEXA
 
-Architecture, contracts, implementation and executable backlog for **TORGNEXA** — an open-source/self-hosted commerce & distribution operating platform.
+[Русская версия](README.ru.md)
 
-TORGNEXA covers marketplace/classified/social channels, ERP, PIM/MDM, bidirectional synchronization, reconciliation, reporting/settlements, advertising/promotions, procurement/WMS, logistics/PUDO, Russian compliance, legal-party/product-compliance master data, enterprise IAM/SIEM/Cloud billing/security edge, external automation and agent workflows.
+TORGNEXA is an open-source, self-hosted, API-first commerce and distribution
+platform. It unifies operations across marketplaces, storefronts, social
+channels, ERP, PIM/MDM, inventory, orders, fulfillment, finance, compliance
+and automation.
 
-## Package contents
+## What is included
 
-- `docs/` — architecture v1.0 and domain/platform specifications.
-- `adr/` — architectural decisions.
-- `contracts/` — OpenAPI/events/plugins/webhooks/privacy/ledger/AI/conformance contracts.
-- `frontend/` — React/TypeScript/Vite shell using the generated TypeScript SDK and host-owned OIDC adapter.
-- `tasks/issues/` — contiguous atomic task cards numbered 001–159, with
-  implementation and validation status recorded in each card.
-- `tasks/milestones/` — dependency-aware milestones M0-M13.
-- `templates/` — repeatable architecture, implementation and review artifacts.
-- Go scaffold, migrations, Docker Compose and CI baseline.
+- provider-neutral commerce and distribution core;
+- marketplace, storefront, classified, social, ERP, payment, logistics and
+  compliance connectors;
+- catalog/PIM, pricing, inventory, orders, returns, procurement, WMS,
+  fulfillment and settlement workflows;
+- REST API, OpenAPI contracts, signed webhooks, MCP/OpenClaw and n8n
+  integration boundaries;
+- tenant-scoped governance, approvals, audit/lineage, secrets, privacy,
+  upload security, IAM and SIEM foundations;
+- React/TypeScript frontend, Go services, migrations, Docker Compose and CI
+  validation tooling.
 
-## Technology baseline
+## Repository map
 
-Go 1.26.x, PostgreSQL 18.x, Apache Kafka 4.3.x (KRaft), Valkey 9.1.x, ClickHouse 26.x, S3-compatible storage, Keycloak 26.7.x, React/TypeScript/Vite, OpenTelemetry/Prometheus/Grafana/Loki. n8n is an external integration; MCP/OpenClaw uses scoped APIs/tools.
+- `docs/` — architecture and domain/platform documentation;
+- `adr/` — architectural decisions;
+- `contracts/` — OpenAPI, event, plugin, webhook and JSON Schema contracts;
+- `connectors/` — SDK-based provider implementations grouped by category;
+- `internal/` — core, platform and application packages;
+- `frontend/` — React/TypeScript/Vite application;
+- `tasks/` — scoped implementation tasks and execution plans;
+- `scripts/`, `deploy/`, `docker-compose*.yml` — development and deployment
+  tooling.
 
+## Architecture
 
-## Community Docker quick start
+TORGNEXA starts as a modular monolith in Go. PostgreSQL is the operational
+system of record; Kafka is the durable event platform; ClickHouse stores
+analytics/history; Valkey is limited to cache, lock and rate-limit state; and
+S3-compatible storage holds media and evidence artifacts.
 
-The server-side Community stack is now reproducible from repository state:
+Core code does not branch on provider names. Connectors implement SDK ports and
+capability declarations, while host-side runtime adapters own network access,
+secret callbacks, policy checks and bounded retries. Architecture v1 is frozen
+in [`docs/54-architecture-freeze-v1.md`](docs/54-architecture-freeze-v1.md).
+
+## Community quick start
+
+Requirements: Docker with Compose v2 and a local checkout.
 
 ```bash
+make community-init
 make community-up
+make community-status
 ```
 
-The command creates a private local `.env` if needed, validates deployment
-policy, builds TORGNEXA application/frontend images and starts PostgreSQL,
-Kafka, Valkey, ClickHouse, Garage S3, ClamAV, Keycloak, the canonical migration
-job, API, worker, scheduler, MCP and the React frontend. All development host
-ports bind to `127.0.0.1`.
+The Community stack runs locally on loopback and includes PostgreSQL, Kafka,
+Valkey, ClickHouse, S3-compatible storage, ClamAV, Keycloak, the API, worker,
+scheduler, MCP service and frontend. Local demo access uses the synthetic
+Keycloak account `demo` / `demo-local-only`.
 
-Для проверки фронта используйте локальную учётную запись Keycloak `demo` /
-`demo-local-only`. Она синтетическая и предназначена только для Community;
-при первом запросе API её членство в development workspace создаётся
-автоматически.
-
-Полный авторизованный браузерный smoke-тест запускается отдельной командой:
+For a full browser smoke test, start the stack and run:
 
 ```bash
 make community-e2e
 ```
 
-Команда использует чистый профиль Chrome, проходит настоящий вход через
-Keycloak и проверяет каталог, карточку товара с изображением и заказы с
-миниатюрами. Для запуска нужны поднятый Community-стек и установленный
-`google-chrome` (или переменная `CHROME_BIN`).
+See [`docs/deployment/environment-variables.md`](docs/deployment/environment-variables.md)
+for configuration and safe secret rotation. Do not use `.env.example` as a
+production configuration. Production deployment guidance is in
+[`docs/deployment/093-community-docker-deployment.md`](docs/deployment/093-community-docker-deployment.md)
+and [`docs/deployment/production-ssh-deploy.md`](docs/deployment/production-ssh-deploy.md).
 
-The generated file is self-documented. A complete list of variables, accepted
-formats, examples and safe rotation rules is available in
-[`docs/deployment/environment-variables.md`](docs/deployment/environment-variables.md).
-Do not copy `.env.example` as a ready configuration: generate real secrets with
-`make community-init`.
+## Validation and evidence
+
+The tracked [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) is a concise
+repository validation summary. Run-specific runtime and release evidence is
+generated into `qualification/evidence/` or retained as CI artifacts; those
+outputs are deliberately not committed as source files.
+
+## Development
+
+Read [`docs/00-product-scope.md`](docs/00-product-scope.md),
+[`docs/01-architecture.md`](docs/01-architecture.md),
+[`docs/03-module-boundaries.md`](docs/03-module-boundaries.md) and the relevant
+task card before changing the repository. Public API changes are contract-first
+under `contracts/openapi/`; mutating operations must preserve tenant scope,
+idempotency, auditability and security policy.
+
+The standard repository checks are:
 
 ```bash
-make community-status
-make community-down
+gofmt -w <changed-go-files>
+go test ./...
+go vet ./...
+./scripts/check-contracts.sh
 ```
 
-The frontend lockfile is committed and used by the Community Compose build.
-Compose runs the frontend container on the loopback interface; production
-frontend publication remains disabled by the JavaScript supply-chain policy.
-This is a local single-host artifact, not a production CDN/web-server topology. See
-`docs/deployment/093-community-docker-deployment.md`.
+## License
 
-The guarded manual SSH rollout for a pre-provisioned production host is described
-in [`docs/deployment/production-ssh-deploy.md`](docs/deployment/production-ssh-deploy.md).
-
-## Architecture rule
-
-**Core never knows provider names.** Marketplaces, storefronts (including WooCommerce, PrestaShop and OpenCart), classified/verticals, social channels, ERP, EDO, government, payment, logistics, PUDO and CRM providers are plugins/connectors using capability contracts and the conformance suite.
-
-Architecture v1.0 is frozen in `docs/54-architecture-freeze-v1.md`.
-
-Marketplace coverage, admitted capabilities and qualification evidence are
-summarized in [`docs/connectors/marketplaces.md`](docs/connectors/marketplaces.md).
-Actual production execution is deliberately narrower than manifest coverage;
-the current **18 generic / 43 separate-surface / 0 planned** split is documented in
-[`docs/10-integrations-matrix.md`](docs/10-integrations-matrix.md).
-
-The AI-provider surface includes hosted providers (including Google Gemini and
-Grok) plus local Ollama, LM Studio and Open WebUI adapters. Local model servers
-remain operator-managed and are reached only through the host-mediated
-allowlisted transport. Midjourney is not connectable because its official
-policy prohibits third-party automation and does not offer a general API.
-
-The Integrations surface also includes a separate self-hosted 1С-Битрикс
-storefront card. Its current executable scope is product catalog read/write via
-the official REST-module webhook; inventory, prices and orders remain closed
-until matching worker bridges are qualified.
-
-## Development workflow
-
-```text
-Read docs/00-product-scope.md, docs/01-architecture.md,
-docs/03-module-boundaries.md and tasks/issues/001-bootstrap-go-platform.md.
-Implement Task 001 only. Do not expand scope. Run repository checks and
-report changed files, validation evidence, risks and follow-ups.
-```
-
-After shared contracts are stable, follow `tasks/EXECUTION_PLAN.md`. Do not parallelize provider connectors before the Connector SDK, schema contracts, plugin security and connector conformance gate are stable.
+TORGNEXA is distributed under the Apache License 2.0. See [`LICENSE`](LICENSE).

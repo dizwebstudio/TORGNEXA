@@ -69,6 +69,14 @@ REST protocol double: run `scripts/shopify-smoke.sh` with
 `docker-compose.shopify-test.yml` as documented in
 `docs/connectors/shopify/docker-live-qualification.md`. A real Shopify Dev Store
 and app token are still required for merchant qualification.
+Shopware has a disposable Docker store gate: run `scripts/shopware-smoke.sh`
+with `docker-compose.shopware-test.yml` as documented in
+`docs/connectors/shopware/docker-live-qualification.md`. The smoke uses a
+temporary Shopware Integration credential and checks the real Admin API,
+including JSON:API/flat-response mapping, catalog, price/stock, orders/refunds,
+writes, read-after-write and cleanup. A real merchant staging endpoint remains
+required for external qualification; the Dockware image is community-supported
+and disposable, not a production deployment.
 
 ## Machine-readable report
 

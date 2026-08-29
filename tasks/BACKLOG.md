@@ -127,6 +127,18 @@ Shopify marks REST legacy for new apps, so a future GraphQL Admin API migration
 must be handled as a separately scoped compatibility task rather than hidden in
 this qualification.
 
+## Shopware storefront qualification
+
+Task 148's Shopware 6 connector is credential-smoke-tested against a disposable
+Shopware 6.7 Docker store using a temporary Integration credential. The gate
+covers client-credentials OAuth, JSON:API and flat DAL response mapping,
+catalog/detail, EUR price, stock, orders, refunds, product/price/stock writes,
+read-after-write reconciliation and automatic cleanup. The Dockware image is a
+community-supported disposable fixture; external merchant staging remains
+blocked until an HTTPS endpoint, scoped Integration credential and synthetic SKU
+are supplied. See `docs/connectors/shopware/docker-live-qualification.md` and
+`live-qualification-status.json`.
+
 ## Почта России logistics connector
 
 Task 155 adds «Почта России» to the separate Delivery surface with encrypted

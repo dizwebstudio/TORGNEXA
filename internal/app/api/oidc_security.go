@@ -192,20 +192,14 @@ func profileFromOIDCClaims(claims oidcClaims, info userInfoClaims, subjectRef st
 	profile := userprofile.Identity{
 		SubjectRef:  subjectRef,
 		Username:    firstProfileClaim(info.Username, claims.Username, 128),
-		Email:       strings.ToLower(firstProfileClaim(info.Email, claims.Email, 254)),
+		Email:       profileEmailClaim(info.Email, claims.Email),
 		GivenName:   firstProfileClaim(info.GivenName, claims.GivenName, 160),
 		FamilyName:  firstProfileClaim(info.FamilyName, claims.FamilyName, 160),
 		PictureURL:  profilePictureClaim(info.PictureURL, claims.PictureURL),
 		Birthdate:   profileBirthdateClaim(info.Birthdate, claims.Birthdate),
-		JobTitle:    firstProfileClaim(info.JobTitle, claims.JobTitle, 160),
+		JobTitle:    profileJobTitle(claims, info),
 		Department:  firstProfileClaim(info.Department, claims.Department, 160),
 		PhoneNumber: firstProfileClaim(info.PhoneNumber, claims.PhoneNumber, 64),
-	}
-	if profile.JobTitle == "" {
-		profile.JobTitle = firstProfileClaim(info.Position, claims.Position, 160)
-	}
-	if profile.JobTitle == "" {
-		profile.JobTitle = firstProfileClaim(info.Title, claims.Title, 160)
 	}
 	if !profile.Valid() {
 		// An invalid optional claim must not invalidate an otherwise valid OIDC
@@ -213,7 +207,7 @@ func profileFromOIDCClaims(claims oidcClaims, info userInfoClaims, subjectRef st
 		profile = userprofile.Identity{
 			SubjectRef:  subjectRef,
 			Username:    safeProfileClaim(profile.Username, 128),
-			Email:       strings.ToLower(safeProfileClaim(profile.Email, 254)),
+			Email:       profileEmailClaim(profile.Email, ""),
 			GivenName:   safeProfileClaim(profile.GivenName, 160),
 			FamilyName:  safeProfileClaim(profile.FamilyName, 160),
 			PictureURL:  profilePictureClaim(profile.PictureURL, ""),
@@ -231,6 +225,25 @@ func firstProfileClaim(primary, fallback string, maximum int) string {
 		return value
 	}
 	return safeProfileClaim(fallback, maximum)
+}
+
+func profileEmailClaim(primary, fallback string) string {
+	for _, value := range []string{primary, fallback} {
+		candidate := safeProfileClaim(value, 254)
+		if candidate != "" && strings.Contains(candidate, "@") {
+			return strings.ToLower(candidate)
+		}
+	}
+	return ""
+}
+
+func profileJobTitle(claims oidcClaims, info userInfoClaims) string {
+	for _, value := range []string{info.JobTitle, info.Position, info.Title, claims.JobTitle, claims.Position, claims.Title} {
+		if candidate := safeProfileClaim(value, 160); candidate != "" {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func safeProfileClaim(value string, maximum int) string {

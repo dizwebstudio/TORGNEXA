@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "connector_id": "shopware",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/shopware/conformance-report.json"
+  },
+  "docker_store": {
+    "status": "pass",
+    "checked_at": "2026-08-29",
+    "compose": "docker-compose.shopware-test.yml",
+    "image": "dockware/shopware:6.7.2.2",
+    "endpoint": "http://127.0.0.1:18005",
+    "sku": "SWDEMO10002",
+    "currency": "EUR",
+    "checks": [
+      "unauthorized_admin_api_rejected",
+      "client_credentials_oauth_exchange",
+      "bounded_product_search_and_detail",
+      "json_api_and_plain_entity_response_mapping",
+      "currency_and_price_read",
+      "stock_read",
+      "orders_read",
+      "refunds_read_hyphenated_route",
+      "product_write_read_after_write",
+      "price_write_read_after_write",
+      "stock_write_read_after_write",
+      "automatic_cleanup_restore"
+    ],
+    "result": "pass",
+    "scope": "Disposable Shopware Admin API store; not a merchant production or staging store"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "SHOPWARE_BASE_URL",
+      "SHOPWARE_CLIENT_ID",
+      "SHOPWARE_CLIENT_SECRET",
+      "SHOPWARE_TEST_SKU",
+      "SHOPWARE_STORE_CURRENCY"
+    ],
+    "requirement": "HTTPS non-production Shopware store with a scoped Integration credential and synthetic fixture"
+  },
+  "smoke_script": "scripts/shopware-smoke.sh",
+  "reason_code": "external_non_production_endpoint_not_configured"
+}

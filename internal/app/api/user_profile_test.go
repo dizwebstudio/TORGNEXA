@@ -55,9 +55,9 @@ func (stub *auditStub) Capture(_ context.Context, _ tenancy.Scope, entry audit.E
 	return audit.Record{}, nil
 }
 
-type uploadReceiverStub struct{ called bool }
+type profileUploadReceiverStub struct{ called bool }
 
-func (stub *uploadReceiverStub) ReceiveWithID(context.Context, tenancy.Scope, uploads.ID, uploads.Metadata, io.Reader, uploads.Mutation) (uploads.Record, error) {
+func (stub *profileUploadReceiverStub) ReceiveWithID(context.Context, tenancy.Scope, uploads.ID, uploads.Metadata, io.Reader, uploads.Mutation) (uploads.Record, error) {
 	stub.called = true
 	return uploads.Record{ID: "upl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", State: uploads.StateQuarantined}, nil
 }
@@ -134,7 +134,7 @@ func TestUserProfileUpdateRequiresIdempotencyAndAuditsChangedFields(t *testing.T
 }
 
 func TestImageOnlyUploadReceiverRejectsNonImageFilenameBeforeStorage(t *testing.T) {
-	stub := &uploadReceiverStub{}
+	stub := &profileUploadReceiverStub{}
 	receiver := imageOnlyUploadReceiver{receiver: stub}
 	_, err := receiver.ReceiveWithID(context.Background(), validTestScope(t), "upl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", uploads.Metadata{OriginalFilename: "payload.txt", DeclaredMediaType: "text/plain", DeclaredSizeBytes: 1}, strings.NewReader("x"), uploads.Mutation{})
 	if !errors.Is(err, uploads.ErrInvalid) || stub.called {

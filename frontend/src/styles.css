@@ -249,6 +249,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .field-with-action .token-reveal { flex:1; margin:0; }
 .settings-avatar { width: 82px; height: 82px; border-radius: 24px; font-size: 24px; box-shadow: 0 10px 24px rgba(49,89,216,.14); }
 .profile-hero { display: flex; align-items: center; gap: 16px; }
+.profile-hero-actions { margin-left: auto; align-self: flex-start; }
 .profile-hero-copy { min-width: 0; }
 .profile-hero-copy h2 { font-size: 23px; }
 .profile-title { margin: 6px 0 10px; color: var(--text-muted); font-size: 13px; }
@@ -256,6 +257,11 @@ tbody tr:last-child td { border-bottom: 0; }
 .profile-badges span { display: inline-flex; align-items: center; min-height: 25px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--surface-soft); font-size: 11px; font-weight: 650; }
 .profile-facts { grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 20px; }
 .profile-source-note { line-height: 1.45; }
+.profile-avatar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+.profile-avatar-actions small { flex-basis: 100%; color: var(--text-muted); font-size: 11px; }
+.profile-editor { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.profile-editor .settings-form { margin: 0 0 16px; }
+.profile-editor-actions { display: flex; justify-content: flex-end; gap: 9px; }
 .settings-facts { display: grid; gap: 14px; margin: 24px 0 0; }
 .settings-facts div { display: grid; gap: 5px; }
 .settings-facts dt { color: #8a94a6; font-size: 12px; }

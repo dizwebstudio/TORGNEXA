@@ -778,6 +778,29 @@ orders/refunds, product/price/inventory writes, read-after-write and cleanup.
   have a safe complete rollback in the generic test contract;
 - status is tracked in `docs/connectors/shopify/live-qualification-status.json`.
 
+## Phase 27.4 — Shopware storefront qualification
+
+`148`
+
+Task 148 adds Shopware 6 as a self-hosted storefront connector. The SDK
+conformance report is 13/13 PASS. On 2026-08-29 a disposable Shopware 6.7
+Docker store passed credentialed Admin API smoke for OAuth, catalog/detail,
+currency/price, stock, orders, refunds, product/price/stock writes,
+read-after-write and cleanup. The connector was corrected to accept both the
+current JSON:API response (`data.attributes`, `meta.total`) and flat DAL
+responses; refunds use the public hyphenated entity route.
+
+### Gate RUNTIME-148
+
+- run `docker-compose.shopware-test.yml` with `scripts/shopware-smoke.sh` and a
+  temporary Integration credential; the disposable all-in-one Dockware image
+  is community-supported and must not receive production data;
+- product create and incoming webhooks remain fail-closed; order cancellation
+  is not part of the automatic smoke because it is irreversible;
+- external merchant qualification remains separate and requires an HTTPS
+  endpoint, scoped Integration credential and synthetic SKU; status is tracked
+  in `docs/connectors/shopware/live-qualification-status.json`.
+
 ## Phase 27.5 — Saleor storefront qualification
 
 `154`

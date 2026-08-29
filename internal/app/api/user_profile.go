@@ -137,12 +137,14 @@ func (api profileAPI) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	changed := changedProfileFields(current, updated)
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "settings.profile.updated", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"changed_fields": changed, "picture_changed": current.PictureUploadID != updated.PictureUploadID, "version": updated.Version},
-	}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
-		return
+	if len(changed) > 0 {
+		if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.updated", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"changed_fields": changed, "picture_changed": current.PictureUploadID != updated.PictureUploadID, "version": updated.Version},
+		}); auditErr != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, api.view(principal, updated))
 }
@@ -183,9 +185,11 @@ func (api profileAPI) deleteAvatar(w http.ResponseWriter, r *http.Request) {
 		writeProfileError(w, err)
 		return
 	}
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "settings.profile.avatar_removed", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"picture_changed": current.PictureUploadID != updated.PictureUploadID, "version": updated.Version}}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
-		return
+	if current.PictureUploadID != updated.PictureUploadID {
+		if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.avatar_removed", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"picture_changed": true, "version": updated.Version}}); auditErr != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, api.view(principal, updated))
 }

@@ -80,13 +80,13 @@ self-hosted (and cloud) e-commerce platform, especially in the EU market.
   cache only pays off within one call's own sub-requests, not across
   separate top-level operations. A real, accepted efficiency trade-off,
   not a correctness issue.
-- Live-instance qualification: unverifiable without a real self-hosted
-  Shopware deployment and Integration credential, same limitation already
-  documented for SBP/Robokassa/Shopify/Medusa.
-- The Task-064 conformance suite's `sandbox_isolation` check could not be
-  exercised in this repository's execution environment because it cannot
-  create unprivileged Linux user namespaces (`unshare --user` returns
-  `Operation not permitted`); this is an environment constraint shared by
-  every connector's Task-029 sandbox probe, not a Shopware-specific gap.
-  `docs/connectors/shopware/conformance-report.json` records the genuine
-  12/13 result rather than a fabricated pass.
+- Live-instance qualification: a disposable Shopware 6.7 Docker store has now
+  passed credentialed Admin API smoke (catalog, currency/price, stock, orders,
+  refunds, writes, read-after-write and cleanup). A real merchant staging
+  endpoint and Integration credential remain a separate qualification gate;
+  see `docs/connectors/shopware/docker-live-qualification.md` and
+  `live-qualification-status.json`.
+- The Task-064 conformance suite passes all 13 checks. The connector also
+  accepts the current JSON:API (`data.attributes`, `meta.total`) and flat DAL
+  response shapes observed across Shopware installations; regression coverage
+  is in `connectors/storefronts/shopware/connector_test.go`.

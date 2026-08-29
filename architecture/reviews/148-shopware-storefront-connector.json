@@ -98,7 +98,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "Provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/shopware/conformance-report.json records this genuine result rather than a fabricated pass."
+      "evidence": "Provider tests, go build/vet/test and the Task-064 conformance candidate pass all 13 checks. The credentialed disposable Shopware Docker Admin API smoke is recorded in docs/connectors/shopware/docker-live-qualification.md and live-qualification-status.json; external merchant qualification remains a separate gate."
     }
   ],
   "provider": {

@@ -1,5 +1,5 @@
-import {useEffect,useState} from "react";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {useEffect,useRef,useState} from "react";
+import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useAuth} from "../auth/AuthProvider";
 import {useApi} from "../api/ApiProvider";
 import {ErrorBlock} from "../components/ApiState";
@@ -41,6 +41,54 @@ function formatBirthdate(value?: string): string {
   return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat("ru-RU", {dateStyle: "long", timeZone: "UTC"}).format(parsed) : value;
 }
 
+interface BackendUserProfile {
+  username: string;
+  email: string;
+  given_name: string;
+  family_name: string;
+  birthdate?: string;
+  job_title?: string;
+  department?: string;
+  phone_number?: string;
+  picture_url?: string;
+  picture_upload_id?: string;
+  picture_source: "none" | "identity_provider" | "uploaded";
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+type EditableUserProfile = Pick<BackendUserProfile, "given_name" | "family_name" | "birthdate" | "job_title" | "department" | "phone_number">;
+
+function decodeUserProfile(value: unknown): BackendUserProfile {
+  if (!value || typeof value !== "object") throw new Error("invalid user profile response");
+  const row = value as Record<string, unknown>;
+  for (const key of ["username", "email", "given_name", "family_name", "picture_source", "created_at", "updated_at"]) {
+    if (typeof row[key] !== "string") throw new Error("invalid user profile response");
+  }
+  if (typeof row.version !== "number" || !Number.isSafeInteger(row.version) || row.version < 1 || !["none", "identity_provider", "uploaded"].includes(row.picture_source as string)) throw new Error("invalid user profile response");
+  return row as unknown as BackendUserProfile;
+}
+
+function profileFromBackend(value: BackendUserProfile): UserProfile {
+  return {username: value.username || undefined, email: value.email || undefined, givenName: value.given_name || undefined, familyName: value.family_name || undefined, birthdate: value.birthdate || undefined, jobTitle: value.job_title || undefined, department: value.department || undefined, phoneNumber: value.phone_number || undefined, picture: value.picture_url || undefined};
+}
+
+function editableFromBackend(value: BackendUserProfile): EditableUserProfile {
+  return {given_name: value.given_name, family_name: value.family_name, birthdate: value.birthdate ?? "", job_title: value.job_title ?? "", department: value.department ?? "", phone_number: value.phone_number ?? ""};
+}
+
+function bytesToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 const accessGroups: readonly {id: CapabilityGroupID; title: string; description: string; icon: IconName}[] = [
   {id: "commerce", title: "Продажи и данные", description: "Каталог, заказы, остатки и аналитика", icon: "catalog"},
   {id: "integrations", title: "Интеграции и обмен", description: "Каналы, синхронизация и автоматизация", icon: "connectors"},
@@ -74,7 +122,38 @@ export function SettingsPage() {
   const isAdmin = session.roles?.includes("admin") ?? false;
   const roles = session.roles?.length ? session.roles : [];
   const capabilities = [...new Set(session.capabilities)];
-  const profile = profileForDisplay(session);
+  const canReadProfile = capabilities.includes("settings.profile.read");
+  const canWriteProfile = capabilities.includes("settings.profile.write");
+  const profileQuery = useQuery({queryKey: ["settings", "profile"], enabled: canReadProfile, queryFn: async () => decodeUserProfile((await api.getCurrentUserProfile()).body), staleTime: 30_000});
+  const remoteProfile = profileQuery.data;
+  const sessionProfile = profileForDisplay(session);
+  const profile = remoteProfile ? {...sessionProfile, ...profileFromBackend(remoteProfile)} : sessionProfile;
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<EditableUserProfile>({given_name: "", family_name: "", birthdate: "", job_title: "", department: "", phone_number: ""});
+  const avatarInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (remoteProfile && !editingProfile) setProfileDraft(editableFromBackend(remoteProfile)); }, [remoteProfile, editingProfile]);
+  const updateProfile = useMutation({mutationFn: async () => {
+    if (!remoteProfile) throw new Error("Профиль ещё загружается");
+    return api.updateCurrentUserProfile({idempotencyKey: crypto.randomUUID(), body: {...profileDraft, version: remoteProfile.version}});
+  }, onSuccess: (response) => { const updated = decodeUserProfile(response.body); queryClient.setQueryData(["settings", "profile"], updated); setEditingProfile(false); }});
+  const avatarMutation = useMutation({mutationFn: async (file: File) => {
+    if (!remoteProfile) throw new Error("Профиль ещё загружается");
+    if (!/^image\/(?:png|jpeg|gif)$/.test(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) throw new Error("Поддерживаются PNG, JPEG и GIF размером до 5 МБ");
+    const accepted = await api.uploadCurrentUserAvatar({idempotencyKey: crypto.randomUUID(), body: {filename: file.name, declared_media_type: file.type, content_base64: bytesToBase64(await file.arrayBuffer())}});
+    const acceptedBody = accepted.body as {id?: unknown};
+    if (typeof acceptedBody?.id !== "string") throw new Error("Сервис загрузки не вернул идентификатор фото");
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const status = (await api.getUpload({uploadId: acceptedBody.id})).body as {state?: unknown};
+      if (status.state === "released") return api.updateCurrentUserProfile({idempotencyKey: crypto.randomUUID(), body: {picture_upload_id: acceptedBody.id, version: remoteProfile.version}});
+      if (status.state === "rejected") throw new Error("Фото отклонено проверкой безопасности");
+      await wait(500);
+    }
+    throw new Error("Проверка фото занимает больше обычного времени, повторите через несколько секунд");
+  }, onSuccess: (response) => { queryClient.setQueryData(["settings", "profile"], decodeUserProfile(response.body)); if (avatarInput.current) avatarInput.current.value = ""; }});
+  const removeAvatar = useMutation({mutationFn: async () => {
+    if (!remoteProfile) throw new Error("Профиль ещё загружается");
+    return api.deleteCurrentUserAvatar({idempotencyKey: crypto.randomUUID(), body: {version: remoteProfile.version}});
+  }, onSuccess: (response) => queryClient.setQueryData(["settings", "profile"], decodeUserProfile(response.body))});
   const primaryRole = roles.find((role) => roleLabels[role]) ?? roles[0];
   const roleTitle = primaryRole ? roleLabels[primaryRole] ?? primaryRole : "Участник рабочего пространства";
   const groupedCapabilities = accessGroups.map((group) => ({...group, items: capabilities.filter((capability) => capabilityGroupFor(capability) === group.id)})).filter((group) => group.items.length > 0);
@@ -88,7 +167,9 @@ export function SettingsPage() {
     <div id="settings-panel-general" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-general" tabIndex={0} hidden={activeTab !== "general"}>
       <div className="settings-grid">
       <section className="panel settings-card profile-card">
-        <div className="profile-hero"><UserAvatar session={session} profile={profile} className="settings-avatar"/><div className="profile-hero-copy"><p className="eyebrow">Профиль пользователя</p><h2>{session.displayName}</h2><p className="profile-title">{profile.jobTitle ?? roleTitle}</p><div className="profile-badges"><span>{roleTitle}</span><span>{profile.username ? `@${profile.username}` : "OIDC-профиль"}</span></div></div></div>
+        <div className="profile-hero"><UserAvatar session={session} profile={profile} className="settings-avatar"/><div className="profile-hero-copy"><p className="eyebrow">Профиль пользователя</p><h2>{session.displayName}</h2><p className="profile-title">{profile.jobTitle ?? roleTitle}</p><div className="profile-badges"><span>{roleTitle}</span><span>{profile.username ? `@${profile.username}` : "Профиль пользователя"}</span></div></div><div className="profile-hero-actions">{canWriteProfile && remoteProfile ? <button type="button" className="button ghost compact" onClick={() => setEditingProfile((value) => !value)}>{editingProfile ? "Закрыть" : "Изменить профиль"}</button> : null}</div></div>
+        {canWriteProfile && remoteProfile ? <div className="profile-avatar-actions"><input ref={avatarInput} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) avatarMutation.mutate(file); }}/><button type="button" className="button ghost compact" disabled={avatarMutation.isPending || removeAvatar.isPending} onClick={() => avatarInput.current?.click()}>{avatarMutation.isPending ? "Проверяем фото…" : "Загрузить фото"}</button>{remoteProfile.picture_source === "uploaded" ? <button type="button" className="button ghost compact" disabled={avatarMutation.isPending || removeAvatar.isPending} onClick={() => removeAvatar.mutate()}>Удалить фото</button> : null}<small>PNG, JPEG или GIF · до 5 МБ · фото проходит проверку безопасности</small></div> : null}
+        {editingProfile && remoteProfile ? <form className="profile-editor" onSubmit={(event) => { event.preventDefault(); updateProfile.mutate(); }}><div className="settings-form"><label className="field"><span>Имя</span><input value={profileDraft.given_name} maxLength={160} autoComplete="given-name" onChange={(event) => setProfileDraft((current) => ({...current, given_name: event.target.value}))}/></label><label className="field"><span>Фамилия</span><input value={profileDraft.family_name} maxLength={160} autoComplete="family-name" onChange={(event) => setProfileDraft((current) => ({...current, family_name: event.target.value}))}/></label><label className="field"><span>Дата рождения</span><input type="date" value={profileDraft.birthdate} onChange={(event) => setProfileDraft((current) => ({...current, birthdate: event.target.value}))}/></label><label className="field"><span>Должность</span><input value={profileDraft.job_title} maxLength={160} autoComplete="organization-title" onChange={(event) => setProfileDraft((current) => ({...current, job_title: event.target.value}))}/></label><label className="field"><span>Отдел</span><input value={profileDraft.department} maxLength={160} autoComplete="organization" onChange={(event) => setProfileDraft((current) => ({...current, department: event.target.value}))}/></label><label className="field"><span>Телефон</span><input value={profileDraft.phone_number} maxLength={64} autoComplete="tel" onChange={(event) => setProfileDraft((current) => ({...current, phone_number: event.target.value}))}/></label></div><div className="profile-editor-actions"><button type="button" className="button ghost" onClick={() => { setProfileDraft(editableFromBackend(remoteProfile)); setEditingProfile(false); }}>Отмена</button><button type="submit" className="button primary" disabled={updateProfile.isPending}>{updateProfile.isPending ? "Сохраняем…" : "Сохранить профиль"}</button></div></form> : null}
         <dl className="settings-facts profile-facts">
           <div><dt>Должность</dt><dd>{profile.jobTitle ?? roleTitle}</dd></div>
           <div><dt>Подразделение</dt><dd>{profile.department ?? "Не указано в профиле OIDC"}</dd></div>
@@ -97,7 +178,11 @@ export function SettingsPage() {
           <div><dt>Дата рождения</dt><dd>{formatBirthdate(profile.birthdate)}</dd></div>
           <div><dt>Сессия действует до</dt><dd>{formatExpiry(session.expiresAt)}</dd></div>
         </dl>
-        <p className="settings-note profile-source-note">Профильные данные приходят из Keycloak и не сохраняются в TORGNEXA. Изменить фото и личные данные можно в кабинете учётной записи.</p>
+        <p className="settings-note profile-source-note">Имя пользователя и электронная почта синхронизируются с Keycloak. Личные данные, фото, версии изменений и результаты проверки изображения хранятся в TORGNEXA в текущем рабочем пространстве.</p>
+        {profileQuery.isError ? <ErrorBlock retry={() => void profileQuery.refetch()}>Не удалось загрузить сохранённый профиль.</ErrorBlock> : null}
+        {updateProfile.isError ? <ErrorBlock retry={() => updateProfile.reset()}>Не удалось сохранить профиль. Обновите данные и повторите.</ErrorBlock> : null}
+        {avatarMutation.isError ? <ErrorBlock retry={() => avatarMutation.reset()}>Не удалось загрузить фото. Проверьте формат, размер и результат проверки безопасности.</ErrorBlock> : null}
+        {removeAvatar.isError ? <ErrorBlock retry={() => removeAvatar.reset()}>Не удалось удалить фото профиля.</ErrorBlock> : null}
       </section>
       <section className="panel settings-card">
         <p className="eyebrow">Безопасность</p>

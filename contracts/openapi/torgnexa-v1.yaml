@@ -233,13 +233,15 @@ paths:
       requestBody:
         required: true
         content:
-          application/octet-stream: {schema: {type: string, format: binary}}
-          application/json: {schema: {$ref: '#/components/schemas/UploadWrite'}}
+          application/octet-stream:
+            schema: {type: string, format: binary}
+          application/json:
+            schema: {$ref: '#/components/schemas/UploadWrite'}
       responses:
         '202':
           description: Avatar accepted into quarantine; attach it with PATCH /me/profile after the state becomes released
           content: {application/json: {schema: {$ref: '#/components/schemas/UploadAccepted'}}}
-        '400': {description: Invalid image metadata, filename, size or idempotency key}
+        '400': {description: 'Invalid image metadata, filename, size or idempotency key'}
         '409': {description: Idempotency key conflict}
         '503': {description: Quarantine or scanner dependency unavailable}
     delete:

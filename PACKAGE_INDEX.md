@@ -32,13 +32,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 522
+- docs: 525
 - adrs: 114
 - tasks: 164
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2830
+- total source files (excluding local secrets/build/dependency/cache trees): 2843
 
 
 ## Connector category layout
@@ -399,7 +399,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `Makefile`
 - `PACKAGE_INDEX.md`
 - `README.md`
-- `Readme.ru.md`
+- `README.ru.md`
 - `VALIDATION_REPORT.md`
 - `adr/0001-modular-monolith.md`
 - `adr/0002-kafka-event-platform.md`
@@ -1531,6 +1531,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docker-compose.production.yml`
 - `docker-compose.saleor-test.yml`
 - `docker-compose.shopify-test.yml`
+- `docker-compose.shopware-test.yml`
 - `docker-compose.woocommerce-test.yml`
 - `docker-compose.yml`
 - `docker/opencart-test/Dockerfile`
@@ -1922,6 +1923,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/shopware/capability-audit.md`
 - `docs/connectors/shopware/conformance-plan.md`
 - `docs/connectors/shopware/conformance-report.json`
+- `docs/connectors/shopware/docker-live-qualification.md`
+- `docs/connectors/shopware/live-qualification-status.json`
 - `docs/connectors/shopware/reconciliation.md`
 - `docs/connectors/shopware/spec.md`
 - `docs/connectors/telegram/README.md`
@@ -2016,6 +2019,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/migrations/000023-offline-demo-product-images.md`
 - `docs/migrations/000023-upload-security-pipeline.md`
 - `docs/migrations/000024-sync-engine.md`
+- `docs/migrations/000024-user-profiles.md`
 - `docs/migrations/000025-reconciliation.md`
 - `docs/migrations/000026-ai-agent-governance.md`
 - `docs/migrations/000027-social-core.md`
@@ -2326,6 +2330,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/notifications.go`
 - `internal/app/api/notifications_test.go`
 - `internal/app/api/oidc_membership_test.go`
+- `internal/app/api/oidc_profile_test.go`
 - `internal/app/api/oidc_security.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
 - `internal/app/api/order_status.go`
@@ -2353,6 +2358,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/trust_control.go`
 - `internal/app/api/uploads_content.go`
 - `internal/app/api/uploads_content_test.go`
+- `internal/app/api/user_profile.go`
+- `internal/app/api/user_profile_test.go`
 - `internal/app/api/webhooks.go`
 - `internal/app/api/webhooks_test.go`
 - `internal/app/api/workspace_settings.go`
@@ -2398,6 +2405,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/core/tenancy/id_test.go`
 - `internal/core/tenancy/tenancy.go`
 - `internal/core/tenancy/tenancy_test.go`
+- `internal/core/userprofile/profile.go`
+- `internal/core/userprofile/profile_test.go`
 - `internal/platform/advertising/advertising.go`
 - `internal/platform/advertising/advertising_test.go`
 - `internal/platform/agentgovernance/governance.go`
@@ -2681,6 +2690,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/trustcontrolrepo/repository.go`
 - `internal/platform/postgres/uploadrepo/migration_test.go`
 - `internal/platform/postgres/uploadrepo/repository.go`
+- `internal/platform/postgres/userprofilerepo/migration_test.go`
+- `internal/platform/postgres/userprofilerepo/repository.go`
 - `internal/platform/postgres/webhookrepo/migration_test.go`
 - `internal/platform/postgres/webhookrepo/repository.go`
 - `internal/platform/postgres/workerrepo/repository.go`
@@ -2777,6 +2788,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000021_ai_provider_local_runtime.sql`
 - `migrations/000022_ai_provider_gemini_grok.sql`
 - `migrations/000023_offline_demo_product_images.sql`
+- `migrations/000024_user_profiles.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -2928,6 +2940,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/scan-supply-chain.sh`
 - `scripts/shopify-mock-server.py`
 - `scripts/shopify-smoke.sh`
+- `scripts/shopware-smoke.sh`
 - `scripts/stage-github-release.sh`
 - `scripts/verify-action-pins.sh`
 - `scripts/verify-release-evidence-external.sh`
