@@ -31,6 +31,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
@@ -294,6 +295,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_catalog_repository_startup_failed", repoErr)
 		}
+		orderRepository, repoErr := ordersrepo.New(db)
+		if repoErr != nil {
+			return fail("worker_orders_repository_startup_failed", repoErr)
+		}
 		approvalRepository, repoErr := approvalrepo.New(db)
 		if repoErr != nil {
 			return fail("worker_approval_repository_startup_failed", repoErr)
@@ -302,7 +307,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_notification_repository_startup_failed", repoErr)
 		}
-		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, approvalRepository, notificationRepository, secretProvider, secretRepository, runtimeRegistry)
+		actionExecutor, actionErr := newReconciliationActionExecutor(syncRepository, accountRepository, mappingRepository, catalogRepository, orderRepository, approvalRepository, notificationRepository, secretProvider, secretRepository, runtimeRegistry)
 		if actionErr != nil {
 			return fail("worker_reconciliation_action_startup_failed", actionErr)
 		}
@@ -581,7 +586,7 @@ func runReconciliation(ctx context.Context, logger *slog.Logger, dispatch *worke
 				logger.Warn("reconciliation job deferred", "event", "worker.reconciliation_deferred", "run_id", job.ItemID, "error_code", code)
 				continue
 			}
-			outboundWritable := registry != nil && registry.supportsProductWrite(account)
+			outboundWritable := registry != nil && registry.supportsWriteForEntity(account, policy.EntityType)
 			actions := actionPolicyFor(policy, outboundWritable)
 			_, execErr := engine.Resume(ctx, job.Scope, job.ItemID, 24*time.Hour, actions, reconciliation.MaxPageSize, source)
 			if execErr != nil {

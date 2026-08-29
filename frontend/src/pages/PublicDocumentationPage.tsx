@@ -1,4 +1,4 @@
-import {useEffect, type ReactNode} from "react";
+import {createContext, useContext, useEffect, type ReactNode} from "react";
 import {connectorCatalog} from "../generated/connector-catalog";
 
 export const documentationSections = [
@@ -29,10 +29,49 @@ const documentationNavigation = [
   {title: "Для разработчиков", items: [documentationSections[13]]},
 ] as const;
 
-const docsTitle = "Документация TORGNEXA — интеграции, каталог и синхронизация";
-const docsDescription = "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, управление каталогом, заказами и синхронизацией.";
+export const docsTitle = "Документация TORGNEXA — интеграции, каталог и синхронизация";
+export const docsDescription = "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, управление каталогом, заказами и синхронизацией.";
 
-function DocumentationMetadata() {
+export const documentationPages = [
+  {id: "interface", path: "/docs/getting-started", heading: "Первый вход и интерфейс", title: "Первый вход и интерфейс — документация TORGNEXA", description: "Как войти в TORGNEXA, выбрать рабочий контур и быстро найти нужный раздел интерфейса."},
+  {id: "overview", path: "/docs/overview", heading: "Обзор", title: "Обзор TORGNEXA — документация", description: "Как читать операционные показатели, онбординг, состояние сервисов и задачи, требующие внимания."},
+  {id: "catalog-orders", path: "/docs/catalog-and-orders", heading: "Каталог и заказы", title: "Каталог и заказы — документация TORGNEXA", description: "Как работать с товарами, изображениями, предложениями, заказами, статусами и безопасными повторными операциями."},
+  {id: "inventory-incidents", path: "/docs/inventory-and-incidents", heading: "Остатки и инциденты", title: "Остатки и инциденты — документация TORGNEXA", description: "Как читать остатки и ATP, обрабатывать складские инциденты и безопасно маршрутизировать fulfillment."},
+  {id: "integrations", path: "/docs/integrations", heading: "Интеграции", title: "Интеграции — документация TORGNEXA", description: "Пошаговое подключение маркетплейсов, интернет-магазинов, платежей, CRM и других внешних систем."},
+  {id: "social", path: "/docs/publications", heading: "Публикации", title: "Публикации — документация TORGNEXA", description: "Как создавать и планировать публикации в подключённых социальных каналах с контролем статуса и прав."},
+  {id: "sync", path: "/docs/synchronization", heading: "Синхронизация", title: "Синхронизация — документация TORGNEXA", description: "Как настроить направления обмена, расписание, импорт, сверку и разбор расхождений."},
+  {id: "master-data", path: "/docs/counterparties-and-finance", heading: "Контрагенты и финансы", title: "Контрагенты и финансы — документация TORGNEXA", description: "Как вести единые справочники юридических лиц, банковские реквизиты, платежи, курсы и расчёты."},
+  {id: "control", path: "/docs/approvals-and-documents", heading: "Согласования и документы", title: "Согласования и документы — документация TORGNEXA", description: "Как управлять чувствительными операциями, сертификатами, ЭДО, МЧД и запросами приватности."},
+  {id: "monitoring", path: "/docs/notifications-reports-audit", heading: "Уведомления, отчёты и аудит", title: "Уведомления, отчёты и аудит — документация TORGNEXA", description: "Как отслеживать ошибки, читать отчёты и подтверждать историю привилегированных действий."},
+  {id: "settings", path: "/docs/settings", heading: "Настройки", title: "Настройки TORGNEXA — документация", description: "Как настроить профиль, рабочее пространство, роли, уведомления, интеграции, AI-провайдеров и безопасность."},
+  {id: "automation", path: "/docs/automation", heading: "Автоматизация и расширения", title: "Автоматизация и расширения — документация TORGNEXA", description: "Как безопасно использовать AI-провайдеров, MCP, webhooks, n8n и плагины с ограниченными правами."},
+  {id: "developer", path: "/docs/api-and-extensions", heading: "API и расширения", title: "API и расширения — документация TORGNEXA", description: "Как интегрировать TORGNEXA через REST API, SDK, webhooks, MCP и внешние расширения."},
+  {id: "security", path: "/docs/security", heading: "Доступ и безопасность", title: "Доступ и безопасность — документация TORGNEXA", description: "Как устроены default deny, OIDC, секреты, tenant-контекст, аудит и согласования опасных действий."},
+  {id: "environment", path: "/docs/environment", heading: "Переменные окружения .env", title: "Переменные окружения .env — документация TORGNEXA", description: "Справочник переменных Community-развёртывания: секреты, порты, OIDC, worker, ClamAV и уведомления."},
+  {id: "operations", path: "/docs/operations", heading: "Эксплуатация Community-контура", title: "Эксплуатация TORGNEXA — документация", description: "Как запускать, проверять, обновлять и восстанавливать Community-контур TORGNEXA."},
+  {id: "troubleshooting", path: "/docs/troubleshooting", heading: "Решение проблем", title: "Решение проблем TORGNEXA — документация", description: "Диагностика входа, API, интеграций, синхронизации и случайного раскрытия секрета."},
+] as const;
+
+export type DocumentationSectionId = (typeof documentationPages)[number]["id"];
+
+const documentationPageById = new Map<string, (typeof documentationPages)[number]>(documentationPages.map(page => [page.id, page]));
+
+export function documentationSectionIdForPath(pathname: string): DocumentationSectionId | undefined {
+  const normalized = pathname.replace(/\/+$/, "") || "/";
+  return documentationPages.find(page => page.path === normalized)?.id;
+}
+
+function documentationPathFor(id: string): string {
+  return documentationPageById.get(id)?.path ?? "/docs";
+}
+
+function documentationPageForId(id: DocumentationSectionId) {
+  return documentationPageById.get(id)!;
+}
+
+const DocumentationSectionContext = createContext<DocumentationSectionId | undefined>(undefined);
+
+function DocumentationMetadata({page}: {page: {path: string; title: string; description: string}}) {
   useEffect(() => {
     const previousTitle = document.title;
     const managed: Array<{element: HTMLMetaElement | HTMLLinkElement; previous: string | null; attribute: "content" | "href"; created: boolean}> = [];
@@ -48,26 +87,28 @@ function DocumentationMetadata() {
       element.setAttribute(attribute, value);
     };
 
-    document.title = docsTitle;
-    setHeadValue("meta", 'meta[name="description"]', "content", docsDescription, {name: "description"});
-    setHeadValue("meta", 'meta[property="og:title"]', "content", docsTitle, {property: "og:title"});
-    setHeadValue("meta", 'meta[property="og:description"]', "content", docsDescription, {property: "og:description"});
+    const canonical = `${window.location.origin}${page.path}`;
+    document.title = page.title;
+    setHeadValue("meta", 'meta[name="description"]', "content", page.description, {name: "description"});
+    setHeadValue("meta", 'meta[property="og:title"]', "content", page.title, {property: "og:title"});
+    setHeadValue("meta", 'meta[property="og:description"]', "content", page.description, {property: "og:description"});
     setHeadValue("meta", 'meta[property="og:type"]', "content", "article", {property: "og:type"});
     setHeadValue("meta", 'meta[property="og:locale"]', "content", "ru_RU", {property: "og:locale"});
-    setHeadValue("meta", 'meta[property="og:url"]', "content", `${window.location.origin}/docs`, {property: "og:url"});
+    setHeadValue("meta", 'meta[property="og:url"]', "content", canonical, {property: "og:url"});
     setHeadValue("meta", 'meta[name="twitter:card"]', "content", "summary", {name: "twitter:card"});
-    setHeadValue("link", 'link[rel="canonical"]', "href", `${window.location.origin}/docs`, {rel: "canonical"});
+    setHeadValue("link", 'link[rel="canonical"]', "href", canonical, {rel: "canonical"});
 
     const structuredData = document.createElement("script");
     structuredData.type = "application/ld+json";
     structuredData.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "TechArticle",
-      headline: docsTitle,
-      description: docsDescription,
+      headline: page.title,
+      description: page.description,
       inLanguage: "ru-RU",
-      url: `${window.location.origin}/docs`,
-      mainEntityOfPage: `${window.location.origin}/docs`,
+      url: canonical,
+      mainEntityOfPage: canonical,
+      isPartOf: {"@type": "TechArticle", url: `${window.location.origin}/docs`, name: docsTitle},
       publisher: {"@type": "Organization", name: "TORGNEXA"},
     });
     document.head.appendChild(structuredData);
@@ -424,8 +465,11 @@ const environmentGroups = [
 ] as const;
 
 function DocSection({id, title, intro, children}: {id: string; title: string; intro?: string; children: ReactNode}) {
+  const activeSection = useContext(DocumentationSectionContext);
+  if (activeSection && activeSection !== id) return null;
+  const dedicatedPage = activeSection === id;
   return <section id={id}>
-    <header className="docs-section-heading"><div><p className="eyebrow">РУКОВОДСТВО</p><h2>{title}</h2>{intro ? <p>{intro}</p> : null}</div><a href="#start" aria-label="К началу документации">↑</a></header>
+    {dedicatedPage ? null : <header className="docs-section-heading"><div><p className="eyebrow">РУКОВОДСТВО</p><h2>{title}</h2>{intro ? <p>{intro}</p> : null}</div><a href="/docs" aria-label="К началу документации">↑</a></header>}
     {children}
   </section>;
 }
@@ -447,26 +491,35 @@ function EnvironmentTables() {
   </div>)}</div>;
 }
 
-export function PublicDocumentationPage() {
+export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationSectionId} = {}) {
+  const activeSection = sectionId ?? (typeof window === "undefined" ? undefined : documentationSectionIdForPath(window.location.pathname));
+  const activePage = activeSection ? documentationPageForId(activeSection) : undefined;
+  const page = activePage ?? {path: "/docs", title: docsTitle, description: docsDescription, heading: "Документация TORGNEXA"};
   return <div className="docs-shell">
-    <DocumentationMetadata/>
+    <DocumentationMetadata page={page}/>
     <header className="docs-header">
       <a className="docs-brand" href="/"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Документация</small></span></a>
-      <nav aria-label="Навигация документации"><a href="#start">Руководство</a><a className="docs-login-link" href="/">Войти</a></nav>
+      <nav aria-label="Навигация документации"><a href="/docs">Руководство</a><a className="docs-login-link" href="/">Войти</a></nav>
     </header>
     <div className="docs-layout">
-      <nav className="docs-toc" aria-label="Разделы документации"><strong>Содержание</strong>{documentationNavigation.map(group => <div className="docs-toc-group" key={group.title}><span>{group.title}</span>{group.items.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div>)}</nav>
+      <nav className="docs-toc" aria-label="Разделы документации"><strong><a href="/docs" aria-current={!activeSection ? "page" : undefined}>Содержание</a></strong>{documentationNavigation.map(group => <div className="docs-toc-group" key={group.title}><span>{group.title}</span>{group.items.map(([id, label]) => <a key={id} href={documentationPathFor(id)} aria-current={activeSection === id ? "page" : undefined}>{label}</a>)}</div>)}</nav>
       <main className="docs-content">
-        <section className="docs-hero" id="start">
+        {activePage ? <section className="docs-subpage-intro">
+          <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><a href="/docs">Документация</a><span aria-hidden="true">›</span><span>{activePage.heading}</span></nav>
+          <div className="docs-version"><span>Руководство пользователя</span><span>Тематический раздел</span></div>
+          <h1>{activePage.heading}</h1>
+          <p className="docs-lead">{activePage.description}</p>
+        </section> : <section className="docs-hero" id="start">
           <nav className="docs-breadcrumbs" aria-label="Хлебные крошки"><a href="/">TORGNEXA</a><span aria-hidden="true">›</span><span>Документация</span></nav>
           <div className="docs-version"><span>Руководство пользователя</span><span>Текущий интерфейс</span></div>
           <h1>Документация TORGNEXA</h1>
           <p className="docs-lead">Понятное руководство для e-commerce-команд: как подключить маркетплейс, интернет-магазин, платежи или CRM, работать с каталогом и заказами и безопасно запускать синхронизацию.</p>
-          <div className="docs-hero-actions"><a className="button primary" href="/">Войти в TORGNEXA</a><a className="button secondary" href="#interface">С чего начать</a></div>
-          <div className="docs-reading-paths" aria-label="Сценарии чтения"><a href="#interface"><strong>Я впервые в TORGNEXA</strong><span>Вход, роли и навигация</span></a><a href="#integrations"><strong>Подключаю интеграцию</strong><span>Кабинет, проверка и импорт</span></a><a href="#environment"><strong>Разворачиваю Community</strong><span>.env, Docker и эксплуатация</span></a><a href="#developer"><strong>Интегрирую по API</strong><span>Контракты и расширения</span></a></div>
+          <div className="docs-hero-actions"><a className="button primary" href="/">Войти в TORGNEXA</a><a className="button secondary" href={documentationPathFor("interface")}>С чего начать</a></div>
+          <div className="docs-reading-paths" aria-label="Сценарии чтения"><a href={documentationPathFor("interface")}><strong>Я впервые в TORGNEXA</strong><span>Вход, роли и навигация</span></a><a href={documentationPathFor("integrations")}><strong>Подключаю интеграцию</strong><span>Кабинет, проверка и импорт</span></a><a href={documentationPathFor("environment")}><strong>Разворачиваю Community</strong><span>.env, Docker и эксплуатация</span></a><a href={documentationPathFor("developer")}><strong>Интегрирую по API</strong><span>Контракты и расширения</span></a></div>
           <div className="docs-install-address"><span>Адрес локальной установки</span><code>http://127.0.0.1:5173</code></div>
-        </section>
+        </section>}
 
+        <DocumentationSectionContext.Provider value={activeSection}>
         <DocSection id="interface" title="Первый вход и интерфейс" intro="Публичная документация открывается без авторизации. Рабочие разделы становятся доступны после входа.">
           <ol className="docs-steps">
             <li><strong>Откройте приложение</strong><span>На стартовом экране нажмите «Войти». Технический термин OIDC пользователю в кнопке не показывается.</span></li>
@@ -641,7 +694,7 @@ export function PublicDocumentationPage() {
         </DocSection>
 
         <DocSection id="operations" title="Эксплуатация Community-контура" intro="Перед обновлением проверьте состояние сервисов, резервные копии и возможность восстановления.">
-          <p>Создание и заполнение конфигурации подробно разобрано в разделе <a href="#environment">«Переменные окружения .env»</a>.</p>
+          <p>Создание и заполнение конфигурации подробно разобрано в разделе <a href={documentationPathFor("environment")}>«Переменные окружения .env»</a>.</p>
           <pre><code>docker compose --env-file .env ps{`\n`}curl http://127.0.0.1:8080/api/v1/health{`\n`}docker compose --env-file .env logs --tail=100 api</code></pre>
           <p>PostgreSQL — операционная истина, Kafka — событийная платформа, ClickHouse — аналитика, Valkey — кеши и координация. Нормальное состояние: необходимые сервисы и frontend имеют статус healthy.</p>
           <h3>Рабочая среда на отдельном VPS</h3>
@@ -665,6 +718,7 @@ export function PublicDocumentationPage() {
           </dl>
           <figure><img src="/docs/documentation.png" alt="Публичная документация TORGNEXA"/><figcaption>Руководство доступно до входа и адаптируется под настольный и мобильный экран.</figcaption></figure>
         </DocSection>
+        </DocumentationSectionContext.Provider>
       </main>
     </div>
   </div>;

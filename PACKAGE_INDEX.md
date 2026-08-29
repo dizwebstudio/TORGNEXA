@@ -34,11 +34,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 - docs: 527
 - adrs: 114
-- tasks: 170
+- tasks: 171
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2968
+- total source files (excluding local secrets/build/dependency/cache trees): 2969
 
 
 ## Connector category layout
@@ -142,6 +142,26 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - existing connector/health/sync/OAuth owners remain authoritative; no secrets,
   raw provider errors, provider branches or center-side financial/commerce
   mutations are introduced.
+
+
+## Task 169 additions
+
+- planned provider-neutral AI-помощник для оператора поверх канонических
+  catalog, publication-quality, inventory/forecast, orders/returns,
+  integration-state, notifications, reports, unit-economics and workflow
+  read surfaces;
+- twenty bounded subtasks covering ADR/threat model, session/run contracts,
+  privacy/retention, provider/model budgets, intent routing, grounded retrieval,
+  citations/freshness, server prompt boundary, answer/refusal quality, typed
+  action previews, Task-017 approval hand-off, forced-RLS persistence, durable
+  worker, events/audit/notifications, REST/OpenAPI/SDK, Russian UI, MCP/n8n
+  boundary, operations, synthetic fixtures and Compose/test/documentation
+  qualification;
+- first release is recommendation/preview-first: no autonomous writes, raw
+  prompt/response, chain-of-thought, secrets or second source of truth;
+  external/model text is `UNTRUSTED_TOOL_DATA`, and every proposed mutation
+  reuses capability, policy, approval, idempotency, audit and canonical worker
+  boundaries.
 
 
 ## Task 154 additions
@@ -3356,6 +3376,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/166-product-publication-quality-center.md`
 - `tasks/issues/167-channel-unit-economics.md`
 - `tasks/issues/168-integration-state-center.md`
+- `tasks/issues/169-ai-operator-assistant.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

@@ -21,7 +21,14 @@ Non-secret runtime configuration:
   "base_path": "",
   "catalog_iblock_id": 23,
   "store_currency": "RUB",
-  "price_type_id": 1
+  "price_type_id": 1,
+  "order_statuses": {
+    "pending": "<bitrix-status-id>",
+    "confirmed": "<bitrix-status-id>",
+    "processing": "<bitrix-status-id>",
+    "fulfilled": "<bitrix-status-id>",
+    "cancelled": "<bitrix-status-id>"
+  }
 }
 ```
 
@@ -63,9 +70,12 @@ Order reads use `sale.order.list` and enrich each page with
 `sale.basketitem.list`. Bitrix custom basket lines with `productId=0` are
 excluded from the canonical catalog-line projection; fractional quantities
 are rejected because SDK v1 order quantities are integers. Order status writes
-use `sale.order.update` and verify with `sale.order.get`; the connector does
-not claim runtime admission until the provider-neutral worker order bridge is
-wired.
+use `sale.order.update` and verify with `sale.order.get`. The runtime requires
+all five canonical lifecycle values (`pending`, `confirmed`, `processing`,
+`fulfilled`, `cancelled`) to be mapped explicitly to the installation's
+Bitrix status IDs. The worker then exposes inbound order reconciliation and
+outbound canonical status events; unknown or unmapped statuses remain
+fail-closed.
 
 All network access is host-mediated by the reviewed builtin runtime transport.
 The connector package has no direct HTTP, database or Core imports. Remote

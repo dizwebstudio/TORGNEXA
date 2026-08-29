@@ -66,6 +66,18 @@ make community-status
 | `TORGNEXA_VERSION` | `0.1.0-dev` | Версия образа и метка миграций. Для локальной разработки оставьте значение; для релиза используйте фактическую SemVer-версию. |
 | `TORGNEXA_LOG_LEVEL` | `info` | `debug`, `info`, `warn` или `error`. |
 
+## Публичный адрес frontend и документации
+
+| Переменная | По умолчанию | Как заполнять |
+|---|---:|---|
+| `TORGNEXA_PUBLIC_URL` | не задано в production | Полный публичный HTTPS-адрес frontend без завершающего `/`, например `https://app.example.ru`. Production overlay передаёт его в frontend-сборку; значение встраивается в canonical, Open Graph, JSON-LD и `sitemap.xml`. |
+
+Для локальной сборки документации переменная необязательна: используется
+`http://127.0.0.1:5173`. Для production она обязательна — Compose остановит
+рендеринг конфигурации, если переменная не задана. После изменения адреса
+пересоберите frontend, чтобы обновились статический HTML, `robots.txt` и
+`sitemap.xml`.
+
 `TORGNEXA_ENV`, формат журнала, HTTP-адреса и security-edge параметры для
 Community Compose задаются непосредственно в `docker-compose.yml`. Изменять их
 через `.env` для публичной production-топологии недостаточно.

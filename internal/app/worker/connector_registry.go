@@ -80,7 +80,7 @@ func (registry *runtimeRegistry) productReader(scope tenancy.Scope, account sdk.
 	return reader, err
 }
 
-func (registry *runtimeRegistry) orderReader(scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.OrderReader, error) {
+func (registry *runtimeRegistry) orderReader(scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (builtins.OrderReader, error) {
 	if registry == nil || registry.builtins == nil || !scope.Valid() {
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
@@ -177,6 +177,17 @@ func (registry *runtimeRegistry) supportsOrderStatusWrite(account sdk.Account) b
 	return registry.builtins.SupportsOrderStatusWrite(account)
 }
 
+func (registry *runtimeRegistry) supportsWriteForEntity(account sdk.Account, entity string) bool {
+	switch strings.TrimSuffix(entity, "s") {
+	case "product":
+		return registry.supportsProductWrite(account)
+	case "order":
+		return registry.supportsOrderStatusWrite(account)
+	default:
+		return false
+	}
+}
+
 func (registry *runtimeRegistry) supportsSync(account sdk.Account, entityType, direction string) bool {
 	if registry == nil || registry.builtins == nil {
 		return false
@@ -205,7 +216,7 @@ type productReconciliationSource struct {
 type orderReconciliationSource struct {
 	database *sql.DB
 	account  sdk.Account
-	reader   sdk.OrderReader
+	reader   builtins.OrderReader
 	now      func() time.Time
 }
 
@@ -217,7 +228,7 @@ func (source *orderReconciliationSource) Scan(ctx context.Context, scope tenancy
 	if limit > 50 {
 		limit = 50
 	}
-	page, err := source.reader.ReadOrders(ctx, sdk.PageRequest{Cursor: req.Cursor, Limit: limit})
+	page, err := source.reader.Read(ctx, sdk.PageRequest{Cursor: req.Cursor, Limit: limit})
 	if err != nil {
 		return reconciliation.ScanPage{}, err
 	}

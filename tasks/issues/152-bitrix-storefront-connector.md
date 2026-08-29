@@ -35,9 +35,9 @@ runtime adapter for self-hosted 1С-Битрикс internet shops.
 
 ## Explicit exclusions
 
-Production inventory reconciliation, inbound prices and order worker routing,
-offers/custom properties, browser automation and webhook receipt are not
-claimed as working application routes. Inventory writes require an explicit
-`warehouse` entity mapping to the configured Bitrix warehouse. A real
+Inbound prices, offers/custom properties, browser automation and webhook
+receipt are not claimed as working application routes. Order runtime routing
+requires an explicit `order_statuses` map for all canonical lifecycle values.
+Inventory writes require an explicit `warehouse` entity mapping to the configured Bitrix warehouse. A real
 self-hosted site with the REST module enabled and a non-production webhook is
 still required for live qualification.

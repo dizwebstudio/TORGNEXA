@@ -95,10 +95,10 @@ surface providers and 15 planned entries.
 
 Task 152 adds a separate 1С-Битрикс internet-store card and host-mediated
 official REST-module webhook adapter. Product catalog reads and idempotent
-product writes are executable; inventory, prices and orders stay fail-closed
-because the worker has no corresponding entity bridges. The runtime inventory
-is now 16 generic integrations, 23 separate-surface providers and 14 planned
-entries.
+product writes, outbound regular prices and inventory documents are executable;
+order reads/status writes are also admitted through the explicit status map.
+Inventory and price reads, offers and custom properties remain outside the
+generic runtime until their inbound bridges are added.
 
 ## CS-Cart storefront runtime
 
@@ -250,6 +250,25 @@ documentation evidence. The center performs no remote probe on GET, never
 stores secrets and cannot authorize an operation; manifest/health-only/SDK-only
 evidence remains fail-closed. See
 `tasks/issues/168-integration-state-center.md`.
+
+## AI-помощник для оператора
+
+Task 169 is the planned provider-neutral operator copilot over the canonical
+catalog, publication-quality, inventory/forecast, orders/returns, integration
+state, notifications, reports, unit-economics and workflow surfaces. The
+current Reports → Ask AI flow is only a caller-assembled completion request;
+Task 169 adds server-side intent/retrieval, source evidence and freshness,
+grounded answers/refusals, durable runs, typed action previews and the existing
+approval/domain execution boundaries. The decomposition has twenty bounded
+subtasks covering ADR/threat model, contracts, privacy/retention, model/egress
+policy, intent routing, source adapters, citations, prompt-injection boundary,
+answer quality, action catalog, approval hand-off, RLS persistence, durable
+worker, events/audit/notifications, REST/OpenAPI/SDK, Russian operator UI,
+MCP/OpenClaw/n8n boundary, operations, deterministic demo fixtures and full
+Compose/test/documentation qualification. The first release is
+recommendation/preview-first: no autonomous writes, raw prompt/response,
+chain-of-thought, secrets or second source of truth. See
+`tasks/issues/169-ai-operator-assistant.md`.
 
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.

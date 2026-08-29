@@ -14,3 +14,18 @@ Catalog or documentation modules before they are opened. The production build
 keeps the critical JavaScript chunk below 250 KiB; the loading fallback is
 limited to the content area so navigation remains responsive while a route
 chunk arrives.
+
+### Public documentation rendering and indexing
+
+The public `/docs` route is prerendered during `npm run build` into
+`frontend/dist/docs/index.html`. It contains the documentation content, title,
+description, canonical URL, Open Graph metadata and `TechArticle` JSON-LD before
+the browser executes JavaScript; the small static server serves this directory
+index before falling back to the authenticated SPA. Native anchors and
+`<details>` blocks keep the public page useful without a module bundle.
+
+The production overlay requires `TORGNEXA_PUBLIC_URL` and bakes that HTTPS URL
+into the canonical metadata, `robots.txt` and `sitemap.xml`. When the content or
+public host changes, rebuild the frontend and run `npm run test:docs` from
+`frontend/`; the check verifies the rendered content, metadata, indexing policy
+and absence of the SPA module from the public HTML.

@@ -91,7 +91,7 @@ type ProductReader interface {
 // production registry. The registry normalizes configured provider statuses
 // before handing the page to the worker.
 type OrderReader interface {
-	sdk.OrderReader
+	Read(context.Context, sdk.PageRequest) (sdk.OrderPage, error)
 }
 
 // CRMReader is the provider-neutral CRM read surface admitted by the
@@ -419,6 +419,15 @@ func (r *Registry) SupportsProductWrite(account sdk.Account) bool {
 		return false
 	}
 	return SupportsCapability(account.ConnectorID, "products.write")
+}
+
+// SupportsOrderStatusWrite reports whether the generated runtime contract
+// admits an executable order status writer for the account's connector.
+func (r *Registry) SupportsOrderStatusWrite(account sdk.Account) bool {
+	if r == nil || account.Validate() != nil {
+		return false
+	}
+	return SupportsCapability(account.ConnectorID, "orders.status.write") && account.ConnectorID == "bitrix"
 }
 
 // ProductStatus translates the canonical catalog lifecycle into the remote
@@ -787,6 +796,11 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -799,7 +813,7 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	// Keep the adapter-level admission stable for callers that use this port
 	// outside the generic sync route. The generated runtime-support contract
 	// separately controls which entities the production worker may route.
-	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop")
+	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop" || account.ConnectorID == "opencart")
 }
 
 // InventoryWriter resolves first-party connectors with an executable
@@ -841,13 +855,13 @@ type marketplaceReader struct {
 }
 
 type mappedOrderReader struct {
-	value            sdk.OrderReader
-	account          sdk.Account
-	runtime          sdk.Runtime
+	value             sdk.OrderReader
+	account           sdk.Account
+	runtime           sdk.Runtime
 	remoteToCanonical map[string]string
 }
 
-func (r mappedOrderReader) ReadOrders(ctx context.Context, request sdk.PageRequest) (sdk.OrderPage, error) {
+func (r mappedOrderReader) Read(ctx context.Context, request sdk.PageRequest) (sdk.OrderPage, error) {
 	if r.value == nil || request.Limit < 50 {
 		return sdk.OrderPage{}, sdk.ErrInvalidReadRequest
 	}
@@ -1155,11 +1169,11 @@ func (source bitrixStoreConfigSource) Resolve(ctx context.Context, account sdk.A
 		return bitrixstore.Configuration{}, err
 	}
 	var value struct {
-		StoreHost       string `json:"store_host"`
-		BasePath        string `json:"base_path"`
-		CatalogIblockID int64  `json:"catalog_iblock_id"`
-		StoreCurrency   string `json:"store_currency"`
-		PriceTypeID     int64  `json:"price_type_id"`
+		StoreHost       string            `json:"store_host"`
+		BasePath        string            `json:"base_path"`
+		CatalogIblockID int64             `json:"catalog_iblock_id"`
+		StoreCurrency   string            `json:"store_currency"`
+		PriceTypeID     int64             `json:"price_type_id"`
 		OrderStatuses   map[string]string `json:"order_statuses"`
 	}
 	if decodeStrict(raw, &value) != nil {

@@ -46,6 +46,7 @@ must additionally define these values:
 | `KEYCLOAK_HOSTNAME` | `auth.example.ru` | Public HTTPS hostname used by Keycloak behind the host reverse proxy. |
 | `TORGNEXA_OIDC_ISSUER` | `https://auth.example.ru/realms/torgnexa` | HTTPS issuer URL matching the realm and browser configuration. |
 | `TORGNEXA_OIDC_USERINFO_URL` | `https://auth.example.ru/realms/torgnexa/protocol/openid-connect/userinfo` | HTTPS userinfo URL reachable by the API. |
+| `TORGNEXA_PUBLIC_URL` | `https://app.example.ru` | Public frontend URL without a trailing slash. It is baked into documentation canonical, Open Graph, JSON-LD and sitemap during the frontend image build. |
 | `TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32` | Only the address range of the trusted local reverse proxy. |
 | `TORGNEXA_SECURITY_ADMIN_CIDRS` | `127.0.0.1/32` | Explicit admin-edge allowlist. |
 | `TORGNEXA_SECURITY_ALLOWED_ORIGINS` | `https://app.example.ru` | Exact public frontend origin, without a trailing slash. |

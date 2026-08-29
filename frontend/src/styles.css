@@ -798,6 +798,7 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .docs-toc { max-height:calc(100vh - 124px); overflow:auto; padding:4px 12px 18px 4px; scrollbar-width:thin; }
 .docs-toc a { padding-left:10px; border-left:2px solid transparent; line-height:1.35; }
 .docs-toc a:hover { border-color:var(--brand); }
+.docs-toc a[aria-current="page"] { border-color:var(--brand); color:var(--brand); font-weight:750; }
 .docs-toc-group { display:grid; gap:7px; }
 .docs-toc-group > span { padding:8px 10px 0; color:var(--text-faint); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .docs-content { gap:24px; min-width:0; }
@@ -807,6 +808,8 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .docs-hero { min-height:430px; display:flex; flex-direction:column; justify-content:center; background:
   radial-gradient(circle at 88% 20%,rgba(49,89,216,.13),transparent 30%),
   linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--brand-soft) 72%,var(--surface)))!important; }
+.docs-subpage-intro { min-height:250px; display:flex; flex-direction:column; justify-content:center; background:linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--brand-soft) 72%,var(--surface)))!important; }
+.docs-subpage-intro h1 { max-width:720px; margin:16px 0 12px; font-size:clamp(34px,4.5vw,52px); line-height:1.06; letter-spacing:-.04em; }
 .docs-hero h1 { max-width:720px; margin:16px 0 12px; font-size:clamp(38px,5vw,60px); line-height:1.04; letter-spacing:-.045em; }
 .docs-breadcrumbs { display:flex; align-items:center; gap:7px; margin-bottom:14px; color:var(--text-muted); font-size:12px; }
 .docs-breadcrumbs a { color:var(--brand); font-weight:750; text-decoration:none; }

@@ -74,6 +74,6 @@ services:
       context: .
       dockerfile: frontend/Dockerfile.production
       args:
-        TORGNEXA_PUBLIC_URL: ${TORGNEXA_PUBLIC_URL:-http://127.0.0.1:5173}
+        TORGNEXA_PUBLIC_URL: ${TORGNEXA_PUBLIC_URL:?set TORGNEXA_PUBLIC_URL to the public HTTPS URL}
     ports:
       - 127.0.0.1:${TORGNEXA_FRONTEND_PORT:-5173}:5173

@@ -4,7 +4,7 @@
     {"connector_id":"aliexpress-ru","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
     {"connector_id":"auto-ru","stage":"separate_surface","surface":"classified","operational_capabilities":[],"sync":[],"health_only":true},
     {"connector_id":"avito","stage":"separate_surface","surface":"classified","operational_capabilities":[],"sync":[],"health_only":true},
-    {"connector_id":"bitrix","stage":"ready","surface":"integrations","operational_capabilities":["inventory.write","prices.write","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]},{"entity_type":"inventory","directions":["outbound"]}],"runtime_config_template":{"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1}},
+    {"connector_id":"bitrix","stage":"ready","surface":"integrations","operational_capabilities":["inventory.write","orders.read","orders.status.write","prices.write","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]},{"entity_type":"inventory","directions":["outbound"]},{"entity_type":"orders","directions":["inbound","outbound"]}],"runtime_config_template":{"store_host":"shop.example.ru","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1}},
     {"connector_id":"bitrix24","stage":"separate_surface","surface":"crm","operational_capabilities":["crm.entities.read","crm.entities.write","crm.productrows.read","crm.productrows.write"],"sync":[],"runtime_config_template":{"portal_host":"acme.bitrix24.com"}},
     {"connector_id":"cbr-fx","stage":"separate_surface","surface":"finance","operational_capabilities":["fx.rates.read"],"sync":[]},
     {"connector_id":"cdek","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
@@ -26,8 +26,8 @@
     {"connector_id":"lamoda","stage":"separate_surface","surface":"marketplace","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {"connector_id":"lm-studio","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {
-      "connector_id":"magento","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"magento","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
     },
     {
@@ -41,8 +41,8 @@
       "runtime_config_template":{"chat_id":-70801090403050}
     },
     {
-      "connector_id":"medusa","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"medusa","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
     },
     {
@@ -66,8 +66,8 @@
     {"connector_id":"open-webui","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {"connector_id":"openai-compatible","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {
-      "connector_id":"opencart","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"opencart","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"}
     },
     {"connector_id":"ozon","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
@@ -85,19 +85,19 @@
     {"connector_id":"rutube","stage":"separate_surface","surface":"social","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {"connector_id":"saby-edo","stage":"separate_surface","surface":"edo","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {
-      "connector_id":"saleor","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"saleor","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.com","base_path":"","channel":"default-channel","warehouse":"main-warehouse"}
     },
     {"connector_id":"sbp","stage":"separate_surface","surface":"finance","operational_capabilities":["payments.create","payments.reconcile","payments.refund","payments.status.read"],"sync":[],"runtime_config_template":{"gateway_host":"sbp-gateway.example.ru","member_id":"100000001"}},
     {
-      "connector_id":"shopify","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"shopify","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"shop_domain":"example.myshopify.com","store_currency":"RUB"}
     },
     {
-      "connector_id":"shopware","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"shopware","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.com","base_path":"","store_currency":"RUB"}
     },
     {
@@ -110,13 +110,13 @@
     {"connector_id":"vk","stage":"separate_surface","surface":"social","operational_capabilities":[],"sync":[],"health_only":true},
     {"connector_id":"wildberries","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],"sync":[{"entity_type":"products","directions":["inbound"]}]},
     {
-      "connector_id":"woocommerce","stage":"ready","surface":"integrations","operational_capabilities":["products.read","products.write"],
-      "sync":[{"entity_type":"products","directions":["inbound","outbound"]}],
+      "connector_id":"woocommerce","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read","products.write"],
+      "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB"}
     },
     {
-      "connector_id":"yandex-market","stage":"ready","surface":"integrations","operational_capabilities":["products.read"],
-      "sync":[{"entity_type":"products","directions":["inbound"]}],
+      "connector_id":"yandex-market","stage":"ready","surface":"integrations","operational_capabilities":["prices.write","products.read"],
+      "sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"prices","directions":["outbound"]}],
       "runtime_config_template":{"business_id":1,"campaign_id":1,"inventory_mode":"partner_warehouses","price_mode":"business_wide","warehouses":[]}
     },
     {"connector_id":"yandexgpt","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},

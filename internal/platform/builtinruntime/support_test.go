@@ -80,7 +80,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("Bitrix24 CRM runtime support is inaccurate: %+v", bitrix)
 	}
 	storefront, ok := SupportFor("bitrix")
-	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsCapability("bitrix", "prices.write") || !SupportsCapability("bitrix", "inventory.write") || !SupportsSync("bitrix", "products", "bidirectional") || !SupportsSync("bitrix", "prices", "outbound") || !SupportsSync("bitrix", "inventory", "outbound") || SupportsCapability("bitrix", "prices.read") || SupportsCapability("bitrix", "orders.read") {
+	if !ok || storefront.Stage != SupportReady || storefront.Surface != "integrations" || !SupportsAccountConfiguration("bitrix") || !SupportsCapability("bitrix", "products.read") || !SupportsCapability("bitrix", "products.write") || !SupportsCapability("bitrix", "prices.write") || !SupportsCapability("bitrix", "inventory.write") || !SupportsCapability("bitrix", "orders.read") || !SupportsCapability("bitrix", "orders.status.write") || !SupportsSync("bitrix", "products", "bidirectional") || !SupportsSync("bitrix", "prices", "outbound") || !SupportsSync("bitrix", "inventory", "outbound") || !SupportsSync("bitrix", "orders", "bidirectional") || SupportsCapability("bitrix", "prices.read") {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
@@ -201,6 +201,20 @@ func TestBitrixPriceWriterAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestStorefrontPriceWriterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+	for _, connectorID := range []string{"bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+		account := supportTestAccount(t, connectorID)
+		if !registry.SupportsPriceWrite(account) || !SupportsCapability(connectorID, "prices.write") || !SupportsSync(connectorID, "prices", "outbound") {
+			t.Fatalf("%s price write support is not admitted", connectorID)
+		}
+		if _, err := registry.PriceWriter(account, supportTestRuntime{}, load); err != nil {
+			t.Fatalf("%s price writer unavailable: %v", connectorID, err)
+		}
+	}
+}
+
 func TestBitrixInventoryWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	account := supportTestAccount(t, "bitrix")
@@ -215,6 +229,32 @@ func TestBitrixInventoryWriterAdmissionIsExact(t *testing.T) {
 	}
 	if _, err := registry.InventoryWriter(account, supportTestRuntime{}, nil); !errors.Is(err, ErrConfigurationNeeded) {
 		t.Fatalf("missing 1C-Bitrix runtime configuration returned %v", err)
+	}
+}
+
+func TestBitrixOrderRuntimeAdmissionRequiresExplicitStatusMap(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "bitrix")
+	if !registry.SupportsOrderStatusWrite(account) {
+		t.Fatal("1C-Bitrix order status writer capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1,"order_statuses":{"pending":"N","confirmed":"P","processing":"T","fulfilled":"F","cancelled":"C"}}`), nil
+	}
+	if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("1C-Bitrix order reader unavailable: %v", err)
+	}
+	if _, err := registry.OrderStatusWriter(context.Background(), account, supportTestRuntime{}, load); err != nil {
+		t.Fatalf("1C-Bitrix order status writer unavailable: %v", err)
+	}
+	if got, ok := registry.OrderStatus(context.Background(), account, "processing", load); !ok || got != "T" {
+		t.Fatalf("processing status = %q, %v; want T, true", got, ok)
+	}
+	missing := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","base_path":"","catalog_iblock_id":23,"store_currency":"RUB","price_type_id":1}`), nil
+	}
+	if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, missing); !errors.Is(err, ErrConfigurationNeeded) {
+		t.Fatalf("missing Bitrix order status map returned %v", err)
 	}
 }
 

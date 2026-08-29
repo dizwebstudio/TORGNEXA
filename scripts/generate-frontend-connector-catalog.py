@@ -127,7 +127,7 @@ for connector_id, support in support_by_id.items():
     if support.get("health_only", False) and (support["stage"] != "separate_surface" or support["operational_capabilities"] or support["sync"]):
         raise SystemExit(f"health-only connector must be a capability-free separate surface: {connector_id}")
     for sync_support in support["sync"]:
-        if sync_support.get("entity_type") not in {"products", "prices", "inventory"} or not sync_support.get("directions") or any(direction not in {"inbound", "outbound"} for direction in sync_support.get("directions", [])) or sorted(set(sync_support.get("directions", []))) != sorted(sync_support.get("directions", [])):
+        if sync_support.get("entity_type") not in {"products", "prices", "inventory", "orders"} or not sync_support.get("directions") or any(direction not in {"inbound", "outbound"} for direction in sync_support.get("directions", [])) or sorted(set(sync_support.get("directions", []))) != sorted(sync_support.get("directions", [])):
             raise SystemExit(f"invalid runtime sync declaration: {connector_id}")
 
 lines = [

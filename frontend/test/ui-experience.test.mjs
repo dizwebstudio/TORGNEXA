@@ -256,6 +256,24 @@ test("frontend image policy permits catalog HTTPS thumbnails", () => {
   assert.match(server, /img-src 'self' data: https:/);
 });
 
+test("public documentation is prerendered and served before the SPA fallback", () => {
+  const packageJSON = JSON.parse(readRoot("frontend/package.json"));
+  const server = readRoot("frontend/serve.mjs");
+  const compose = readRoot("docker-compose.production.yml");
+  const dockerfile = readRoot("frontend/Dockerfile.production");
+  const robots = readRoot("frontend/public/robots.txt");
+  assert.match(packageJSON.scripts.build, /npm run build:docs/);
+  assert.equal(packageJSON.scripts["build:docs"], "vite build --ssr src/ssr/docs-entry.tsx --outDir .prerender && node scripts/prerender-docs.mjs");
+  assert.equal(packageJSON.scripts["test:docs"], "node scripts/check-public-docs.mjs");
+  assert.match(server, /directoryIndex/);
+  assert.match(server, /\.txt.*text\/plain/);
+  assert.match(server, /\.xml.*application\/xml/);
+  assert.match(compose, /TORGNEXA_PUBLIC_URL: \$\{TORGNEXA_PUBLIC_URL:\?set TORGNEXA_PUBLIC_URL/);
+  assert.match(dockerfile, /TORGNEXA_PUBLIC_URL/);
+  assert.match(robots, /Allow: \/docs/);
+  assert.match(robots, /Disallow: \/api\//);
+});
+
 test("task 120 uses server-side grids with cursor pagination for core commerce lists", () => {
   const grid = read("components/ServerDataGrid.tsx");
   const catalog = read("features/catalog/ProductList.tsx");

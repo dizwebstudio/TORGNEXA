@@ -64,8 +64,26 @@ func TestCommerceWriteEntityOnlyRoutesCanonicalEvents(t *testing.T) {
 	if _, ok := commerceWriteEntity("commerce.catalog.offer_changed.v1"); ok {
 		t.Fatal("offer event must remain outside the commerce product write route")
 	}
-	if _, ok := commerceWriteEntity("commerce.orders.order_changed.v1"); ok {
-		t.Fatal("order event must not enter commerce write route")
+	if got, ok := commerceWriteEntity("commerce.orders.order_changed.v1"); !ok || got != commerceOrdersEntity {
+		t.Fatalf("order event route = %q, %v", got, ok)
+	}
+}
+
+func TestCommerceOrderEventValidation(t *testing.T) {
+	var event commerceOrderEvent
+	if err := decodeCommerceEvent(json.RawMessage(`{"order_id":"order-1","status":"processing","version":2,"change":"status_changed"}`), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.OrderID != "order-1" || event.Status != "processing" || event.Version != 2 || event.Change != "status_changed" || !isCanonicalOrderStatus(event.Status) {
+		t.Fatalf("unexpected order event: %+v", event)
+	}
+	for _, status := range []string{"", "unknown", "PROCESSING"} {
+		if isCanonicalOrderStatus(status) {
+			t.Fatalf("status %q must be rejected", status)
+		}
+	}
+	if !isCanonicalOrderStatus("cancelled") {
+		t.Fatal("cancelled must be a canonical order status")
 	}
 }
 

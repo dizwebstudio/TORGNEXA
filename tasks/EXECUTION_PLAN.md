@@ -1252,6 +1252,75 @@ The implementation is split into eighteen subtasks:
   performance, Compose, screenshot, documentation and release-evidence checks
   are green before production admission.
 
+## Phase 39 — AI-помощник для оператора
+
+`169`
+
+Task 169 is planned as a provider-neutral, grounded operator copilot over the
+canonical commerce and operations modules. It is intentionally separate from
+the legacy `/settings/ai-providers:analyze` completion call: the server owns
+intent, retrieval, data classes, evidence, risk and action limits. The first
+release is read/recommendation/preview-first and cannot become an autonomous
+administrator. The implementation is split into twenty subtasks:
+
+1. `169.1` ADR, scope, threat model and definition of done;
+2. `169.2` canonical session/run/message/answer/evidence/action contracts;
+3. `169.3` privacy classes, retention, redaction and transcript policy;
+4. `169.4` provider/model registry, routing, egress and cost budgets;
+5. `169.5` deterministic intent classifier and question/refusal policy;
+6. `169.6` typed source retrieval ports and bounded grounded context builder;
+7. `169.7` citations, watermarks, freshness and explainability contract;
+8. `169.8` server prompt templates, versioning and injection boundary;
+9. `169.9` typed answer composer, claim validation and refusal quality policy;
+10. `169.10` typed action catalog and side-effect-free preview compiler;
+11. `169.11` Task-017 approval bridge and canonical execution hand-off;
+12. `169.12` PostgreSQL forced-RLS persistence, lineage and retention;
+13. `169.13` durable run worker, queue, leases, cancellation and streaming;
+14. `169.14` EventBus/Outbox/Inbox, audit and Notification Center integration;
+15. `169.15` permission-aware REST/OpenAPI and generated SDK;
+16. `169.16` Russian operator UI, safe rendering, accessibility and deep links;
+17. `169.17` MCP/OpenClaw/n8n boundary, remaining deny-by-default gate;
+18. `169.18` security, observability, SLO, quotas, kill switches and runbooks;
+19. `169.19` connector/domain readiness matrix and synthetic demo fixtures;
+20. `169.20` unit/property/contract/RLS/security/Compose/load tests,
+    screenshots, documentation and retained release evidence.
+
+### Gate RUNTIME-169
+
+- answers are tenant/actor-scoped, bounded and grounded in authoritative
+  evidence with source refs, watermarks, freshness, visibility and digests;
+  `insufficient_data`, `stale`, `partial`, `blocked` and `refused` never become
+  confident facts;
+- server determines tenant, permissions, intent, data classes, source set,
+  provider/model eligibility, risk and limits; model/frontend/external text is
+  structurally `UNTRUSTED_TOOL_DATA` and cannot grant authority;
+- legacy completion remains compatible, but arbitrary client system prompts or
+  data-class claims cannot select the assistant path; provider routing, egress,
+  templates and budgets are versioned and governed;
+- no raw prompt/response, chain-of-thought, secret, token, private key, raw
+  provider payload or unnecessary PII appears in persistence, events, audit,
+  logs, URLs, screenshots or exports; retention/legal hold is tested;
+- actions are typed/provider-neutral and preview-only by default; writes reuse
+  current capability/runtime/quality/compliance/policy checks, Task-017
+  approval, expected version, idempotency, audit and canonical workers;
+  unknown external outcomes never blind-retry;
+- session/run/worker/event/outbox/inbox/notification paths are duplicate,
+  out-of-order, crash, lease-loss, cancellation, DLQ and replay safe; source
+  outage yields partial/stale evidence, not false completion;
+- API/OpenAPI/SDK/UI expose accessible Russian workflow, citations, safe links,
+  permission-aware redaction, cursor/ETag/bounds, resume/cancel and clear
+  distinction between source fact, AI recommendation, approval and unavailable
+  operation;
+- MCP/OpenClaw/n8n remain additive and deny-by-default until trusted
+  Governor/Auditor composition; no privileged path or credential exposure is
+  introduced;
+- small-VPS Compose quotas bound context, provider calls, tokens, memory,
+  connections, queue/Kafka lag, streams and DB queries; dashboards, alerts,
+  kill switches and runbooks enable recovery without stopping commerce;
+- all unit/property/contract/RLS/adversarial/frontend/worker/connector/
+  Compose/load/chaos/screenshot/documentation checks pass with synthetic data
+  before production admission.
+
 ## Phase 35 — Прогноз остатков и автопополнение
 
 `165`

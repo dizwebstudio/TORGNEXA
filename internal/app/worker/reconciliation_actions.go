@@ -79,7 +79,8 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 	if err != nil {
 		return err
 	}
-	if trimEntity(ac.policy.EntityType) != "product" {
+	entity := trimEntity(ac.policy.EntityType)
+	if entity != "product" && entity != "order" {
 		return reconciliation.ErrActionUnavailable
 	}
 	switch req.Direction {
@@ -87,15 +88,18 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 		if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
 			return reconciliation.ErrActionUnsafe
 		}
-		_, err = e.mappings.UpsertMapping(ctx, sdk.MappingUpsert{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ConnectorAccountID: ac.account.ID, EntityType: "product", LocalEntityID: req.Drift.LocalEntityID, RemoteID: req.Drift.RemoteID, ExpectedVersion: 0})
+		_, err = e.mappings.UpsertMapping(ctx, sdk.MappingUpsert{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ConnectorAccountID: ac.account.ID, EntityType: entity, LocalEntityID: req.Drift.LocalEntityID, RemoteID: req.Drift.RemoteID, ExpectedVersion: 0})
 		if errors.Is(err, sdk.ErrMappingConflict) {
-			existing, lookup := e.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), ac.account.ID, "product", req.Drift.LocalEntityID)
+			existing, lookup := e.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), ac.account.ID, entity, req.Drift.LocalEntityID)
 			if lookup == nil && existing.RemoteID == req.Drift.RemoteID {
 				return nil
 			}
 		}
 		return err
 	case reconciliation.RepairRemoteToLocal:
+		if entity == "order" {
+			return e.autoFixOrderRemoteToLocal(ctx, scope, ac, req)
+		}
 		remote, err := e.findRemoteProduct(ctx, scope, ac, req.Drift.RemoteID)
 		if err != nil {
 			return err
@@ -134,6 +138,9 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 			return reconciliation.ErrActionUnsafe
 		}
 	case reconciliation.RepairLocalToRemote:
+		if entity == "order" {
+			return e.autoFixOrderLocalToRemote(ctx, scope, ac, req)
+		}
 		writer, err := e.registry.productWriter(scope, ac.account, ac.runtime)
 		if err != nil {
 			return err
@@ -159,6 +166,62 @@ func (e *reconciliationActionExecutor) AutoFix(ctx context.Context, scope tenanc
 	default:
 		return reconciliation.ErrActionUnsafe
 	}
+}
+
+func (e *reconciliationActionExecutor) autoFixOrderRemoteToLocal(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteStatus == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	orderScope, err := coreorders.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	orderID, err := coreorders.ParseOrderID(req.Drift.LocalEntityID)
+	if err != nil {
+		return err
+	}
+	current, err := e.orders.Order(ctx, orderScope, orderID)
+	if err != nil {
+		return err
+	}
+	target := coreorders.Status(req.Drift.RemoteStatus)
+	if current.Status == target {
+		return nil
+	}
+	_, err = e.orders.ChangeStatus(ctx, orderScope, coreorders.ChangeStatus{ID: orderID, ExpectedVersion: current.Version, Status: target}, orderMutation(req.IdempotencyKey, req.Drift.ID))
+	return err
+}
+
+func (e *reconciliationActionExecutor) autoFixOrderLocalToRemote(ctx context.Context, scope tenancy.Scope, ac actionContext, req reconciliation.RepairRequest) error {
+	if req.Drift.LocalEntityID == "" || req.Drift.RemoteID == "" {
+		return reconciliation.ErrActionUnsafe
+	}
+	orderScope, err := coreorders.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return err
+	}
+	orderID, err := coreorders.ParseOrderID(req.Drift.LocalEntityID)
+	if err != nil {
+		return err
+	}
+	current, err := e.orders.Order(ctx, orderScope, orderID)
+	if err != nil {
+		return err
+	}
+	status, ok := e.registry.orderStatus(scope, ac.account, string(current.Status))
+	if !ok {
+		return reconciliation.ErrActionUnsafe
+	}
+	writer, err := e.registry.orderStatusWriter(scope, ac.account, ac.runtime)
+	if err != nil {
+		return err
+	}
+	_, err = writer.WriteOrderStatus(ctx, ac.account, ac.runtime, sdk.OrderStatusWriteRequest{OrderRemoteID: req.Drift.RemoteID, StatusRemoteID: status, IdempotencyKey: req.IdempotencyKey})
+	return err
+}
+
+func orderMutation(key, causation string) coreorders.Mutation {
+	return coreorders.Mutation{AuditID: stableUUID("audit:" + key), EventID: stableID("evt_rec_", key), ActorID: "system:reconciliation", Source: "worker.reconciliation", CorrelationID: stableID("corr_rec_", key), CausationID: causation, OccurredAt: time.Now().UTC()}
 }
 
 func (e *reconciliationActionExecutor) findRemoteProduct(ctx context.Context, scope tenancy.Scope, ac actionContext, remoteID string) (builtins.Product, error) {
