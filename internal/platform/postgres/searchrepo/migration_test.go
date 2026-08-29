@@ -169,3 +169,37 @@ func TestDemoStatusExamplesCoverVisibleLifecycleStatuses(t *testing.T) {
 		}
 	}
 }
+
+func TestDemoSeedCoversFinanceIntegrationAndControlSurfaces(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "internal/platform/postgres/searchrepo/demo_extended_seed.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed := strings.ToLower(string(data))
+	for _, table := range []string{
+		"payments",
+		"payment_refunds",
+		"settlement_entries",
+		"settlement_reconciliation_runs",
+		"fx_rate_facts",
+		"sync_policies",
+		"reconciliation_runs",
+		"connector_accounts",
+		"approval_policies",
+		"approval_requests",
+		"notification_deliveries",
+	} {
+		if !strings.Contains(seed, "insert into "+table) {
+			t.Fatalf("demo seed does not populate %s", table)
+		}
+	}
+	families := make(map[string]bool, len(demoConnectorAccounts))
+	for _, account := range demoConnectorAccounts {
+		families[account.family] = true
+	}
+	for _, family := range []string{"marketplace", "payment", "fx"} {
+		if !families[family] {
+			t.Fatalf("demo seed does not include a %s connector account", family)
+		}
+	}
+}

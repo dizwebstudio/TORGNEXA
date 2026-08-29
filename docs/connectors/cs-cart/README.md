@@ -13,3 +13,9 @@ tenant-scoped mapping и детерминированный idempotency key. З�
 
 Официальная документация: [REST API](https://docs.cs-cart.com/latest/developer_guide/api/index.html),
 [Products](https://docs.cs-cart.com/latest/developer_guide/api/entities/products.html).
+
+Уровни проверки разделены: SDK-конформанс проходит 13/13 обязательных проб,
+но live/Docker-квалификация требует лицензированный тестовый магазин и
+включённый Basic Auth. Инструкция и smoke находятся в
+[docker-live-qualification.md](docker-live-qualification.md); до их успешного
+запуска live-проверка считается заблокированной.

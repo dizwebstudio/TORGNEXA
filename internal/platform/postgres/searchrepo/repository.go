@@ -277,9 +277,10 @@ func (r *Repository) OrderDetail(ctx context.Context, scope tenancy.Scope, id st
 	return out, err
 }
 
-// SeedDemoOrders atomically creates a tenant-scoped synthetic catalog and five
-// orders and is idempotent. The catalog contains 26 products with public demo
-// images and human-readable descriptions, including draft and archived cards.
+// SeedDemoOrders atomically creates a tenant-scoped synthetic commerce dataset
+// and is idempotent. Besides the 26-product catalog and five orders, it fills
+// the finance, connector, sync, approval and notification-delivery surfaces so
+// a local workspace can be reviewed end to end without manual setup.
 func (r *Repository) SeedDemoOrders(ctx context.Context, scope tenancy.Scope, recipientID string) (int, error) {
 	if r == nil || r.db == nil || ctx == nil || !scope.Valid() || recipientID == "" || len(recipientID) > 128 {
 		return 0, search.ErrInvalid
@@ -323,6 +324,9 @@ func (r *Repository) SeedDemoOrders(ctx context.Context, scope tenancy.Scope, re
 			return 0, err
 		}
 		if err := seedDemoFulfillmentAllocations(ctx, tx, org, ws, stamp); err != nil {
+			return 0, err
+		}
+		if err := seedDemoExtendedDataset(ctx, tx, org, ws, recipientID, productID, stamp); err != nil {
 			return 0, err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM demo_dataset_tombstones WHERE organization_id=$1 AND workspace_id=$2`, org, ws); err != nil {
@@ -384,6 +388,9 @@ func (r *Repository) SeedDemoOrders(ctx context.Context, scope tenancy.Scope, re
 		return 0, err
 	}
 	if err = seedDemoFulfillmentAllocations(ctx, tx, org, ws, stamp); err != nil {
+		return 0, err
+	}
+	if err = seedDemoExtendedDataset(ctx, tx, org, ws, recipientID, productID, stamp); err != nil {
 		return 0, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -811,7 +818,7 @@ func seedDemoNotifications(ctx context.Context, tx *sql.Tx, org, ws, recipientID
 		severity, key, title, body string
 		offset                     time.Duration
 	}{
-		{"info", "demo.dataset.ready", "Демонстрационный контур готов", "Созданы 26 товаров, пять заказов с разными статусами, складской остаток и декларация соответствия.", -2 * time.Hour},
+		{"info", "demo.dataset.ready", "Демонстрационный контур готов", "Созданы товары, заказы, остатки, финансы, подключения, синхронизация и согласования для демонстрационного рабочего контура.", -2 * time.Hour},
 		{"warning", "demo.stock.reservation", "Часть остатка зарезервирована", "На демонстрационном складе зарезервировано 7 из 48 единиц товара DEMO-SKU.", -time.Hour},
 		{"critical", "demo.compliance.expiry", "Проверьте срок декларации", "Демонстрационное критическое уведомление показывает, как выглядят события, требующие внимания.", 0},
 	}

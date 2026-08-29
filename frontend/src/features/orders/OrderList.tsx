@@ -14,6 +14,7 @@ import {ProductImage} from "../../components/ProductImage";
 import {useAuth} from "../../auth/AuthProvider";
 import {formatQuantityUnit} from "../../components/quantity";
 import {LineageTimeline} from "../../components/LineageTimeline";
+import {refreshDemoDataset} from "../demoDataset";
 
 function money(minor: number, currency: string): string {return new Intl.NumberFormat("ru-RU", {style: "currency", currency}).format(minor / 100)}
 function ProductThumbnail({api,src}:{api:ReturnType<typeof useApi>;src?:string}){return src?<ProductImage api={api} className="order-product-thumbnail" src={src} alt=""/>:<span className="order-product-thumbnail order-product-thumbnail-empty" aria-hidden="true"><Icon name="catalog" size={18}/></span>}
@@ -31,7 +32,7 @@ export function OrderList({initialId}:{initialId?:string}) {
   const [selected,setSelected]=useState<string|undefined>(initialId),[q,setQ]=useState(""),[status,setStatus]=useState(""),[cursor,setCursor]=useState(""),[history,setHistory]=useState<string[]>([]);
   const queryClient=useQueryClient();
   const canChangeStatus=auth.session?.capabilities.includes("orders.status.write")??false;
-  const demo=useMutation({mutationFn:async()=>{await api.createDemoOrders({idempotencyKey:"demo-dataset:create"})},onSuccess:async()=>{toast.push({kind:"success",title:"Демо-набор создан",body:"26 товаров, заказы по статусам и остатки появились в рабочем контуре."});await Promise.all([queryClient.invalidateQueries({queryKey:["orders"]}),queryClient.invalidateQueries({queryKey:["inventory"]}),queryClient.invalidateQueries({queryKey:["products"]})])},onError:()=>toast.push({kind:"error",title:"Не удалось создать демо-данные"})});
+  const demo=useMutation({mutationFn:async()=>{await api.createDemoOrders({idempotencyKey:"demo-dataset:create"})},onSuccess:async()=>{toast.push({kind:"success",title:"Демо-контур создан",body:"Каталог, финансы, подключения, синхронизация и согласования заполнены."});await refreshDemoDataset(queryClient)},onError:()=>toast.push({kind:"error",title:"Не удалось создать демо-контур",body:"Проверьте права и повторите операцию."})});
   const query=useQuery({queryKey:["orders","shell",q,status,cursor],queryFn:async()=>decodeOrderPage((await api.listOrders({limit:25,q:q||undefined,status:status||undefined,cursor:cursor||undefined})).body),staleTime:20_000});
   const detail=useQuery({queryKey:["orders","detail",selected],queryFn:async()=>(await api.getOrder({orderId:selected!})).body as any,enabled:!!selected});
   const changeStatus=useMutation({mutationFn:async(input:{orderId:string;status:OrderStatus;version:number})=>api.changeOrderStatus({orderId:input.orderId,idempotencyKey:crypto.randomUUID(),body:{status:input.status,version:input.version}}),onSuccess:async(_result,input)=>{toast.push({kind:"success",title:"Статус заказа изменён"});await Promise.all([queryClient.invalidateQueries({queryKey:["orders"]}),queryClient.invalidateQueries({queryKey:["orders","detail",input.orderId]})])},onError:(error:unknown)=>{const statusCode=typeof error==="object"&&error!==null&&"statusCode" in error?(error as {statusCode?:number}).statusCode:undefined;toast.push({kind:"error",title:"Не удалось изменить статус",body:statusCode===409?"Заказ уже изменился или такой переход недоступен. Обновите карточку заказа.":"Проверьте права и повторите операцию."})}});

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "connector_id": "magento",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/magento/conformance-report.json"
+  },
+  "docker_store": {
+    "status": "not_configured",
+    "requirement": "Magento Open Source or Adobe Commerce project/package plus Adobe Cloud Docker prerequisites"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "MAGENTO_BASE_URL",
+      "MAGENTO_TOKEN",
+      "MAGENTO_TEST_SKU"
+    ]
+  },
+  "smoke_script": "scripts/magento-smoke.sh",
+  "reason_code": "non_production_store_not_configured"
+}

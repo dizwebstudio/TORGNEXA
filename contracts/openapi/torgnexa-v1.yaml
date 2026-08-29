@@ -1054,7 +1054,7 @@ paths:
   /orders/demo:
     post:
       operationId: createDemoOrders
-      description: Idempotently creates a synthetic tenant-scoped dataset with 26 products (each with a public demo image and description), demo prices and categories, five orders, fulfillment allocations, a primary offer, warehouse, stock positions, a verified compliance declaration and personal demo notifications for the authenticated actor, then appends audit evidence.
+      description: Idempotently creates a synthetic tenant-scoped dataset with 26 products (each with a public demo image and description), demo prices and categories, five orders, fulfillment allocations, a primary offer, warehouse, stock positions, a verified compliance declaration, demo payments and settlement fees, FX rates, connected marketplace/payment/FX accounts, sync policies and runs, approval requests and notification delivery attempts for the authenticated actor.
 
       parameters:
         - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}

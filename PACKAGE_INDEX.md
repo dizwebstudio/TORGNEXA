@@ -32,13 +32,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 511
-- adrs: 113
-- tasks: 162
+- docs: 513
+- adrs: 114
+- tasks: 163
 - milestones: 14
 - contracts: 218
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2767
+- total source files (excluding local secrets/build/dependency/cache trees): 2779
 
 
 ## Connector category layout
@@ -514,6 +514,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0112-dolyami-payment-surface.md`
 - `adr/0113-gemini-grok-ai-providers.md`
 - `adr/0114-prestashop-price-inventory-runtime-route.md`
+- `adr/0115-commerce-product-event-runtime-route.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -666,6 +667,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/159a-gemini-ai-provider.json`
 - `architecture/reviews/159b-grok-ai-provider.json`
 - `architecture/reviews/160-prestashop-commerce-sync-runtime.json`
+- `architecture/reviews/161-commerce-product-event-runtime-route.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1512,6 +1514,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `deploy/clickhouse/000001_reporting_foundation.sql`
 - `deploy/edge/nginx.conf.example`
 - `deploy/garage/render-config.sh`
+- `deploy/kafka/bootstrap-topics.sh`
+- `deploy/kafka/topics.txt`
 - `deploy/keycloak/init-db.sh`
 - `deploy/keycloak/torgnexa-realm.json`
 - `deploy/nginx/security-edge.conf`
@@ -1680,6 +1684,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/cs-cart/capability-audit.md`
 - `docs/connectors/cs-cart/conformance-plan.md`
 - `docs/connectors/cs-cart/conformance-report.json`
+- `docs/connectors/cs-cart/docker-live-qualification.md`
+- `docs/connectors/cs-cart/live-qualification-status.json`
 - `docs/connectors/cs-cart/reconciliation.md`
 - `docs/connectors/cs-cart/spec.md`
 - `docs/connectors/deepseek/capability-audit.md`
@@ -2152,16 +2158,19 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/components/Drawer.tsx`
 - `frontend/src/components/EmptyState.tsx`
 - `frontend/src/components/Icon.tsx`
+- `frontend/src/components/LineageTimeline.tsx`
 - `frontend/src/components/ProductImage.tsx`
 - `frontend/src/components/ServerDataGrid.tsx`
 - `frontend/src/components/Skeleton.tsx`
 - `frontend/src/components/StatusBadge.tsx`
 - `frontend/src/components/Toast.tsx`
 - `frontend/src/components/icon-names.ts`
+- `frontend/src/components/labels.ts`
 - `frontend/src/components/quantity.ts`
 - `frontend/src/components/useFocusTrap.ts`
 - `frontend/src/env.d.ts`
 - `frontend/src/features/catalog/ProductList.tsx`
+- `frontend/src/features/demoDataset.ts`
 - `frontend/src/features/notifications/NotificationList.tsx`
 - `frontend/src/features/orders/OrderList.tsx`
 - `frontend/src/features/settings/AIProviderSettings.tsx`
@@ -2605,6 +2614,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/retentionrepo/migration_test.go`
 - `internal/platform/postgres/retentionrepo/privacy_store.go`
 - `internal/platform/postgres/retentionrepo/repository.go`
+- `internal/platform/postgres/searchrepo/demo_extended_seed.go`
 - `internal/platform/postgres/searchrepo/migration_test.go`
 - `internal/platform/postgres/searchrepo/repository.go`
 - `internal/platform/postgres/secretrepo/migration_test.go`
@@ -2842,6 +2852,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-trust-control-postgres.sh`
 - `scripts/check.sh`
 - `scripts/community-demo-member.sql`
+- `scripts/cscart-smoke.sh`
 - `scripts/dzen-content-transformer-test.py`
 - `scripts/dzen-content-transformer.py`
 - `scripts/ensure-community-demo-user.sh`
@@ -3062,6 +3073,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/158-dolyami-payment-surface.md`
 - `tasks/issues/159-gemini-grok-ai-providers.md`
 - `tasks/issues/160-prestashop-commerce-sync-runtime.md`
+- `tasks/issues/161-commerce-product-event-runtime-route.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

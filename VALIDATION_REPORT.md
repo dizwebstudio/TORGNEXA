@@ -162,7 +162,10 @@
   worker routes are claimed;
 - focused connector and builtin-runtime tests: **PASS**;
 - live qualification is **not claimed** without a non-production CS-Cart store
-  with API access enabled;
+  with API access enabled. The credentialed check is now provided by
+  `scripts/cscart-smoke.sh` and is tracked separately in
+  `docs/connectors/cs-cart/live-qualification-status.json` (**BLOCKED** until
+  such a store and key are configured);
 - CS-Cart generated catalog/runtime rows are synchronized (**56 admitted
   manifests / 18 generic / 24 separate / 14 planned**); Saleor and «Почта
   России» are registered by Tasks 154–155.

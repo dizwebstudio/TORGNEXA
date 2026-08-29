@@ -1,5 +1,12 @@
 # Conformance plan
 
-Run the mandatory Task-064 13-check Connector SDK suite with synthetic credentials, tenant-isolation probes, retry/error normalization, idempotency/replay and Linux sandbox isolation. Production credentials are forbidden in the harness.
+The canonical Task-064 report is **PASS 13/13** with synthetic credentials,
+tenant-isolation probes, retry/error normalization, idempotency/replay and the
+Linux sandbox check. Production credentials are forbidden in this harness; the
+report is [conformance-report.json](conformance-report.json).
 
-12 of 13 checks pass in the current execution environment; `sandbox_isolation` cannot be exercised here because this environment cannot create unprivileged Linux user namespaces (`unshare --user` returns `Operation not permitted`), which the Task-029 sandbox probe requires regardless of connector. This is an environment constraint, not a Magento-specific defect — the same probe exercises the shared emulator, not any Magento code path. Re-run in an environment with user namespaces enabled to obtain a full pass.
+SDK conformance is not proof that a particular Magento installation, API
+version, ACL or credential works. The separate credentialed gate is documented
+in [docker-live-qualification.md](docker-live-qualification.md) and executed
+by `scripts/magento-smoke.sh`. Until that smoke passes on a non-production
+store, Magento remains repository-qualified, not live-qualified.

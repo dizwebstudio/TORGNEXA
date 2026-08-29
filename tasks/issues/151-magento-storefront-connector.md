@@ -1,6 +1,6 @@
 # Task 151 — Magento (Adobe Commerce open-source) storefront connector
 
-Status: Repository implementation complete
+Status: Repository implementation complete; live qualification blocked
 
 ## Problem
 
@@ -82,10 +82,9 @@ platforms, with a large installed base among mid-market merchants.
 - Live-instance qualification: unverifiable without a real self-hosted
   Magento deployment and Integration credential, same limitation already
   documented for SBP/Robokassa/Shopify/Medusa/Shopware.
-- The Task-064 conformance suite's `sandbox_isolation` check could not be
-  exercised in this repository's execution environment because it cannot
-  create unprivileged Linux user namespaces (`unshare --user` returns
-  `Operation not permitted`); this is an environment constraint shared by
-  every connector's Task-029 sandbox probe, not a Magento-specific gap.
-  `docs/connectors/magento/conformance-report.json` records the genuine
-  12/13 result rather than a fabricated pass.
+- The canonical Task-064 report records 13/13 SDK checks. This deterministic
+  suite is not a live-store qualification: the credentialed gate is
+  `scripts/magento-smoke.sh`, documented in
+  `docs/connectors/magento/docker-live-qualification.md`.
+- Live qualification remains blocked until a non-production Magento/Adobe
+  Commerce store, activated Integration token and synthetic SKU are supplied.

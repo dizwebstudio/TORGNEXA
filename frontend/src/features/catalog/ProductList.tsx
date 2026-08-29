@@ -12,6 +12,7 @@ import {useToast} from "../../components/Toast";
 import {Icon} from "../../components/Icon";
 import {ProductImage} from "../../components/ProductImage";
 import {LineageTimeline} from "../../components/LineageTimeline";
+import {refreshDemoDataset} from "../demoDataset";
 
 type R={body:any;headers:Headers}; type Client={listProducts(x?:object):Promise<R>;getProduct(x:object):Promise<R>;createProduct(x:object):Promise<R>;updateProduct(x:object):Promise<R>;createDemoOrders(x:object):Promise<R>;createProductOffer(x:object):Promise<R>;updateProductOffer(x:object):Promise<R>;createOfferPrice(x:object):Promise<R>;updateOfferPrice(x:object):Promise<R>;listCatalogCategories():Promise<R>;createCatalogCategory(x:object):Promise<R>;assignProductCategory(x:object):Promise<R>;createProductImage(x:object):Promise<R>;updateProductImage(x:object):Promise<R>;createUpload(x:object):Promise<R>;getUpload(x:object):Promise<R>;
 getUploadContent(x:object):Promise<R>};
@@ -40,7 +41,7 @@ async function uploadAndAttachImage(api:Client,product:string,file:File,alt:stri
 export function ProductList({initialId}:{initialId?:string}) {
   const api=useApi() as unknown as Client,qc=useQueryClient(),toast=useToast();
   const [id,setId]=useState(initialId??""),[creating,setCreating]=useState(false),[q,setQ]=useState(""),[status,setStatus]=useState(""),[cursor,setCursor]=useState(""),[history,setHistory]=useState<string[]>([]);
-  const demo=useMutation({mutationFn:()=>api.createDemoOrders({idempotencyKey:"demo-dataset:catalog"}),onSuccess:async()=>{toast.push({kind:"success",title:"Демо-каталог создан",body:"26 товаров, изображения и описания добавлены в каталог."});await Promise.all([qc.invalidateQueries({queryKey:["products"]}),qc.invalidateQueries({queryKey:["orders"]}),qc.invalidateQueries({queryKey:["inventory"]})])},onError:()=>toast.push({kind:"error",title:"Не удалось создать демо-каталог",body:"Проверьте права на создание демо-данных."})});
+  const demo=useMutation({mutationFn:()=>api.createDemoOrders({idempotencyKey:"demo-dataset:catalog"}),onSuccess:async()=>{toast.push({kind:"success",title:"Демо-контур создан",body:"Каталог, финансы, подключения, синхронизация и согласования заполнены."});await refreshDemoDataset(qc)},onError:()=>toast.push({kind:"error",title:"Не удалось создать демо-контур",body:"Проверьте права на создание демо-данных."})});
   const list=useQuery({queryKey:["products","catalog",q,status,cursor],queryFn:async()=>decodeProductPage((await api.listProducts({limit:25,q:q||undefined,status:status||undefined,cursor:cursor||undefined})).body)});
   const detail=useQuery({queryKey:["product",id],enabled:!!id,queryFn:async()=>normalized((await api.getProduct({productId:id})).body)});
   const refresh=async()=>{await qc.invalidateQueries({queryKey:["products"]});if(id)await qc.invalidateQueries({queryKey:["product",id]})};

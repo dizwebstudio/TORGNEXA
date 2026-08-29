@@ -686,6 +686,26 @@ webhook credentials encrypted.
 - live qualification still requires a dedicated non-production 1С-Битрикс site,
   enabled REST module and a scoped webhook.
 
+## Phase 26.5 — Magento / Adobe Commerce storefront qualification
+
+`151`
+
+Task 151 adds the Magento / Adobe Commerce Connector SDK implementation and
+catalog card. The canonical deterministic report is 13/13, but this does not
+prove a merchant installation. The credentialed REST gate is
+`scripts/magento-smoke.sh`, with Docker/project prerequisites and cleanup
+documented in `docs/connectors/magento/docker-live-qualification.md`.
+
+### Gate RUNTIME-151
+
+- a non-production Magento/Adobe Commerce project, activated Integration token
+  and synthetic SKU are required;
+- read checks cover the products, legacy stockItems and optional order/
+  creditmemo endpoints; writes are explicit and restore original values;
+- until the smoke passes on a real store, Magento remains repository-qualified,
+  not live-qualified, and unsupported product-create/SKU-rename/webhook
+  operations remain fail-closed.
+
 ## Phase 27 — CS-Cart storefront connector
 
 `153`
@@ -707,7 +727,10 @@ unsupported inventory, prices, orders and webhooks remain unavailable.
   webhooks;
 - Go tests/vet, contracts, frontend tests/build and package-index checks pass;
 - live qualification still requires a non-production CS-Cart store with API
-  access enabled for the administrator.
+  access enabled for the administrator. The credentialed API 2.0 smoke is
+  documented in `docs/connectors/cs-cart/docker-live-qualification.md` and
+  implemented by `scripts/cscart-smoke.sh`; until it passes, the provider is
+  repository-qualified only (SDK 13/13), not live-qualified.
 
 ## Phase 28 — «Почта России» logistics connector
 

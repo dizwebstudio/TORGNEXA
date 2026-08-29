@@ -98,7 +98,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "Provider tests, go build/vet/test and the Task-064 conformance candidate pass 12 of 13 checks -- sandbox_isolation could not be exercised because this execution environment cannot create unprivileged Linux user namespaces, an environment constraint shared by every connector's Task-029 probe. docs/connectors/magento/conformance-report.json records this genuine result rather than a fabricated pass."
+      "evidence": "Provider tests and the canonical Task-064 report pass all 13 SDK checks with synthetic credentials. This proves the Connector SDK boundary only; credentialed Docker/live qualification is a separate gate, executable via scripts/magento-smoke.sh and blocked until a non-production Magento/Adobe Commerce store, Integration token and synthetic SKU are supplied."
     }
   ],
   "provider": {

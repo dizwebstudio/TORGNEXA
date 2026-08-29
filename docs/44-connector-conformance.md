@@ -45,6 +45,19 @@ The provider release pipeline then writes the validated report to the canonical 
 
 After Task 064 is in the protected branch merge base, the architecture checker requires every admitted provider to have a valid passing report at this path. The report `connector_id` must equal the policy provider id.
 
+### SDK conformance is not live qualification
+
+The thirteen checks run against deterministic candidates and the Task-029
+sandbox. They prove the Connector SDK boundary, not a provider's current
+installation, API version, credentials, rate limits or data semantics. A
+provider may therefore have a passing `conformance-report.json` while its
+credentialed Docker/live qualification is still blocked. For CS-Cart the
+executable gate is `scripts/cscart-smoke.sh`, documented in
+`docs/connectors/cs-cart/docker-live-qualification.md`. Magento / Adobe
+Commerce uses the same split: `scripts/magento-smoke.sh` is documented in
+`docs/connectors/magento/docker-live-qualification.md`; its canonical SDK
+report does not imply that a merchant store or Integration token works.
+
 ## Machine-readable report
 
 The contract is:

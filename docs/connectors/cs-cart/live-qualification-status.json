@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "connector_id": "cs-cart",
+  "status": "blocked",
+  "evidence_type": "credentialed_store_smoke",
+  "sdk_conformance": {
+    "status": "pass",
+    "required_checks": 13,
+    "report": "docs/connectors/cs-cart/conformance-report.json"
+  },
+  "docker_store": {
+    "status": "not_configured",
+    "requirement": "licensed CS-Cart distribution mounted in the official Docker development environment"
+  },
+  "live_endpoint": {
+    "status": "blocked",
+    "required_environment": [
+      "CS_CART_BASE_URL",
+      "CS_CART_EMAIL",
+      "CS_CART_API_KEY"
+    ]
+  },
+  "smoke_script": "scripts/cscart-smoke.sh",
+  "reason_code": "non_production_store_not_configured"
+}
