@@ -247,6 +247,7 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 				"finance.fx_rate.events.v1",
 				"finance.fx_rate.events.v2",
 				"finance.settlement_entry.events.v1",
+				"finance.unit_economics.events.v1",
 				"governance.approval.events.v1",
 				"governance.entitlement.events.v1",
 				"party.counterparty.events.v1",

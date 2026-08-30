@@ -112,7 +112,7 @@ func TestLogisticsCancelRouteConsumesApprovalAndCompletesRemoteMutation(t *testi
 	remote := &logisticsCancelConnectorStub{result: sdk.ShipmentResult{RemoteID: shipment.RemoteID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: shipment.RemoteID, ObservedAt: time.Now().UTC()}}
 	approvals := &logisticsCancelApprovalStub{request: logisticsCancelApproval(shipment)}
 	shipments := &logisticsCancelShipmentStub{shipment: shipment}
-	runtime := &logisticsCancelRuntimeStub{canceler: connector}
+	runtime := &logisticsCancelRuntimeStub{canceler: remote}
 	route, err := newLogisticsCancelRoute(shipments, logisticsCancelAccountStub{account: logisticsCancelAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.cancel", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, runtime, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
 		return logisticsCancelRuntimeValue{}, nil
 	})
