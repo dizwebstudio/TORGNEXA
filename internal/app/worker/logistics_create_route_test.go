@@ -83,10 +83,10 @@ func TestLogisticsCreateRouteExecutesApprovedCDEKShipmentOnce(t *testing.T) {
 	shipment := logisticsCreateShipment()
 	approvalRequest := logisticsCreateApproval(shipment)
 	payload := []byte(`{"external_id":"order-17","service_code":"cdek_tariff_136","idempotency_key":"create-key-1","from":{"country":"RU","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","city":"Санкт-Петербург","line1":"Невский, 1"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}],"sender":{"name":"ООО Торгнекса","phone":"+74951234567"},"recipient":{"name":"Иван Петров","phone":"+79991234567"}}`)
-	connector := &logisticsCreateConnectorStub{result: sdk.ShipmentResult{RemoteID: "1100285492", Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: "1100285492", ObservedAt: time.Now().UTC()}}
+	remote := &logisticsCreateConnectorStub{result: sdk.ShipmentResult{RemoteID: "1100285492", Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: "1100285492", ObservedAt: time.Now().UTC()}}
 	shipments := &logisticsCreateShipmentStub{shipment: shipment, createRef: "sec:v1:0123456789abcdef0123456789abcdef"}
 	approvals := &logisticsCancelApprovalStub{request: approvalRequest}
-	route, err := newLogisticsCreateRoute(shipments, logisticsCancelAccountStub{account: logisticsCreateAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, logisticsCreateRuntimeStub{creator: connector}, logisticsCreateSecretStub{payload: payload}, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
+	route, err := newLogisticsCreateRoute(shipments, logisticsCancelAccountStub{account: logisticsCreateAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, logisticsCreateRuntimeStub{creator: remote}, logisticsCreateSecretStub{payload: payload}, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
 		return logisticsCancelRuntimeValue{}, nil
 	})
 	if err != nil {
@@ -95,27 +95,27 @@ func TestLogisticsCreateRouteExecutesApprovedCDEKShipmentOnce(t *testing.T) {
 	if err := route.Handle(context.Background(), logisticsCreateDelivery(t, shipment, approvalRequest.ID)); err != nil {
 		t.Fatal(err)
 	}
-	if connector.calls != 1 || shipments.applied != 1 || shipments.unknown != 0 || approvals.begin != 1 || approvals.complete != 1 || len(approvals.success) != 1 || !approvals.success[0] {
-		t.Fatalf("remote=%d applied=%d unknown=%d begin=%d complete=%d success=%v", connector.calls, shipments.applied, shipments.unknown, approvals.begin, approvals.complete, approvals.success)
+	if remote.calls != 1 || shipments.applied != 1 || shipments.unknown != 0 || approvals.begin != 1 || approvals.complete != 1 || len(approvals.success) != 1 || !approvals.success[0] {
+		t.Fatalf("remote=%d applied=%d unknown=%d begin=%d complete=%d success=%v", remote.calls, shipments.applied, shipments.unknown, approvals.begin, approvals.complete, approvals.success)
 	}
 }
 
 func TestLogisticsCreateRouteMarksRemoteOutcomeUnknownWithoutRetry(t *testing.T) {
 	shipment := logisticsCreateShipment()
 	approvalRequest := logisticsCreateApproval(shipment)
-	connector := &logisticsCreateConnectorStub{err: errors.New("transport failed after request")}
+	remote := &logisticsCreateConnectorStub{err: errors.New("transport failed after request")}
 	shipments := &logisticsCreateShipmentStub{shipment: shipment, createRef: "sec:v1:0123456789abcdef0123456789abcdef"}
 	approvals := &logisticsCancelApprovalStub{request: approvalRequest}
 	payload := []byte(`{"external_id":"order-17","service_code":"cdek_tariff_136","idempotency_key":"create-key-1","from":{"country":"RU","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","city":"Санкт-Петербург","line1":"Невский, 1"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}],"sender":{"name":"ООО Торгнекса","phone":"+74951234567"},"recipient":{"name":"Иван Петров","phone":"+79991234567"}}`)
-	route, err := newLogisticsCreateRoute(shipments, logisticsCancelAccountStub{account: logisticsCreateAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, logisticsCreateRuntimeStub{creator: connector}, logisticsCreateSecretStub{payload: payload}, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
+	route, err := newLogisticsCreateRoute(shipments, logisticsCancelAccountStub{account: logisticsCreateAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, logisticsCreateRuntimeStub{creator: remote}, logisticsCreateSecretStub{payload: payload}, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
 		return logisticsCancelRuntimeValue{}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	class, code := eventbus.ClassifyFailure(route.Handle(context.Background(), logisticsCreateDelivery(t, shipment, approvalRequest.ID)))
-	if class != eventbus.FailurePermanent || code != "logistics_create_outcome_unknown" || connector.calls != 1 || shipments.unknown != 1 || shipments.applied != 0 || approvals.complete != 1 || len(approvals.success) != 1 || approvals.success[0] {
-		t.Fatalf("class=%v code=%s remote=%d unknown=%d applied=%d complete=%d success=%v", class, code, connector.calls, shipments.unknown, shipments.applied, approvals.complete, approvals.success)
+	if class != eventbus.FailurePermanent || code != "logistics_create_outcome_unknown" || remote.calls != 1 || shipments.unknown != 1 || shipments.applied != 0 || approvals.complete != 1 || len(approvals.success) != 1 || approvals.success[0] {
+		t.Fatalf("class=%v code=%s remote=%d unknown=%d applied=%d complete=%d success=%v", class, code, remote.calls, shipments.unknown, shipments.applied, approvals.complete, approvals.success)
 	}
 }
 

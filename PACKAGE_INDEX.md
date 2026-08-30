@@ -131,7 +131,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Task 168 additions
 
-- repository-complete provider-neutral Unified Integration State Center combining account,
+- complete provider-neutral Unified Integration State Center combining account,
   runtime stage, credential/config class, capabilities, health/freshness,
   rate-limit, sync/retry/DLQ, reconciliation, webhook and separate-surface
   evidence into one permission-aware read model;

@@ -1248,7 +1248,7 @@ rebuildable projection. The implementation is delivered as the eighteen-subtask 
 
 `168`
 
-Task 168 is repository-complete as a provider-neutral read model and operator triage center
+Task 168 is complete as a provider-neutral read model and operator triage center
 for the complete integration lifecycle. It composes account lifecycle,
 credential/configuration class, truthful runtime stage, capability grants,
 health/freshness/rate limits, OAuth reauthorization, sync/retry/DLQ,

@@ -39,19 +39,19 @@ type logisticsCreateRuntime interface {
 }
 
 type logisticsCreateRoute struct {
-	shipments  logisticsCreateShipmentStore
-	accounts   logisticsCreateAccounts
-	approvals  logisticsCreateApprovals
-	runtime    logisticsCreateRuntime
-	secrets    secrets.SecretProvider
-	newRuntime logisticsRuntimeFactory
+	shipments       logisticsCreateShipmentStore
+	accounts        logisticsCreateAccounts
+	approvals       logisticsCreateApprovals
+	runtime         logisticsCreateRuntime
+	credentialStore secrets.SecretProvider
+	newRuntime      logisticsRuntimeFactory
 }
 
-func newLogisticsCreateRoute(shipments logisticsCreateShipmentStore, accounts logisticsCreateAccounts, approvals logisticsCreateApprovals, runtime logisticsCreateRuntime, secretProvider secrets.SecretProvider, newRuntime logisticsRuntimeFactory) (*logisticsCreateRoute, error) {
-	if shipments == nil || accounts == nil || approvals == nil || runtime == nil || secretProvider == nil || newRuntime == nil {
+func newLogisticsCreateRoute(shipments logisticsCreateShipmentStore, accounts logisticsCreateAccounts, approvals logisticsCreateApprovals, runtime logisticsCreateRuntime, credentialStore secrets.SecretProvider, newRuntime logisticsRuntimeFactory) (*logisticsCreateRoute, error) {
+	if shipments == nil || accounts == nil || approvals == nil || runtime == nil || credentialStore == nil || newRuntime == nil {
 		return nil, errors.New("worker: logistics creation dependencies required")
 	}
-	return &logisticsCreateRoute{shipments: shipments, accounts: accounts, approvals: approvals, runtime: runtime, secrets: secretProvider, newRuntime: newRuntime}, nil
+	return &logisticsCreateRoute{shipments: shipments, accounts: accounts, approvals: approvals, runtime: runtime, credentialStore: credentialStore, newRuntime: newRuntime}, nil
 }
 
 func (route *logisticsCreateRoute) Handle(ctx context.Context, delivery eventbus.Delivery) error {
@@ -146,7 +146,7 @@ func (route *logisticsCreateRoute) Handle(ctx context.Context, delivery eventbus
 
 func (route *logisticsCreateRoute) readPayload(ctx context.Context, scope tenancy.Scope, reference secrets.Reference, shipment logistics.Shipment) (sdk.ShipmentCreateRequest, error) {
 	var request sdk.ShipmentCreateRequest
-	err := route.secrets.Use(ctx, scope, reference, func(material []byte) error {
+	err := route.credentialStore.Use(ctx, scope, reference, func(material []byte) error {
 		decoder := json.NewDecoder(strings.NewReader(string(material)))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&request); err != nil {

@@ -2,9 +2,10 @@
 
 Family: `logistics`. The current production surface is credential verification
 plus bounded read-only pickup-point, rate-preview and tracking reads, as well as
-the approval-bound cancellation route. The SDK candidate also proves shipment
-creation, labels and return flow without making those operations available to
-application callers.
+approval-bound cancellation and shipment-creation routes. Shipment creation is
+available through the host-side asynchronous route only after capability,
+approval, idempotency and encrypted-payload checks; labels, returns and webhooks
+remain qualification-gated.
 
 Production networking is host-injected through a typed transport; provider code has no direct Core or SQL authority. Paste credentials as JSON `{ "client_id": "…", "client_secret": "…" }`. The host exchanges them at `/v2/oauth/token`, performs a bounded `/v2/location/cities?size=1` read for health and can perform a bounded `/v2/deliverypoints` read for a requested country/city, then discards the access token. OAuth client credentials and all remote tariff/PVZ identifiers remain provider-local. Host-side account service mapping converts remote tariff ids into canonical TORGNEXA service codes before routing. The delivery-point adapter is available through the protected application route only when its capability is explicitly enabled; live provider qualification is still required before enabling it in a production account.
 
@@ -18,6 +19,9 @@ are not returned by the application route. A bounded tracking read is
 available through `GET /api/v1/logistics/tracking` when
 `logistics.track.read` is enabled. It selects the latest status from at most
 100 provider status records and returns no raw provider payload. Shipment
-Shipment creation, labels, returns and webhooks remain qualification-gated.
+creation is routed through `POST /api/v1/logistics/shipments`; the worker uses
+the official CDEK order contract and records an ambiguous remote outcome as
+`unknown` without a blind retry. Labels, returns and webhooks remain
+qualification-gated.
 
 Official documentation: https://apidoc.cdek.ru/

@@ -249,7 +249,7 @@ AI/MCP/n8n cannot change financial facts. See
 
 ## Единый центр состояния интеграций
 
-Task 168 is repository-complete: the provider-neutral integration state center
+Task 168 is complete: the provider-neutral integration state center
 now composes
 account lifecycle, credential/configuration class, truthful runtime stage,
 capability grants, health/freshness/rate limits, OAuth reauthorization,

@@ -2,10 +2,13 @@
 
 ## Статус
 
-`repository-complete` — реализованы типизированный reducer, tenant-scoped API,
-OpenAPI/SDK, derived PostgreSQL metadata/queue, canonical events, worker
-consumer и UI `/integrations/status`; release evidence и Compose smoke
-проверяются общими репозиторными gate-командами.
+`complete` — 2026-08-31. Реализованы и проверены все восемнадцать этапов:
+типизированный reducer, tenant-scoped API, OpenAPI/SDK, derived PostgreSQL
+metadata/queue, canonical events, Inbox-дедупликация, durable recompute worker,
+ETag/no-store, UI `/integrations/status`, русские статусы, документация и
+репозиторные release gates. Compose/live-provider evidence остаются
+топологически-зависимым этапом выкладки и выполняются на целевом production
+окружении по runbook ниже.
 
 ## Цель
 
