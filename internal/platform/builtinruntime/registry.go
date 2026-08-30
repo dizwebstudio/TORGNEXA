@@ -121,6 +121,21 @@ type CRMWriter interface {
 	sdk.CRMProductRowWriter
 }
 
+// PickupPoints reads a bounded provider pickup-point directory through the
+// reviewed logistics composition. The returned identifiers remain remote
+// references and are never treated as canonical warehouse identifiers.
+func (r *Registry) PickupPoints(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "pickup.points.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 type Registry struct {
 	http    *httpTransport
 	localAI *localAIHTTP

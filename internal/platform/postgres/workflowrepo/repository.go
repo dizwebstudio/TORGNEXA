@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/workflow"
@@ -19,7 +18,19 @@ import (
 
 const applyScope = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
 
+var workflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+
 type Repository struct{ db *sql.DB }
+
+// Transaction is the narrow SQL surface used when an event trigger is
+// persisted inside the caller-owned Inbox transaction. Keeping this boundary
+// separate from Repository.tx makes the run insert and the immutable Inbox
+// receipt commit atomically.
+type Transaction interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
 
 func New(db *sql.DB) (*Repository, error) {
 	if db == nil {
@@ -29,7 +40,7 @@ func New(db *sql.DB) (*Repository, error) {
 }
 
 func (r *Repository) Create(ctx context.Context, scope workflow.Scope, id string, definition workflow.Definition) (workflow.Workflow, error) {
-	if err := valid(ctx, r, scope); err != nil || definition.Validate() != nil || strings.TrimSpace(id) == "" {
+	if err := valid(ctx, r, scope); err != nil || definition.Validate() != nil || !workflowIDValid(id) {
 		return workflow.Workflow{}, workflow.ErrInvalid
 	}
 	plan, err := workflow.Compile(definition)
@@ -47,6 +58,29 @@ func (r *Repository) Create(ctx context.Context, scope workflow.Scope, id string
 	now := time.Now().UTC()
 	var out workflow.Workflow
 	err = r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))`, scope.OrganizationID(), scope.WorkspaceID()); err != nil {
+			return err
+		}
+		// Resource creation is replay-safe even though the public command only
+		// carries an Idempotency-Key. The API derives the default workflow ID
+		// from that key; a same-definition retry returns the existing resource,
+		// while reusing an ID for different semantics is a conflict.
+		var existing workflow.Workflow
+		existingErr := scanWorkflow(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,name,description,status,current_version,version,created_at,updated_at FROM workflows WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), id), &existing)
+		if existingErr == nil {
+			var existingDigest string
+			if err := tx.QueryRowContext(ctx, `SELECT plan_digest FROM workflow_versions WHERE organization_id=$1 AND workspace_id=$2 AND workflow_id=$3 AND version=$4`, scope.OrganizationID(), scope.WorkspaceID(), id, existing.CurrentVersion).Scan(&existingDigest); err != nil {
+				return err
+			}
+			if existing.Name == definition.Name && existing.Description == definition.Description && existingDigest == plan.Digest {
+				out = existing
+				return nil
+			}
+			return workflow.ErrConflict
+		}
+		if !errors.Is(existingErr, workflow.ErrNotFound) {
+			return existingErr
+		}
 		var active int
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM workflows WHERE organization_id=$1 AND workspace_id=$2 AND status<>'archived'`, scope.OrganizationID(), scope.WorkspaceID()).Scan(&active); err != nil {
 			return err
@@ -180,7 +214,7 @@ func (r *Repository) ChangeStatus(ctx context.Context, scope workflow.Scope, id 
 }
 
 func (r *Repository) CreateRun(ctx context.Context, scope workflow.Scope, req workflow.RunRequest) (workflow.Run, error) {
-	if err := valid(ctx, r, scope); err != nil || req.ID == "" || req.WorkflowID == "" || req.WorkflowVersion < 1 || !req.TriggerKind.Valid() || req.IdempotencyKey == "" || req.InputDigest == "" {
+	if err := valid(ctx, r, scope); err != nil || req.Validate() != nil {
 		return workflow.Run{}, workflow.ErrInvalid
 	}
 	if _, err := workflow.ParseScope(scope.OrganizationID(), scope.WorkspaceID()); err != nil {
@@ -189,6 +223,25 @@ func (r *Repository) CreateRun(ctx context.Context, scope workflow.Scope, req wo
 	now := time.Now().UTC()
 	var out workflow.Run
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))`, scope.OrganizationID(), scope.WorkspaceID()); err != nil {
+			return err
+		}
+		// Resolve the idempotency key before applying quotas.  A retried command
+		// must replay the original run even when the workspace is currently at
+		// its concurrency limit; a different request under the same key is a
+		// deterministic conflict rather than a database 500.
+		var existing workflow.Run
+		err := scanRun(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND workflow_id=$3 AND idempotency_key=$4`, scope.OrganizationID(), scope.WorkspaceID(), req.WorkflowID, req.IdempotencyKey), &existing)
+		if err == nil {
+			if sameRunRequest(existing, scope, req) {
+				out = existing
+				return nil
+			}
+			return workflow.ErrConflict
+		}
+		if !errors.Is(err, workflow.ErrNotFound) {
+			return err
+		}
 		var recent, concurrent int
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE available_at>=clock_timestamp()-interval '1 minute'), count(*) FILTER (WHERE status IN ('queued','running','waiting_approval','waiting_retry')) FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2`, scope.OrganizationID(), scope.WorkspaceID()).Scan(&recent, &concurrent); err != nil {
 			return err
@@ -196,12 +249,27 @@ func (r *Repository) CreateRun(ctx context.Context, scope workflow.Scope, req wo
 		if recent >= 120 || concurrent >= 8 {
 			return workflow.ErrQuotaExceeded
 		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO workflow_runs(organization_id,workspace_id,id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,available_at,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'queued',$10,1) RETURNING id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version`, scope.OrganizationID(), scope.WorkspaceID(), req.ID, req.WorkflowID, req.WorkflowVersion, string(req.TriggerKind), req.TriggerRef, req.IdempotencyKey, req.InputDigest, now).Scan(&out.ID, &out.OrganizationID, &out.WorkspaceID, &out.WorkflowID, &out.WorkflowVersion, &out.TriggerKind, &out.TriggerRef, &out.IdempotencyKey, &out.InputDigest, &out.Status, &out.AttemptCount, &out.AvailableAt, &out.StartedAt, &out.CompletedAt, &out.LastErrorCode, &out.Version); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO workflow_runs(organization_id,workspace_id,id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,available_at,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'queued',$10,1) ON CONFLICT (organization_id,workspace_id,workflow_id,idempotency_key) DO NOTHING RETURNING id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version`, scope.OrganizationID(), scope.WorkspaceID(), req.ID, req.WorkflowID, req.WorkflowVersion, string(req.TriggerKind), req.TriggerRef, req.IdempotencyKey, req.InputDigest, now).Scan(&out.ID, &out.OrganizationID, &out.WorkspaceID, &out.WorkflowID, &out.WorkflowVersion, &out.TriggerKind, &out.TriggerRef, &out.IdempotencyKey, &out.InputDigest, &out.Status, &out.AttemptCount, &out.AvailableAt, &out.StartedAt, &out.CompletedAt, &out.LastErrorCode, &out.Version); err == nil {
+			return nil
+		} else if !errors.Is(err, workflow.ErrNotFound) {
 			return mapWriteError(err)
 		}
+		// A concurrent insert won the unique key.  Re-read it in this
+		// transaction and apply the same semantic equality check.
+		if err := scanRun(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND workflow_id=$3 AND idempotency_key=$4`, scope.OrganizationID(), scope.WorkspaceID(), req.WorkflowID, req.IdempotencyKey), &existing); err != nil {
+			return err
+		}
+		if !sameRunRequest(existing, scope, req) {
+			return workflow.ErrConflict
+		}
+		out = existing
 		return nil
 	})
 	return out, err
+}
+
+func sameRunRequest(existing workflow.Run, scope workflow.Scope, req workflow.RunRequest) bool {
+	return existing.ID == req.ID && existing.OrganizationID == scope.OrganizationID() && existing.WorkspaceID == scope.WorkspaceID() && existing.WorkflowID == req.WorkflowID && existing.WorkflowVersion == req.WorkflowVersion && existing.TriggerKind == req.TriggerKind && existing.TriggerRef == req.TriggerRef && existing.IdempotencyKey == req.IdempotencyKey && existing.InputDigest == req.InputDigest
 }
 
 func (r *Repository) GetRun(ctx context.Context, scope workflow.Scope, id string) (workflow.Run, error) {
@@ -266,7 +334,7 @@ func (r *Repository) DispatchDueSchedules(ctx context.Context, scope workflow.Sc
 		return workflow.ErrInvalid
 	}
 	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT id,current_version,next_run_at,trigger_interval_minutes FROM workflows WHERE organization_id=$1 AND workspace_id=$2 AND status='published' AND trigger_kind='schedule' AND trigger_enabled AND next_run_at IS NOT NULL AND next_run_at<=clock_timestamp() ORDER BY next_run_at,id FOR UPDATE SKIP LOCKED LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), batch)
+		rows, err := tx.QueryContext(ctx, `WITH capacity AS (SELECT count(*) FILTER (WHERE available_at>=clock_timestamp()-interval '1 minute') AS recent, count(*) FILTER (WHERE status IN ('queued','running','waiting_approval','waiting_retry')) AS active FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2), due AS (SELECT w.id,w.current_version,w.next_run_at,w.trigger_interval_minutes FROM workflows w CROSS JOIN capacity WHERE capacity.recent<120 AND w.organization_id=$1 AND w.workspace_id=$2 AND w.status='published' AND w.trigger_kind='schedule' AND w.trigger_enabled AND w.next_run_at IS NOT NULL AND w.next_run_at<=clock_timestamp() ORDER BY w.next_run_at,w.id FOR UPDATE SKIP LOCKED LIMIT LEAST($3,GREATEST(0,8-capacity.active))) SELECT id,current_version,next_run_at,trigger_interval_minutes FROM due`, scope.OrganizationID(), scope.WorkspaceID(), batch)
 		if err != nil {
 			return err
 		}
@@ -299,7 +367,7 @@ func (r *Repository) ClaimRuns(ctx context.Context, scope workflow.Scope, worker
 	}
 	claimed := make([]ClaimedRun, 0, batch)
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `WITH due AS (SELECT id FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND status IN ('queued','waiting_retry') AND available_at<=clock_timestamp() AND (lease_until IS NULL OR lease_until<clock_timestamp()) ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE workflow_runs w SET lease_token=$4,lease_until=clock_timestamp()+$5::interval,version=version+1 FROM due WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.id=due.id RETURNING w.id,w.organization_id,w.workspace_id,w.workflow_id,w.workflow_version,w.trigger_kind,w.trigger_ref,w.idempotency_key,w.input_digest,w.status,w.attempt_count,w.available_at,w.started_at,w.completed_at,w.last_error_code,w.version`, scope.OrganizationID(), scope.WorkspaceID(), batch, leaseToken, intervalLiteral(lease))
+		rows, err := tx.QueryContext(ctx, `WITH active AS (SELECT count(*) AS count FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND status IN ('queued','running','waiting_approval','waiting_retry')), due AS (SELECT w.id FROM workflow_runs w CROSS JOIN active WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.status IN ('queued','running','waiting_retry','waiting_approval') AND w.available_at<=clock_timestamp() AND (w.lease_until IS NULL OR w.lease_until<clock_timestamp()) ORDER BY w.available_at,w.id FOR UPDATE SKIP LOCKED LIMIT LEAST($3,GREATEST(0,8-active.count))) UPDATE workflow_runs w SET lease_token=$4,lease_until=clock_timestamp()+$5::interval,version=version+1 FROM due WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.id=due.id RETURNING w.id,w.organization_id,w.workspace_id,w.workflow_id,w.workflow_version,w.trigger_kind,w.trigger_ref,w.idempotency_key,w.input_digest,w.status,w.attempt_count,w.available_at,w.started_at,w.completed_at,w.last_error_code,w.version`, scope.OrganizationID(), scope.WorkspaceID(), batch, leaseToken, intervalLiteral(lease))
 		if err != nil {
 			return err
 		}
@@ -361,6 +429,59 @@ func (r *Repository) Step(ctx context.Context, scope workflow.Scope, runID, node
 	return out, err
 }
 
+// ListSteps returns bounded step state for an operator run timeline.
+func (r *Repository) ListSteps(ctx context.Context, scope workflow.Scope, runID string, limit int) ([]workflow.StepRun, error) {
+	if err := valid(ctx, r, scope); err != nil || runID == "" || limit < 1 || limit > 200 {
+		return nil, workflow.ErrInvalid
+	}
+	items := make([]workflow.StepRun, 0)
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT id,run_id,organization_id,workspace_id,node_id,status,attempt_count,output_digest,error_code,started_at,completed_at,version FROM workflow_step_runs WHERE organization_id=$1 AND workspace_id=$2 AND run_id=$3 ORDER BY id LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), runID, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item workflow.StepRun
+			if err := scanStep(rows, &item); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
+// ListEvidence returns immutable, bounded evidence in observation order.
+func (r *Repository) ListEvidence(ctx context.Context, scope workflow.Scope, runID string, limit int) ([]workflow.ExecutionEvidence, error) {
+	if err := valid(ctx, r, scope); err != nil || runID == "" || limit < 1 || limit > 200 {
+		return nil, workflow.ErrInvalid
+	}
+	items := make([]workflow.ExecutionEvidence, 0)
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT id,run_id,organization_id,workspace_id,node_id,attempt,outcome,output_digest,error_code,observed_at FROM workflow_step_evidence WHERE organization_id=$1 AND workspace_id=$2 AND run_id=$3 ORDER BY observed_at,id LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), runID, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item workflow.ExecutionEvidence
+			var outcome string
+			if err := rows.Scan(&item.ID, &item.RunID, &item.OrganizationID, &item.WorkspaceID, &item.NodeID, &item.Attempt, &outcome, &item.OutputDigest, &item.ErrorCode, &item.ObservedAt); err != nil {
+				return err
+			}
+			item.Outcome = workflow.StepStatus(outcome)
+			if err := item.Validate(); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
 // UpsertStep creates a queued step or updates it with an optimistic version.
 func (r *Repository) UpsertStep(ctx context.Context, scope workflow.Scope, item workflow.StepRun, expectedVersion int64) (workflow.StepRun, error) {
 	if err := valid(ctx, r, scope); err != nil || item.Validate() != nil || item.OrganizationID != scope.OrganizationID() || item.WorkspaceID != scope.WorkspaceID() {
@@ -377,7 +498,7 @@ func (r *Repository) UpsertStep(ctx context.Context, scope workflow.Scope, item 
 }
 
 func (r *Repository) AppendEvidence(ctx context.Context, scope workflow.Scope, id, runID, nodeID string, attempt int, outcome workflow.StepStatus, outputDigest, errorCode string, observedAt time.Time) error {
-	if err := valid(ctx, r, scope); err != nil || id == "" || runID == "" || nodeID == "" || attempt < 1 || attempt > 64 || !observedAt.UTC().Equal(observedAt) || outputDigest != "" && !hexDigest(outputDigest) || errorCode != "" && !validErrorCode(errorCode) {
+	if err := valid(ctx, r, scope); err != nil || id == "" || runID == "" || nodeID == "" || attempt < 1 || attempt > 64 || !isEvidenceOutcome(outcome) || !observedAt.UTC().Equal(observedAt) || outputDigest != "" && !hexDigest(outputDigest) || errorCode != "" && !validErrorCode(errorCode) {
 		return workflow.ErrInvalid
 	}
 	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
@@ -391,38 +512,73 @@ func (r *Repository) TriggerEvent(ctx context.Context, scope workflow.Scope, eve
 	if err := valid(ctx, r, scope); err != nil || event.ID == "" || event.Type.Validate() != nil {
 		return nil, workflow.ErrInvalid
 	}
-	digest := fmt.Sprintf("%x", sha256Bytes(event.Data))
 	created := make([]workflow.Run, 0)
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT id,current_version FROM workflows WHERE organization_id=$1 AND workspace_id=$2 AND status='published' AND trigger_kind='event' AND trigger_enabled AND trigger_event_type=$3 ORDER BY id`, scope.OrganizationID(), scope.WorkspaceID(), string(event.Type))
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var workflowID string
-			var version int64
-			if err := rows.Scan(&workflowID, &version); err != nil {
-				return err
-			}
-			runID := "run_" + digest[:32] + fmt.Sprintf("_%x", sha256Bytes([]byte(workflowID))[:8])
-			_, err := tx.ExecContext(ctx, `INSERT INTO workflow_runs(organization_id,workspace_id,id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,available_at,version) VALUES($1,$2,$3,$4,$5,'event',$6,$7,$8,'queued',clock_timestamp(),1) ON CONFLICT (organization_id,workspace_id,workflow_id,idempotency_key) DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), runID, workflowID, version, event.ID, event.ID, digest)
-			if err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO workflow_event_receipts(organization_id,workspace_id,event_id,workflow_id,workflow_version,run_id) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), event.ID, workflowID, version, runID); err != nil {
-				return err
-			}
-			var item workflow.Run
-			if err := scanRun(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), runID), &item); err == nil {
-				created = append(created, item)
-			} else if !errors.Is(err, workflow.ErrNotFound) {
-				return err
-			}
-		}
-		return rows.Err()
+		var err error
+		created, err = r.triggerEventTransaction(ctx, scope, tx, event)
+		return err
 	})
 	return created, err
+}
+
+// TriggerEventInTransaction persists event-triggered runs in an existing
+// Inbox-owned transaction. The caller commits the transaction and its receipt
+// together, so a crash cannot leave a run without deduplication evidence (or a
+// receipt without its corresponding run).
+func (r *Repository) TriggerEventInTransaction(ctx context.Context, scope workflow.Scope, tx Transaction, event eventbus.Event) ([]workflow.Run, error) {
+	if err := valid(ctx, r, scope); err != nil || tx == nil || event.ID == "" || event.Type.Validate() != nil {
+		return nil, workflow.ErrInvalid
+	}
+	if _, err := tx.ExecContext(ctx, applyScope, scope.OrganizationID(), scope.WorkspaceID()); err != nil {
+		return nil, err
+	}
+	return r.triggerEventTransaction(ctx, scope, tx, event)
+}
+
+func (r *Repository) triggerEventTransaction(ctx context.Context, scope workflow.Scope, tx Transaction, event eventbus.Event) ([]workflow.Run, error) {
+	digest := fmt.Sprintf("%x", sha256Bytes(event.Data))
+	created := make([]workflow.Run, 0)
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))`, scope.OrganizationID(), scope.WorkspaceID()); err != nil {
+		return nil, err
+	}
+	var recent, active int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE available_at>=clock_timestamp()-interval '1 minute'), count(*) FILTER (WHERE status IN ('queued','running','waiting_approval','waiting_retry')) FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2`, scope.OrganizationID(), scope.WorkspaceID()).Scan(&recent, &active); err != nil {
+		return nil, err
+	}
+	newRuns := 0
+	rows, err := tx.QueryContext(ctx, `SELECT id,current_version FROM workflows WHERE organization_id=$1 AND workspace_id=$2 AND status='published' AND trigger_kind='event' AND trigger_enabled AND trigger_event_type=$3 ORDER BY id`, scope.OrganizationID(), scope.WorkspaceID(), string(event.Type))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var workflowID string
+		var version int64
+		if err := rows.Scan(&workflowID, &version); err != nil {
+			return nil, err
+		}
+		if recent >= 120 || active+newRuns >= 8 {
+			return nil, workflow.ErrQuotaExceeded
+		}
+		runID := "run_" + digest[:32] + fmt.Sprintf("_%x", sha256Bytes([]byte(workflowID))[:8])
+		result, err := tx.ExecContext(ctx, `INSERT INTO workflow_runs(organization_id,workspace_id,id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,available_at,version) VALUES($1,$2,$3,$4,$5,'event',$6,$7,$8,'queued',clock_timestamp(),1) ON CONFLICT (organization_id,workspace_id,workflow_id,idempotency_key) DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), runID, workflowID, version, event.ID, event.ID, digest)
+		if err != nil {
+			return nil, err
+		}
+		if inserted, rowsErr := result.RowsAffected(); rowsErr == nil && inserted == 1 {
+			newRuns++
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO workflow_event_receipts(organization_id,workspace_id,event_id,workflow_id,workflow_version,run_id) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), event.ID, workflowID, version, runID); err != nil {
+			return nil, err
+		}
+		var item workflow.Run
+		if err := scanRun(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,workflow_id,workflow_version,trigger_kind,trigger_ref,idempotency_key,input_digest,status,attempt_count,available_at,started_at,completed_at,last_error_code,version FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), runID), &item); err == nil {
+			created = append(created, item)
+		} else if !errors.Is(err, workflow.ErrNotFound) {
+			return nil, err
+		}
+	}
+	return created, rows.Err()
 }
 
 func (r *Repository) tx(ctx context.Context, scope workflow.Scope, readOnly bool, fn func(*sql.Tx) error) error {
@@ -453,6 +609,14 @@ func valid(ctx context.Context, r *Repository, scope workflow.Scope) error {
 		return workflow.ErrInvalid
 	}
 	return nil
+}
+
+func workflowIDValid(value string) bool {
+	return workflowIDPattern.MatchString(value)
+}
+
+func isEvidenceOutcome(status workflow.StepStatus) bool {
+	return status == workflow.StepCompleted || status == workflow.StepFailed || status == workflow.StepSkipped || status == workflow.StepWaitingApproval || status == workflow.StepWaitingRetry
 }
 
 type scanner interface{ Scan(...any) error }

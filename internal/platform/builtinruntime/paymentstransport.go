@@ -267,9 +267,10 @@ func (t yookassaHTTP) Refund(ctx context.Context, secret []byte, request sdk.Pay
 	return sdk.PaymentRefundResult{RemoteRefundID: refund.ID, Status: refund.Status, ObservedAt: time.Now().UTC()}, nil
 }
 
-// Reconcile lists refunds is not directly supported by a single YooKassa
-// endpoint; instead this walks the payments list for the window. Amounts
-// already flow through the same decimal parser as Create/Status.
+// Reconcile reads both payment and refund lists for the bounded window. The
+// YooKassa list API exposes the same created_at filters for /payments and
+// /refunds, while the host remains responsible for matching observations to
+// tenant-local records before applying any lifecycle change.
 func (t yookassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk.PaymentReconcileRequest) (sdk.PaymentReconcileResult, error) {
 	user, pass, err := splitBasicCredential(secret)
 	if err != nil {
@@ -303,7 +304,42 @@ func (t yookassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk.
 		if timeErr != nil {
 			occurred = time.Now().UTC()
 		}
-		items = append(items, sdk.PaymentSettlement{RemoteID: payment.ID, Kind: "sale", Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: payment.Amount.Currency}, OccurredAt: occurred.UTC()})
+		commission := int64(0)
+		if payment.IncomeAmount != nil {
+			if income, incomeErr := decimalToMinorUnits(payment.IncomeAmount.Value); incomeErr == nil && income <= minor {
+				commission = minor - income
+			}
+		}
+		items = append(items, sdk.PaymentSettlement{RemoteID: payment.ID, Kind: "sale", Status: payment.Status, Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: payment.Amount.Currency}, CommissionMinorUnits: commission, OccurredAt: occurred.UTC()})
+	}
+	refundQuery := url.Values{
+		"created_at.gte": []string{request.From.UTC().Format(time.RFC3339)},
+		"created_at.lte": []string{request.To.UTC().Format(time.RFC3339)},
+		"limit":          []string{"100"},
+	}
+	refundStatus, refundBody, _, _, _, err := t.h.do(ctx, http.MethodGet, yookassaHost, "/v3/refunds", refundQuery, nil, http.Header{}, user, pass)
+	if err != nil {
+		return sdk.PaymentReconcileResult{}, err
+	}
+	if refundStatus < 200 || refundStatus >= 300 {
+		return sdk.PaymentReconcileResult{}, fmt.Errorf("yookassa: refund reconcile rejected with status %d", refundStatus)
+	}
+	var refundPage struct {
+		Items []yookassaRefund `json:"items"`
+	}
+	if err := json.Unmarshal(refundBody, &refundPage); err != nil {
+		return sdk.PaymentReconcileResult{}, errors.New("yookassa: invalid refund reconcile response")
+	}
+	for _, refund := range refundPage.Items {
+		minor, amountErr := decimalToMinorUnits(refund.Amount.Value)
+		if amountErr != nil {
+			continue
+		}
+		occurred, timeErr := time.Parse(time.RFC3339, refund.CreatedAt)
+		if timeErr != nil {
+			occurred = time.Now().UTC()
+		}
+		items = append(items, sdk.PaymentSettlement{RemoteID: refund.ID, Kind: "refund", Status: refund.Status, Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: refund.Amount.Currency}, OccurredAt: occurred.UTC()})
 	}
 	return sdk.PaymentReconcileResult{Items: items, ObservedAt: time.Now().UTC()}, nil
 }
@@ -514,6 +550,7 @@ func (t sbpHTTP) Reconcile(ctx context.Context, host string, secret []byte, requ
 	var page struct {
 		Orders []struct {
 			QRCID     string `json:"qrcId"`
+			Status    string `json:"status"`
 			Amount    int64  `json:"amount"`
 			Currency  string `json:"currency"`
 			CreatedAt string `json:"createdAt"`
@@ -528,7 +565,7 @@ func (t sbpHTTP) Reconcile(ctx context.Context, host string, secret []byte, requ
 		if timeErr != nil {
 			occurred = time.Now().UTC()
 		}
-		items = append(items, sdk.PaymentSettlement{RemoteID: order.QRCID, Kind: "sale", Amount: sdk.PaymentAmount{MinorUnits: order.Amount, Currency: order.Currency}, OccurredAt: occurred.UTC()})
+		items = append(items, sdk.PaymentSettlement{RemoteID: order.QRCID, Kind: "sale", Status: order.Status, Amount: sdk.PaymentAmount{MinorUnits: order.Amount, Currency: order.Currency}, OccurredAt: occurred.UTC()})
 	}
 	return sdk.PaymentReconcileResult{Items: items, ObservedAt: time.Now().UTC()}, nil
 }
@@ -600,18 +637,18 @@ func robokassaInvID(externalID string) int64 {
 }
 
 type robokassaJWTPayload struct {
-	MerchantLogin string  `json:"MerchantLogin"`
-	InvoiceType   string  `json:"InvoiceType"`
-	Culture       string  `json:"Culture"`
-	InvId         int64   `json:"InvId"`
-	OutSum        float64 `json:"OutSum"`
-	Description   string  `json:"Description,omitempty"`
+	MerchantLogin string      `json:"MerchantLogin"`
+	InvoiceType   string      `json:"InvoiceType"`
+	Culture       string      `json:"Culture"`
+	InvId         int64       `json:"InvId"`
+	OutSum        json.Number `json:"OutSum"`
+	Description   string      `json:"Description,omitempty"`
 }
 
 // robokassaSignJWT mirrors sdk-php's jwtSignMd5: HMAC-MD5 over
 // "base64url(header).base64url(payload)", keyed by "login:password1", with
 // the raw digest itself base64url-encoded as the third JWT segment.
-func robokassaSignJWT(login, password1 string, invID int64, outSum float64, description string) (string, error) {
+func robokassaSignJWT(login, password1 string, invID int64, outSum json.Number, description string) (string, error) {
 	header := []byte(`{"alg":"MD5","typ":"JWT"}`)
 	payload, err := json.Marshal(robokassaJWTPayload{MerchantLogin: login, InvoiceType: "OneTime", Culture: "ru", InvId: invID, OutSum: outSum, Description: description})
 	if err != nil {
@@ -700,10 +737,7 @@ func (t robokassaHTTP) Create(ctx context.Context, secret []byte, request sdk.Pa
 		return sdk.PaymentCreateResult{}, errors.New("robokassa: only RUB is supported")
 	}
 	invID := robokassaInvID(request.ExternalID)
-	outSum, err := strconv.ParseFloat(minorUnitsToDecimal(request.Amount.MinorUnits), 64)
-	if err != nil {
-		return sdk.PaymentCreateResult{}, err
-	}
+	outSum := json.Number(minorUnitsToDecimal(request.Amount.MinorUnits))
 	token, err := robokassaSignJWT(string(login), string(password1), invID, outSum, request.Purpose)
 	if err != nil {
 		return sdk.PaymentCreateResult{}, err
@@ -795,10 +829,10 @@ func (t robokassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk
 		return sdk.PaymentReconcileResult{}, fmt.Errorf("robokassa: reconcile rejected with status %d", status)
 	}
 	var items []struct {
-		InvId     int64   `json:"InvId"`
-		OutSum    float64 `json:"OutSum"`
-		State     string  `json:"State"`
-		StateDate string  `json:"StateDate"`
+		InvId     int64       `json:"InvId"`
+		OutSum    json.Number `json:"OutSum"`
+		State     string      `json:"State"`
+		StateDate string      `json:"StateDate"`
 	}
 	if err := json.Unmarshal(respBody, &items); err != nil {
 		return sdk.PaymentReconcileResult{}, errors.New("robokassa: invalid reconcile response")
@@ -809,11 +843,15 @@ func (t robokassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk
 		if timeErr != nil {
 			occurred = time.Now().UTC()
 		}
-		minor, amountErr := strconv.ParseFloat(fmt.Sprintf("%.2f", item.OutSum), 64)
+		minor, amountErr := decimalToMinorUnits(item.OutSum.String())
 		if amountErr != nil {
 			continue
 		}
-		settlements = append(settlements, sdk.PaymentSettlement{RemoteID: strconv.FormatInt(item.InvId, 10), Kind: "sale", Amount: sdk.PaymentAmount{MinorUnits: int64(minor*100 + 0.5), Currency: "RUB"}, OccurredAt: occurred.UTC()})
+		stateCode, stateErr := strconv.Atoi(item.State)
+		if stateErr != nil {
+			continue
+		}
+		settlements = append(settlements, sdk.PaymentSettlement{RemoteID: strconv.FormatInt(item.InvId, 10), Kind: "sale", Status: robokassaStatusFromCode(stateCode), Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: "RUB"}, OccurredAt: occurred.UTC()})
 	}
 	return sdk.PaymentReconcileResult{Items: settlements, ObservedAt: time.Now().UTC()}, nil
 }

@@ -2,7 +2,15 @@
 
 ## Status
 
-`planned` — декомпозиция подготовлена, реализация не начата.
+`in_progress` — foundation, durable runtime, typed adapters, REST/OpenAPI и
+operator UI реализованы; release qualification и нагрузочные/chaos-проверки
+остаются обязательным следующим этапом.
+
+Repository qualification is now executable via `make workflow-qualification`.
+It covers the deterministic compiler, tenant persistence boundary, Inbox-backed
+event trigger path, lease recovery, retry budget, API/worker tests and contract
+fixtures. The command deliberately reports live-provider and target-VPS
+capacity checks as deployment evidence rather than inventing a production claim.
 
 ## Objective
 

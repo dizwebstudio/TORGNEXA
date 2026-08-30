@@ -52,6 +52,21 @@ paths:
       responses:
         '202': {description: Canonical publication accepted for asynchronous delivery, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublication'}}}}
         '409': {description: 'Channel, content or idempotent replay conflict'}
+  /logistics/pickup-points:
+    get:
+      operationId: listLogisticsPickupPoints
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: country, in: query, required: true, schema: {type: string, pattern: '^[A-Za-z]{2}$'}}
+        - {name: city, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 200}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500, default: 50}}
+      responses:
+        '200': {description: Bounded pickup-point directory, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsPickupPointPage'}}}}
+        '400': {description: Invalid pickup-point query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
   /payments:
     get:
       operationId: listPayments
@@ -1425,6 +1440,7 @@ paths:
       responses:
         '201': {description: Draft workflow created}
         '400': {description: Invalid bounded workflow definition}
+        '429': {description: Workspace workflow quota exceeded}
         '409': {description: Idempotency or identity conflict}
   /workflow-commands/validate:
     post:
@@ -1438,7 +1454,7 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowPublish'}}}}
-      responses: {'200': {description: Immutable published version}, '400': {description: Invalid definition}, '409': {description: Optimistic version conflict}}
+      responses: {'200': {description: Immutable published version}, '400': {description: Invalid definition}, '409': {description: Optimistic version conflict}, '429': {description: Workspace workflow quota exceeded}}
   /workflow-commands/pause:
     post:
       operationId: pauseWorkflow
@@ -1459,7 +1475,7 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 256}}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowRunCreate'}}}}
-      responses: {'202': {description: Idempotently queued workflow run}, '400': {description: Invalid run request}, '409': {description: Duplicate identity conflict}}
+      responses: {'202': {description: Idempotently queued workflow run}, '400': {description: Invalid run request}, '409': {description: Duplicate identity conflict}, '429': {description: Workspace workflow quota exceeded}}
   /workflows/{workflow_id}:
     get:
       operationId: getWorkflow
@@ -1492,6 +1508,22 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: run_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
       responses: {'200': {description: Workflow run state}, '404': {description: Run not found}}
+  /workflow-runs/{run_id}/steps:
+    get:
+      operationId: listWorkflowRunSteps
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses: {'200': {description: Bounded step state for the run timeline, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowStepPage'}}}}, '404': {description: Run not found}}
+  /workflow-runs/{run_id}/evidence:
+    get:
+      operationId: listWorkflowRunEvidence
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses: {'200': {description: Immutable redacted execution evidence, content: {application/json: {schema: {$ref: '#/components/schemas/WorkflowEvidencePage'}}}}, '404': {description: Run not found}}
   /settlements:
     get:
       operationId: listSettlementEntries
@@ -1983,15 +2015,22 @@ components:
       type: string
       pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'
     WorkflowTrigger:
-      type: object
-      additionalProperties: false
-      required: [kind, enabled]
-      properties:
-        kind: {type: string, enum: [event, schedule]}
-        event_type: {type: string, maxLength: 160, pattern: '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.v[1-9][0-9]{0,2}$'}
-        interval_minutes: {type: integer, minimum: 1, maximum: 10080}
-        enabled: {type: boolean}
-        next_run_at: {type: string, format: date-time}
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, event_type, enabled]
+          properties:
+            kind: {const: event}
+            event_type: {type: string, maxLength: 160, pattern: '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.v[1-9][0-9]{0,2}$'}
+            enabled: {type: boolean}
+        - type: object
+          additionalProperties: false
+          required: [kind, interval_minutes, enabled]
+          properties:
+            kind: {const: schedule}
+            interval_minutes: {type: integer, minimum: 1, maximum: 10080}
+            enabled: {type: boolean}
+            next_run_at: {type: [string, 'null'], format: date-time}
     WorkflowNode:
       type: object
       additionalProperties: false
@@ -2000,7 +2039,13 @@ components:
         id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
         kind: {type: string, enum: [condition, action, delay, approval]}
         action: {type: string, enum: [notification.create, reconciliation.run, approval.request, sync.dry_run]}
-        config: {type: object, additionalProperties: true, maxProperties: 32}
+        config:
+          type: object
+          maxProperties: 32
+          propertyNames:
+            allOf:
+              - {pattern: '^[a-z][a-z0-9_.-]{0,63}$'}
+              - {not: {pattern: '(?i)(secret|token|password|authorization|private_key)'}}
     WorkflowEdge:
       type: object
       additionalProperties: false
@@ -2094,6 +2139,46 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WorkflowRun'}}
+    WorkflowStep:
+      type: object
+      additionalProperties: false
+      required: [id, run_id, node_id, status, attempt_count, version]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        run_id: {type: string, minLength: 1, maxLength: 128}
+        node_id: {type: string, minLength: 1, maxLength: 128}
+        status: {type: string, enum: [queued, running, waiting_approval, waiting_retry, completed, failed, skipped]}
+        attempt_count: {type: integer, minimum: 0, maximum: 64}
+        output_digest: {type: string, pattern: '^$|^[0-9a-f]{64}$'}
+        error_code: {type: string, maxLength: 64, pattern: '^$|^[a-z][a-z0-9._-]{0,63}$'}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        version: {type: integer, minimum: 1}
+    WorkflowStepPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WorkflowStep'}}
+    WorkflowEvidence:
+      type: object
+      additionalProperties: false
+      required: [id, run_id, node_id, attempt, outcome, observed_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        run_id: {type: string, minLength: 1, maxLength: 128}
+        node_id: {type: string, minLength: 1, maxLength: 128}
+        attempt: {type: integer, minimum: 1, maximum: 64}
+        outcome: {type: string, enum: [completed, failed, skipped, waiting_approval, waiting_retry]}
+        output_digest: {type: string, pattern: '^$|^[0-9a-f]{64}$'}
+        error_code: {type: string, maxLength: 64, pattern: '^$|^[a-z][a-z0-9._-]{0,63}$'}
+        observed_at: {type: string, format: date-time}
+    WorkflowEvidencePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WorkflowEvidence'}}
     SocialChannel:
       type: object
       additionalProperties: false
@@ -2150,6 +2235,23 @@ components:
       required: [items]
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/SocialPublication'}}
+    LogisticsPickupPoint:
+      type: object
+      additionalProperties: false
+      required: [remote_id, name, country, city, address, active]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192}
+        name: {type: string, minLength: 1, maxLength: 300}
+        country: {type: string, pattern: '^[A-Z]{2}$'}
+        city: {type: string, minLength: 1, maxLength: 200}
+        address: {type: string, minLength: 1, maxLength: 500}
+        active: {type: boolean}
+    LogisticsPickupPointPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/LogisticsPickupPoint'}}
     Money:
       type: object
       additionalProperties: false

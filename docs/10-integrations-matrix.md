@@ -67,6 +67,14 @@ provider failures go through the normal Kafka retry topic; malformed events,
 missing offer mappings, product mapping collisions and non-retryable provider
 responses go to the DLQ.
 
+Payment accounts admitted to the finance surface also have a bounded background
+reconciliation sweep. It runs at most every five minutes for the last 48 hours,
+matches returned settlement observations by account, remote ID and exact money,
+including provider refund observations when the audited rail exposes them,
+and applies only valid canonical status transitions. An unknown status, amount
+mismatch or unavailable gateway remains visible as stale/manual attention and
+is never converted into a successful local payment.
+
 | Separate surface | Working operations | Tenant account |
 |---|---|---|
 | Bitrix24 CRM | lead/deal/contact/company reads and reconciled writes; lead/deal product-row reads/replacements | OAuth 2.0 + `portal_host` |
@@ -156,9 +164,11 @@ therefore has zero `planned` entries while retaining fail-closed domain
 capabilities.
 
 The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
-and Ozon Доставка SDK adapters. All six expose only the separately reviewed
-credential-check surface; shipment writes remain fail-closed until provider
-qualification.
+and Ozon Доставка SDK adapters. CDEK additionally exposes a bounded, read-only
+`pickup.points.read` application route for the provider's ПВЗ directory;
+shipment writes, rates and other carrier operations remain fail-closed until
+provider qualification. The other five expose only the separately reviewed
+credential-check surface.
 
 Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
 карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded

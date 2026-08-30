@@ -35,6 +35,8 @@ const (
 	MaxDescriptionLength = 4000
 	MaxNodes             = 64
 	MaxEdges             = 128
+	MaxStepAttempts      = 8
+	MaxDefinitionBytes   = 16 * 1024
 	MaxConfigBytes       = 16 * 1024
 	MaxEventTypeLength   = 160
 	MinScheduleMinutes   = 1
@@ -153,6 +155,9 @@ func (n Node) Validate() error {
 		if !AllowedAction(n.Action) {
 			return ErrInvalid
 		}
+		if n.Kind == NodeApproval && n.Action != "approval.request" {
+			return ErrInvalid
+		}
 	} else if n.Action != "" {
 		return ErrInvalid
 	}
@@ -161,6 +166,9 @@ func (n Node) Validate() error {
 	}
 	if len(n.Config) > 0 {
 		if err := validateConfig(n.Config); err != nil {
+			return err
+		}
+		if err := validateNodeConfig(n); err != nil {
 			return err
 		}
 	}
@@ -193,6 +201,10 @@ type Definition struct {
 
 func (d Definition) Validate() error {
 	if !validName(d.Name) || !validDescription(d.Description) || d.Trigger.Validate() != nil || len(d.Nodes) == 0 || len(d.Nodes) > MaxNodes || len(d.Edges) > MaxEdges {
+		return ErrInvalid
+	}
+	encoded, err := json.Marshal(d)
+	if err != nil || len(encoded) > MaxDefinitionBytes {
 		return ErrInvalid
 	}
 	seen := make(map[string]struct{}, len(d.Nodes))
@@ -475,6 +487,19 @@ type RunRequest struct {
 	InputDigest     string
 }
 
+// Validate checks the bounded, replay-safe command used to enqueue a run.
+// The request intentionally carries only opaque references and a digest; raw
+// trigger payloads and credentials are not part of the workflow contract.
+func (r RunRequest) Validate() error {
+	if !idPattern.MatchString(r.ID) || !idPattern.MatchString(r.WorkflowID) || r.WorkflowVersion < 1 || !r.TriggerKind.Valid() || !validKey(r.IdempotencyKey, 256) || !hexDigest(r.InputDigest) {
+		return ErrInvalid
+	}
+	if r.TriggerRef != "" && !validKey(r.TriggerRef, 256) {
+		return ErrInvalid
+	}
+	return nil
+}
+
 func (r Run) Validate() error {
 	if !idPattern.MatchString(r.ID) || !idPattern.MatchString(r.OrganizationID) || !idPattern.MatchString(r.WorkspaceID) || !idPattern.MatchString(r.WorkflowID) || r.WorkflowVersion < 1 || !r.TriggerKind.Valid() || !validKey(r.IdempotencyKey, 256) || !hexDigest(r.InputDigest) || !r.Status.Valid() || r.AttemptCount < 0 || r.AttemptCount > 64 || !isUTC(r.AvailableAt) || r.Version < 1 {
 		return ErrInvalid
@@ -508,6 +533,32 @@ type StepRun struct {
 	StartedAt      *time.Time `json:"started_at,omitempty"`
 	CompletedAt    *time.Time `json:"completed_at,omitempty"`
 	Version        int64      `json:"version"`
+}
+
+// ExecutionEvidence is an immutable, bounded record of one step attempt.
+// It contains digests and machine codes only; provider payloads are never
+// copied into workflow history.
+type ExecutionEvidence struct {
+	ID             string     `json:"id"`
+	RunID          string     `json:"run_id"`
+	OrganizationID string     `json:"organization_id"`
+	WorkspaceID    string     `json:"workspace_id"`
+	NodeID         string     `json:"node_id"`
+	Attempt        int        `json:"attempt"`
+	Outcome        StepStatus `json:"outcome"`
+	OutputDigest   string     `json:"output_digest,omitempty"`
+	ErrorCode      string     `json:"error_code,omitempty"`
+	ObservedAt     time.Time  `json:"observed_at"`
+}
+
+func (e ExecutionEvidence) Validate() error {
+	if !idPattern.MatchString(e.ID) || !idPattern.MatchString(e.RunID) || !idPattern.MatchString(e.OrganizationID) || !idPattern.MatchString(e.WorkspaceID) || !idPattern.MatchString(e.NodeID) || e.Attempt < 1 || e.Attempt > 64 || !isEvidenceOutcome(e.Outcome) || !isUTC(e.ObservedAt) {
+		return ErrInvalid
+	}
+	if e.OutputDigest != "" && !hexDigest(e.OutputDigest) || e.ErrorCode != "" && !validErrorCode(e.ErrorCode) {
+		return ErrInvalid
+	}
+	return nil
 }
 
 func (s StepRun) Validate() error {
@@ -551,21 +602,93 @@ func ValidateRunTransition(from, to RunStatus) error {
 }
 
 func validateConfig(data []byte) error {
+	object, err := decodeConfigObject(data)
+	if err != nil {
+		return err
+	}
+	return validateJSONValue(object, 0)
+}
+
+func decodeConfigObject(data []byte) (map[string]any, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	var value any
 	if err := dec.Decode(&value); err != nil {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	var extra any
 	if err := dec.Decode(&extra); err != io.EOF {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	object, ok := value.(map[string]any)
 	if !ok {
+		return nil, ErrInvalid
+	}
+	return object, nil
+}
+
+func validateNodeConfig(node Node) error {
+	object, err := decodeConfigObject(node.Config)
+	if err != nil {
+		return err
+	}
+	allowed := map[string]struct{}{}
+	switch node.Kind {
+	case NodeCondition:
+		allowed = map[string]struct{}{"result": {}, "value": {}, "enabled": {}}
+	case NodeDelay:
+		allowed = map[string]struct{}{"seconds": {}}
+	case NodeAction, NodeApproval:
+		switch node.Action {
+		case "notification.create":
+			allowed = map[string]struct{}{"recipient_id": {}, "dedupe_key": {}, "severity": {}, "title": {}, "body": {}, "category": {}}
+		case "reconciliation.run":
+			allowed = map[string]struct{}{"policy_id": {}, "mode": {}, "trigger_ref": {}}
+		case "approval.request":
+			allowed = map[string]struct{}{"action": {}, "resource_type": {}, "resource_id": {}, "risk": {}}
+		case "sync.dry_run":
+			allowed = map[string]struct{}{"mode": {}}
+		default:
+			return ErrInvalid
+		}
+	default:
 		return ErrInvalid
 	}
-	return validateJSONValue(object, 0)
+	for key, value := range object {
+		if _, ok := allowed[key]; !ok {
+			return ErrInvalid
+		}
+		switch key {
+		case "result", "value", "enabled":
+			if _, ok := value.(bool); !ok {
+				if text, textOK := value.(string); !textOK || (text != "true" && text != "false") {
+					return ErrInvalid
+				}
+			}
+		case "seconds":
+			number, ok := value.(json.Number)
+			if !ok {
+				return ErrInvalid
+			}
+			seconds, parseErr := number.Int64()
+			if parseErr != nil || seconds < 0 || seconds > 24*60*60 {
+				return ErrInvalid
+			}
+		case "severity":
+			if text, ok := value.(string); !ok || (text != "info" && text != "warning" && text != "critical") {
+				return ErrInvalid
+			}
+		default:
+			if _, ok := value.(string); !ok {
+				return ErrInvalid
+			}
+		}
+	}
+	return nil
+}
+
+func isEvidenceOutcome(status StepStatus) bool {
+	return status == StepCompleted || status == StepFailed || status == StepSkipped || status == StepWaitingApproval || status == StepWaitingRetry
 }
 
 func validateJSONValue(value any, depth int) error {

@@ -101,6 +101,17 @@ func (registry *runtimeRegistry) inventoryReader(scope tenancy.Scope, account sd
 	return reader, err
 }
 
+func (registry *runtimeRegistry) paymentGateway(scope tenancy.Scope, account sdk.Account) (builtins.PaymentGateway, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	gateway, err := registry.builtins.PaymentGateway(account, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return gateway, err
+}
+
 func (registry *runtimeRegistry) configLoader(scope tenancy.Scope) builtins.ConfigLoader {
 	return func(ctx context.Context, accountID string) (json.RawMessage, error) {
 		raw, _, err := registry.configs.Config(ctx, scope, accountID)

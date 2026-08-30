@@ -15,6 +15,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/inventory"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/core/workflow"
+	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
@@ -36,6 +37,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
@@ -220,11 +222,19 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_workflow_notification_service_startup_failed", err)
 	}
+	workflowApprovalRepository, err := approvalrepo.New(db)
+	if err != nil {
+		return fail("worker_workflow_approval_repository_startup_failed", err)
+	}
+	workflowReconciliationRepository, err := reconciliationrepo.New(db)
+	if err != nil {
+		return fail("worker_workflow_reconciliation_repository_startup_failed", err)
+	}
 	workflowAdapters, err := workflowengine.NewRegistry(map[string]workflowengine.Adapter{
 		"notification.create": workflowNotificationAdapter{service: workflowNotifications},
 		"sync.dry_run":        workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return nil }),
-		"reconciliation.run":  workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return workflowengine.ErrAdapterUnavailable }),
-		"approval.request":    workflowengine.AdapterFunc(func(context.Context, workflowengine.ActionRequest) error { return workflowengine.ErrApprovalRequired }),
+		"reconciliation.run":  workflowReconciliationAdapter{repository: workflowReconciliationRepository},
+		"approval.request":    workflowApprovalAdapter{repository: workflowApprovalRepository},
 	})
 	if err != nil {
 		return fail("worker_workflow_adapter_registry_startup_failed", err)
@@ -311,10 +321,22 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			if scopeErr != nil {
 				return eventbus.Permanent("workflow_invalid_scope")
 			}
-			if _, triggerErr := workflowRepository.TriggerEvent(eventCtx, scope, delivery.Event); triggerErr != nil {
-				return eventbus.Retryable("workflow_trigger_persist_failed")
+			tenantScope, tenantScopeErr := tenancy.ParseScope(scope.OrganizationID(), scope.WorkspaceID())
+			if tenantScopeErr != nil {
+				return eventbus.Permanent("workflow_invalid_scope")
 			}
-			return nil
+			// Keep the workflow run insert and the Inbox receipt in one
+			// PostgreSQL transaction. This is the durable deduplication
+			// boundary for Kafka redelivery; a separate TriggerEvent
+			// transaction could otherwise commit a run and lose its receipt
+			// between process crashes.
+			handler := inboxProcessor.EventHandler(tenantScope, "workflow.triggers.v1", func(callCtx context.Context, tx inboxrepo.Transaction, item eventbus.Delivery) error {
+				if _, triggerErr := workflowRepository.TriggerEventInTransaction(callCtx, scope, tx, item.Event); triggerErr != nil {
+					return eventbus.Retryable("workflow_trigger_persist_failed")
+				}
+				return nil
+			})
+			return handler(eventCtx, delivery)
 		})
 	}})
 	components = append(components, component{name: "social-publications", run: func(componentCtx context.Context) error {
@@ -334,10 +356,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_sync_repository_startup_failed", repoErr)
 		}
-		reconciliationRepository, repoErr := reconciliationrepo.New(db)
-		if repoErr != nil {
-			return fail("worker_reconciliation_repository_startup_failed", repoErr)
-		}
+		reconciliationRepository := workflowReconciliationRepository
 		accountRepository, repoErr := connectorrepo.New(db)
 		if repoErr != nil {
 			return fail("worker_connector_repository_startup_failed", repoErr)
@@ -362,10 +381,11 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_inventory_repository_startup_failed", repoErr)
 		}
-		approvalRepository, repoErr := approvalrepo.New(db)
+		paymentsRepository, repoErr := paymentsrepo.New(db)
 		if repoErr != nil {
-			return fail("worker_approval_repository_startup_failed", repoErr)
+			return fail("worker_payments_repository_startup_failed", repoErr)
 		}
+		approvalRepository := workflowApprovalRepository
 		notificationRepository, repoErr := notificationrepo.New(db)
 		if repoErr != nil {
 			return fail("worker_notification_repository_startup_failed", repoErr)
@@ -399,6 +419,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		}
 		components = append(components, component{name: "commerce-sync", run: func(componentCtx context.Context) error {
 			return commerceConsumer.Run(componentCtx, commerceRoute.Handle)
+		}})
+		components = append(components, component{name: "payment-reconciliation", run: func(componentCtx context.Context) error {
+			return runPaymentReconciliation(componentCtx, logger, dispatchRepository, accountRepository, paymentsRepository, secretProvider, secretRepository, runtimeRegistry, cfg.Worker.PollInterval)
 		}})
 	}
 
@@ -645,6 +668,153 @@ func (a workflowNotificationAdapter) Execute(ctx context.Context, request workfl
 	}
 	_, err = a.service.Notify(ctx, scope, notifications.Request{RecipientID: input.RecipientID, DedupeKey: input.DedupeKey, Severity: input.Severity, Title: input.Title, Body: input.Body, OccurredAt: time.Now().UTC()})
 	return err
+}
+
+// workflowApprovalAdapter bridges the declarative approval node to the normal
+// Task-017 repository.  The node only carries an opaque resource reference;
+// policy lookup, audit and outbox publication remain owned by approvalrepo.
+type workflowApprovalAdapter struct{ repository *approvalrepo.Repository }
+
+func (a workflowApprovalAdapter) Execute(ctx context.Context, request workflowengine.ActionRequest) error {
+	if a.repository == nil || ctx == nil {
+		return workflowengine.ErrAdapterUnavailable
+	}
+	var input struct {
+		Action       string             `json:"action"`
+		ResourceType string             `json:"resource_type"`
+		ResourceID   string             `json:"resource_id"`
+		Risk         approval.RiskClass `json:"risk"`
+	}
+	if len(request.Node.Config) > 0 {
+		if err := json.Unmarshal(request.Node.Config, &input); err != nil {
+			return workflow.ErrInvalid
+		}
+	}
+	// Defaults make a node usable in the builder while still requiring an
+	// explicitly installed tenant policy for the resulting request.
+	if input.Action == "" {
+		input.Action = "workflow.sensitive_action"
+	}
+	if input.ResourceType == "" {
+		input.ResourceType = "workflow_run"
+	}
+	if input.ResourceID == "" {
+		input.ResourceID = request.RunID + ":" + request.Node.ID
+	}
+	if input.Risk == "" {
+		input.Risk = approval.RiskWriteSensitive
+	}
+	if !input.Risk.Valid() || len(input.Action) > 160 || len(input.ResourceType) > 128 || len(input.ResourceID) > 512 {
+		return workflow.ErrInvalid
+	}
+	scope, err := tenancy.ParseScope(request.Scope.OrganizationID(), request.Scope.WorkspaceID())
+	if err != nil {
+		return workflow.ErrInvalid
+	}
+	requestID := stableUUID("workflow.approval:" + request.Scope.OrganizationID() + ":" + request.Scope.WorkspaceID() + ":" + request.RunID + ":" + request.Node.ID)
+	if existing, lookupErr := a.repository.Request(ctx, scope, requestID); lookupErr == nil && existing.ID == requestID {
+		switch existing.State {
+		case approval.StateApproved:
+			return nil
+		case approval.StateRejected, approval.StateExpired, approval.StateCancelled, approval.StateFailed:
+			return approval.ErrDenied
+		default:
+			return workflowengine.ErrApprovalRequired
+		}
+	}
+	now := time.Now().UTC()
+	mutationKey := "workflow.approval:" + requestID
+	_, err = a.repository.CreateRequest(ctx, scope, input.Action, input.ResourceType, approval.RequestCommand{
+		RequestID:  requestID,
+		ResourceID: input.ResourceID,
+		Risk:       input.Risk,
+		Mutation: approval.Mutation{
+			AuditID:       stableUUID(mutationKey + ":audit"),
+			EventID:       stableUUID(mutationKey + ":event"),
+			ActorID:       "workflow.engine",
+			Source:        "workflow.engine",
+			CorrelationID: requestID,
+			CausationID:   request.Node.ID,
+			OccurredAt:    now,
+		},
+	})
+	if err != nil {
+		// Missing/insufficient policy is deliberately fail-closed.  It must not
+		// be represented as an approval wait because no operator request exists.
+		if errors.Is(err, approval.ErrDenied) {
+			return workflowengine.ErrAdapterUnavailable
+		}
+		// A concurrent delivery may have created the deterministic request
+		// between the lookup and insert.  Re-read it and preserve its state.
+		if existing, lookupErr := a.repository.Request(ctx, scope, requestID); lookupErr == nil && existing.ID == requestID {
+			if existing.State == approval.StateApproved {
+				return nil
+			}
+			if existing.State == approval.StatePending {
+				return workflowengine.ErrApprovalRequired
+			}
+		}
+		return err
+	}
+	return workflowengine.ErrApprovalRequired
+}
+
+// workflowReconciliationAdapter creates the existing Task-014 run record.
+// The normal reconciliation worker owns transport resolution and execution;
+// this adapter only submits a bounded, tenant-scoped request to that durable
+// queue and never touches a connector itself.
+type workflowReconciliationAdapter struct {
+	repository *reconciliationrepo.Repository
+}
+
+func (a workflowReconciliationAdapter) Execute(ctx context.Context, request workflowengine.ActionRequest) error {
+	if a.repository == nil || ctx == nil {
+		return workflowengine.ErrAdapterUnavailable
+	}
+	var input struct {
+		PolicyID   string              `json:"policy_id"`
+		Mode       reconciliation.Mode `json:"mode"`
+		TriggerRef string              `json:"trigger_ref"`
+	}
+	if len(request.Node.Config) > 0 {
+		if err := json.Unmarshal(request.Node.Config, &input); err != nil {
+			return workflow.ErrInvalid
+		}
+	}
+	if input.PolicyID == "" || len(input.PolicyID) > 128 {
+		return workflow.ErrInvalid
+	}
+	if input.Mode == "" {
+		input.Mode = reconciliation.ModeOnDemand
+	}
+	if !input.Mode.Valid() {
+		return workflow.ErrInvalid
+	}
+	if input.TriggerRef == "" {
+		input.TriggerRef = request.RunID
+	}
+	if len(input.TriggerRef) > 128 {
+		return workflow.ErrInvalid
+	}
+	scope, err := tenancy.ParseScope(request.Scope.OrganizationID(), request.Scope.WorkspaceID())
+	if err != nil {
+		return workflow.ErrInvalid
+	}
+	runID := stableID("rec_wf_", request.RunID+":"+request.Node.ID)
+	if existing, lookupErr := a.repository.Run(ctx, scope, runID); lookupErr == nil && existing.ID == runID {
+		return nil
+	}
+	now := time.Now().UTC()
+	_, err = a.repository.CreateRun(ctx, scope, reconciliation.Run{ID: runID, PolicyID: input.PolicyID, Mode: input.Mode, TriggerRef: input.TriggerRef, Status: reconciliation.RunRunning, Version: 1, StartedAt: now, UpdatedAt: now})
+	if err != nil {
+		// A worker crash after commit but before evidence publication is safe to
+		// replay: the deterministic run identity is the idempotency boundary.
+		if existing, lookupErr := a.repository.Run(ctx, scope, runID); lookupErr == nil && existing.ID == runID {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 type sourceResolver struct {

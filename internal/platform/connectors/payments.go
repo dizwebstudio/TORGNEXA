@@ -83,14 +83,40 @@ func (r PaymentRefundRequest) Validate() error {
 
 type PaymentReconcileRequest struct{ From, To time.Time }
 type PaymentSettlement struct {
-	RemoteID, Kind       string
-	Amount               PaymentAmount
-	CommissionMinorUnits int64
-	OccurredAt           time.Time
+	RemoteID, Kind, Status string
+	Amount                 PaymentAmount
+	CommissionMinorUnits   int64
+	OccurredAt             time.Time
 }
+
+// Validate checks the bounded, provider-neutral settlement observation used
+// by the background reconciliation worker. Status is intentionally kept as
+// the provider's safe machine code; the host maps it to the canonical payment
+// lifecycle only after matching the remote payment and exact amount.
+func (s PaymentSettlement) Validate() error {
+	if !paymentRefPattern.MatchString(s.RemoteID) || !safeCodePattern.MatchString(s.Kind) || !safeCodePattern.MatchString(s.Status) || s.Amount.Validate() != nil || s.CommissionMinorUnits < 0 || s.OccurredAt.IsZero() || s.OccurredAt.Location() != time.UTC {
+		return ErrInvalidPaymentRequest
+	}
+	return nil
+}
+
 type PaymentReconcileResult struct {
 	Items      []PaymentSettlement
 	ObservedAt time.Time
+}
+
+// Validate checks a bounded reconciliation response before it crosses the
+// connector/runtime boundary.
+func (r PaymentReconcileResult) Validate() error {
+	if r.ObservedAt.IsZero() || r.ObservedAt.Location() != time.UTC || len(r.Items) > 1000 {
+		return ErrInvalidPaymentRequest
+	}
+	for _, item := range r.Items {
+		if item.Validate() != nil {
+			return ErrInvalidPaymentRequest
+		}
+	}
+	return nil
 }
 
 type PaymentWebhook struct {

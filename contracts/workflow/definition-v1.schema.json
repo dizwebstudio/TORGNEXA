@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/workflow/definition-v1.json",
+  "title": "TORGNEXA workflow definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "trigger", "nodes", "edges"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "description": {"type": "string", "maxLength": 4000},
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "event_type", "enabled"],
+          "properties": {
+            "kind": {"const": "event"},
+            "event_type": {"type": "string", "maxLength": 160, "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.v[1-9][0-9]{0,2}$"},
+            "enabled": {"type": "boolean"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "interval_minutes", "enabled"],
+          "properties": {
+            "kind": {"const": "schedule"},
+            "interval_minutes": {"type": "integer", "minimum": 1, "maximum": 10080},
+            "enabled": {"type": "boolean"},
+            "next_run_at": {"type": ["string", "null"], "format": "date-time"}
+          }
+        }
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+          "kind": {"enum": ["condition", "action", "delay", "approval"]},
+          "action": {"enum": ["notification.create", "reconciliation.run", "approval.request", "sync.dry_run"]},
+          "config": {
+            "type": "object",
+            "maxProperties": 32,
+            "propertyNames": {"allOf": [{"pattern": "^[a-z][a-z0-9_.-]{0,63}$"}, {"not": {"pattern": "(?i)(secret|token|password|authorization|private_key)"}}]}
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": {"type": "string", "minLength": 1, "maxLength": 128},
+          "to": {"type": "string", "minLength": 1, "maxLength": 128},
+          "condition": {"enum": ["always", "true", "false"]}
+        }
+      }
+    }
+  }
+}

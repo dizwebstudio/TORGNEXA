@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/workflow/step-evidence-v1.json",
+  "title": "TORGNEXA workflow step evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "run_id", "node_id", "attempt", "outcome", "observed_at"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "node_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "attempt": {"type": "integer", "minimum": 1, "maximum": 64},
+    "outcome": {"enum": ["completed", "failed", "skipped", "waiting_approval", "waiting_retry"]},
+    "output_digest": {"type": "string", "pattern": "^$|^[0-9a-f]{64}$"},
+    "error_code": {"type": "string", "maxLength": 64, "pattern": "^$|^[a-z][a-z0-9._-]{0,63}$"},
+    "observed_at": {"type": "string", "format": "date-time"}
+  }
+}

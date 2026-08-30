@@ -572,7 +572,27 @@
         "contract_preconditions": []
       },
       "backfill": null,
-      "sha256": "67ae6e19a344a5bdedd52f651e6ebda0f0a6a594074a9294ff2ba51e5f3f0e1e"
+      "sha256": "1f37b7ef00dc4f60339f61214b11dfb9d333c9a58b24b1f1f2d1b3b702a8aef4"
+    },
+    {
+      "version": 28,
+      "name": "payment_reconciliation_worker",
+      "file": "000028_payment_reconciliation_worker.sql",
+      "phase": "expand",
+      "risk": "medium",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": false,
+      "dependencies": [27],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "b1fc38aac11aa4440e9740a3a7b6e3ff472e8f16d5133d3d408aa396dc20f365"
     }
   ]
 }

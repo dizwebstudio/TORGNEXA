@@ -94,6 +94,9 @@ func (c *Connector) ReconcilePayments(ctx context.Context, a sdk.Account, r sdk.
 		out, x = c.transport.Reconcile(ctx, configuration.GatewayHost, s, q)
 		return x
 	})
+	if e == nil && out.Validate() != nil {
+		return sdk.PaymentReconcileResult{}, remote(sdk.ErrorInternal, "invalid_remote_response", 0)
+	}
 	return out, e
 }
 func (c *Connector) VerifyPaymentWebhook(ctx context.Context, a sdk.Account, r sdk.Runtime, body, sig []byte) (sdk.PaymentWebhook, error) {

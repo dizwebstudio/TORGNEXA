@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -12,7 +13,7 @@ func validDefinition() Definition {
 		Name:    "Уведомить об изменении",
 		Trigger: Trigger{Kind: TriggerEvent, EventType: "commerce.catalog.product_changed.v1"},
 		Nodes: []Node{
-			{ID: "condition", Kind: NodeCondition, Config: json.RawMessage(`{"key":"status"}`)},
+			{ID: "condition", Kind: NodeCondition, Config: json.RawMessage(`{"result":true}`)},
 			{ID: "notify", Kind: NodeAction, Action: "notification.create", Config: json.RawMessage(`{"category":"commerce"}`)},
 		},
 		Edges: []Edge{{From: "condition", To: "notify", Condition: "always"}},
@@ -54,6 +55,36 @@ func TestDefinitionRejectsSecretConfig(t *testing.T) {
 	definition.Nodes[1].Config = json.RawMessage(`{"api_token":"not allowed"}`)
 	if err := definition.Validate(); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("secret-shaped config error = %v", err)
+	}
+}
+
+func TestDefinitionRejectsUnknownActionConfig(t *testing.T) {
+	definition := validDefinition()
+	definition.Nodes[1].Config = json.RawMessage(`{"unsupported":"value"}`)
+	if err := definition.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("unknown action config error = %v", err)
+	}
+}
+
+func TestRunRequestRejectsNonDigestInput(t *testing.T) {
+	req := RunRequest{ID: "run_1", WorkflowID: "wf_1", WorkflowVersion: 1, TriggerKind: TriggerEvent, IdempotencyKey: "request-1", InputDigest: "not-a-digest"}
+	if err := req.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("invalid run request error = %v", err)
+	}
+}
+
+func TestDefinitionRejectsOversizedDocument(t *testing.T) {
+	definition := validDefinition()
+	definition.Description = strings.Repeat("x", MaxDescriptionLength)
+	definition.Nodes[1].Config = json.RawMessage(`{"title":"` + strings.Repeat("x", 4000) + `"}`)
+	definition.Nodes = append(definition.Nodes,
+		Node{ID: "notify2", Kind: NodeAction, Action: "notification.create", Config: json.RawMessage(`{"title":"` + strings.Repeat("y", 4000) + `"}`)},
+		Node{ID: "notify3", Kind: NodeAction, Action: "notification.create", Config: json.RawMessage(`{"title":"` + strings.Repeat("z", 4000) + `"}`)},
+		Node{ID: "notify4", Kind: NodeAction, Action: "notification.create", Config: json.RawMessage(`{"title":"` + strings.Repeat("q", 4000) + `"}`)},
+	)
+	definition.Edges = append(definition.Edges, Edge{From: "notify", To: "notify2", Condition: "always"}, Edge{From: "notify2", To: "notify3", Condition: "always"}, Edge{From: "notify3", To: "notify4", Condition: "always"})
+	if err := definition.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("oversized definition error = %v", err)
 	}
 }
 

@@ -601,6 +601,9 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .drawer-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .drawer-form { display:grid; gap:12px; }
 .drawer-inline { display:flex; gap:8px; }
+.pickup-lookup .drawer-inline { align-items:flex-end; flex-wrap:wrap; }
+.pickup-lookup .drawer-inline .field { flex:1 1 160px; min-width:0; }
+.pickup-lookup .drawer-inline .button { flex:0 0 auto; }
 .drawer-inline input { flex:1; min-width:0; }
 .detail-list { display:grid; gap:0; margin:0; }
 .detail-list > div { display:grid; grid-template-columns:140px 1fr; gap:14px; padding:10px 0; border-bottom:1px solid var(--border); }

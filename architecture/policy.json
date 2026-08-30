@@ -479,11 +479,11 @@
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/workflowrepo",
+      "path": "internal/platform/postgres/workerrepo",
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/workerrepo",
+      "path": "internal/platform/postgres/workflowrepo",
       "kind": "infrastructure_adapter"
     },
     {
@@ -579,15 +579,15 @@
       "kind": "platform_capability"
     },
     {
-      "path": "internal/platform/workflowengine",
-      "kind": "platform_capability"
-    },
-    {
       "path": "internal/platform/wmsexecution",
       "kind": "platform_capability"
     },
     {
       "path": "internal/platform/wmsledger",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/workflowengine",
       "kind": "platform_capability"
     }
   ],

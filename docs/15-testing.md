@@ -29,6 +29,14 @@ compatibility, and upgraded/fresh schema parity.
 
 External APIs must be mocked/fixture-driven in CI unless a separately configured sandbox test is explicitly enabled. Never use live production credentials in CI.
 
+Task 163 adds `make workflow-qualification`. It runs the workflow compiler,
+PostgreSQL repository guards, Inbox-backed trigger boundary, lease recovery and
+retry budget tests in a disposable Docker Go image, then validates contract
+fixtures and the frontend logic/public docs. Evidence is written under
+`qualification/evidence/workflow-<UTC>/`. This is repository qualification,
+not a live-provider claim; the exact Compose topology still needs its bounded
+load/chaos drill before production release.
+
 ## Contract gates
 
 `make contracts` and `./scripts/check-contracts.sh` are the canonical local and CI entry points. They run the isolated `tools/contractcheck` module with a read-only module graph, including its unit/fuzz seed tests and vet, then validate the repository contracts. The gate fails closed; missing optional Python packages never disable YAML or OpenAPI validation.

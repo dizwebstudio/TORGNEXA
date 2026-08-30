@@ -156,7 +156,8 @@ provider IDs and the `docs/connectors/<provider>` documentation paths.
 
 ## Workflow automation builder
 
-Task 163 is the planned provider-neutral automation builder. It is decomposed
+Task 163 is the in-progress provider-neutral automation builder. Its foundation
+and runtime are implemented; it is decomposed
 into ten bounded subtasks: ADR/action catalog; canonical immutable workflow
 versions; schema-backed DSL/compiler; tenant-scoped PostgreSQL state; EventBus
 and durable schedule triggers; execution/retry/approval state machine; typed

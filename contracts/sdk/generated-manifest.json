@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "c2877dc3bbc08e84312daf3121f956cc1e6e574720354aef7194629e5428614c",
+    "sha256": "97cd3d29d0c53cd6394a7d4a2280242ee816d2611ee52a8cf9500032be9ca770",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -470,6 +470,11 @@
       "path": "/inventory/warehouses"
     },
     {
+      "operation_id": "listLogisticsPickupPoints",
+      "method": "GET",
+      "path": "/logistics/pickup-points"
+    },
+    {
       "operation_id": "listMCPAccounts",
       "method": "GET",
       "path": "/settings/mcp-accounts"
@@ -558,6 +563,16 @@
       "operation_id": "listWebhookSubscriptions",
       "method": "GET",
       "path": "/webhook-subscriptions"
+    },
+    {
+      "operation_id": "listWorkflowRunEvidence",
+      "method": "GET",
+      "path": "/workflow-runs/{run_id}/evidence"
+    },
+    {
+      "operation_id": "listWorkflowRunSteps",
+      "method": "GET",
+      "path": "/workflow-runs/{run_id}/steps"
     },
     {
       "operation_id": "listWorkflowRuns",

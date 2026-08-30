@@ -78,6 +78,15 @@ func TestYooKassaCreateStatusRefundRoundTrip(t *testing.T) {
 	mux.HandleFunc("/v3/payments", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Query().Has("created_at.gte") {
+				_ = json.NewEncoder(w).Encode(map[string]any{"type": "list", "items": []any{map[string]any{
+					"id": "2019-payment", "status": "succeeded",
+					"amount":        map[string]string{"value": "150.00", "currency": "RUB"},
+					"income_amount": map[string]string{"value": "147.00", "currency": "RUB"},
+					"created_at":    "2026-08-30T09:00:00Z",
+				}}})
+				return
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": "2019-payment", "status": "succeeded",
 				"amount":        map[string]string{"value": "150.00", "currency": "RUB"},
@@ -109,6 +118,14 @@ func TestYooKassaCreateStatusRefundRoundTrip(t *testing.T) {
 		})
 	})
 	mux.HandleFunc("/v3/refunds", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"type": "list", "items": []any{map[string]any{
+				"id": "refund-1", "payment_id": "2019-payment", "status": "succeeded",
+				"amount": map[string]string{"value": "50.00", "currency": "RUB"}, "created_at": "2026-08-30T09:15:00Z",
+			}}})
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		var req struct {
 			PaymentID string `json:"payment_id"`
@@ -153,6 +170,14 @@ func TestYooKassaCreateStatusRefundRoundTrip(t *testing.T) {
 	}
 	if refund.RemoteRefundID != "refund-1" || refund.Status != "succeeded" {
 		t.Fatalf("unexpected refund result: %+v", refund)
+	}
+
+	reconciled, err := client.Reconcile(context.Background(), secret, sdk.PaymentReconcileRequest{From: time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if len(reconciled.Items) != 2 || reconciled.Items[0].Kind != "sale" || reconciled.Items[1].Kind != "refund" {
+		t.Fatalf("unexpected reconciliation result: %+v", reconciled.Items)
 	}
 
 	notification, _ := json.Marshal(map[string]any{"type": "notification", "event": "payment.succeeded", "object": map[string]any{"id": "2019-payment", "status": "succeeded", "amount": map[string]string{"value": "150.00", "currency": "RUB"}, "created_at": time.Now().UTC().Format(time.RFC3339)}})

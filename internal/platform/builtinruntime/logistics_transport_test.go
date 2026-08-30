@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
 func TestCDEKCredentialProbe(t *testing.T) {
@@ -35,6 +37,55 @@ func TestCDEKCredentialProbe(t *testing.T) {
 	}
 	if err := transport.Ping(context.Background(), []byte(`{"client_id":"client-1"}`)); err == nil {
 		t.Fatal("malformed CDEK credentials accepted")
+	}
+	if err := transport.Ping(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1","unexpected":"value"}`)); err == nil {
+		t.Fatal("unknown CDEK credential field accepted")
+	}
+}
+
+func TestCDEKPickupPointsAreBoundedAndNormalized(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "pickup-token"})
+		case "/v2/deliverypoints":
+			if r.Method != http.MethodGet || r.URL.Query().Get("country_code") != "RU" || r.URL.Query().Get("city") != "Москва" || r.URL.Query().Get("size") != "2" || r.Header.Get("Authorization") != "Bearer pickup-token" {
+				t.Fatalf("unexpected CDEK delivery-point request: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"code": 137, "uuid": "office-uuid-1", "name": "ПВЗ на Тверской", "is_closed": false, "location": map[string]any{"country_code": "RU", "city": "Москва", "address": "Тверская, 1"}},
+				{"code": "138", "address": "Ленина, 2", "location": map[string]any{"country_code": "RU", "city": "Москва"}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	points, err := transport.Pickup(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 2})
+	if err != nil {
+		t.Fatalf("CDEK delivery-point request failed: %v", err)
+	}
+	if len(points) != 2 || points[0].RemoteID != "office-uuid-1" || points[0].Name != "ПВЗ на Тверской" || points[0].Address != "Тверская, 1" || !points[0].Active {
+		t.Fatalf("unexpected first normalized point: %+v", points)
+	}
+	if points[1].RemoteID != "138" || points[1].Name != "СДЭК ПВЗ 138" || points[1].Address != "Ленина, 2" {
+		t.Fatalf("unexpected fallback normalized point: %+v", points[1])
+	}
+}
+
+func TestCDEKPickupPointsRejectIncompleteResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "pickup-token"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"code": 137, "location": map[string]any{"country_code": "RU", "city": "Москва"}}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Pickup(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 1}); err == nil {
+		t.Fatal("incomplete CDEK delivery-point response accepted")
 	}
 }
 

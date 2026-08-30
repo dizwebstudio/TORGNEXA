@@ -138,15 +138,9 @@ func (api paymentsAPI) getPayment(w http.ResponseWriter, r *http.Request, rawID 
 		writePaymentsError(w, err)
 		return
 	}
-	// There is no live webhook ingress yet (see the payments plan's "Known
-	// limitation" — provider-to-us callbacks need their own unauthenticated,
-	// signature-verified ingress, which is separate infrastructure this
-	// session did not build). Until then, a single-payment read is the
-	// natural place to refresh a still-pending remote status: the caller is
-	// already waiting on this exact payment (e.g. polling after checkout
-	// redirect), so one extra remote round trip here is the cheapest way to
-	// avoid a stuck "created" row. Bulk freshness across many payments still
-	// needs a periodic reconciliation job, which remains future work.
+	// The single-payment refresh remains useful for checkout polling. The worker
+	// independently performs a bounded background reconciliation sweep, so
+	// payments do not depend on a user opening this endpoint to become fresh.
 	if payment.Status == payments.StatusCreated && api.accounts != nil && api.registry != nil {
 		if refreshed, refreshErr := api.refreshPaymentStatus(r.Context(), tenantScope, scope, payment); refreshErr == nil {
 			payment = refreshed

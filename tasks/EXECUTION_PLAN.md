@@ -16,7 +16,9 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 - Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
 - Task `161` is repository-complete: `commerce-sync` now consumes canonical product change events, invokes admitted ProductWriter routes with provider-native status translation, and persists product mappings only after validated remote receipts.
 - Task `162` is repository-complete: the Community deployment now has a repeatable authenticated Chrome E2E that reconciles the Keycloak demo member and verifies catalog, product images, orders and order thumbnails through the rendered browser UI.
-- Task `163` is planned: the Workflow Automation Builder is decomposed into
+- Task `163` is in progress: the Workflow Automation Builder foundation and
+  runtime are implemented; the remaining qualification gates are tracked in
+  the issue and must pass before production readiness. The feature is decomposed into
   ten bounded subtasks covering the action catalog/ADR, immutable workflow
   versions, schema-backed DSL/compiler, RLS persistence, EventBus and durable
   schedule triggers, execution/retry/approval runtime, typed safe adapters,
@@ -636,11 +638,12 @@ non-production credentials are qualified.
 Task 145 moves CDEK out of `planned` and adds Деловые Линии to the separate
 «Доставка» surface. Both connectors support encrypted account enrollment and a
 bounded authenticated health probe: CDEK uses OAuth client credentials plus a
-city-directory read, while Деловые Линии uses appkey/PAT session login. No
-shipment, rate, label, return or product-sync route is advertised until the
-current carrier contracts and an idempotent host bridge are qualified. Runtime
-inventory is 12 generic product integrations, 18 separate-surface providers
-and 15 planned entries.
+city-directory read, while Деловые Линии uses appkey/PAT session login. CDEK
+also has a bounded read-only ПВЗ route (`pickup.points.read`); no shipment,
+rate, label, return or product-sync route is advertised until the current
+carrier contracts and an idempotent host bridge are qualified. Runtime
+inventory keeps logistics as a separate surface and only admits the CDEK
+pickup-point read capability.
 
 ### Gate RUNTIME-145
 
@@ -992,7 +995,7 @@ and JavaScript supply-chain graph remain unchanged.
 
 `163`
 
-Task 163 is planned as a provider-neutral automation builder on top of the
+Task 163 is being implemented as a provider-neutral automation builder on top of the
 existing EventBus/Transactional Outbox/Inbox, PostgreSQL scheduler, worker,
 approval and connector-port boundaries. The implementation is intentionally
 split into ten subtasks so that the first safe vertical slice can ship before

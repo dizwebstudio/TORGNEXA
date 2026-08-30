@@ -4907,9 +4907,7 @@
         "occurred_at": "2026-08-10T09:00:00Z",
         "organization_id": "018f0000-0000-7000-8000-000000000001",
         "workspace_id": "018f0000-0000-7000-8000-000000000002",
-        "data": {
-          "order_id": "order_test_001"
-        }
+        "data": {"order_id": "order_test_001"}
       },
       "invalid": {
         "delivery_id": "whd_00000000000000000000000000000001",
@@ -4918,11 +4916,71 @@
         "occurred_at": "2026-08-10T09:00:00Z",
         "organization_id": "018f0000-0000-7000-8000-000000000001",
         "workspace_id": "018f0000-0000-7000-8000-000000000002",
-        "data": [
-          1,
-          2,
-          3
-        ]
+        "data": [1, 2, 3]
+      }
+    },
+    {
+      "schema": "workflow/definition-v1.schema.json",
+      "valid": {
+        "name": "Notify on product change",
+        "trigger": {"kind": "event", "event_type": "commerce.catalog.product_changed.v1", "enabled": false},
+        "nodes": [
+          {"id": "condition", "kind": "condition", "config": {"result": true}},
+          {"id": "notify", "kind": "action", "action": "notification.create", "config": {"title": "Changed"}}
+        ],
+        "edges": [{"from": "condition", "to": "notify", "condition": "always"}]
+      },
+      "invalid": {
+        "name": "Invalid workflow",
+        "trigger": {"kind": "event", "event_type": "commerce.catalog.product_changed.v1", "enabled": false},
+        "nodes": [{"id": "action", "kind": "action", "action": "sync.dry_run", "config": {"api_token": "secret"}}],
+        "edges": [],
+        "unknown": true
+      }
+    },
+    {
+      "schema": "workflow/run-v1.schema.json",
+      "valid": {
+        "id": "run_workflow_001",
+        "workflow_id": "wf_catalog",
+        "workflow_version": 1,
+        "trigger_kind": "event",
+        "status": "queued",
+        "attempt_count": 0,
+        "available_at": "2026-08-30T10:00:00Z",
+        "version": 1
+      },
+      "invalid": {
+        "id": "run_workflow_001",
+        "workflow_id": "wf_catalog",
+        "workflow_version": 0,
+        "trigger_kind": "event",
+        "status": "queued",
+        "attempt_count": 0,
+        "available_at": "bad",
+        "version": 1,
+        "payload": {"token": "secret"}
+      }
+    },
+    {
+      "schema": "workflow/step-evidence-v1.schema.json",
+      "valid": {
+        "id": "evidence_workflow_001",
+        "run_id": "run_workflow_001",
+        "node_id": "notify",
+        "attempt": 1,
+        "outcome": "completed",
+        "output_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observed_at": "2026-08-30T10:00:01Z"
+      },
+      "invalid": {
+        "id": "evidence_workflow_001",
+        "run_id": "run_workflow_001",
+        "node_id": "notify",
+        "attempt": 0,
+        "outcome": "completed",
+        "observed_at": "bad",
+        "extra": true
       }
     }
   ]

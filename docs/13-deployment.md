@@ -24,3 +24,10 @@ All recognized `TORGNEXA_` environment values are strictly validated and fail cl
 Development defaults bind the API to `127.0.0.1:8080`. A container or production deployment must explicitly set `TORGNEXA_HTTP_ADDR` (for example, `:8080`) and place the listener behind the controls specified in `docs/66-security-edge-baseline.md`. Logs default to structured JSON and redact attributes whose keys identify credentials or signing material.
 
 `SIGINT` and `SIGTERM` initiate bounded graceful shutdown. The API stops accepting new connections and drains active requests for at most `TORGNEXA_SHUTDOWN_TIMEOUT`; the common process supervisor enforces the same outer bound for every runner. A second signal uses the operating system's default termination behavior.
+
+Workflow automation (Task 163) is part of the normal Compose topology: `api`
+serves the tenant-scoped builder/API, `worker` consumes event-triggered runs and
+executes typed adapters, and `scheduler` dispatches PostgreSQL-owned schedule
+state. Do not run only the frontend/API when validating schedules or event
+redelivery. The Kafka `kafka-init` one-shot service must complete before the
+worker starts; otherwise trigger delivery can fail on a clean broker.

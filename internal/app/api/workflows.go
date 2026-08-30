@@ -28,6 +28,8 @@ type workflowStore interface {
 	CreateRun(context.Context, workflow.Scope, workflow.RunRequest) (workflow.Run, error)
 	GetRun(context.Context, workflow.Scope, string) (workflow.Run, error)
 	ListRuns(context.Context, workflow.Scope, int) ([]workflow.Run, error)
+	ListSteps(context.Context, workflow.Scope, string, int) ([]workflow.StepRun, error)
+	ListEvidence(context.Context, workflow.Scope, string, int) ([]workflow.ExecutionEvidence, error)
 	CancelRun(context.Context, workflow.Scope, string, int64) (workflow.Run, error)
 }
 
@@ -57,6 +59,30 @@ type workflowRunView struct {
 	CompletedAt     *string              `json:"completed_at,omitempty"`
 	LastErrorCode   string               `json:"last_error_code,omitempty"`
 	Version         int64                `json:"version"`
+}
+
+type workflowStepView struct {
+	ID           string              `json:"id"`
+	RunID        string              `json:"run_id"`
+	NodeID       string              `json:"node_id"`
+	Status       workflow.StepStatus `json:"status"`
+	AttemptCount int                 `json:"attempt_count"`
+	OutputDigest string              `json:"output_digest,omitempty"`
+	ErrorCode    string              `json:"error_code,omitempty"`
+	StartedAt    *string             `json:"started_at,omitempty"`
+	CompletedAt  *string             `json:"completed_at,omitempty"`
+	Version      int64               `json:"version"`
+}
+
+type workflowEvidenceView struct {
+	ID           string              `json:"id"`
+	RunID        string              `json:"run_id"`
+	NodeID       string              `json:"node_id"`
+	Attempt      int                 `json:"attempt"`
+	Outcome      workflow.StepStatus `json:"outcome"`
+	OutputDigest string              `json:"output_digest,omitempty"`
+	ErrorCode    string              `json:"error_code,omitempty"`
+	ObservedAt   string              `json:"observed_at"`
 }
 
 func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
@@ -168,6 +194,15 @@ func newWorkflowRoutes(store workflowStore) []ProtectedRoute {
 			if input.InputDigest == "" {
 				digest := sha256.Sum256([]byte("workflow.manual.empty-input.v1"))
 				input.InputDigest = hex.EncodeToString(digest[:])
+			}
+			version, versionErr := store.Version(r.Context(), scope, input.WorkflowID, input.WorkflowVersion)
+			if versionErr != nil {
+				writeWorkflowError(w, versionErr)
+				return
+			}
+			if version.PublishedAt == nil {
+				writeProblem(w, http.StatusConflict, "Conflict")
+				return
 			}
 			run, err := store.CreateRun(r.Context(), scope, workflow.RunRequest{ID: stableID("run_", 32, tenancyScope(scope), key), WorkflowID: input.WorkflowID, WorkflowVersion: input.WorkflowVersion, TriggerKind: workflow.TriggerEvent, TriggerRef: input.TriggerRef, IdempotencyKey: key, InputDigest: input.InputDigest})
 			if err != nil {
@@ -302,7 +337,13 @@ func workflowByPath(w http.ResponseWriter, r *http.Request, store workflowStore)
 	writeJSON(w, 200, toWorkflowView(item))
 }
 func workflowRunByPath(w http.ResponseWriter, r *http.Request, store workflowStore) {
-	id := strings.TrimPrefix(r.URL.Path, WorkflowRunsPath+"/")
+	rest := strings.TrimPrefix(r.URL.Path, WorkflowRunsPath+"/")
+	parts := strings.Split(rest, "/")
+	if len(parts) == 2 && (parts[1] == "steps" || parts[1] == "evidence") {
+		workflowRunSubresource(w, r, store, parts[0], parts[1])
+		return
+	}
+	id := rest
 	if id == "" || strings.Contains(id, "/") {
 		writeProblem(w, 400, "Bad Request")
 		return
@@ -318,6 +359,67 @@ func workflowRunByPath(w http.ResponseWriter, r *http.Request, store workflowSto
 		return
 	}
 	writeJSON(w, 200, toWorkflowRunView(item))
+}
+
+func workflowRunSubresource(w http.ResponseWriter, r *http.Request, store workflowStore, runID, resource string) {
+	if runID == "" || strings.Contains(runID, "/") {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	scope, ok := workflowScope(r)
+	if !ok || store == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	if _, err := store.GetRun(r.Context(), scope, runID); err != nil {
+		writeWorkflowError(w, err)
+		return
+	}
+	limit, good := boundedLimit(r, 100, 200)
+	if !good {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	switch resource {
+	case "steps":
+		items, err := store.ListSteps(r.Context(), scope, runID, limit)
+		if err != nil {
+			writeWorkflowError(w, err)
+			return
+		}
+		views := make([]workflowStepView, 0, len(items))
+		for _, item := range items {
+			views = append(views, toWorkflowStepView(item))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": views})
+	case "evidence":
+		items, err := store.ListEvidence(r.Context(), scope, runID, limit)
+		if err != nil {
+			writeWorkflowError(w, err)
+			return
+		}
+		views := make([]workflowEvidenceView, 0, len(items))
+		for _, item := range items {
+			views = append(views, toWorkflowEvidenceView(item))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": views})
+	}
+}
+
+func toWorkflowStepView(v workflow.StepRun) workflowStepView {
+	return workflowStepView{ID: v.ID, RunID: v.RunID, NodeID: v.NodeID, Status: v.Status, AttemptCount: v.AttemptCount, OutputDigest: v.OutputDigest, ErrorCode: v.ErrorCode, StartedAt: formatOptionalTime(v.StartedAt), CompletedAt: formatOptionalTime(v.CompletedAt), Version: v.Version}
+}
+
+func toWorkflowEvidenceView(v workflow.ExecutionEvidence) workflowEvidenceView {
+	return workflowEvidenceView{ID: v.ID, RunID: v.RunID, NodeID: v.NodeID, Attempt: v.Attempt, Outcome: v.Outcome, OutputDigest: v.OutputDigest, ErrorCode: v.ErrorCode, ObservedAt: v.ObservedAt.Format(time.RFC3339Nano)}
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.Format(time.RFC3339Nano)
+	return &formatted
 }
 func workflowStatusAction(w http.ResponseWriter, r *http.Request, store workflowStore, next workflow.DefinitionStatus) {
 	scope, ok := workflowScope(r)
@@ -345,6 +447,8 @@ func writeWorkflowError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, workflow.ErrConflict):
 		writeProblem(w, 409, "Conflict")
+	case errors.Is(err, workflow.ErrQuotaExceeded):
+		writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
 	case errors.Is(err, workflow.ErrNotFound):
 		writeProblem(w, 404, "Not Found")
 	case errors.Is(err, workflow.ErrGraphCycle), errors.Is(err, workflow.ErrGraphUnreachable), errors.Is(err, workflow.ErrInvalid), errors.Is(err, workflow.ErrInvalidState):

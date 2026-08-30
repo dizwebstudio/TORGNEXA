@@ -112,6 +112,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
+	routes = append(routes, newLogisticsRoutes(deps.accounts, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)

@@ -83,6 +83,37 @@ func (r *Repository) ActiveScopes(ctx context.Context, limit int) ([]tenancy.Sco
 	return out, nil
 }
 
+// PaymentScopes returns tenant scopes that currently have at least one active
+// payment connector account. The database function exposes scope identities
+// only; callers must re-enter each scope before reading payment or account
+// data, preserving the same RLS boundary as ActiveScopes.
+func (r *Repository) PaymentScopes(ctx context.Context, limit int) ([]tenancy.Scope, error) {
+	if ctx == nil || r == nil || r.db == nil || limit < 1 || limit > 1000 {
+		return nil, errors.New("worker repository: invalid payment scope request")
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT organization_id,workspace_id FROM list_worker_payment_scopes($1)`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("worker repository: list payment scopes: %w", normalizeSchemaError(err))
+	}
+	defer rows.Close()
+	out := make([]tenancy.Scope, 0, limit)
+	for rows.Next() {
+		var org, ws string
+		if err := rows.Scan(&org, &ws); err != nil {
+			return nil, fmt.Errorf("worker repository: scan payment scope: %w", err)
+		}
+		scope, err := tenancy.ParseScope(org, ws)
+		if err != nil {
+			return nil, errors.New("worker repository: invalid persisted payment scope")
+		}
+		out = append(out, scope)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("worker repository: iterate payment scopes: %w", err)
+	}
+	return out, nil
+}
+
 func (r *Repository) Claim(ctx context.Context, kind Kind, workerID string, batch int, lease time.Duration) ([]Job, error) {
 	if ctx == nil || r == nil || r.db == nil || !kind.Valid() || !safeID.MatchString(workerID) || batch < 1 || batch > 1000 || lease < 10*time.Second || lease > 10*time.Minute {
 		return nil, errors.New("worker repository: invalid claim")

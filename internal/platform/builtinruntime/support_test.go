@@ -89,8 +89,15 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		carrier, ok := SupportFor(connectorID)
-		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || len(carrier.OperationalCapabilities) != 0 || SupportsCapability(connectorID, "logistics.shipment.create") || SupportsSync(connectorID, "products", "inbound") {
+		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || SupportsCapability(connectorID, "logistics.shipment.create") || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
+		}
+		if connectorID == "cdek" {
+			if len(carrier.OperationalCapabilities) != 1 || !SupportsCapability(connectorID, "pickup.points.read") {
+				t.Fatalf("CDEK pickup-point support is inaccurate: %+v", carrier)
+			}
+		} else if len(carrier.OperationalCapabilities) != 0 {
+			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)
 		}
 	}
 	dolyami, ok := SupportFor("dolyami")

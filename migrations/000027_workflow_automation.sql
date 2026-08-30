@@ -33,7 +33,7 @@ CREATE TABLE workflows (
   CONSTRAINT workflows_version_chk CHECK (version>=1 AND current_version>=1),
   CONSTRAINT workflows_trigger_kind_chk CHECK (trigger_kind IN ('event','schedule')),
   CONSTRAINT workflows_event_type_chk CHECK (trigger_event_type='' OR trigger_event_type ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.v[1-9][0-9]{0,2}$'),
-  CONSTRAINT workflows_interval_chk CHECK ((trigger_kind='event' AND trigger_interval_minutes=0 AND next_run_at IS NULL AND NOT trigger_enabled) OR (trigger_kind='schedule' AND trigger_interval_minutes BETWEEN 1 AND 10080 AND ((trigger_enabled AND next_run_at IS NOT NULL) OR (NOT trigger_enabled AND next_run_at IS NULL)))),
+  CONSTRAINT workflows_interval_chk CHECK ((trigger_kind='event' AND trigger_event_type<>'' AND trigger_interval_minutes=0 AND next_run_at IS NULL) OR (trigger_kind='schedule' AND trigger_event_type='' AND trigger_interval_minutes BETWEEN 1 AND 10080 AND ((trigger_enabled AND next_run_at IS NOT NULL) OR (NOT trigger_enabled AND next_run_at IS NULL)))),
   CONSTRAINT workflows_schedule_lease_chk CHECK ((schedule_lease_token IS NULL AND schedule_lease_until IS NULL) OR (schedule_lease_token IS NOT NULL AND schedule_lease_until IS NOT NULL)),
   CONSTRAINT workflows_time_chk CHECK (updated_at>=created_at)
 );
@@ -170,9 +170,34 @@ CREATE FUNCTION workflow_head_guard() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN
   IF NEW.id<>OLD.id OR NEW.organization_id<>OLD.organization_id OR NEW.workspace_id<>OLD.workspace_id OR NEW.created_at<>OLD.created_at OR NEW.version<>OLD.version+1 OR NEW.current_version<OLD.current_version OR NEW.updated_at<OLD.updated_at THEN
     RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow head transition is invalid'';
   END IF;
+  IF OLD.status<>NEW.status AND NOT ((OLD.status=''draft'' AND NEW.status IN (''published'',''archived'')) OR (OLD.status=''published'' AND NEW.status IN (''paused'',''archived'')) OR (OLD.status=''paused'' AND NEW.status IN (''published'',''archived''))) THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow head status transition is invalid'';
+  END IF;
   RETURN NEW;
 END';
 CREATE TRIGGER workflows_head_guard BEFORE UPDATE ON workflows FOR EACH ROW EXECUTE FUNCTION workflow_head_guard();
+
+CREATE FUNCTION workflow_run_guard() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN
+  IF NEW.id<>OLD.id OR NEW.organization_id<>OLD.organization_id OR NEW.workspace_id<>OLD.workspace_id OR NEW.workflow_id<>OLD.workflow_id OR NEW.workflow_version<>OLD.workflow_version OR NEW.idempotency_key<>OLD.idempotency_key OR NEW.input_digest<>OLD.input_digest OR NEW.version<>OLD.version+1 THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow run identity is immutable'';
+  END IF;
+  IF OLD.status<>NEW.status AND NOT ((OLD.status=''queued'' AND NEW.status IN (''running'',''cancelled'')) OR (OLD.status=''running'' AND NEW.status IN (''waiting_approval'',''waiting_retry'',''completed'',''failed'',''cancelled'')) OR (OLD.status=''waiting_approval'' AND NEW.status IN (''running'',''failed'',''cancelled'')) OR (OLD.status=''waiting_retry'' AND NEW.status IN (''running'',''failed'',''cancelled''))) THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow run status transition is invalid'';
+  END IF;
+  RETURN NEW;
+END';
+CREATE TRIGGER workflow_runs_guard BEFORE UPDATE ON workflow_runs FOR EACH ROW EXECUTE FUNCTION workflow_run_guard();
+
+CREATE FUNCTION workflow_step_guard() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN
+  IF NEW.id<>OLD.id OR NEW.run_id<>OLD.run_id OR NEW.organization_id<>OLD.organization_id OR NEW.workspace_id<>OLD.workspace_id OR NEW.node_id<>OLD.node_id OR NEW.version<>OLD.version+1 THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow step identity is immutable'';
+  END IF;
+  IF OLD.status<>NEW.status AND NOT ((OLD.status=''queued'' AND NEW.status IN (''running'',''skipped'')) OR (OLD.status=''running'' AND NEW.status IN (''waiting_approval'',''waiting_retry'',''completed'',''failed'',''skipped'')) OR (OLD.status=''waiting_approval'' AND NEW.status IN (''running'',''failed'')) OR (OLD.status=''waiting_retry'' AND NEW.status IN (''running'',''failed''))) THEN
+    RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow step status transition is invalid'';
+  END IF;
+  RETURN NEW;
+END';
+CREATE TRIGGER workflow_step_runs_guard BEFORE UPDATE ON workflow_step_runs FOR EACH ROW EXECUTE FUNCTION workflow_step_guard();
 
 CREATE FUNCTION workflow_immutable_evidence() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN
   RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''workflow historical evidence is immutable'';

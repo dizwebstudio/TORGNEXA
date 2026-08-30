@@ -228,6 +228,17 @@ transactional outbox event.
 metadata. Duplicate/collision counters and receipt age/attempt are observability
 signals; raw event payloads and errors must remain outside inbox telemetry.
 
+## Workflow trigger consumer
+
+Task 163 consumes the same canonical events in the stable consumer namespace
+`workflow.triggers.v1`. The handler inserts matching published workflow runs and
+the Inbox receipt in the same PostgreSQL transaction. `workflow_event_receipts`
+is an additional immutable workflow-level mapping used for operator lineage;
+the Inbox receipt remains the Kafka redelivery boundary. A duplicate event is a
+successful no-op, while a fingerprint collision is permanent poison data.
+Only envelope metadata and a SHA-256 input digest enter workflow state; the
+event body is never copied to a run, step or evidence row.
+
 ## Operational requirements
 
 Kafka is durable transport and replay state, **not transactional business

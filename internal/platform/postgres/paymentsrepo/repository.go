@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/torgnexa/torgnexa/internal/core/payments"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -20,6 +21,8 @@ import (
 const applyScope = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
 const paymentSelect = `SELECT id,organization_id,workspace_id,connector_account_id,external_id,COALESCE(remote_id,''),COALESCE(purpose,''),amount_minor_units,currency,commission_minor_units,status,COALESCE(remote_status,''),COALESCE(reason_code,''),version,created_at,updated_at,expires_at,succeeded_at FROM payments WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
 const refundSelect = `SELECT id,organization_id,workspace_id,payment_id,external_id,COALESCE(remote_refund_id,''),amount_minor_units,currency,status,version,created_at,updated_at FROM payment_refunds WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
+
+var refRemotePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 
 type Repository struct{ db *sql.DB }
 
@@ -69,6 +72,26 @@ func (r *Repository) PaymentByRemoteID(ctx context.Context, scope payments.Scope
 	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
 		var err error
 		result, err = scanPayment(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,connector_account_id,external_id,COALESCE(remote_id,''),COALESCE(purpose,''),amount_minor_units,currency,commission_minor_units,status,COALESCE(remote_status,''),COALESCE(reason_code,''),version,created_at,updated_at,expires_at,succeeded_at FROM payments WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND remote_id=$4`, scope.OrganizationID(), scope.WorkspaceID(), connectorAccountID, remoteID))
+		return err
+	})
+	return result, err
+}
+
+// RefundByRemoteID looks up a refund by connector account and provider refund
+// identifier. The account predicate is retained even though payment_refunds
+// currently reaches the provider through its parent payment, so a remote ID
+// can never be matched across payment rails inside one workspace.
+func (r *Repository) RefundByRemoteID(ctx context.Context, scope payments.Scope, connectorAccountID, remoteID string) (payments.Refund, error) {
+	if err := validate(ctx, r, scope); err != nil {
+		return payments.Refund{}, err
+	}
+	if !refRemotePattern.MatchString(remoteID) {
+		return payments.Refund{}, payments.ErrInvalidRecord
+	}
+	var result payments.Refund
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		var err error
+		result, err = scanRefund(tx.QueryRowContext(ctx, `SELECT r.id,r.organization_id,r.workspace_id,r.payment_id,r.external_id,COALESCE(r.remote_refund_id,''),r.amount_minor_units,r.currency,r.status,r.version,r.created_at,r.updated_at FROM payment_refunds r JOIN payments p ON p.organization_id=r.organization_id AND p.workspace_id=r.workspace_id AND p.id=r.payment_id WHERE r.organization_id=$1 AND r.workspace_id=$2 AND p.connector_account_id=$3 AND r.remote_refund_id=$4`, scope.OrganizationID(), scope.WorkspaceID(), connectorAccountID, remoteID))
 		return err
 	})
 	return result, err

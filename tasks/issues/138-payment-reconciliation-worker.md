@@ -1,6 +1,6 @@
 # Task 138 — Background payment reconciliation worker
 
-Status: Not started
+Status: Repository-complete (external payment-gateway qualification remains environment-specific)
 
 ## Problem
 
@@ -50,6 +50,28 @@ safety net for a delivery that never arrives or fails verification.
   produce once.
 - Go test/vet, contracts, architecture and migration-static (if a new job
   kind is added) gates pass.
+
+## Implemented repository scope
+
+- `worker.payment-reconciliation` runs as an independent bounded component when
+  worker reconciliation is enabled. It discovers tenant scopes through the
+  dedicated `list_worker_payment_scopes` function, re-enters each tenant scope,
+  and processes active payment accounts independently.
+- The sweep is limited to the last 48 hours and runs no more often than every
+  five minutes. Provider outages or invalid observations are isolated to the
+  affected account and do not stop the other accounts.
+- `PaymentSettlement` now carries the provider status and is validated before
+  it reaches Payment Core. A local payment or refund is changed only after
+  matching the connector account, remote ID, exact minor-unit amount and
+  currency; lifecycle transitions still pass through the existing
+  `ValidatePaymentTransition`/`ValidateRefundTransition` and corresponding
+  `Change*Status` repositories. YooKassa reconciliation reads both its payment
+  and refund lists; other payment rails remain limited to the settlement kinds
+  they expose in their audited list contract.
+- Unknown statuses, unsupported settlement kinds, amount mismatches and stale
+  optimistic versions are skipped with structured worker evidence. Re-running
+  the same window is idempotent because an already-applied canonical status is
+  not written again.
 
 ## Explicit exclusions
 
