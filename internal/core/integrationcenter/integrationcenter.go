@@ -374,10 +374,20 @@ func validateIssue(issue Issue) error {
 	if !safeCode(issue.Code) || !safeCode(issue.Dimension) || (issue.Severity != "info" && issue.Severity != "warning" && issue.Severity != "critical") || issue.Title == "" || len(issue.Title) > 160 || !safeCode(issue.ReasonCode) || issue.OccurrenceCount < 1 || issue.OccurrenceCount > 1000000 || issue.FirstSeenAt.IsZero() || issue.LastSeenAt.IsZero() || issue.FirstSeenAt.Location() != time.UTC || issue.LastSeenAt.Location() != time.UTC || issue.LastSeenAt.Before(issue.FirstSeenAt) || !validVisibility(issue.Visibility) {
 		return errors.New("integration center: invalid issue")
 	}
-	if strings.ContainsAny(issue.Title, "\x00\r\n") {
+	if strings.ContainsAny(issue.Title, "\x00\r\n") || containsSensitiveText(issue.Title) {
 		return errors.New("integration center: unsafe issue title")
 	}
 	return nil
+}
+
+func containsSensitiveText(value string) bool {
+	lower := strings.ToLower(value)
+	for _, marker := range []string{"token", "secret", "password", "authorization", "bearer", "api_key", "apikey", "private_key"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func staleDimension(d Dimension, now time.Time) bool {

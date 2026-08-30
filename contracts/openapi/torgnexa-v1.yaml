@@ -1164,6 +1164,42 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Account id already binds different configuration}
         '422': {description: Connector is not executable through the generic integration runtime}
+  /integration-center:
+    get:
+      operationId: getIntegrationCenter
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: family, in: query, schema: {type: string, maxLength: 64}}
+        - {name: surface, in: query, schema: {type: string, maxLength: 64}}
+        - {name: overall, in: query, schema: {type: string, enum: [healthy, attention, degraded, syncing, blocked, setup_required, reauthorization_required, stale, disabled, unsupported, unknown]}}
+        - {name: health, in: query, schema: {type: string, enum: [unknown, healthy, degraded, unavailable, stale]}}
+        - {name: sync, in: query, schema: {type: string, enum: [not_configured, idle, running, retrying, failed, stale, paused]}}
+        - {name: capability, in: query, schema: {type: string, maxLength: 128}}
+        - {name: issue, in: query, schema: {type: string, maxLength: 96}}
+        - {name: stale, in: query, schema: {type: boolean}}
+        - {name: account_id, in: query, schema: {type: string, maxLength: 128}}
+      responses:
+        '200':
+          description: Tenant-scoped integration state snapshot; GET never performs remote IO
+          content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationCenterResponse'}}}
+        '400': {description: Invalid cursor, filter or limit}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+  /integration-center/{account_id}:
+    get:
+      operationId: getIntegrationCenterAccount
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: account_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+      responses:
+        '200':
+          description: Detailed integration state and safe operator actions without secret material
+          content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationCenterAccount'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+        '404': {description: Account is not visible in the resolved tenant}
   /connector-accounts:disable:
     post:
       operationId: disableConnectorAccount
