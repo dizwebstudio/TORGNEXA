@@ -20,6 +20,14 @@ var (
 
 type Repository struct{ database *sql.DB }
 
+// State is the non-secret projection used by read models. Config bytes never
+// leave this package through the bulk boundary.
+type State struct {
+	Present bool
+	Valid   bool
+	Version int64
+}
+
 func New(database *sql.DB) (*Repository, error) {
 	if database == nil {
 		return nil, ErrInvalid
@@ -46,6 +54,49 @@ func (r *Repository) Config(ctx context.Context, scope tenancy.Scope, accountID 
 		return nil, 0, ErrInvalid
 	}
 	return append(json.RawMessage(nil), raw...), version, nil
+}
+
+// States returns presence/validity/version for up to 100 accounts in one
+// tenant-scoped query. It deliberately discards configuration payloads after
+// validation, so callers cannot accidentally expose non-secret config values.
+func (r *Repository) States(ctx context.Context, scope tenancy.Scope, accountIDs []string) (map[string]State, error) {
+	if ctx == nil || !scope.Valid() || r == nil || r.database == nil || len(accountIDs) > 101 {
+		return nil, ErrInvalid
+	}
+	result := make(map[string]State, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return result, nil
+	}
+	placeholders := make([]string, len(accountIDs))
+	args := make([]any, 0, len(accountIDs)+2)
+	args = append(args, scope.OrganizationID().String(), scope.WorkspaceID().String())
+	for i, accountID := range accountIDs {
+		if accountID == "" || len(accountID) > 128 || strings.ContainsAny(accountID, "\x00\r\n") {
+			return nil, ErrInvalid
+		}
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
+		args = append(args, accountID)
+	}
+	query := `SELECT connector_account_id,config,version FROM connector_runtime_configs
+WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id IN (` + strings.Join(placeholders, ",") + `)`
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var accountID string
+			var raw []byte
+			var version int64
+			if err := rows.Scan(&accountID, &raw, &version); err != nil {
+				return err
+			}
+			result[accountID] = State{Present: true, Valid: version >= 1 && validateConfig(raw) == nil, Version: version}
+		}
+		return rows.Err()
+	})
+	return result, err
 }
 
 func (r *Repository) Put(ctx context.Context, scope tenancy.Scope, accountID string, config json.RawMessage, expectedVersion int64) (int64, error) {

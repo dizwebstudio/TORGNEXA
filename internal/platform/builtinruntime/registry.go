@@ -219,6 +219,16 @@ func (r *Registry) LogisticsCanceler(ctx context.Context, account sdk.Account, r
 	return cdek.New(cdekHTTP{r.http}, nil), nil
 }
 
+// LogisticsCreator resolves the qualified CDEK shipment-creation surface.
+// The host must still enforce tenant scope, capability settings, policy/
+// approval and operation idempotency before invoking it.
+func (r *Registry) LogisticsCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsShipmentCreator, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "cdek" || !SupportsCapability(account.ConnectorID, "logistics.shipment.create") {
+		return nil, ErrUnavailable
+	}
+	return cdek.New(cdekHTTP{r.http}, nil), nil
+}
+
 type Registry struct {
 	http    *httpTransport
 	localAI *localAIHTTP

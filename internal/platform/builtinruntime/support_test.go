@@ -89,13 +89,13 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		carrier, ok := SupportFor(connectorID)
-		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || SupportsCapability(connectorID, "logistics.shipment.create") || SupportsSync(connectorID, "products", "inbound") {
+		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
 			wantCapabilities := 1
 			if connectorID == "cdek" {
-				wantCapabilities = 4
+				wantCapabilities = 5
 			} else if connectorID == "dellin" {
 				wantCapabilities = 3
 			} else if connectorID == "pek" {
@@ -113,7 +113,10 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.cancel") {
-				t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
+				 t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
 			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
 			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)

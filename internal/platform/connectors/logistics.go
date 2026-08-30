@@ -46,6 +46,15 @@ func (p Parcel) Validate() error {
 	return nil
 }
 
+// LogisticsContact carries the minimum recipient/sender contact details
+// needed by a carrier shipment request. It is request-scoped and is never
+// part of the canonical shipment projection.
+type LogisticsContact struct {
+	Name  string
+	Phone string
+	Email string
+}
+
 type RateRequest struct {
 	From, To Address
 	Parcels  []Parcel
@@ -79,6 +88,7 @@ type ShipmentCreateRequest struct {
 	From, To                                Address
 	Parcels                                 []Parcel
 	PickupPointRef                          string
+	Sender, Recipient                       LogisticsContact
 }
 type ShipmentResult struct {
 	RemoteID, Status string

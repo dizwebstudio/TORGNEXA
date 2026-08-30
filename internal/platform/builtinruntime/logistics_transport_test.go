@@ -272,6 +272,66 @@ func TestDellinCredentialProbe(t *testing.T) {
 	}
 }
 
+func TestDellinRatesUseCalculatorAndExactMoney(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии login request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "session-1"}})
+		case "/v2/calculator.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии calculator request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "pat-1") {
+				t.Fatalf("PAT leaked into calculator request: %s", body)
+			}
+			var request dellinRateRequest
+			if json.Unmarshal(body, &request) != nil || request.AppKey != "app-1" || request.SessionID != "session-1" || request.Delivery.DeliveryType.Type != "auto" || request.Delivery.Derival.Variant != "address" || request.Delivery.Arrival.Variant != "address" || request.Delivery.Derival.Address.Search != "RU, 101000, Москва, Тверская, 1" || request.Delivery.Arrival.Address.Search != "RU, 190000, Санкт-Петербург, Невский, 1" || request.Payment.Type != "cash" || request.Cargo.Quantity != 1 || request.Cargo.Length.String() != "0.1" || request.Cargo.Width.String() != "0.1" || request.Cargo.Height.String() != "0.1" || request.Cargo.Weight.String() != "1" || request.Cargo.TotalWeight.String() != "1" || request.Cargo.TotalVolume.String() != "0.001" {
+				t.Fatalf("unexpected Деловые Линии calculator body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"metadata": map[string]any{"status": 200},
+				"data":     map[string]any{"price": "1499.00", "priceMinimal": "auto", "deliveryTerm": 2, "orderDates": map[string]string{"arrivalToOspReceiver": "2026-09-02"}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+	}
+	rates, err := transport.Rates(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), request)
+	if err != nil {
+		t.Fatalf("Деловые Линии calculator request failed: %v", err)
+	}
+	if len(rates) != 1 || rates[0].ServiceCode != "dellin_auto" || rates[0].Cost.MinorUnits != 149900 || rates[0].Cost.Currency != "RUB" || !rates[0].MinDeliveryAt.Equal(time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("unexpected normalized Деловые Линии rate: %+v", rates)
+	}
+}
+
+func TestDellinRatesRejectMalformedCalculatorPrice(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v4/auth/login.json" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "session-1"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"price": "1.234", "priceMinimal": "auto", "deliveryTerm": 1}})
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", City: "Казань", Line1: "Баумана, 1"}, Parcels: []sdk.Parcel{{WeightGrams: 1, LengthMM: 1, WidthMM: 1, HeightMM: 1}}}
+	if _, err := transport.Rates(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), request); err == nil {
+		t.Fatal("malformed Деловые Линии calculator price accepted")
+	}
+}
+
 func TestDellinPickupPointsReadCatalogAndBoundResults(t *testing.T) {
 	badURL := false
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

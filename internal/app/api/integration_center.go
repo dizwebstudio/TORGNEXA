@@ -75,12 +75,38 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 		return integrationCenterReadResult{}, err
 	}
 	partial := false
+	capabilitiesReadable := true
+	accountIDs := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		accountIDs = append(accountIDs, account.ID)
+	}
+	capabilityByAccount := make(map[string][]sdk.AccountCapabilitySetting, len(accountIDs))
+	if caps, capsErr := s.accounts.AccountCapabilitiesBulk(ctx, scope, accountIDs); capsErr != nil {
+		partial = true
+		capabilitiesReadable = false
+	} else {
+		capabilityByAccount = caps
+	}
+	configByAccount := make(map[string]connectorconfigrepo.State, len(accountIDs))
+	configsReadable := s.configs != nil
+	if s.configs != nil {
+		if states, statesErr := s.configs.States(ctx, scope, accountIDs); statesErr != nil {
+			partial = true
+			configsReadable = false
+		} else {
+			configByAccount = states
+		}
+	} else {
+		partial = true
+	}
 	policies := make([]syncengine.Policy, 0)
 	if s.policies != nil {
 		policies, err = s.policies.ListPolicies(ctx, scope, 100)
 		if err != nil {
 			partial = true
 		}
+	} else {
+		partial = true
 	}
 	runs := make([]reconciliation.Run, 0)
 	if s.reconciliation != nil {
@@ -88,6 +114,8 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 		if err != nil {
 			partial = true
 		}
+	} else {
+		partial = true
 	}
 	drifts := make([]reconciliation.Drift, 0)
 	if s.reconciliation != nil {
@@ -95,6 +123,8 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 		if err != nil {
 			partial = true
 		}
+	} else {
+		partial = true
 	}
 	policyByAccount := make(map[string][]syncengine.Policy)
 	for _, p := range policies {
@@ -114,14 +144,14 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 	}
 	rows := make([]integrationcenter.Snapshot, 0, centerMin(len(accounts), request.Limit))
 	for _, account := range accounts {
-		row, rowPartial := s.reduceAccount(ctx, scope, account, policyByAccount[account.ID], latestRunByPolicy, openDriftByPolicy)
+		row, rowPartial := s.reduceAccount(account, policyByAccount[account.ID], latestRunByPolicy, openDriftByPolicy, capabilityByAccount[account.ID], configByAccount[account.ID], capabilitiesReadable, configsReadable)
 		partial = partial || rowPartial
 		if !centerMatches(row, request) {
 			continue
 		}
 		rows = append(rows, row)
 	}
-	result := integrationCenterReadResult{Rows: rows, Partial: partial, GeneratedAt: time.Now().UTC(), SourceWatermarks: []string{"connector_accounts:" + resultVersion(accounts), "sync_policies:" + resultVersion(policies), "reconciliation:" + resultVersion(runs)}}
+	result := integrationCenterReadResult{Rows: rows, Partial: partial, GeneratedAt: time.Now().UTC(), SourceWatermarks: []string{accountWatermark(accounts), policyWatermark(policies), runWatermark(runs)}}
 	if len(accounts) > request.Limit {
 		result.NextCursor = encodeAccountCursor(accounts[request.Limit-1].ID)
 		result.Rows = result.Rows[:centerMin(len(result.Rows), request.Limit)]
@@ -129,7 +159,7 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 	return result, nil
 }
 
-func (s integrationCenterSource) reduceAccount(ctx context.Context, scope tenancy.Scope, account sdk.Account, policies []syncengine.Policy, runs map[string]reconciliation.Run, drifts map[string]bool) (integrationcenter.Snapshot, bool) {
+func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []syncengine.Policy, runs map[string]reconciliation.Run, drifts map[string]bool, settings []sdk.AccountCapabilitySetting, configState connectorconfigrepo.State, capabilitiesReadable, configsReadable bool) (integrationcenter.Snapshot, bool) {
 	now := time.Now().UTC()
 	partial := false
 	support, supported := builtinruntime.SupportFor(account.ConnectorID)
@@ -159,28 +189,31 @@ func (s integrationCenterSource) reduceAccount(ctx context.Context, scope tenanc
 	credential := integrationcenter.CredentialUnknown
 	if account.SecretReference == "" {
 		credential = integrationcenter.CredentialMissing
+	} else if account.Health.Status == sdk.HealthHealthy && !account.Health.CheckedAt.IsZero() {
+		// A non-empty opaque reference only proves that a record exists. The
+		// host-owned health flow must have authenticated successfully before the
+		// center can classify credentials as present.
+		credential = integrationcenter.CredentialPresent
 	} else if account.Health.ReasonCode == "oauth_reauthorization_required" || account.Health.ReasonCode == "oauth_refresh_failed" {
 		credential = integrationcenter.CredentialReauthorizationRequired
 	} else if account.Health.ReasonCode == "credentials_invalid" || account.Health.ReasonCode == "auth_rejected" {
 		credential = integrationcenter.CredentialInvalid
-	} else {
-		credential = integrationcenter.CredentialPresent
 	}
 	configuration := integrationcenter.ConfigurationValid
+	configurationVisibility := integrationcenter.VisibilityFull
 	if support.RuntimeConfigRequired {
-		configuration = integrationcenter.ConfigurationUnknown
-		if s.configs != nil {
-			_, _, configErr := s.configs.Config(ctx, scope, account.ID)
-			switch {
-			case configErr == nil:
-				configuration = integrationcenter.ConfigurationValid
-			case errors.Is(configErr, connectorconfigrepo.ErrNotFound):
-				configuration = integrationcenter.ConfigurationMissing
-			default:
-				partial = true
-			}
+		if !configsReadable {
+			configuration = integrationcenter.ConfigurationUnknown
+			configurationVisibility = integrationcenter.VisibilityRedacted
 		} else {
-			configuration = integrationcenter.ConfigurationMissing
+			switch {
+			case !configState.Present:
+				configuration = integrationcenter.ConfigurationMissing
+			case !configState.Valid:
+				configuration = integrationcenter.ConfigurationInvalid
+			default:
+				configuration = integrationcenter.ConfigurationValid
+			}
 		}
 	}
 	healthStatus := integrationcenter.HealthUnknown
@@ -192,35 +225,41 @@ func (s integrationCenterSource) reduceAccount(ctx context.Context, scope tenanc
 		healthStatus = integrationcenter.HealthUnavailable
 	}
 	healthChecked := account.Health.CheckedAt
-	if healthChecked.IsZero() {
-		healthChecked = account.UpdatedAt
+	healthReason := account.Health.ReasonCode
+	if healthStatus != integrationcenter.HealthUnknown && healthChecked.IsZero() {
+		// A healthy value without completion time is not evidence. Keep the
+		// source timestamp valid for the envelope, but fail closed to unknown.
+		healthStatus = integrationcenter.HealthUnknown
+		healthReason = "health_check_missing"
 	}
-	healthEvidence := centerEvidence(now, healthChecked, "connector_health", account.ID, account.Health.ReasonCode, integrationcenter.VisibilityFull)
+	healthEvidence := centerEvidence(now, healthChecked, "connector_health", account.ID, healthReason, integrationcenter.VisibilityFull)
 	capabilities := make([]integrationcenter.Capability, 0)
 	capStatus := integrationcenter.CapabilityNotDeclared
+	capabilityVisibility := integrationcenter.VisibilityFull
 	manifest, manifestErr := sdk.CatalogManifest(account.ConnectorID)
 	if manifestErr == nil && len(manifest.Capabilities) > 0 {
-		capStatus = integrationcenter.CapabilityDeclared
-		settings, settingsErr := s.accounts.AccountCapabilities(ctx, scope, account.ID)
-		if settingsErr != nil {
-			partial = true
-			capStatus = integrationcenter.CapabilityBlocked
-		} else if len(settings) == 0 {
-			capStatus = integrationcenter.CapabilityBlocked
+		if !capabilitiesReadable {
+			capStatus = integrationcenter.CapabilityStale
+			capabilityVisibility = integrationcenter.VisibilityRedacted
 		} else {
-			capStatus = integrationcenter.CapabilityGranted
-			for _, setting := range settings {
-				status := integrationcenter.CapabilityDeclared
-				if setting.Enabled {
-					if builtinruntime.SupportsCapability(account.ConnectorID, string(setting.Capability)) {
-						status = integrationcenter.CapabilityEnabled
-					} else {
-						status = integrationcenter.CapabilityQualificationRequired
+			capStatus = integrationcenter.CapabilityDeclared
+			if len(settings) == 0 {
+				capStatus = integrationcenter.CapabilityBlocked
+			} else {
+				capStatus = integrationcenter.CapabilityGranted
+				for _, setting := range settings {
+					status := integrationcenter.CapabilityDeclared
+					if setting.Enabled {
+						if builtinruntime.SupportsCapability(account.ConnectorID, string(setting.Capability)) {
+							status = integrationcenter.CapabilityEnabled
+						} else {
+							status = integrationcenter.CapabilityQualificationRequired
+						}
 					}
-				}
-				capabilities = append(capabilities, integrationcenter.Capability{Name: string(setting.Capability), Direction: string(setting.Direction), Status: status, ApprovalRequired: setting.ApprovalRequired, Risk: string(setting.Risk)})
-				if status == integrationcenter.CapabilityEnabled {
-					capStatus = integrationcenter.CapabilityEnabled
+					capabilities = append(capabilities, integrationcenter.Capability{Name: string(setting.Capability), Direction: string(setting.Direction), Status: status, ApprovalRequired: setting.ApprovalRequired, Risk: string(setting.Risk)})
+					if status == integrationcenter.CapabilityEnabled {
+						capStatus = integrationcenter.CapabilityEnabled
+					}
 				}
 			}
 		}
@@ -255,7 +294,11 @@ func (s integrationCenterSource) reduceAccount(ctx context.Context, scope tenanc
 			}
 		}
 	}
-	dims := integrationcenter.Dimensions{Runtime: integrationcenter.Dimension{Status: string(runtimeStatus), Evidence: e}, Account: integrationcenter.Dimension{Status: string(accountStatus), Evidence: e}, Credential: integrationcenter.Dimension{Status: string(credential), Evidence: e}, Configuration: integrationcenter.Dimension{Status: string(configuration), Evidence: e}, Health: integrationcenter.Dimension{Status: string(healthStatus), Evidence: healthEvidence}, Capability: integrationcenter.Dimension{Status: string(capStatus), Evidence: e}, Sync: integrationcenter.Dimension{Status: string(syncStatus), Evidence: e}, Reconciliation: integrationcenter.Dimension{Status: string(reconStatus), Evidence: e}, Webhook: integrationcenter.Dimension{Status: string(integrationcenter.WebhookNotConfigured), Evidence: e}, RateLimit: integrationcenter.Dimension{Status: string(integrationcenter.RateLimitNotObserved), Evidence: e}}
+	configurationEvidence := e
+	configurationEvidence.Visibility = configurationVisibility
+	capabilityEvidence := e
+	capabilityEvidence.Visibility = capabilityVisibility
+	dims := integrationcenter.Dimensions{Runtime: integrationcenter.Dimension{Status: string(runtimeStatus), Evidence: e}, Account: integrationcenter.Dimension{Status: string(accountStatus), Evidence: e}, Credential: integrationcenter.Dimension{Status: string(credential), Evidence: e}, Configuration: integrationcenter.Dimension{Status: string(configuration), Evidence: configurationEvidence}, Health: integrationcenter.Dimension{Status: string(healthStatus), Evidence: healthEvidence}, Capability: integrationcenter.Dimension{Status: string(capStatus), Evidence: capabilityEvidence}, Sync: integrationcenter.Dimension{Status: string(syncStatus), Evidence: e}, Reconciliation: integrationcenter.Dimension{Status: string(reconStatus), Evidence: e}, Webhook: integrationcenter.Dimension{Status: string(integrationcenter.WebhookNotConfigured), Evidence: e}, RateLimit: integrationcenter.Dimension{Status: string(integrationcenter.RateLimitNotObserved), Evidence: e}}
 	input := integrationcenter.Input{AccountID: account.ID, ConnectorID: account.ConnectorID, Family: string(account.Family), Surface: support.Surface, Version: account.Version, Dimensions: dims, Capabilities: capabilities, Now: now}
 	if !supported {
 		input.Surface = "unknown"
@@ -281,7 +324,36 @@ func centerEvidence(now, checked time.Time, kind, ref, reason string, visibility
 	}
 	return integrationcenter.EvidenceRef{ObservedAt: observed, CheckedAt: checked, SourceKind: kind, SourceRef: ref, ReasonCode: reason, Visibility: visibility, StaleAfterSeconds: 3600, AgeSeconds: maxInt64(0, int64(now.Sub(checked).Seconds()))}
 }
-func resultVersion[T any](values []T) string { return strconv.Itoa(len(values)) }
+func accountWatermark(accounts []sdk.Account) string {
+	values := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		values = append(values, account.ID+":"+strconv.FormatInt(account.Version, 10)+":"+strconv.FormatInt(account.UpdatedAt.UnixNano(), 10))
+	}
+	return "connector_accounts:" + watermarkDigest(values)
+}
+
+func policyWatermark(policies []syncengine.Policy) string {
+	values := make([]string, 0, len(policies))
+	for _, policy := range policies {
+		values = append(values, policy.ID+":"+strconv.FormatInt(policy.Version, 10)+":"+strconv.FormatInt(policy.UpdatedAt.UnixNano(), 10))
+	}
+	return "sync_policies:" + watermarkDigest(values)
+}
+
+func runWatermark(runs []reconciliation.Run) string {
+	values := make([]string, 0, len(runs))
+	for _, run := range runs {
+		values = append(values, run.ID+":"+string(run.Status)+":"+strconv.FormatInt(run.UpdatedAt.UnixNano(), 10))
+	}
+	return "reconciliation:" + watermarkDigest(values)
+}
+
+func watermarkDigest(values []string) string {
+	sort.Strings(values)
+	sum := sha256.Sum256([]byte(strings.Join(values, "\x00")))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
 func centerMin(a, b int) int {
 	if a < b {
 		return a
@@ -381,7 +453,12 @@ func integrationCenterList(w http.ResponseWriter, r *http.Request, reader integr
 	response := integrationCenterResponse{SnapshotVersion: 1, GeneratedAt: result.GeneratedAt, Partial: result.Partial, Consistency: "best_effort", SourceWatermarks: result.SourceWatermarks, Summary: integrationcenter.BuildSummary(result.Rows), Items: result.Rows, NextCursor: result.NextCursor}
 	response.SnapshotDigest = integrationCenterDigest(result.Rows, result.SourceWatermarks)
 	response.SnapshotVersion = 1
-	w.Header().Set("ETag", `"`+response.SnapshotDigest+`"`)
+	etag := `"` + response.SnapshotDigest + `"`
+	setIntegrationCenterHeaders(w, etag)
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	writeJSON(w, http.StatusOK, response)
 }
 
@@ -413,8 +490,32 @@ func integrationCenterDetail(w http.ResponseWriter, r *http.Request, reader inte
 		return
 	}
 	row := result.Rows[0]
-	w.Header().Set("ETag", `"`+row.SnapshotDigest+`"`)
+	etag := `"` + row.SnapshotDigest + `"`
+	setIntegrationCenterHeaders(w, etag)
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	writeJSON(w, http.StatusOK, row)
+}
+
+func setIntegrationCenterHeaders(w http.ResponseWriter, etag string) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("ETag", etag)
+}
+
+func etagMatches(header, current string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || candidate == current {
+			return true
+		}
+		if strings.HasPrefix(candidate, "W/") && strings.TrimPrefix(candidate, "W/") == current {
+			return true
+		}
+	}
+	return false
 }
 
 func parseIntegrationCenterRequest(r *http.Request) (integrationCenterReadRequest, bool) {

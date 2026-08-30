@@ -26,6 +26,7 @@ import (
 var errLogisticsOperationNotAdmitted = errors.New("logistics operation requires carrier qualification")
 var safeCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 var pekDecimalPattern = regexp.MustCompile(`^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?$`)
+var cdekPhonePattern = regexp.MustCompile(`^[0-9+() -]{7,32}$`)
 
 // fivepostHTTP is the reviewed host-side credential probe. The partner API
 // publishes the token endpoint, while shipment payload mappings remain behind
@@ -236,6 +237,45 @@ type cdekRateRequest struct {
 	From     cdekRateLocation  `json:"from_location"`
 	To       cdekRateLocation  `json:"to_location"`
 	Packages []cdekRatePackage `json:"packages"`
+}
+
+type cdekCreateContact struct {
+	Name   string            `json:"name"`
+	Phones []cdekCreatePhone `json:"phones"`
+	Email  string            `json:"email,omitempty"`
+}
+
+type cdekCreatePhone struct {
+	Number string `json:"number"`
+}
+
+type cdekCreatePackage struct {
+	Number string `json:"number"`
+	Weight int64  `json:"weight"`
+	Length int64  `json:"length"`
+	Width  int64  `json:"width"`
+	Height int64  `json:"height"`
+}
+
+type cdekCreateOrder struct {
+	Type           int                `json:"type"`
+	Number        string             `json:"number"`
+	TariffCode    int                `json:"tariff_code"`
+	ShipmentPoint string             `json:"shipment_point,omitempty"`
+	DeliveryPoint string             `json:"delivery_point,omitempty"`
+	FromLocation  cdekRateLocation   `json:"from_location"`
+	ToLocation    cdekRateLocation   `json:"to_location"`
+	Sender        cdekCreateContact  `json:"sender"`
+	Recipient     cdekCreateContact  `json:"recipient"`
+	Packages      []cdekCreatePackage `json:"packages"`
+}
+
+type cdekCreateResponse struct {
+	Entity struct {
+		UUID       string          `json:"uuid"`
+		CDEKNumber json.RawMessage `json:"cdek_number"`
+		Number     json.RawMessage `json:"number"`
+	} `json:"entity"`
 }
 
 type cdekTariffQuote struct {
@@ -510,8 +550,97 @@ func (transport cdekHTTP) Track(ctx context.Context, secret []byte, request sdk.
 	}, nil
 }
 
-func (cdekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+func cdekTariffCode(serviceCode string) (int, error) {
+	const prefix = "cdek_tariff_"
+	if !strings.HasPrefix(serviceCode, prefix) {
+		return 0, errors.New("СДЭК shipment service code is not a tariff code")
+	}
+	value := strings.TrimPrefix(serviceCode, prefix)
+	if value == "" || !safeCodePattern.MatchString(value) {
+		return 0, errors.New("СДЭК shipment tariff code is invalid")
+	}
+	tariff, err := strconv.Atoi(value)
+	if err != nil || tariff < 1 || tariff > 10000 {
+		return 0, errors.New("СДЭК shipment tariff code is out of range")
+	}
+	return tariff, nil
+}
+
+func validCdekContact(contact sdk.LogisticsContact) bool {
+	name := strings.TrimSpace(contact.Name)
+	phone := strings.TrimSpace(contact.Phone)
+	email := strings.TrimSpace(contact.Email)
+	if name == "" || name != contact.Name || len(name) > 255 || phone == "" || phone != contact.Phone || !cdekPhonePattern.MatchString(phone) {
+		return false
+	}
+	if email != "" && (email != contact.Email || len(email) > 254 || strings.ContainsAny(email, "\r\n\t ")) {
+		return false
+	}
+	return true
+}
+
+func (transport cdekHTTP) Create(ctx context.Context, secret []byte, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
+	if transport.h == nil || request.Validate() != nil || len(request.Parcels) > 50 || request.PickupPointRef != "" && !cdekRemotePattern.MatchString(request.PickupPointRef) || !validCdekContact(request.Sender) || !validCdekContact(request.Recipient) {
+		return sdk.ShipmentResult{}, errors.New("СДЭК shipment creation request is unavailable")
+	}
+	tariffCode, err := cdekTariffCode(request.ServiceCode)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	token, err := transport.accessToken(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	packages := make([]cdekCreatePackage, 0, len(request.Parcels))
+	for index, parcel := range request.Parcels {
+		if parcel.Validate() != nil {
+			return sdk.ShipmentResult{}, errors.New("СДЭК shipment parcel is invalid")
+		}
+		packages = append(packages, cdekCreatePackage{
+			Number: strconv.Itoa(index + 1),
+			Weight: parcel.WeightGrams,
+			Length: cdekDimensionMillimeters(parcel.LengthMM),
+			Width:  cdekDimensionMillimeters(parcel.WidthMM),
+			Height: cdekDimensionMillimeters(parcel.HeightMM),
+		})
+	}
+	body, err := json.Marshal(cdekCreateOrder{
+		Type:           1,
+		Number:         request.ExternalID,
+		TariffCode:     tariffCode,
+		DeliveryPoint: request.PickupPointRef,
+		FromLocation:  cdekAddress(request.From),
+		ToLocation:    cdekAddress(request.To),
+		Sender:        cdekCreateContact{Name: request.Sender.Name, Phones: []cdekCreatePhone{{Number: request.Sender.Phone}}, Email: request.Sender.Email},
+		Recipient:     cdekCreateContact{Name: request.Recipient.Name, Phones: []cdekCreatePhone{{Number: request.Recipient.Phone}}, Email: request.Recipient.Email},
+		Packages:      packages,
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.cdek.ru", "/v2/orders", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("СДЭК shipment creation rejected with status %d", status)
+	}
+	var response cdekCreateResponse
+	if json.Unmarshal(responseBody, &response) != nil {
+		return sdk.ShipmentResult{}, errors.New("СДЭК shipment creation response rejected")
+	}
+	remoteID := cdekScalarText(response.Entity.CDEKNumber)
+	if remoteID == "" {
+		remoteID = strings.TrimSpace(response.Entity.UUID)
+	}
+	if remoteID == "" || !cdekRemotePattern.MatchString(remoteID) {
+		return sdk.ShipmentResult{}, errors.New("СДЭК shipment creation response has no valid identifier")
+	}
+	trackingNumber := cdekScalarText(response.Entity.CDEKNumber)
+	if trackingNumber == "" {
+		trackingNumber = remoteID
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: trackingNumber, ObservedAt: time.Now().UTC()}, nil
 }
 func (transport cdekHTTP) Cancel(ctx context.Context, secret []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
@@ -1005,8 +1134,8 @@ func (pekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.S
 var _ pek.Transport = pekHTTP{}
 
 // dellinHTTP validates an app key and personal access token by opening a
-// short-lived Деловые Линии API session. The returned session ID is discarded;
-// future operational calls remain qualification-gated.
+// short-lived Деловые Линии API session. The returned session ID is discarded
+// after each host-side read; shipment writes remain qualification-gated.
 type dellinHTTP struct{ h *httpTransport }
 
 type dellinCredentials struct {

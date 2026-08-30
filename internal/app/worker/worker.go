@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -313,6 +314,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_integration_center_repository_startup_failed", err)
 	}
+	integrationCenterAccounts, err := connectorrepo.New(db)
+	if err != nil {
+		return fail("worker_integration_center_account_repository_startup_failed", err)
+	}
 	integrationCenterReader, err := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".integration-center-consumer", integrationCenterKafkaConsumerGroup, consumerTopics)
 	if err != nil {
 		return fail("worker_integration_center_kafka_reader_startup_failed", err)
@@ -358,7 +363,22 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			})
 		}},
 		{name: "integration-center-events", run: func(componentCtx context.Context) error {
-			return integrationCenterConsumer.Run(componentCtx, integrationCenterEventHandler{queue: integrationCenterRepository}.Handle)
+			return integrationCenterConsumer.Run(componentCtx, func(eventCtx context.Context, delivery eventbus.Delivery) error {
+				if !strings.HasPrefix(delivery.Event.Type.String(), "commerce.integration.") {
+					return nil
+				}
+				scope, scopeErr := tenancy.ParseScope(delivery.Event.OrganizationID, delivery.Event.WorkspaceID)
+				if scopeErr != nil {
+					return eventbus.Permanent("integration_center_invalid_scope")
+				}
+				handler := inboxProcessor.EventHandler(scope, integrationCenterKafkaConsumerGroup, func(callCtx context.Context, tx inboxrepo.Transaction, item eventbus.Delivery) error {
+					return integrationCenterEventHandler{queue: integrationCenterRepository}.HandleInTransaction(callCtx, tx, item)
+				})
+				return handler(eventCtx, delivery)
+			})
+		}},
+		{name: "integration-center-recompute", run: func(componentCtx context.Context) error {
+			return runIntegrationCenterRecompute(componentCtx, logger, dispatchRepository, integrationCenterRepository, integrationCenterAccounts, runtimeRegistry, workerID, cfg.Worker)
 		}},
 	}...)
 	components = append(components, component{name: "workflow-automation", run: func(componentCtx context.Context) error {

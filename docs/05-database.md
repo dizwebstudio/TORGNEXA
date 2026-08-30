@@ -25,6 +25,14 @@ Current platform tables include organizations, workspaces, stores, connector_acc
 
 `audit_records` is an append-only tenant-scoped evidence table for application access. New records require actor, source, action, resource, correlation, risk and a bounded redacted JSON summary. Application roles receive SELECT/INSERT behavior only; mutation/truncation is blocked by RLS/trigger guards. See `docs/migrations/000004-audit-base.md` and `contracts/audit/audit-record.schema.json`.
 
+## Integration state center (migration 000035)
+
+Task 168 stores only rebuildable integration-state metadata: immutable snapshots,
+status transitions, action receipts and a coalescing recompute queue. These rows
+are tenant-scoped with forced RLS and never replace connector account,
+credential, health, capability, sync or reconciliation sources. See
+`docs/migrations/000035-integration-state-center.md`.
+
 Tenancy identifiers are canonical UUIDv7 or ULID text so they remain portable
 and time-sortable without relying on database sequences. Lifecycle changes use
 `status`, `updated_at`, and an optimistic `version`; archival is not a hidden

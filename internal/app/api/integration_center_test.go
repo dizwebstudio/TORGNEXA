@@ -65,6 +65,28 @@ func TestIntegrationCenterRejectsTenantSelectorsAndBadFilters(t *testing.T) {
 	}
 }
 
+func TestIntegrationCenterListSupportsNoStoreAndConditionalRead(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	row, err := integrationcenter.Reduce(integrationcenter.Input{AccountID: "account-1", ConnectorID: "woocommerce", Family: "storefront", Surface: "integrations", Version: 1, Dimensions: integrationcenterTestDimensions(now), SourceWatermarks: []string{"accounts:1"}, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := &centerReaderStub{result: integrationCenterReadResult{Rows: []integrationcenter.Snapshot{row}, GeneratedAt: now, SourceWatermarks: []string{"accounts:1"}}}
+	first := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, IntegrationCenterPath, nil).WithContext(context.WithValue(context.Background(), requestScopeKey{}, validTestScope(t)))
+	integrationCenterList(first, request, reader)
+	if first.Code != http.StatusOK || first.Header().Get("Cache-Control") != "no-store" || first.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("headers/status=%d cache=%q content=%q", first.Code, first.Header().Get("Cache-Control"), first.Header().Get("X-Content-Type-Options"))
+	}
+	second := httptest.NewRecorder()
+	conditional := httptest.NewRequest(http.MethodGet, IntegrationCenterPath, nil).WithContext(context.WithValue(context.Background(), requestScopeKey{}, validTestScope(t)))
+	conditional.Header.Set("If-None-Match", first.Header().Get("ETag"))
+	integrationCenterList(second, conditional, reader)
+	if second.Code != http.StatusNotModified || second.Body.Len() != 0 {
+		t.Fatalf("conditional status/body=%d/%q", second.Code, second.Body.String())
+	}
+}
+
 func integrationcenterTestDimensions(now time.Time) integrationcenter.Dimensions {
 	e := integrationcenter.EvidenceRef{ObservedAt: now.Add(-time.Minute), CheckedAt: now.Add(-time.Minute), SourceKind: "test", SourceRef: "source:1", Visibility: integrationcenter.VisibilityFull, StaleAfterSeconds: 3600, AgeSeconds: 60}
 	return integrationcenter.Dimensions{Runtime: integrationcenter.Dimension{Status: "ready", Evidence: e}, Account: integrationcenter.Dimension{Status: "active", Evidence: e}, Credential: integrationcenter.Dimension{Status: "present", Evidence: e}, Configuration: integrationcenter.Dimension{Status: "valid", Evidence: e}, Health: integrationcenter.Dimension{Status: "healthy", Evidence: e}, Capability: integrationcenter.Dimension{Status: "enabled", Evidence: e}, Sync: integrationcenter.Dimension{Status: "idle", Evidence: e}, Reconciliation: integrationcenter.Dimension{Status: "healthy", Evidence: e}, Webhook: integrationcenter.Dimension{Status: "receiving", Evidence: e}, RateLimit: integrationcenter.Dimension{Status: "available", Evidence: e}}

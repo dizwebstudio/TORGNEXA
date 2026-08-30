@@ -1184,6 +1184,7 @@ paths:
         '200':
           description: Tenant-scoped integration state snapshot; GET never performs remote IO
           content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationCenterResponse'}}}
+        '304': {description: Snapshot has not changed (If-None-Match matched ETag)}
         '400': {description: "Invalid cursor, filter or limit"}
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
@@ -1197,6 +1198,7 @@ paths:
         '200':
           description: Detailed integration state and safe operator actions without secret material
           content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationCenterAccount'}}}
+        '304': {description: Snapshot has not changed (If-None-Match matched ETag)}
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
         '404': {description: Account is not visible in the resolved tenant}

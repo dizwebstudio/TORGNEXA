@@ -79,9 +79,23 @@ func (r *Repository) EnqueueRecompute(ctx context.Context, scope tenancy.Scope, 
 		return ErrInvalid
 	}
 	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO integration_center_recompute_queue(organization_id,workspace_id,account_id,reason_code,event_id,available_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (organization_id,workspace_id,account_id) DO UPDATE SET reason_code=EXCLUDED.reason_code,event_id=EXCLUDED.event_id,available_at=LEAST(integration_center_recompute_queue.available_at,EXCLUDED.available_at),status='pending',lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()`, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, reasonCode, eventID, now)
-		return err
+		return EnqueueRecomputeInTransaction(ctx, tx, scope, accountID, reasonCode, eventID, now)
 	})
+}
+
+// EnqueueRecomputeInTransaction is the inbox/outbox bridge used by the Kafka
+// consumer. The caller owns the transaction (and must already have applied the
+// tenant RLS settings), so a committed inbox receipt and its coalesced work
+// item are atomic. It intentionally accepts only the tiny ExecContext surface
+// rather than leaking database/sql into the event handler.
+func EnqueueRecomputeInTransaction(ctx context.Context, tx interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, scope tenancy.Scope, accountID, reasonCode, eventID string, now time.Time) error {
+	if ctx == nil || tx == nil || !scope.Valid() || accountID == "" || reasonCode == "" || eventID == "" || now.IsZero() || now.Location() != time.UTC || !safeQueueCode(reasonCode) {
+		return ErrInvalid
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO integration_center_recompute_queue(organization_id,workspace_id,account_id,reason_code,event_id,available_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (organization_id,workspace_id,account_id) DO UPDATE SET reason_code=EXCLUDED.reason_code,event_id=EXCLUDED.event_id,available_at=LEAST(integration_center_recompute_queue.available_at,EXCLUDED.available_at),status='pending',lease_token=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()`, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, reasonCode, eventID, now)
+	return err
 }
 
 type QueueItem struct {
@@ -97,7 +111,22 @@ func (r *Repository) ClaimRecompute(ctx context.Context, scope tenancy.Scope, wo
 	}
 	var out QueueItem
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		row := tx.QueryRowContext(ctx, `WITH candidate AS (SELECT account_id FROM integration_center_recompute_queue WHERE organization_id=$1 AND workspace_id=$2 AND status='pending' AND available_at <= $3 ORDER BY available_at,account_id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE integration_center_recompute_queue q SET status='leased',lease_token=$4,lease_expires_at=$5,attempts=q.attempts+1,updated_at=$3 FROM candidate WHERE q.organization_id=$1 AND q.workspace_id=$2 AND q.account_id=candidate.account_id RETURNING q.account_id,q.reason_code,q.event_id,q.status,q.attempts,q.available_at`, scope.OrganizationID().String(), scope.WorkspaceID().String(), now, workerID, now.Add(lease))
+		row := tx.QueryRowContext(ctx, `WITH expired AS (
+  UPDATE integration_center_recompute_queue
+     SET status='pending', lease_token=NULL, lease_expires_at=NULL,
+         available_at=LEAST(available_at,$3), last_error_code='lease_expired', updated_at=$3
+   WHERE organization_id=$1 AND workspace_id=$2 AND status='leased' AND lease_expires_at <= $3
+), candidate AS (
+  SELECT account_id FROM integration_center_recompute_queue
+   WHERE organization_id=$1 AND workspace_id=$2 AND status='pending' AND available_at <= $3
+   ORDER BY available_at,account_id FOR UPDATE SKIP LOCKED LIMIT 1
+)
+UPDATE integration_center_recompute_queue q
+   SET status='leased', lease_token=$4, lease_expires_at=$5,
+       attempts=q.attempts+1, updated_at=$3
+  FROM candidate
+ WHERE q.organization_id=$1 AND q.workspace_id=$2 AND q.account_id=candidate.account_id
+RETURNING q.account_id,q.reason_code,q.event_id,q.status,q.attempts,q.available_at`, scope.OrganizationID().String(), scope.WorkspaceID().String(), now, workerID, now.Add(lease))
 		if err := row.Scan(&out.AccountID, &out.ReasonCode, &out.EventID, &out.Status, &out.Attempts, &out.AvailableAt); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
@@ -107,6 +136,33 @@ func (r *Repository) ClaimRecompute(ctx context.Context, scope tenancy.Scope, wo
 		return nil
 	})
 	return out, err
+}
+
+// RetryRecompute releases a leased item with bounded exponential backoff.
+// Once the queue attempt budget is exhausted it is moved to dead_letter so a
+// provider outage cannot create an unbounded retry storm. The returned error
+// distinguishes a lost lease from a database failure and is safe to retry.
+func (r *Repository) RetryRecompute(ctx context.Context, scope tenancy.Scope, accountID, workerID, errorCode string, now time.Time, delay time.Duration) error {
+	if r == nil || r.db == nil || ctx == nil || !scope.Valid() || accountID == "" || workerID == "" || !safeQueueCode(errorCode) || now.IsZero() || now.Location() != time.UTC || delay < 0 || delay > 15*time.Minute {
+		return ErrInvalid
+	}
+	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE integration_center_recompute_queue
+SET status=CASE WHEN attempts >= 20 THEN 'dead_letter' ELSE 'pending' END,
+    lease_token=NULL, lease_expires_at=NULL,
+    available_at=CASE WHEN attempts >= 20 THEN available_at ELSE $4 END,
+    last_error_code=$5, updated_at=$4
+WHERE organization_id=$1 AND workspace_id=$2 AND account_id=$3
+  AND status='leased' AND lease_token=$6`, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, now.Add(delay), errorCode, workerID)
+		if err != nil {
+			return err
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			return ErrConflict
+		}
+		return nil
+	})
 }
 
 func (r *Repository) CompleteRecompute(ctx context.Context, scope tenancy.Scope, accountID, workerID string, now time.Time, failed bool) error {
@@ -147,4 +203,19 @@ func (r *Repository) tx(ctx context.Context, scope tenancy.Scope, readOnly bool,
 		return err
 	}
 	return tx.Commit()
+}
+
+func safeQueueCode(value string) bool {
+	if len(value) == 0 || len(value) > 95 {
+		return false
+	}
+	for i, r := range value {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '.' && r != '_' && r != '-' {
+			return false
+		}
+		if i == 0 && (r < 'a' || r > 'z') {
+			return false
+		}
+	}
+	return true
 }

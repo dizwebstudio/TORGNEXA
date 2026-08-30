@@ -651,7 +651,7 @@ admit a bounded `logistics.track.read` status lookup; no shipment, label, return
 route is advertised until the current carrier contracts and an idempotent host
 bridge are qualified. Runtime inventory keeps logistics as a separate surface
 and admits only these exact CDEK rate/tracking/PVZ, ПЭК rate/tracking/PVZ and
-Деловые Линии pickup/tracking routes.
+Деловые Линии rate/tracking/PVZ routes.
 
 ### Gate RUNTIME-145
 

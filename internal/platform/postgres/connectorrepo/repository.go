@@ -7,12 +7,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
 const applyScopeStatement = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
+
+var bulkAccountIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 
 const accountSelect = `SELECT id, organization_id, workspace_id, provider, family, status, secret_reference,
   version, health_status, health_reason_code, health_checked_at, created_at, updated_at
@@ -259,6 +263,61 @@ func (repository *Repository) AccountCapabilities(ctx context.Context, scope ten
 		return rows.Err()
 	})
 	return settings, err
+}
+
+// AccountCapabilitiesBulk returns the latest capability revision for each
+// requested account in one tenant-scoped query. The integration-state center
+// uses this boundary to avoid one database round-trip per card.
+func (repository *Repository) AccountCapabilitiesBulk(ctx context.Context, scope tenancy.Scope, accountIDs []string) (map[string][]sdk.AccountCapabilitySetting, error) {
+	if err := validateRepositoryCall(ctx, repository); err != nil {
+		return nil, err
+	}
+	if !scope.Valid() || len(accountIDs) > 101 {
+		return nil, sdk.ErrInvalidAccount
+	}
+	result := make(map[string][]sdk.AccountCapabilitySetting, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return result, nil
+	}
+	placeholders := make([]string, len(accountIDs))
+	args := make([]any, 0, len(accountIDs)+2)
+	args = append(args, scope.OrganizationID().String(), scope.WorkspaceID().String())
+	for i, accountID := range accountIDs {
+		if !bulkAccountIDPattern.MatchString(accountID) {
+			return nil, sdk.ErrInvalidAccount
+		}
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
+		args = append(args, accountID)
+		result[accountID] = []sdk.AccountCapabilitySetting{}
+	}
+	query := `SELECT h.connector_account_id,h.capability,h.direction,h.risk_class,h.approval_required,h.enabled
+FROM connector_account_capability_history h
+WHERE h.organization_id=$1 AND h.workspace_id=$2
+  AND h.connector_account_id IN (` + strings.Join(placeholders, ",") + `)
+  AND h.account_version=(SELECT max(latest.account_version) FROM connector_account_capability_history latest
+    WHERE latest.organization_id=$1 AND latest.workspace_id=$2 AND latest.connector_account_id=h.connector_account_id)
+ORDER BY h.connector_account_id,h.capability`
+	err := repository.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, query, args...)
+		if err != nil {
+			return fmt.Errorf("connector account repository: list capabilities bulk: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var accountID string
+			var setting sdk.AccountCapabilitySetting
+			if err := rows.Scan(&accountID, &setting.Capability, &setting.Direction, &setting.Risk, &setting.ApprovalRequired, &setting.Enabled); err != nil {
+				return fmt.Errorf("connector account repository: scan capability bulk: %w", err)
+			}
+			definition, ok := sdk.CapabilityDefinitionFor(setting.Capability)
+			if !ok || setting.Direction != definition.Direction || setting.Risk != definition.Risk || setting.ApprovalRequired != definition.ApprovalRequired {
+				return sdk.ErrInvalidCapabilitySettings
+			}
+			result[accountID] = append(result[accountID], setting)
+		}
+		return rows.Err()
+	})
+	return result, err
 }
 
 // ReplaceAccountCapabilities appends a complete manifest-bound snapshot and

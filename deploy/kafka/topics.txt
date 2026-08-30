@@ -4,8 +4,8 @@ billing.subscription.events.v1
 commerce.catalog.events.v1
 commerce.claim.events.v1
 commerce.fulfillment.events.v1
-commerce.inventory.events.v1
 commerce.integration.events.v1
+commerce.inventory.events.v1
 commerce.orders.events.v1
 commerce.pim.events.v1
 commerce.pricing.events.v1

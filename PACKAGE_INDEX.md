@@ -32,13 +32,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 527
-- adrs: 114
-- tasks: 171
+- docs: 538
+- adrs: 121
+- tasks: 172
 - milestones: 14
-- contracts: 218
+- contracts: 234
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 2969
+- total source files (excluding local secrets/build/dependency/cache trees): 3069
 
 
 ## Connector category layout
@@ -131,7 +131,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Task 168 additions
 
-- planned provider-neutral Unified Integration State Center combining account,
+- repository-complete provider-neutral Unified Integration State Center combining account,
   runtime stage, credential/config class, capabilities, health/freshness,
   rate-limit, sync/retry/DLQ, reconciliation, webhook and separate-surface
   evidence into one permission-aware read model;
@@ -631,6 +631,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0113-gemini-grok-ai-providers.md`
 - `adr/0114-prestashop-price-inventory-runtime-route.md`
 - `adr/0115-commerce-product-event-runtime-route.md`
+- `adr/0116-workflow-automation-builder.md`
+- `adr/0117-returns-cancellations-refunds.md`
+- `adr/0117-wms-operator-workspace-and-marketplace-fulfillment.md`
+- `adr/0118-inventory-forecast-auto-replenishment.md`
+- `adr/0119-product-publication-quality-center.md`
+- `adr/0120-channel-unit-economics.md`
+- `adr/0121-integration-state-center.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -784,6 +791,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/159b-grok-ai-provider.json`
 - `architecture/reviews/160-prestashop-commerce-sync-runtime.json`
 - `architecture/reviews/161-commerce-product-event-runtime-route.json`
+- `architecture/reviews/164-returns-cancellations-refunds.json`
+- `architecture/reviews/165-inventory-forecast-auto-replenishment.json`
+- `architecture/reviews/166-product-publication-quality-center.json`
+- `architecture/reviews/167-channel-unit-economics.json`
+- `architecture/reviews/168-integration-state-center.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -985,6 +997,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/logistics/dellin/connector.go`
 - `connectors/logistics/dellin/connector_test.go`
 - `connectors/logistics/dellin/manifest.json`
+- `connectors/logistics/dellin/operations.go`
 - `connectors/logistics/dellin/presentation.json`
 - `connectors/logistics/dellin/transport.go`
 - `connectors/logistics/fivepost/candidate_transport.go`
@@ -1012,6 +1025,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/logistics/pochta-russia/connector.go`
 - `connectors/logistics/pochta-russia/connector_test.go`
 - `connectors/logistics/pochta-russia/manifest.json`
+- `connectors/logistics/pochta-russia/operations.go`
 - `connectors/logistics/pochta-russia/presentation.json`
 - `connectors/logistics/pochta-russia/transport.go`
 - `connectors/marketplaces/aliexpress-ru/conformance.go`
@@ -1464,6 +1478,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/events/approval-requested-v1.schema.json`
 - `contracts/events/approval-state-changed-v1.schema.json`
 - `contracts/events/billing-subscription-state-changed-v1.schema.json`
+- `contracts/events/cancellation-requested-v1.schema.json`
+- `contracts/events/cancellation-state-changed-v1.schema.json`
 - `contracts/events/claim-created-v1.schema.json`
 - `contracts/events/compliance-document-status-changed-v1.schema.json`
 - `contracts/events/counterparty-updated-v1.schema.json`
@@ -1472,8 +1488,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/events/event-catalog.json`
 - `contracts/events/event-envelope.schema.json`
 - `contracts/events/fulfillment-allocation-changed-v1.schema.json`
+- `contracts/events/fulfillment-batch-changed-v1.schema.json`
+- `contracts/events/fulfillment-task-changed-v1.schema.json`
 - `contracts/events/fx-rate-published-v1.schema.json`
 - `contracts/events/fx-rate-published-v2.schema.json`
+- `contracts/events/integration-account-status-changed-v1.schema.json`
+- `contracts/events/integration-snapshot-published-v1.schema.json`
 - `contracts/events/inventory-position-changed-v1.schema.json`
 - `contracts/events/legal-party-record-changed-v1.schema.json`
 - `contracts/events/notification-created-v1.schema.json`
@@ -1485,12 +1505,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/events/privacy-request-created-v1.schema.json`
 - `contracts/events/product-changed-v1.schema.json`
 - `contracts/events/product-compliance-record-changed-v1.schema.json`
+- `contracts/events/return-requested-v1.schema.json`
+- `contracts/events/return-state-changed-v1.schema.json`
 - `contracts/events/settlement-entry-created-v1.schema.json`
+- `contracts/events/shipment-changed-v1.schema.json`
 - `contracts/events/social-channel-account-changed-v1.schema.json`
 - `contracts/events/social-content-changed-v1.schema.json`
 - `contracts/events/social-publication-status-changed-v1.schema.json`
 - `contracts/events/social-variant-changed-v1.schema.json`
 - `contracts/events/stock-changed-v1.schema.json`
+- `contracts/events/unit-economics-snapshot-published-v1.schema.json`
+- `contracts/events/unit-economics-snapshot-requested-v1.schema.json`
 - `contracts/events/upload-quarantined-v1.schema.json`
 - `contracts/events/upload-released-v1.schema.json`
 - `contracts/events/upload-rescan-requested-v1.schema.json`
@@ -1597,6 +1622,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/privacy/purpose.schema.json`
 - `contracts/privacy/retention-policy.schema.json`
 - `contracts/protobuf/event_envelope.proto`
+- `contracts/publication-quality/profile.schema.json`
 - `contracts/reconciliation/README.md`
 - `contracts/reconciliation/action-v1.schema.json`
 - `contracts/reconciliation/drift-v1.schema.json`
@@ -1631,6 +1657,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/webhooks/subscription-list-v1.schema.json`
 - `contracts/webhooks/subscription-v1.schema.json`
 - `contracts/webhooks/webhook-envelope.schema.json`
+- `contracts/workflow/README.md`
+- `contracts/workflow/definition-v1.schema.json`
+- `contracts/workflow/run-v1.schema.json`
+- `contracts/workflow/step-evidence-v1.schema.json`
 - `deploy/clickhouse/000001_reporting_foundation.sql`
 - `deploy/edge/nginx.conf.example`
 - `deploy/garage/render-config.sh`
@@ -1723,7 +1753,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/54-architecture-freeze-v1.md`
 - `docs/55-legal-entity-counterparty-core.md`
 - `docs/55-legal-party-counterparty-core.md`
+- `docs/55-workflow-automation.md`
 - `docs/56-product-compliance.md`
+- `docs/56-returns-cancellations-refunds.md`
 - `docs/57-egais-integration.md`
 - `docs/58-enterprise-iam.md`
 - `docs/59-siem-security-event-export.md`
@@ -1884,6 +1916,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/lm-studio/conformance-plan.md`
 - `docs/connectors/lm-studio/conformance-report.json`
 - `docs/connectors/lm-studio/spec.md`
+- `docs/connectors/logistics-write-qualification.md`
 - `docs/connectors/magento/README.md`
 - `docs/connectors/magento/capability-audit.md`
 - `docs/connectors/magento/conformance-plan.md`
@@ -2146,6 +2179,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/migrations/000026-ai-agent-governance.md`
 - `docs/migrations/000026-audit-realtime-lookup-index.md`
 - `docs/migrations/000027-social-core.md`
+- `docs/migrations/000028-payment-reconciliation-worker.md`
+- `docs/migrations/000030-wms-operator-tasks.md`
+- `docs/migrations/000031-wms-task-batches.md`
+- `docs/migrations/000034-channel-unit-economics.md`
+- `docs/migrations/000035-integration-state-center.md`
 - `docs/migrations/000055-connector-account-settings.md`
 - `docs/migrations/000056-demo-dataset-tombstone.md`
 - `docs/migrations/000057-catalog-product-images.md`
@@ -2183,6 +2221,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/operations/074-logistics-carrier-sdk.md`
 - `docs/operations/075-pudo-operations.md`
 - `docs/operations/077-incident-management-runbooks.md`
+- `docs/operations/167-channel-unit-economics.md`
+- `docs/operations/168-integration-state-center.md`
+- `docs/operations/publication-quality.md`
 - `docs/payments/087-reference-acquiring-connector.md`
 - `docs/privacy/061-retention-subject-requests-tenant-deletion.md`
 - `docs/reporting/049-clickhouse-foundation.md`
@@ -2473,6 +2514,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/DashboardPage.tsx`
 - `frontend/src/pages/FinancePage.tsx`
 - `frontend/src/pages/IncidentCenterPage.tsx`
+- `frontend/src/pages/IntegrationStatusPage.tsx`
 - `frontend/src/pages/IntegrationsPage.tsx`
 - `frontend/src/pages/InventoryPage.tsx`
 - `frontend/src/pages/NotificationsPage.tsx`
@@ -2480,10 +2522,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/Page.tsx`
 - `frontend/src/pages/PlaceholderPage.tsx`
 - `frontend/src/pages/PublicDocumentationPage.tsx`
+- `frontend/src/pages/PublicationQualityPage.tsx`
 - `frontend/src/pages/ReportsPage.tsx`
+- `frontend/src/pages/ReturnsPage.tsx`
 - `frontend/src/pages/SettingsPage.tsx`
 - `frontend/src/pages/SocialPage.tsx`
 - `frontend/src/pages/SyncPage.tsx`
+- `frontend/src/pages/WorkflowsPage.tsx`
 - `frontend/src/shell/AppShell.tsx`
 - `frontend/src/shell/navigation.ts`
 - `frontend/src/shell/useLocationPath.ts`
@@ -2548,11 +2593,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/entitlements_test.go`
 - `internal/app/api/identity_provider_settings.go`
 - `internal/app/api/identity_provider_settings_test.go`
+- `internal/app/api/integration_center.go`
+- `internal/app/api/integration_center_test.go`
 - `internal/app/api/inventory.go`
 - `internal/app/api/legalparty.go`
 - `internal/app/api/legalparty_test.go`
 - `internal/app/api/lineage.go`
 - `internal/app/api/lineage_test.go`
+- `internal/app/api/logistics.go`
+- `internal/app/api/logistics_test.go`
 - `internal/app/api/mcp_accounts.go`
 - `internal/app/api/mcp_agent_policies.go`
 - `internal/app/api/mcp_agent_policies_test.go`
@@ -2572,11 +2621,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/payments.go`
 - `internal/app/api/production_routes.go`
 - `internal/app/api/production_scope.go`
+- `internal/app/api/publication_quality.go`
 - `internal/app/api/realtime.go`
 - `internal/app/api/realtime_test.go`
 - `internal/app/api/report_pdf.go`
 - `internal/app/api/reports.go`
 - `internal/app/api/reports_test.go`
+- `internal/app/api/returns.go`
 - `internal/app/api/search.go`
 - `internal/app/api/search_test.go`
 - `internal/app/api/security_composition.go`
@@ -2594,6 +2645,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/user_profile_test.go`
 - `internal/app/api/webhooks.go`
 - `internal/app/api/webhooks_test.go`
+- `internal/app/api/wms.go`
+- `internal/app/api/workflows.go`
 - `internal/app/api/workspace_settings.go`
 - `internal/app/mcp/identity.go`
 - `internal/app/mcp/identity_test.go`
@@ -2607,6 +2660,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/worker/connector_registry.go`
 - `internal/app/worker/fx_reference.go`
 - `internal/app/worker/fx_reference_test.go`
+- `internal/app/worker/integration_center.go`
+- `internal/app/worker/integration_center_test.go`
+- `internal/app/worker/logistics_cancel_route.go`
+- `internal/app/worker/logistics_cancel_route_test.go`
+- `internal/app/worker/payment_reconciliation.go`
+- `internal/app/worker/payment_reconciliation_test.go`
+- `internal/app/worker/publication_quality_gate.go`
 - `internal/app/worker/reconciliation_actions.go`
 - `internal/app/worker/reporting_batch.go`
 - `internal/app/worker/reporting_batch_test.go`
@@ -2619,10 +2679,14 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/core/compliance/compliance.go`
 - `internal/core/compliance/compliance_test.go`
 - `internal/core/compliance/service.go`
+- `internal/core/integrationcenter/integrationcenter.go`
+- `internal/core/integrationcenter/integrationcenter_test.go`
 - `internal/core/inventory/inventory.go`
 - `internal/core/inventory/inventory_test.go`
 - `internal/core/legalparty/legalparty.go`
 - `internal/core/legalparty/legalparty_test.go`
+- `internal/core/logistics/logistics.go`
+- `internal/core/logistics/logistics_test.go`
 - `internal/core/orders/orders.go`
 - `internal/core/orders/orders_test.go`
 - `internal/core/payments/payments.go`
@@ -2631,14 +2695,20 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/core/pim/pim_test.go`
 - `internal/core/pricing/pricing.go`
 - `internal/core/pricing/pricing_test.go`
+- `internal/core/returns/returns.go`
+- `internal/core/returns/returns_test.go`
 - `internal/core/social/social.go`
 - `internal/core/social/social_test.go`
 - `internal/core/tenancy/id.go`
 - `internal/core/tenancy/id_test.go`
 - `internal/core/tenancy/tenancy.go`
 - `internal/core/tenancy/tenancy_test.go`
+- `internal/core/uniteconomics/uniteconomics.go`
+- `internal/core/uniteconomics/uniteconomics_test.go`
 - `internal/core/userprofile/profile.go`
 - `internal/core/userprofile/profile_test.go`
+- `internal/core/workflow/workflow.go`
+- `internal/core/workflow/workflow_test.go`
 - `internal/platform/advertising/advertising.go`
 - `internal/platform/advertising/advertising_test.go`
 - `internal/platform/agentgovernance/governance.go`
@@ -2732,6 +2802,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/connectors/mapping_test.go`
 - `internal/platform/connectors/payments.go`
 - `internal/platform/connectors/pickup.go`
+- `internal/platform/connectors/pickup_test.go`
 - `internal/platform/connectors/read.go`
 - `internal/platform/connectors/registry.go`
 - `internal/platform/connectors/sdk_test.go`
@@ -2856,15 +2927,21 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/inboxrepo/migration_test.go`
 - `internal/platform/postgres/inboxrepo/processor.go`
 - `internal/platform/postgres/inboxrepo/processor_test.go`
+- `internal/platform/postgres/integrationcenterrepo/migration_test.go`
+- `internal/platform/postgres/integrationcenterrepo/repository.go`
 - `internal/platform/postgres/inventoryrepo/allocations.go`
 - `internal/platform/postgres/inventoryrepo/failover.go`
 - `internal/platform/postgres/inventoryrepo/migration_test.go`
 - `internal/platform/postgres/inventoryrepo/repository.go`
 - `internal/platform/postgres/inventoryrepo/repository_test.go`
+- `internal/platform/postgres/inventoryrepo/wms.go`
+- `internal/platform/postgres/inventoryrepo/wms_test.go`
 - `internal/platform/postgres/legalpartyrepo/migration_test.go`
 - `internal/platform/postgres/legalpartyrepo/repository.go`
 - `internal/platform/postgres/lineagerepo/migration_test.go`
 - `internal/platform/postgres/lineagerepo/repository.go`
+- `internal/platform/postgres/logisticsrepo/repository.go`
+- `internal/platform/postgres/logisticsrepo/repository_test.go`
 - `internal/platform/postgres/mcpaccountsrepo/repository.go`
 - `internal/platform/postgres/mcpaccountsrepo/repository_test.go`
 - `internal/platform/postgres/notificationrepo/destinations.go`
@@ -2889,6 +2966,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/privacyrepo/migration_test.go`
 - `internal/platform/postgres/privacyrepo/repository.go`
 - `internal/platform/postgres/privacyrepo/repository_test.go`
+- `internal/platform/postgres/publicationqualityrepo/repository.go`
 - `internal/platform/postgres/reconciliationrepo/migration_test.go`
 - `internal/platform/postgres/reconciliationrepo/repository.go`
 - `internal/platform/postgres/reportrepo/repository.go`
@@ -2896,6 +2974,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/retentionrepo/migration_test.go`
 - `internal/platform/postgres/retentionrepo/privacy_store.go`
 - `internal/platform/postgres/retentionrepo/repository.go`
+- `internal/platform/postgres/returnsrepo/migration_test.go`
+- `internal/platform/postgres/returnsrepo/repository.go`
 - `internal/platform/postgres/searchrepo/demo_extended_seed.go`
 - `internal/platform/postgres/searchrepo/migration_test.go`
 - `internal/platform/postgres/searchrepo/repository.go`
@@ -2920,6 +3000,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/tenancyrepo/repository_test.go`
 - `internal/platform/postgres/trustcontrolrepo/migration_test.go`
 - `internal/platform/postgres/trustcontrolrepo/repository.go`
+- `internal/platform/postgres/uniteconomicsrepo/repository.go`
 - `internal/platform/postgres/uploadrepo/migration_test.go`
 - `internal/platform/postgres/uploadrepo/repository.go`
 - `internal/platform/postgres/userprofilerepo/migration_test.go`
@@ -2927,6 +3008,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/webhookrepo/migration_test.go`
 - `internal/platform/postgres/webhookrepo/repository.go`
 - `internal/platform/postgres/workerrepo/repository.go`
+- `internal/platform/postgres/workflowrepo/migration_test.go`
+- `internal/platform/postgres/workflowrepo/repository.go`
 - `internal/platform/privacy/privacy.go`
 - `internal/platform/privacy/privacy_test.go`
 - `internal/platform/privacy/redaction.go`
@@ -2934,10 +3017,14 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/procurement/procurement_test.go`
 - `internal/platform/promotions/promotions.go`
 - `internal/platform/promotions/promotions_test.go`
+- `internal/platform/publicationquality/quality.go`
+- `internal/platform/publicationquality/quality_test.go`
 - `internal/platform/pudo/pudo.go`
 - `internal/platform/pudo/pudo_test.go`
 - `internal/platform/reconciliation/reconciliation.go`
 - `internal/platform/reconciliation/reconciliation_test.go`
+- `internal/platform/replenishment/planning.go`
+- `internal/platform/replenishment/planning_test.go`
 - `internal/platform/replenishment/replenishment.go`
 - `internal/platform/replenishment/replenishment_test.go`
 - `internal/platform/reporting/clickhouse.go`
@@ -2997,6 +3084,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/wmsexecution/execution_test.go`
 - `internal/platform/wmsledger/ledger.go`
 - `internal/platform/wmsledger/ledger_test.go`
+- `internal/platform/workflowengine/engine.go`
+- `internal/platform/workflowengine/engine_test.go`
 - `migrations/000001_platform.sql`
 - `migrations/000002_tenancy.sql`
 - `migrations/000003_migration_framework.sql`
@@ -3023,6 +3112,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000024_user_profiles.sql`
 - `migrations/000025_upload_security_pg18_compat.sql`
 - `migrations/000026_audit_realtime_lookup_index.sql`
+- `migrations/000027_workflow_automation.sql`
+- `migrations/000028_payment_reconciliation_worker.sql`
+- `migrations/000029_returns_cancellations_refunds.sql`
+- `migrations/000030_wms_operator_tasks.sql`
+- `migrations/000031_wms_task_batches.sql`
+- `migrations/000032_replenishment_forecast_planning.sql`
+- `migrations/000033_product_publication_quality.sql`
+- `migrations/000034_channel_unit_economics.sql`
+- `migrations/000035_integration_state_center.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -3138,6 +3236,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-supply-chain.sh`
 - `scripts/check-tenancy-postgres.sh`
 - `scripts/check-trust-control-postgres.sh`
+- `scripts/check-workflow-qualification.sh`
 - `scripts/check.sh`
 - `scripts/community-demo-member.sql`
 - `scripts/community-e2e.mjs`
@@ -3380,6 +3479,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/167-channel-unit-economics.md`
 - `tasks/issues/168-integration-state-center.md`
 - `tasks/issues/169-ai-operator-assistant.md`
+- `tasks/issues/170-wms-operator-workspace-marketplace-fulfillment.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`
