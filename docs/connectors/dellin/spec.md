@@ -27,6 +27,7 @@ https://api.dellin.ru/v3/public/terminals.json` с appkey, затем загру
 
 Заявленные в SDK capability (`logistics.rates.read`, `logistics.shipment.create`,
 `logistics.shipment.cancel`, `logistics.track.read` и `logistics.label.read`)
-пока не являются runtime-маршрутами. Это явно отражено в runtime support как
-`separate_surface/logistics` с единственной operational capability
-`pickup.points.read`.
+не означают автоматическую доступность операций в production runtime. Сейчас
+runtime support явно включает только `pickup.points.read` и
+`logistics.track.read` на поверхности `separate_surface/logistics`; расчёт,
+оформление, отмена и этикетки остаются fail-closed до отдельной qualification.

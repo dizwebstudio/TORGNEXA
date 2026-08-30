@@ -33,6 +33,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/integrationcenterrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
@@ -308,6 +309,19 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	reportingIngestBatcher := newReportingBatcher(reportingBatchMaxItems, reportingBatchMaxDelay, func(batchCtx context.Context, events []eventbus.Event) error {
 		return reportingIngestor.Ingest(batchCtx, events, nil, "")
 	})
+	integrationCenterRepository, err := integrationcenterrepo.New(db)
+	if err != nil {
+		return fail("worker_integration_center_repository_startup_failed", err)
+	}
+	integrationCenterReader, err := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".integration-center-consumer", integrationCenterKafkaConsumerGroup, consumerTopics)
+	if err != nil {
+		return fail("worker_integration_center_kafka_reader_startup_failed", err)
+	}
+	defer func() { _ = integrationCenterReader.Close() }()
+	integrationCenterConsumer, err := kafkaeventbus.NewConsumer(integrationCenterReader, producer, cfg.Worker.KafkaTopics, kafkaeventbus.RetryPolicy{MaxAttempts: 8, InitialBackoff: time.Second, MaxBackoff: 5 * time.Minute}, nil)
+	if err != nil {
+		return fail("worker_integration_center_kafka_consumer_startup_failed", err)
+	}
 
 	components = append(components, []component{
 		{name: "tenant-dispatch", run: func(componentCtx context.Context) error {
@@ -342,6 +356,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 				}
 				return nil
 			})
+		}},
+		{name: "integration-center-events", run: func(componentCtx context.Context) error {
+			return integrationCenterConsumer.Run(componentCtx, integrationCenterEventHandler{queue: integrationCenterRepository}.Handle)
 		}},
 	}...)
 	components = append(components, component{name: "workflow-automation", run: func(componentCtx context.Context) error {

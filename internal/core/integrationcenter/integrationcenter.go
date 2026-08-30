@@ -290,6 +290,35 @@ type Summary struct {
 	SetupRequired int `json:"setup_required"`
 }
 
+// Validate checks the persisted/public snapshot envelope. It intentionally
+// does not validate source payloads because those never cross this boundary.
+func (s Snapshot) Validate() error {
+	if !safeRef(s.SnapshotID, 64) || !strings.HasPrefix(s.SnapshotID, "ic:") || len(s.SnapshotDigest) != 64 || !safeHex(s.SnapshotDigest) || s.SnapshotVersion < 1 || s.GeneratedAt.IsZero() || s.GeneratedAt.Location() != time.UTC || !safeRef(s.AccountID, 128) || !safeRef(s.ConnectorID, 96) || !safeRef(s.Family, 64) || !safeRef(s.Surface, 64) || s.Version < 1 || len(s.Issues) > MaxIssues || len(s.Actions) > MaxActions || len(s.Capabilities) > MaxCapabilities {
+		return errors.New("integration center: invalid snapshot")
+	}
+	if _, ok := map[OverallStatus]struct{}{OverallHealthy: {}, OverallAttention: {}, OverallDegraded: {}, OverallSyncing: {}, OverallBlocked: {}, OverallSetupRequired: {}, OverallReauthorizationRequired: {}, OverallStale: {}, OverallDisabled: {}, OverallUnsupported: {}, OverallUnknown: {}}[s.Overall]; !ok {
+		return errors.New("integration center: invalid overall status")
+	}
+	if err := s.Dimensions.Validate(s.GeneratedAt); err != nil {
+		return err
+	}
+	for _, issue := range s.Issues {
+		if err := validateIssue(issue); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func safeHex(value string) bool {
+	for _, r := range value {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
 var validStatuses = map[string]map[string]struct{}{
 	"runtime":        {string(RuntimeReady): {}, string(RuntimeSeparateSurface): {}, string(RuntimeHealthOnly): {}, string(RuntimeUnsupported): {}, string(RuntimeNotRegistered): {}, string(RuntimeDrifted): {}},
 	"account":        {string(AccountNotCreated): {}, string(AccountDisabled): {}, string(AccountActive): {}, string(AccountSuspended): {}, string(AccountError): {}},

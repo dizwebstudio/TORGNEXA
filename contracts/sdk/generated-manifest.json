@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "29649ecd1af78e209c7b0073cd1cabe25a2c6b7c9f95982607767128890fe7bf",
+    "sha256": "3b980ed5312200057154a0d6d703b33fa2ca8529c3a87751e8b8ede46c86b12d",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -353,6 +353,16 @@
       "operation_id": "getHealth",
       "method": "GET",
       "path": "/health"
+    },
+    {
+      "operation_id": "getIntegrationCenter",
+      "method": "GET",
+      "path": "/integration-center"
+    },
+    {
+      "operation_id": "getIntegrationCenterAccount",
+      "method": "GET",
+      "path": "/integration-center/{account_id}"
     },
     {
       "operation_id": "getInventoryPosition",

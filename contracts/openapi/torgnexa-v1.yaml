@@ -4072,6 +4072,135 @@ components:
         provider: {type: string}
         status: {type: string}
         capabilities: {type: array, items: {type: string}}
+    IntegrationCenterEvidence:
+      type: object
+      additionalProperties: false
+      required: [observed_at, checked_at, source_kind, source_ref, visibility, stale_after_seconds, age_seconds]
+      properties:
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+        checked_at: {type: string, format: date-time, pattern: 'Z$'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+        source_kind: {type: string, minLength: 1, maxLength: 64}
+        source_ref: {type: string, minLength: 1, maxLength: 192}
+        source_version: {type: string, maxLength: 192}
+        reason_code: {type: string, maxLength: 96, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+        correlation_id: {type: string, maxLength: 192}
+        causation_id: {type: string, maxLength: 192}
+        evidence_digest: {type: string, maxLength: 192}
+        visibility: {type: string, enum: [full, partial, redacted]}
+        stale_after_seconds: {type: integer, minimum: 0}
+        age_seconds: {type: integer, minimum: 0}
+    IntegrationCenterDimension:
+      type: object
+      additionalProperties: false
+      required: [status, evidence]
+      properties:
+        status: {type: string, minLength: 1, maxLength: 64}
+        evidence: {$ref: '#/components/schemas/IntegrationCenterEvidence'}
+    IntegrationCenterDimensions:
+      type: object
+      additionalProperties: false
+      required: [runtime, account, credential, configuration, health, capability, sync, reconciliation, webhook, rate_limit]
+      properties:
+        runtime: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        account: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        credential: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        configuration: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        health: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        capability: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        sync: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        reconciliation: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        webhook: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+        rate_limit: {$ref: '#/components/schemas/IntegrationCenterDimension'}
+    IntegrationCenterCapability:
+      type: object
+      additionalProperties: false
+      required: [name, direction, status, approval_required, risk]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 128}
+        direction: {type: string, enum: [read, write]}
+        status: {type: string, enum: [not_declared, declared, granted, enabled, blocked, qualification_required, stale]}
+        approval_required: {type: boolean}
+        risk: {type: string, maxLength: 64}
+        reason_code: {type: string, maxLength: 96}
+    IntegrationCenterIssue:
+      type: object
+      additionalProperties: false
+      required: [code, dimension, severity, title, reason_code, occurrence_count, first_seen_at, last_seen_at, visibility]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+        dimension: {type: string, maxLength: 64}
+        severity: {type: string, enum: [info, warning, critical]}
+        title: {type: string, minLength: 1, maxLength: 160}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+        occurrence_count: {type: integer, minimum: 1, maximum: 1000000}
+        first_seen_at: {type: string, format: date-time, pattern: 'Z$'}
+        last_seen_at: {type: string, format: date-time, pattern: 'Z$'}
+        visibility: {type: string, enum: [full, partial, redacted]}
+    IntegrationCenterAction:
+      type: object
+      additionalProperties: false
+      required: [id, kind, label, permission, risk, approval_required, expected_version, idempotency_required]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+        kind: {type: string, maxLength: 64}
+        label: {type: string, minLength: 1, maxLength: 160}
+        permission: {type: string, maxLength: 96}
+        risk: {type: string, maxLength: 64}
+        approval_required: {type: boolean}
+        expected_version: {type: integer, minimum: 1}
+        idempotency_required: {type: boolean}
+        href: {type: string, maxLength: 256}
+    IntegrationCenterAccount:
+      type: object
+      additionalProperties: false
+      required: [snapshot_id, snapshot_version, snapshot_digest, generated_at, partial, consistency, account_id, connector_id, family, surface, version, dimensions, capabilities, overall, issues, available_actions]
+      properties:
+        snapshot_id: {type: string, pattern: '^ic:[0-9a-f]{26}$'}
+        snapshot_version: {type: integer, minimum: 1}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        partial: {type: boolean}
+        consistency: {type: string, enum: [atomic, best_effort]}
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        connector_id: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,95}$'}
+        family: {type: string, maxLength: 64}
+        display_name: {type: string, maxLength: 160}
+        surface: {type: string, maxLength: 64}
+        version: {type: integer, minimum: 1}
+        dimensions: {$ref: '#/components/schemas/IntegrationCenterDimensions'}
+        capabilities: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/IntegrationCenterCapability'}}
+        overall: {type: string, enum: [healthy, attention, degraded, syncing, blocked, setup_required, reauthorization_required, stale, disabled, unsupported, unknown]}
+        dominant_issue: {$ref: '#/components/schemas/IntegrationCenterIssue'}
+        issues: {type: array, maxItems: 32, items: {$ref: '#/components/schemas/IntegrationCenterIssue'}}
+        available_actions: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/IntegrationCenterAction'}}
+    IntegrationCenterSummary:
+      type: object
+      additionalProperties: false
+      required: [total, healthy, attention, blocked, stale, syncing, unsupported, setup_required]
+      properties:
+        total: {type: integer, minimum: 0}
+        healthy: {type: integer, minimum: 0}
+        attention: {type: integer, minimum: 0}
+        blocked: {type: integer, minimum: 0}
+        stale: {type: integer, minimum: 0}
+        syncing: {type: integer, minimum: 0}
+        unsupported: {type: integer, minimum: 0}
+        setup_required: {type: integer, minimum: 0}
+    IntegrationCenterResponse:
+      type: object
+      additionalProperties: false
+      required: [snapshot_version, snapshot_digest, generated_at, partial, consistency, source_watermarks, summary, items]
+      properties:
+        snapshot_version: {type: integer, minimum: 1}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        partial: {type: boolean}
+        consistency: {type: string, enum: [atomic, best_effort]}
+        source_watermarks: {type: array, maxItems: 32, items: {type: string, maxLength: 192}}
+        summary: {$ref: '#/components/schemas/IntegrationCenterSummary'}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/IntegrationCenterAccount'}}
+        next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
     ConnectorAccountSettings:
       type: object
       additionalProperties: false

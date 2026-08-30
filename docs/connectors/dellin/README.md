@@ -19,5 +19,6 @@ capability в runtime-support и возвращает нормализованн
 
 Источники: [авторизация пользователя](https://dev.dellin.ru/api/auth/login/),
 [калькулятор](https://dev.dellin.ru/api/calculation/calculator/),
-[журнал заказов](https://dev.dellin.ru/api/orders/search/) и
+[журнал заказов](https://dev.dellin.ru/api/orders/search/),
+[история статусов заказа](https://dev.dellin.ru/api/orders/statuses-history/) и
 [справочник терминалов](https://dev.dellin.ru/api/terminals/directory/).

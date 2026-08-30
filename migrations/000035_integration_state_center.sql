@@ -35,6 +35,7 @@ CREATE TABLE integration_center_snapshot_accounts (
   connector_id text NOT NULL,
   family text NOT NULL,
   surface text NOT NULL,
+  display_name text NOT NULL DEFAULT '',
   overall text NOT NULL,
   account_version bigint NOT NULL,
   dimensions jsonb NOT NULL,
@@ -45,7 +46,7 @@ CREATE TABLE integration_center_snapshot_accounts (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (organization_id,workspace_id,snapshot_id,account_id),
   FOREIGN KEY (organization_id,workspace_id,snapshot_id) REFERENCES integration_center_snapshots(organization_id,workspace_id,snapshot_id) ON DELETE RESTRICT,
-  CONSTRAINT integration_center_snapshot_account_ref_chk CHECK(account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND connector_id ~ '^[a-z0-9][a-z0-9-]{0,95}$' AND family ~ '^[a-z][a-z0-9._:/-]{0,63}$' AND surface ~ '^[a-z][a-z0-9._:/-]{0,63}$' AND account_version >= 1 AND overall IN ('healthy','attention','degraded','syncing','blocked','setup_required','reauthorization_required','stale','disabled','unsupported','unknown') AND row_digest ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT integration_center_snapshot_account_ref_chk CHECK(account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND connector_id ~ '^[a-z0-9][a-z0-9-]{0,95}$' AND family ~ '^[a-z][a-z0-9._:/-]{0,63}$' AND surface ~ '^[a-z][a-z0-9._:/-]{0,63}$' AND char_length(display_name) <= 160 AND display_name = btrim(display_name) AND account_version >= 1 AND overall IN ('healthy','attention','degraded','syncing','blocked','setup_required','reauthorization_required','stale','disabled','unsupported','unknown') AND row_digest ~ '^[0-9a-f]{64}$'),
   CONSTRAINT integration_center_snapshot_account_json_chk CHECK(jsonb_typeof(dimensions)='object' AND jsonb_typeof(capabilities)='array' AND jsonb_typeof(issues)='array' AND jsonb_typeof(actions)='array' AND pg_column_size(dimensions) <= 65536 AND pg_column_size(capabilities) <= 32768 AND pg_column_size(issues) <= 32768 AND pg_column_size(actions) <= 16384)
 );
 CREATE INDEX integration_center_snapshot_account_status_idx ON integration_center_snapshot_accounts(organization_id,workspace_id,overall,account_id);

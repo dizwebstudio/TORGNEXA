@@ -11,6 +11,7 @@
 - [Калькулятор стоимости](https://dev.dellin.ru/api/calculation/calculator/) — `v2/calculator.json`;
 - [Оформление заказа](https://dev.dellin.ru/api/examples/request/) — `v2/request.json`;
 - [Журнал заказов](https://dev.dellin.ru/api/orders/search/) — `v3/orders.json`;
+- [История статусов заказа](https://dev.dellin.ru/api/orders/statuses-history/) — `v3/orders/statuses_history.json`;
 - [Справочник терминалов](https://dev.dellin.ru/api/terminals/directory/) — `v3/public/terminals.json`.
 
 В текущем runtime включены credential-проверка, bounded read-only чтение
