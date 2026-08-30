@@ -2,6 +2,7 @@ package pochtarussia
 
 import (
 	"context"
+	"strings"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
@@ -52,6 +53,27 @@ func (c *Connector) ReadPickupPoints(ctx context.Context, account sdk.Account, r
 	return out, nil
 }
 
+// ReadLogisticsTracking reads one current shipment status through the
+// provider's separate tracking service.
+func (c *Connector) ReadLogisticsTracking(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || strings.TrimSpace(request.RemoteID) == "" {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Track(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if out.RemoteID == "" || out.Status == "" || out.Cost.Validate() != nil || out.ObservedAt.IsZero() {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -61,3 +83,4 @@ func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn
 
 var _ sdk.PickupPointReader = (*Connector)(nil)
 var _ sdk.LogisticsRateReader = (*Connector)(nil)
+var _ sdk.LogisticsTracker = (*Connector)(nil)
