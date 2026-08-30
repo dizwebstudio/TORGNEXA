@@ -104,7 +104,7 @@ func (candidateSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, call
 	if callback == nil {
 		return errors.New("callback missing")
 	}
-	secret := []byte(`{"token":"synthetic-token","key":"c3ludGhldGljLXVzZXI6cGFzc3dvcmQ="}`)
+	secret := []byte(`{"token":"synthetic-token","key":"c3ludGhldGljLXVzZXI6cGFzc3dvcmQ=","tracking_login":"synthetic-login","tracking_password":"synthetic-password"}`)
 	defer clear(secret)
 	return callback(secret)
 }

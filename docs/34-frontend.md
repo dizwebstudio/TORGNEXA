@@ -51,3 +51,9 @@ the visible FAQ and by `FAQPage` JSON-LD. The static documentation check
 asserts that topical guides, FAQ markup and screenshot accessibility attributes
 are present, so a content edit cannot silently remove the reader or crawler
 layer.
+
+The public guide also tracks the current operator surfaces: returns and refund
+allocation, publication-quality preflight, WMS execution tasks, the bounded
+workflow builder, channel unit economics and qualified logistics read
+operations. Runtime availability remains sourced from the generated connector
+catalog; SDK-declared capability alone is never presented as a live operation.

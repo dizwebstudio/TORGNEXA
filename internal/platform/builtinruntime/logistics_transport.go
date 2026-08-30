@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1154,8 +1155,10 @@ var _ dellin.Transport = dellinHTTP{}
 type pochtarussiaHTTP struct{ h *httpTransport }
 
 type pochtarussiaCredentials struct {
-	Token string `json:"token"`
-	Key   string `json:"key"`
+	Token            string `json:"token"`
+	Key              string `json:"key"`
+	TrackingLogin    string `json:"tracking_login"`
+	TrackingPassword string `json:"tracking_password"`
 }
 
 type pochtarussiaOfficeSearch struct {
@@ -1209,6 +1212,146 @@ func (transport pochtarussiaHTTP) Ping(ctx context.Context, secret []byte) error
 		return errors.New("Почта России credential probe returned invalid JSON")
 	}
 	return nil
+}
+
+type pochtarussiaTrackingRecord struct {
+	Item struct {
+		Barcode string `xml:"Barcode"`
+	} `xml:"ItemParameters"`
+	Operation struct {
+		Type struct {
+			ID   string `xml:"Id"`
+			Name string `xml:"Name"`
+		} `xml:"OperType"`
+		Attribute struct {
+			ID   string `xml:"Id"`
+			Name string `xml:"Name"`
+		} `xml:"OperAttr"`
+		Date string `xml:"OperDate"`
+	} `xml:"OperationParameters"`
+}
+
+type pochtarussiaTrackingResponse struct {
+	History []pochtarussiaTrackingRecord `xml:"historyRecord"`
+}
+
+type pochtarussiaTrackingEnvelope struct {
+	Body *struct {
+		Response *pochtarussiaTrackingResponse `xml:"getOperationHistoryResponse"`
+	} `xml:"Body"`
+}
+
+func readPochtaRussiaTrackingCredentials(secret []byte) (pochtarussiaCredentials, error) {
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return pochtarussiaCredentials{}, err
+	}
+	if strings.TrimSpace(credentials.TrackingLogin) == "" || credentials.TrackingPassword == "" {
+		return pochtarussiaCredentials{}, errors.New("Почта России tracking credentials require tracking_login and tracking_password")
+	}
+	return credentials, nil
+}
+
+func pochtarussiaTrackingBarcode(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) == 14 {
+		for _, digit := range []byte(value) {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	if len(value) != 13 {
+		return false
+	}
+	for index, char := range []byte(value) {
+		if index < 2 || index > 10 {
+			if char < 'A' || char > 'Z' {
+				return false
+			}
+			continue
+		}
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func pochtarussiaTrackingSOAPRequest(barcode, login, password string) []byte {
+	var body bytes.Buffer
+	body.WriteString(xml.Header)
+	body.WriteString(`<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:oper="http://russianpost.org/operationhistory" xmlns:data="http://russianpost.org/operationhistory/data" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header/><soap:Body><oper:getOperationHistory><data:OperationHistoryRequest><data:Barcode>`)
+	_ = xml.EscapeText(&body, []byte(barcode))
+	body.WriteString(`</data:Barcode><data:MessageType>0</data:MessageType><data:Language>RUS</data:Language></data:OperationHistoryRequest><data:AuthorizationHeader soapenv:mustUnderstand="1"><data:login>`)
+	_ = xml.EscapeText(&body, []byte(login))
+	body.WriteString(`</data:login><data:password>`)
+	_ = xml.EscapeText(&body, []byte(password))
+	body.WriteString(`</data:password></data:AuthorizationHeader></oper:getOperationHistory></soap:Body></soap:Envelope>`)
+	return body.Bytes()
+}
+
+func pochtarussiaTrackingStatus(record pochtarussiaTrackingRecord) string {
+	text := strings.ToLower(strings.TrimSpace(record.Operation.Type.Name + " " + record.Operation.Attribute.Name))
+	switch {
+	case strings.Contains(text, "вруч"):
+		return "delivered"
+	case strings.Contains(text, "возврат") || strings.Contains(text, "возвращ"):
+		return "returned"
+	case strings.Contains(text, "неуда") || strings.Contains(text, "невруч"):
+		return "exception"
+	case strings.Contains(text, "принят") || strings.Contains(text, "прием") || strings.Contains(text, "приём"):
+		return "created"
+	default:
+		return "in_transit"
+	}
+}
+
+func (transport pochtarussiaHTTP) Track(ctx context.Context, secret []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	if transport.h == nil || !pochtarussiaTrackingBarcode(request.RemoteID) {
+		return sdk.ShipmentResult{}, errors.New("Почта России tracking request rejected")
+	}
+	credentials, err := readPochtaRussiaTrackingCredentials(secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "tracking.russianpost.ru", "/rtm34", url.Values{}, pochtarussiaTrackingSOAPRequest(request.RemoteID, credentials.TrackingLogin, credentials.TrackingPassword), http.Header{
+		"Accept":       []string{"application/soap+xml, text/xml;q=0.9"},
+		"Content-Type": []string{"application/soap+xml; charset=utf-8"},
+	}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("Почта России tracking request rejected with status %d", status)
+	}
+	var envelope pochtarussiaTrackingEnvelope
+	if xml.Unmarshal(responseBody, &envelope) != nil || envelope.Body == nil || envelope.Body.Response == nil || len(envelope.Body.Response.History) > 100 {
+		return sdk.ShipmentResult{}, errors.New("Почта России tracking response rejected")
+	}
+	latest := time.Time{}
+	statusCode := "pending"
+	for _, record := range envelope.Body.Response.History {
+		if barcode := strings.TrimSpace(record.Item.Barcode); barcode != "" && barcode != request.RemoteID {
+			return sdk.ShipmentResult{}, errors.New("Почта России tracking response has mismatched barcode")
+		}
+		if strings.TrimSpace(record.Operation.Type.ID) == "" && strings.TrimSpace(record.Operation.Type.Name) == "" {
+			return sdk.ShipmentResult{}, errors.New("Почта России tracking response has no operation")
+		}
+		observedAt, parseErr := time.Parse(time.RFC3339Nano, strings.TrimSpace(record.Operation.Date))
+		if parseErr != nil {
+			return sdk.ShipmentResult{}, errors.New("Почта России tracking response has invalid operation date")
+		}
+		if latest.IsZero() || observedAt.After(latest) {
+			latest = observedAt
+			statusCode = pochtarussiaTrackingStatus(record)
+		}
+	}
+	if latest.IsZero() {
+		latest = time.Now().UTC()
+	}
+	return sdk.ShipmentResult{RemoteID: request.RemoteID, Status: statusCode, Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: request.RemoteID, ObservedAt: latest.UTC()}, nil
 }
 
 func pochtarussiaPostalCode(raw json.RawMessage) (string, error) {

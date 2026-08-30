@@ -99,12 +99,12 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "pek" {
 				wantCapabilities = 3
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 2
+				wantCapabilities = 3
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
 			}
-			if (connectorID == "cdek" || connectorID == "pek") && !SupportsCapability(connectorID, "logistics.track.read") {
+			if (connectorID == "cdek" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.track.read") {
 				t.Fatalf("%s tracking support is inaccurate: %+v", connectorID, carrier)
 			}
 			if (connectorID == "cdek" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {

@@ -16,7 +16,7 @@ func (testRuntime) Secrets() sdk.SecretAccessor { return testSecrets{} }
 type testSecrets struct{}
 
 func (testSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, callback func([]byte) error) error {
-	return callback([]byte(`{"token":"synthetic-token","key":"c3ludGhldGljLXVzZXI6cGFzc3dvcmQ="}`))
+	return callback([]byte(`{"token":"synthetic-token","key":"c3ludGhldGljLXVzZXI6cGFzc3dvcmQ=","tracking_login":"synthetic-login","tracking_password":"synthetic-password"}`))
 }
 
 func testAccount() sdk.Account {
@@ -60,5 +60,12 @@ func TestPickupUsesCandidateTransport(t *testing.T) {
 	})
 	if err != nil || len(points) != 1 || points[0].RemoteID != "101000" || points[0].Address == "" {
 		t.Fatalf("points=%+v err=%v", points, err)
+	}
+}
+
+func TestTrackingUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsTracking(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentStatusRequest{RemoteID: "RA644000001RU"})
+	if err != nil || result.RemoteID != "RA644000001RU" || result.Status != "in_transit" || result.TrackingNumber != "RA644000001RU" {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }

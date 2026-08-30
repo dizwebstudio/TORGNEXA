@@ -24,6 +24,13 @@ func (candidateTransport) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk
 	}}, nil
 }
 
+func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	return sdk.ShipmentResult{
+		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,
+		Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
+	}, nil
+}
+
 func (candidateTransport) Pickup(_ context.Context, _ []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
 	return []sdk.PickupPoint{{
 		RemoteID: "101000", Name: "Почта России · ОПС 101000", Country: query.Country,

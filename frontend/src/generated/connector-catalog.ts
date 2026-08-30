@@ -1016,7 +1016,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.rates.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.rates.read", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
     },

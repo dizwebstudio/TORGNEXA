@@ -10,9 +10,8 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
-// Connector exposes the separate Delivery-surface health check for Russian
-// Post. Shipment operations remain qualification-gated until the current
-// Otpravka contract is exercised with a non-production account.
+// Connector exposes the separate Delivery-surface health check and bounded
+// tracking read for Russian Post. Shipment writes remain qualification-gated.
 type Connector struct {
 	transport Transport
 	now       func() time.Time

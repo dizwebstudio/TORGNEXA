@@ -146,9 +146,10 @@ are supplied. See `docs/connectors/shopware/docker-live-qualification.md` and
 
 Task 155 adds «Почта России» to the separate Delivery surface with encrypted
 application-token/user-key enrollment and a bounded
-`otpravka-api.pochta.ru/1.0/settings` probe. Rates, shipments, labels, returns,
-pickup points and tracking remain qualification-gated until a current
-non-production carrier account and fixtures are available.
+`otpravka-api.pochta.ru/1.0/settings` probe. Rates, pickup points and a
+single-barcode tracking read are available; shipment creation, labels and
+returns remain qualification-gated until a current non-production carrier
+account and fixtures are available.
 
 ## Connector package layout
 

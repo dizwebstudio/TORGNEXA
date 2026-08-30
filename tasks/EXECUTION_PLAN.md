@@ -888,21 +888,24 @@ checked through a fixed HTTPS settings probe. A bounded read-only
 `pickup.points.read` route searches offices by city and loads each returned
 office card by postal index. A separate read-only `logistics.rates.read` route
 uses the official tariff calculator with postal indexes and total parcel weight;
-shipment, document, return and tracking operations remain closed until a current
-test account and fixtures qualify the REST/API contracts.
+`logistics.track.read` uses the separate official SOAP `getOperationHistory`
+service for one domestic or S10 barcode. Shipment, document and return
+operations remain closed until a current test account and fixtures qualify the
+REST/API contracts.
 
 ### Gate RUNTIME-155
 
 - the Delivery card, manifest, runtime-support contract, policy/review and
   generated catalogs agree on `separate_surface/logistics` with only bounded
-  `pickup.points.read` and `logistics.rates.read` admitted;
+  `pickup.points.read`, `logistics.rates.read` and `logistics.track.read`
+  admitted;
 - credentials stay callback-scoped, strict JSON decoding rejects unknown fields,
   and the host sends only the documented authentication headers to the fixed
   `otpravka-api.pochta.ru` host; the separate public tariff host receives no
   account credentials;
 - deterministic connector, transport, conformance, contract and frontend
   checks pass without production credentials or network access;
-- shipments, labels, returns and tracking cannot be enabled until
+- shipments, labels and returns cannot be enabled until
   non-production provider qualification is retained.
 
 ## Phase 29 — Категорийные health-check поверхности

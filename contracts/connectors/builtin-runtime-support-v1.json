@@ -74,7 +74,7 @@
     {"connector_id":"ozon-delivery","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
     {"connector_id":"ozon-pay","stage":"separate_surface","surface":"finance","operational_capabilities":[],"sync":[]},
     {"connector_id":"pek","stage":"separate_surface","surface":"logistics","operational_capabilities":["logistics.rates.read","logistics.track.read","pickup.points.read"],"sync":[]},
-    {"connector_id":"pochta-russia","stage":"separate_surface","surface":"logistics","operational_capabilities":["logistics.rates.read","pickup.points.read"],"sync":[]},
+    {"connector_id":"pochta-russia","stage":"separate_surface","surface":"logistics","operational_capabilities":["logistics.rates.read","logistics.track.read","pickup.points.read"],"sync":[]},
     {
       "connector_id":"prestashop","stage":"ready","surface":"integrations","operational_capabilities":["inventory.read","inventory.write","orders.read","orders.status.write","prices.read","prices.write","products.read"],
       "sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"prices","directions":["inbound","outbound"]},{"entity_type":"inventory","directions":["inbound","outbound"]},{"entity_type":"orders","directions":["inbound","outbound"]}],

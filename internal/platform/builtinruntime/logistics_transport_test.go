@@ -3,8 +3,10 @@ package builtinruntime
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -500,6 +502,48 @@ func TestRussianPostCredentialProbe(t *testing.T) {
 	}
 	if err := transport.Ping(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz","unexpected":"value"}`)); err == nil {
 		t.Fatal("unknown Почта России credential field accepted")
+	}
+}
+
+func TestRussianPostTrackingUsesSOAPHistoryAndLatestOperation(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/rtm34" || r.Header.Get("Content-Type") != "application/soap+xml; charset=utf-8" || r.Header.Get("Accept") != "application/soap+xml, text/xml;q=0.9" {
+			t.Fatalf("unexpected Почта России tracking request: method=%s path=%s content-type=%q accept=%q", r.Method, r.URL.Path, r.Header.Get("Content-Type"), r.Header.Get("Accept"))
+		}
+		var requestBody []byte
+		requestBody, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read tracking request: %v", err)
+		}
+		requestText := string(requestBody)
+		for _, expected := range []string{"getOperationHistory", "<data:Barcode>RA644000001RU</data:Barcode>", "<data:MessageType>0</data:MessageType>", "<data:Language>RUS</data:Language>", "<data:login>tracking-login</data:login>", "<data:password>tracking-password</data:password>"} {
+			if !strings.Contains(requestText, expected) {
+				t.Fatalf("tracking SOAP request missing %q: %s", expected, requestText)
+			}
+		}
+		w.Header().Set("Content-Type", "application/soap+xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><ns7:getOperationHistoryResponse xmlns:ns7="http://russianpost.org/operationhistory"><ns7:historyRecord><ns3:ItemParameters xmlns:ns3="http://russianpost.org/operationhistory/data"><ns3:Barcode>RA644000001RU</ns3:Barcode></ns3:ItemParameters><ns3:OperationParameters xmlns:ns3="http://russianpost.org/operationhistory/data"><ns3:OperType><ns3:Id>1</ns3:Id><ns3:Name>Принято</ns3:Name></ns3:OperType><ns3:OperDate>2026-08-28T03:00:00.000+03:00</ns3:OperDate></ns3:OperationParameters></ns7:historyRecord><ns7:historyRecord><ns3:ItemParameters xmlns:ns3="http://russianpost.org/operationhistory/data"><ns3:Barcode>RA644000001RU</ns3:Barcode></ns3:ItemParameters><ns3:OperationParameters xmlns:ns3="http://russianpost.org/operationhistory/data"><ns3:OperType><ns3:Id>2</ns3:Id><ns3:Name>Вручение</ns3:Name></ns3:OperType><ns3:OperDate>2026-08-29T03:00:00.000+03:00</ns3:OperDate></ns3:OperationParameters></ns7:historyRecord></ns7:getOperationHistoryResponse></soap:Body></soap:Envelope>`))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Track(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz","tracking_login":"tracking-login","tracking_password":"tracking-password"}`), sdk.ShipmentStatusRequest{RemoteID: "RA644000001RU"})
+	if err != nil {
+		t.Fatalf("Почта России tracking request failed: %v", err)
+	}
+	wantObservedAt := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+	if result.RemoteID != "RA644000001RU" || result.TrackingNumber != "RA644000001RU" || result.Status != "delivered" || !result.ObservedAt.Equal(wantObservedAt) || result.Cost.Currency != "RUB" || result.Cost.MinorUnits != 0 {
+		t.Fatalf("unexpected normalized Почта России tracking result: %+v", result)
+	}
+}
+
+func TestRussianPostTrackingRejectsMismatchedBarcode(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><response:getOperationHistoryResponse xmlns:response="http://russianpost.org/operationhistory"><response:historyRecord><data:ItemParameters xmlns:data="http://russianpost.org/operationhistory/data"><data:Barcode>RA644000002RU</data:Barcode></data:ItemParameters><data:OperationParameters xmlns:data="http://russianpost.org/operationhistory/data"><data:OperType><data:Id>1</data:Id></data:OperType><data:OperDate>2026-08-28T03:00:00Z</data:OperDate></data:OperationParameters></response:historyRecord></response:getOperationHistoryResponse></soap:Body></soap:Envelope>`))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Track(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz","tracking_login":"tracking-login","tracking_password":"tracking-password"}`), sdk.ShipmentStatusRequest{RemoteID: "RA644000001RU"}); err == nil {
+		t.Fatal("mismatched Почта России barcode accepted")
 	}
 }
 
