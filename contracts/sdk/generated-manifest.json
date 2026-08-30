@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "eb015ed0ac8107b149aa220ef3edc14abc2dcefaa8f1257dfa1f29edc40e5a7c",
+    "sha256": "301c090c83be3fb1c98dfed64d83e59258dc497ec63a4894c68dddfd98b45adc",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -133,6 +133,11 @@
       "operation_id": "createInventoryWarehouse",
       "method": "POST",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "createLogisticsShipment",
+      "method": "POST",
+      "path": "/logistics/shipments"
     },
     {
       "operation_id": "createMCPAccount",
