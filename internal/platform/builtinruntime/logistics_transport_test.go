@@ -308,6 +308,81 @@ func TestCDEKCancelRejectsMismatchedLookup(t *testing.T) {
 	}
 }
 
+func TestCDEKLabelCreatesBarcodePrintRequest(t *testing.T) {
+	const orderUUID = "72753031-1820-4f99-9240-aab139f05ca5"
+	const printUUID = "82753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "label-token"})
+		case "/v2/orders":
+			if r.Method != http.MethodGet || r.URL.Query().Get("cdek_number") != "1100285492" || r.Header.Get("Authorization") != "Bearer label-token" {
+				t.Fatalf("unexpected CDEK label lookup: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": orderUUID, "cdek_number": "1100285492"}})
+		case "/v2/print/barcodes":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer label-token" || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected CDEK label request: method=%s authorization=%q content-type=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "secret-1") {
+				t.Fatalf("credential leaked into CDEK label request: %s", body)
+			}
+			var request cdekPrintRequest
+			if json.Unmarshal(body, &request) != nil || len(request.Orders) != 1 || request.Orders[0].OrderUUID != orderUUID || request.CopyCount != 1 || request.Format != "A6" {
+				t.Fatalf("unexpected CDEK label body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": printUUID, "url": "https://api.cdek.ru/v2/print/barcodes/" + printUUID + ".pdf"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.LabelRequest{RemoteID: "1100285492", Format: "a6"})
+	if err != nil {
+		t.Fatalf("CDEK label request failed: %v", err)
+	}
+	if result.ArtifactRef != "cdek:print:barcode:"+printUUID || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized CDEK label result: %+v", result)
+	}
+}
+
+func TestCDEKLabelRejectsMismatchedLookupOrMalformedResponse(t *testing.T) {
+	t.Run("mismatched lookup", func(t *testing.T) {
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v2/oauth/token" {
+				_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "label-token"})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": "72753031-1820-4f99-9240-aab139f05ca5", "cdek_number": "other-number"}})
+		}))
+		defer server.Close()
+		transport := cdekHTTP{h: testTLSTransport(t, server)}
+		if _, err := transport.Label(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.LabelRequest{RemoteID: "1100285492", Format: "pdf"}); err == nil {
+			t.Fatal("CDEK label accepted a mismatched lookup")
+		}
+	})
+	t.Run("malformed print response", func(t *testing.T) {
+		const orderUUID = "72753031-1820-4f99-9240-aab139f05ca5"
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v2/oauth/token" {
+				_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "label-token"})
+				return
+			}
+			if r.URL.Path != "/v2/print/barcodes" || r.Method != http.MethodPost {
+				t.Fatalf("unexpected CDEK print request: method=%s path=%s", r.Method, r.URL.Path)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"number": orderUUID}})
+		}))
+		defer server.Close()
+		transport := cdekHTTP{h: testTLSTransport(t, server)}
+		if _, err := transport.Label(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.LabelRequest{RemoteID: orderUUID, Format: "pdf"}); err == nil {
+			t.Fatal("malformed CDEK label response accepted")
+		}
+	})
+}
+
 func TestDellinCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v4/auth/login.json" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {

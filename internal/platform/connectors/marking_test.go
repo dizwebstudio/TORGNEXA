@@ -20,7 +20,7 @@ func TestMarkingRequestsNeverCarryRawCodes(t *testing.T) {
 	request := MarkingAggregationRequest{
 		MarkingOperationRequest: MarkingOperationRequest{ExternalID: "batch-1", IdempotencyKey: "idem-1", DryRun: true},
 		PackageRef:              "package-1",
-		ChildFingerprints:      []string{strings.Repeat("a", 64)},
+		ChildFingerprints:       []string{strings.Repeat("a", 64)},
 	}
 	if err := request.Validate(); err != nil {
 		t.Fatalf("validate aggregation: %v", err)

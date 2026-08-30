@@ -35,6 +35,9 @@ func (r MarkingOperationRequest) validate() error {
 			return ErrInvalidMarkingOperation
 		}
 	}
+	if !r.DryRun && r.ApprovalRef == "" {
+		return ErrInvalidMarkingOperation
+	}
 	for key, value := range r.Metadata {
 		if !safeCodePattern.MatchString(key) || len(value) > 512 {
 			return ErrInvalidMarkingOperation
@@ -61,12 +64,12 @@ func (s MarkingOperationStatus) Valid() bool {
 // Unknown means the remote may have accepted the request and requires a read
 // or reconciliation before a retry.
 type MarkingOperationReceipt struct {
-	RemoteID       string                 `json:"remote_id,omitempty"`
-	Status         MarkingOperationStatus `json:"status"`
-	Requested      int64                  `json:"requested,omitempty"`
-	Accepted       int64                  `json:"accepted,omitempty"`
-	RemoteRequestID string                `json:"remote_request_id,omitempty"`
-	ObservedAt     time.Time              `json:"observed_at"`
+	RemoteID        string                 `json:"remote_id,omitempty"`
+	Status          MarkingOperationStatus `json:"status"`
+	Requested       int64                  `json:"requested,omitempty"`
+	Accepted        int64                  `json:"accepted,omitempty"`
+	RemoteRequestID string                 `json:"remote_request_id,omitempty"`
+	ObservedAt      time.Time              `json:"observed_at"`
 }
 
 func (r MarkingOperationReceipt) Validate() error {
@@ -118,11 +121,11 @@ type MarkingCodesReserver interface {
 
 type MarkingAggregationRequest struct {
 	MarkingOperationRequest
-	PackageRef      string   `json:"package_ref"`
-	ParentPackageRef string  `json:"parent_package_ref,omitempty"`
+	PackageRef        string   `json:"package_ref"`
+	ParentPackageRef  string   `json:"parent_package_ref,omitempty"`
 	ChildFingerprints []string `json:"child_fingerprints"`
-	Close           bool     `json:"close"`
-	Dissolve        bool     `json:"dissolve"`
+	Close             bool     `json:"close"`
+	Dissolve          bool     `json:"dissolve"`
 }
 
 func (r MarkingAggregationRequest) Validate() error {
@@ -165,10 +168,10 @@ func (k MarkingCirculationKind) Valid() bool {
 
 type MarkingCirculationRequest struct {
 	MarkingOperationRequest
-	Kind              MarkingCirculationKind `json:"kind"`
-	DocumentRef       string                 `json:"document_ref"`
-	CodeFingerprints  []string               `json:"code_fingerprints"`
-	LocationRef       string                 `json:"location_ref,omitempty"`
+	Kind             MarkingCirculationKind `json:"kind"`
+	DocumentRef      string                 `json:"document_ref"`
+	CodeFingerprints []string               `json:"code_fingerprints"`
+	LocationRef      string                 `json:"location_ref,omitempty"`
 }
 
 func (r MarkingCirculationRequest) Validate() error {
@@ -194,9 +197,9 @@ type MarkingCirculationWriter interface {
 type MarkingTransferRequest struct {
 	MarkingOperationRequest
 	DocumentRef      string   `json:"document_ref"`
-	FromLocationRef   string   `json:"from_location_ref"`
-	ToLocationRef     string   `json:"to_location_ref"`
-	CodeFingerprints  []string `json:"code_fingerprints"`
+	FromLocationRef  string   `json:"from_location_ref"`
+	ToLocationRef    string   `json:"to_location_ref"`
+	CodeFingerprints []string `json:"code_fingerprints"`
 }
 
 func (r MarkingTransferRequest) Validate() error {

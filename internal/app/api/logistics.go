@@ -146,7 +146,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 		api.shipments = dependencies[0].shipments
 		api.approvals = dependencies[0].approvals
 	}
-		routes := []ProtectedRoute{
+	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},

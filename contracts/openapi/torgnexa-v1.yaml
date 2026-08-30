@@ -1196,6 +1196,33 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Account id already binds different configuration}
         '422': {description: Connector is not executable through the generic integration runtime}
+  /marking/overview:
+    get:
+      operationId: getMarkingOverview
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Tenant-scoped marking batches and safe operational counters, content: {application/json: {schema: {$ref: '#/components/schemas/MarkingOverview'}}}}
+        '401': {description: Missing or invalid tenant context}
+        '403': {description: Caller lacks stock.read}
+  /marking/scans:
+    post:
+      operationId: recordMarkingScan
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarkingScanWrite'}
+      responses:
+        '201': {description: "Accepted scan; raw barcode is fingerprinted and discarded", content: {application/json: {schema: {$ref: '#/components/schemas/MarkingScan'}}}}
+        '200': {description: "Rejected, duplicate or overflow scan recorded without changing quantity", content: {application/json: {schema: {$ref: '#/components/schemas/MarkingScan'}}}}
+        '400': {description: "Invalid barcode, scan or idempotency key"}
+        '403': {description: Caller lacks stock.write}
+        '422': {description: Scan could not be recorded}
   /integration-center:
     get:
       operationId: getIntegrationCenter
@@ -2389,6 +2416,67 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    MarkingBatch:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, product_group, gtin, sku, requested, received, reserved, status, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        product_group: {type: string, maxLength: 64}
+        gtin: {type: string, pattern: '^[0-9]{8,14}$'}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        requested: {type: integer, minimum: 1}
+        received: {type: integer, minimum: 0}
+        reserved: {type: integer, minimum: 0}
+        status: {type: string, enum: [requested, reserved, available, printed, applied, aggregated, introduced, in_circulation, sold, withdrawn, written_off, returned, rejected, unknown]}
+        raw_artifact_ref: {type: string, maxLength: 192}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarkingBatchView:
+      type: object
+      additionalProperties: false
+      required: [batch, code_count, open_print_jobs, open_drifts]
+      properties:
+        batch: {$ref: '#/components/schemas/MarkingBatch'}
+        code_count: {type: integer, minimum: 0}
+        open_print_jobs: {type: integer, minimum: 0}
+        open_drifts: {type: integer, minimum: 0}
+    MarkingOverview:
+      type: object
+      additionalProperties: false
+      required: [batches, open_operations, open_drifts]
+      properties:
+        batches: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarkingBatchView'}}
+        open_operations: {type: integer, minimum: 0}
+        open_drifts: {type: integer, minimum: 0}
+    MarkingScanWrite:
+      type: object
+      additionalProperties: false
+      required: [barcode, gtin, sku, wms_action, expected_quantity]
+      properties:
+        barcode: {type: string, minLength: 1, maxLength: 4096}
+        gtin: {type: string, pattern: '^[0-9]{8,14}$'}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        wms_action: {type: string, maxLength: 192}
+        expected_quantity: {type: integer, minimum: 1, maximum: 1000000000}
+    MarkingScan:
+      type: object
+      additionalProperties: false
+      required: [id, fingerprint, sku, gtin, wms_action, result, actor_id, occurred_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        sku: {type: string, maxLength: 200}
+        gtin: {type: string, pattern: '^[0-9]{8,14}$'}
+        wms_action: {type: string, maxLength: 192}
+        result: {type: string, enum: [accepted, rejected, duplicate, overflow]}
+        reason_code: {type: string, maxLength: 95}
+        actor_id: {type: string, maxLength: 192}
+        occurred_at: {type: string, format: date-time, pattern: 'Z$'}
     PublicationQualityIssue:
       type: object
       additionalProperties: false

@@ -241,15 +241,42 @@ CREATE TRIGGER marking_remote_observations_append_only_guard BEFORE UPDATE OR DE
 CREATE TRIGGER marking_drifts_append_only_guard BEFORE UPDATE OR DELETE ON marking_drifts FOR EACH ROW EXECUTE FUNCTION marking_append_only();
 CREATE TRIGGER marking_scans_append_only_guard BEFORE UPDATE OR DELETE ON marking_scans FOR EACH ROW EXECUTE FUNCTION marking_append_only();
 
-DO $$
-DECLARE table_name text;
-BEGIN
-  FOREACH table_name IN ARRAY ARRAY['marking_code_batches','marking_codes','marking_operations','marking_packages','marking_package_links','marking_print_jobs','marking_scans','marking_documents','marking_document_lines','marking_remote_observations','marking_drifts','marking_process_runs'] LOOP
-    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name);
-    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name);
-    EXECUTE format('CREATE POLICY %I ON %I FOR ALL USING (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true)) WITH CHECK (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true))', table_name || '_tenant_policy', table_name);
-  END LOOP;
-END $$;
+ALTER TABLE marking_code_batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_code_batches FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_code_batches_tenant_policy ON marking_code_batches FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_codes FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_codes_tenant_policy ON marking_codes FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_operations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_operations FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_operations_tenant_policy ON marking_operations FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_packages FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_packages_tenant_policy ON marking_packages FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_package_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_package_links FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_package_links_tenant_policy ON marking_package_links FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_print_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_print_jobs FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_print_jobs_tenant_policy ON marking_print_jobs FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_scans FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_scans_tenant_policy ON marking_scans FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_documents FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_documents_tenant_policy ON marking_documents FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_document_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_document_lines FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_document_lines_tenant_policy ON marking_document_lines FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_remote_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_remote_observations FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_remote_observations_tenant_policy ON marking_remote_observations FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_drifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_drifts FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_drifts_tenant_policy ON marking_drifts FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marking_process_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marking_process_runs FORCE ROW LEVEL SECURITY;
+CREATE POLICY marking_process_runs_tenant_policy ON marking_process_runs FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
 
 CREATE INDEX marking_codes_observation_idx ON marking_codes(organization_id,workspace_id,last_observed_at DESC,fingerprint);
 CREATE INDEX marking_packages_parent_idx ON marking_packages(organization_id,workspace_id,parent_id,package_id);

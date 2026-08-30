@@ -283,6 +283,20 @@ recommendation/preview-first: no autonomous writes, raw prompt/response,
 chain-of-thought, secrets or second source of truth. See
 `tasks/issues/169-ai-operator-assistant.md`.
 
+## Маркировка, агрегация и УПД
+
+Task 171 is repository-complete as a provider-neutral marking execution
+contour. It adds safe code fingerprints and expiring artifact references,
+typed Connector SDK operations for code ordering/reservation, aggregation,
+circulation and transfer, package-tree validation, WMS scan outcomes, a
+versioned UPD 5.03/EDO state model, reconciliation drift vocabulary and the
+operator marking surface. PostgreSQL migration 000037 uses FORCE RLS and
+append-only evidence for scans, remote observations and drifts. Chestny ZNAK,
+Diadoc, Saby EDO, KKT/OFD and marketplace order/supply writes remain separate
+qualification gates and are not implied by manifest or synthetic conformance.
+See `tasks/issues/171-marking-execution-and-upd.md` and
+`adr/0122-marking-execution-and-edo.md`.
+
 ## P0 — Foundation
 001-010, 017, 021, 024-025, 060, 063-067.
 

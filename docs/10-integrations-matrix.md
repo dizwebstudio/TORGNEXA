@@ -140,10 +140,11 @@ bounded read-only чтение справочника ПВЗ/терминало�
 Для СДЭК, ПЭК, «Деловых Линий» и «Почты России» также доступно bounded
 read-only отслеживание одного отправления через
 `GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
-	Для СДЭК создание отправления доступно через approval-bound асинхронный
-	маршрут `POST /api/v1/logistics/shipments`; этикетки и операции остальных
-	перевозчиков остаются закрытыми до qualification актуального API, provider
-	fixtures и тестового кабинета.
+Для СДЭК создание отправления доступно через approval-bound асинхронный
+маршрут `POST /api/v1/logistics/shipments`, а транспортная этикетка — через
+`GET /api/v1/logistics/labels`; операции остальных перевозчиков остаются
+закрытыми до qualification актуального API, provider fixtures и тестового
+кабинета.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
 использует пару `client_id`/`api_key` продавца Ozon и проверяет доступ к

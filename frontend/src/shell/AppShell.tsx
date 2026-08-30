@@ -36,6 +36,7 @@ const IntegrationStatusPage = lazy(() => import("../pages/IntegrationStatusPage"
 const SocialPage = lazy(() => import("../pages/SocialPage").then(module => ({default: module.SocialPage})));
 const PlaceholderPage = lazy(() => import("../pages/PlaceholderPage").then(module => ({default: module.PlaceholderPage})));
 const IncidentCenterPage = lazy(() => import("../pages/IncidentCenterPage").then(module => ({default: module.IncidentCenterPage})));
+const MarkingPage = lazy(() => import("../pages/MarkingPage").then(module => ({default: module.MarkingPage})));
 const ConnectorOAuthCallbackPage = lazy(() => import("../pages/ConnectorOAuthCallbackPage").then(module => ({default: module.ConnectorOAuthCallbackPage})));
 
 const realtimeLabels: Readonly<Record<string, string>> = {live: "Подключено", connecting: "Подключение…", offline: "Недоступно"};
@@ -48,6 +49,7 @@ function content(path: string) {
   if (path === "/returns" || path.startsWith("/returns/")) return <ReturnsPage />;
   if (path === "/inventory") return <InventoryPage />;
   if (path === "/incidents" || path.startsWith("/incidents/")) return <IncidentCenterPage />;
+  if (path === "/marking") return <MarkingPage />;
   if (path === "/compliance") return <CompliancePage />;
   if (path === "/notifications") return <NotificationsPage />;
   if (path === "/sync") return <SyncPage />;

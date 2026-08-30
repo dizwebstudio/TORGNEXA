@@ -20,6 +20,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
@@ -95,6 +96,7 @@ type productionRouteDependencies struct {
 	integrationCenter  integrationCenterReader
 	workflows          *workflowrepo.Repository
 	returns            *returnsrepo.Repository
+	marking            *markingrepo.Repository
 	mcpAccounts        *mcpaccountsrepo.Repository
 	agentGovernance    *agentgovernancerepo.Repository
 	runtimePosture     *runtimeposture.Inspector
@@ -119,6 +121,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newPublicationQualityRoutes(deps.publicationQuality)...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
+	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)

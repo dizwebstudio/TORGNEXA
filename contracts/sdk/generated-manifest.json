@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "301c090c83be3fb1c98dfed64d83e59258dc497ec63a4894c68dddfd98b45adc",
+    "sha256": "b401db72b226aa2438d97056b01550c55fe6d38c993a677dac132514a1b8651d",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -388,6 +388,11 @@
       "operation_id": "getMCPAgentKillSwitch",
       "method": "GET",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "getMarkingOverview",
+      "method": "GET",
+      "path": "/marking/overview"
     },
     {
       "operation_id": "getNotificationPreference",
@@ -785,9 +790,19 @@
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
     },
     {
+      "operation_id": "readLogisticsLabel",
+      "method": "GET",
+      "path": "/logistics/labels"
+    },
+    {
       "operation_id": "readLogisticsTracking",
       "method": "GET",
       "path": "/logistics/tracking"
+    },
+    {
+      "operation_id": "recordMarkingScan",
+      "method": "POST",
+      "path": "/marking/scans"
     },
     {
       "operation_id": "recordReturnInspection",

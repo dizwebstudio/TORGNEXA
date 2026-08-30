@@ -33,9 +33,10 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/entitlementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
-	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/legalpartyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
@@ -240,6 +241,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("inventory_repository_startup_failed", err)
 	}
+	markingRepository, err := markingrepo.New(db)
+	if err != nil {
+		return newRuntimeError("marking_repository_startup_failed", err)
+	}
 	logisticsRepository, err := logisticsrepo.New(db)
 	if err != nil {
 		return newRuntimeError("logistics_repository_startup_failed", err)
@@ -399,7 +404,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
 		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, publicationQuality: publicationQualityRepository, pim: pimRepository,
-		images: imageRepository, inventory: inventoryRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
+		images: imageRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,

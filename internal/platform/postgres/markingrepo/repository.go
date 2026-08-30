@@ -18,17 +18,17 @@ type Repository struct{ db *sql.DB }
 
 // BatchView is the safe operator projection. It contains no raw code values.
 type BatchView struct {
-	Batch       marking.CodeBatch `json:"batch"`
-	CodeCount   int64             `json:"code_count"`
-	OpenPrints  int64             `json:"open_print_jobs"`
-	OpenDrifts  int64             `json:"open_drifts"`
+	Batch      marking.CodeBatch `json:"batch"`
+	CodeCount  int64             `json:"code_count"`
+	OpenPrints int64             `json:"open_print_jobs"`
+	OpenDrifts int64             `json:"open_drifts"`
 }
 
 // Overview is the bounded operator read model for the marking workspace.
 type Overview struct {
-	Batches       []BatchView `json:"batches"`
-	OpenOperations int64      `json:"open_operations"`
-	OpenDrifts    int64       `json:"open_drifts"`
+	Batches        []BatchView `json:"batches"`
+	OpenOperations int64       `json:"open_operations"`
+	OpenDrifts     int64       `json:"open_drifts"`
 }
 
 // New constructs a tenant-scoped marking repository.

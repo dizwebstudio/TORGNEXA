@@ -1096,6 +1096,34 @@ ports. The implementation is split into twelve subtasks:
 - Go, contract, architecture, migration, frontend, conformance, performance,
   Compose E2E and documentation checks pass before production admission.
 
+## Phase 40 — Маркировка, агрегация и УПД
+
+`171`
+
+Task 171 is repository-complete as a provider-neutral marking execution
+contour. The fifteen subtasks cover the operation matrix and ADR, safe
+fingerprint-only code storage, typed marking SDK writes with dry-run and
+unknown outcomes, code request/reservation, print and scan, unit/kit/box/
+pallet aggregation, circulation/transfer, versioned UPD 5.03 and EDO state,
+full orchestration, reconciliation drifts, operator API/UI and synthetic
+Docker qualification. Live Chestny ZNAK, Diadoc, Saby, KKT/OFD and
+marketplace credentials and legal qualification remain external release
+gates. See `tasks/issues/171-marking-execution-and-upd.md`.
+
+### Gate RUNTIME-171
+
+- no raw marking code is stored in PostgreSQL, events, audit metadata, logs,
+  normal API responses or SDK result types; only fingerprints and expiring
+  artifact references cross durable boundaries;
+- all remote marking writes are typed, capability/approval gated,
+  idempotent, dry-run aware and preserve `unknown` after an ambiguous result;
+- package graph, one-use printing, duplicate/wrong/overflow scans, UPD lines,
+  signing/MChD, EDO statuses and reconciliation drifts are explicit;
+- migration 000037 is backup-gated, tenant-scoped, FORCE RLS and protects
+  scans, observations and drifts with append-only constraints;
+- API/OpenAPI/SDK/UI, unit/contract/architecture/migration/conformance and
+  synthetic Docker checks pass before any external connector admission.
+
 ## Phase 40 — Рабочее место WMS-оператора и marketplace fulfillment
 
 `170`

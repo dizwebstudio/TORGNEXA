@@ -62,12 +62,40 @@ provider-specific HTTP-вызовов: юридически значимый р�
 | УПД/ЭДО | format 5.03, lines, signature, MChD | `edo.documents.send` | да | EDO status read |
 | Reconciliation | local/remote facts, quantity and graph | `marking.status.read` | запуск policy | drift/manual attention |
 
-## Compatibility, migration and security impact
+## Alternatives considered
+
+- Хранить полный код в `marking_codes`: отклонено из-за риска утечки в
+  резервные копии, логи, события и обычные ответы API.
+- Выполнять remote write прямо из HTTP handler: отклонено; worker и outbox
+  должны переживать retry, lease loss и неизвестный результат.
+- Выдать production capability вместе с manifest: отклонено; для
+  юридически значимых операций нужен отдельный non-production qualification.
+
+## Compatibility impact
+
+Новые typed SDK interfaces и OpenAPI routes additive. Существующие
+read/status коннекторы, EDO SDK и WMS API не меняют семантику.
+
+## Migration and data impact
 
 Migration `000037_marking_execution.sql` — expand-only, high risk, backup
 required. Existing read/status tables не переписываются. Новые таблицы имеют
 composite tenant keys, FORCE RLS, append-only evidence triggers and bounded
 references. Public API и SDK additive.
+
+## Security and privacy impact
+
+Tenant scope берётся из аутентифицированного контекста. RawCodeStore имеет
+короткий TTL и callback-only доступ; SQL, outbox/inbox, audit, logs и API
+получают только fingerprint/opaque reference. Private key не передаётся
+коннектору.
+
+## Operational impact
+
+Migration требует backup checkpoint. Worker должен возобновлять queued работу
+по lease, а `unknown` переводить в reconciliation/manual attention. На малом
+VPS печать и сканирование ограничиваются bounded batch/queue; remote retries
+подчиняются manifest policy и не повторяются после неизвестного результата.
 
 Для УПД используется формат 5.03 и штатный docflow: seller title, operator
 confirmations, buyer receipt/title, rejection/clarification and correction

@@ -62,3 +62,42 @@ func TestRawCodeHandleExpires(t *testing.T) {
 		t.Fatalf("expired handle accepted: %v", err)
 	}
 }
+
+func TestProcessAdvancesOnlyAfterSuccess(t *testing.T) {
+	stage, err := NextStage(StageEDO, OperationUnknown)
+	if err != nil || stage != StageEDO {
+		t.Fatalf("unknown operation advanced process: %q, %v", stage, err)
+	}
+	stage, err = NextStage(StageEDO, OperationSucceeded)
+	if err != nil || stage != StageCirculation {
+		t.Fatalf("successful EDO did not advance to circulation: %q, %v", stage, err)
+	}
+}
+
+func TestReconcileClassifiesUnknownAndQuantityDrift(t *testing.T) {
+	drift, found := Reconcile(ReconciliationInput{EntityType: "code", EntityRef: "code-1", ExpectedStatus: "introduced", RemoteStatus: "unknown", UnknownWrite: true}, "drift-1")
+	if !found || drift.Kind != DriftUnknownWrite || drift.Validate() != nil {
+		t.Fatalf("unknown write drift = %#v, found=%v", drift, found)
+	}
+	drift, found = Reconcile(ReconciliationInput{EntityType: "package", EntityRef: "package-1", ExpectedQuantity: 10, RemoteQuantity: 9}, "drift-2")
+	if !found || drift.Kind != DriftQuantity {
+		t.Fatalf("quantity drift = %#v, found=%v", drift, found)
+	}
+}
+
+func TestPrintUseRegistryAllowsSameRetryButRejectsReuse(t *testing.T) {
+	registry := &PrintUseRegistry{}
+	fingerprint := strings.Repeat("c", 64)
+	if err := registry.Reserve("print-1", []string{fingerprint}); err != nil {
+		t.Fatalf("initial print claim rejected: %v", err)
+	}
+	if err := registry.Reserve("print-1", []string{fingerprint}); err != nil {
+		t.Fatalf("same print retry rejected: %v", err)
+	}
+	if err := registry.Reserve("print-2", []string{fingerprint}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("code reuse was not rejected: %v", err)
+	}
+	if !registry.PrintUsed(fingerprint) {
+		t.Fatal("print claim was not retained")
+	}
+}

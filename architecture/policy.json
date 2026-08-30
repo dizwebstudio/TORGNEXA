@@ -99,6 +99,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/marking",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/orders",
       "kind": "core_domain"
     },
@@ -404,6 +408,10 @@
     },
     {
       "path": "internal/platform/postgres/logisticsrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/markingrepo",
       "kind": "infrastructure_adapter"
     },
     {

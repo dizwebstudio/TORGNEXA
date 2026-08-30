@@ -20,6 +20,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "returns", label: "Возвраты", path: "/returns", capability: "orders.returns.read", risk: "WRITE_SENSITIVE", icon: "orders"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},
   {id: "incidents", label: "Инциденты", path: "/incidents", capability: "stock.read", risk: "READ", icon: "incident", shortcut: "G E"},
+  {id: "marking", label: "Маркировка", path: "/marking", capability: "stock.read", risk: "WRITE_SENSITIVE", icon: "compliance"},
   {id: "integration-status", label: "Состояние интеграций", path: "/integrations/status", capability: "connectors.read", risk: "READ", icon: "connectors"},
   {id: "connectors", label: "Интеграции", path: "/integrations", capability: "connectors.read", risk: "READ", icon: "connectors", shortcut: "G X"},
   {id: "social", label: "Публикации", path: "/social", capability: "connectors.read", risk: "WRITE_SAFE", icon: "notifications", shortcut: "G M"},

@@ -12,16 +12,17 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
 
 var (
-	ErrInvalid       = errors.New("marking: invalid value")
-	ErrNotFound      = errors.New("marking: not found")
-	ErrConflict      = errors.New("marking: conflict")
-	ErrInvalidState  = errors.New("marking: invalid state transition")
-	ErrCycle         = errors.New("marking: package cycle")
+	ErrInvalid      = errors.New("marking: invalid value")
+	ErrNotFound     = errors.New("marking: not found")
+	ErrConflict     = errors.New("marking: conflict")
+	ErrInvalidState = errors.New("marking: invalid state transition")
+	ErrCycle        = errors.New("marking: package cycle")
 	ErrRawCode      = errors.New("marking: raw code is not allowed here")
 )
 
@@ -43,7 +44,9 @@ func ParseScope(organizationID, workspaceID string) (Scope, error) {
 
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
-func (s Scope) Valid() bool            { return refPattern.MatchString(s.organizationID) && refPattern.MatchString(s.workspaceID) }
+func (s Scope) Valid() bool {
+	return refPattern.MatchString(s.organizationID) && refPattern.MatchString(s.workspaceID)
+}
 
 // ProductGroup is a traceability category used to select the applicable
 // operation matrix. The list is intentionally generic; provider catalogs own
@@ -51,14 +54,14 @@ func (s Scope) Valid() bool            { return refPattern.MatchString(s.organiz
 type ProductGroup string
 
 const (
-	ProductGroupClothing   ProductGroup = "clothing"
-	ProductGroupShoes       ProductGroup = "shoes"
-	ProductGroupTobacco     ProductGroup = "tobacco"
-	ProductGroupWater       ProductGroup = "water"
-	ProductGroupMedicine    ProductGroup = "medicine"
-	ProductGroupFood        ProductGroup = "food"
-	ProductGroupCosmetics   ProductGroup = "cosmetics"
-	ProductGroupOther       ProductGroup = "other"
+	ProductGroupClothing  ProductGroup = "clothing"
+	ProductGroupShoes     ProductGroup = "shoes"
+	ProductGroupTobacco   ProductGroup = "tobacco"
+	ProductGroupWater     ProductGroup = "water"
+	ProductGroupMedicine  ProductGroup = "medicine"
+	ProductGroupFood      ProductGroup = "food"
+	ProductGroupCosmetics ProductGroup = "cosmetics"
+	ProductGroupOther     ProductGroup = "other"
 )
 
 func (g ProductGroup) Valid() bool {
@@ -75,20 +78,20 @@ func (g ProductGroup) Valid() bool {
 type CodeStatus string
 
 const (
-	CodeRequested      CodeStatus = "requested"
-	CodeReserved       CodeStatus = "reserved"
-	CodeAvailable      CodeStatus = "available"
-	CodePrinted        CodeStatus = "printed"
-	CodeApplied        CodeStatus = "applied"
-	CodeAggregated     CodeStatus = "aggregated"
-	CodeIntroduced     CodeStatus = "introduced"
-	CodeInCirculation  CodeStatus = "in_circulation"
-	CodeSold           CodeStatus = "sold"
-	CodeWithdrawn      CodeStatus = "withdrawn"
-	CodeWrittenOff     CodeStatus = "written_off"
-	CodeReturned       CodeStatus = "returned"
-	CodeRejected       CodeStatus = "rejected"
-	CodeUnknown        CodeStatus = "unknown"
+	CodeRequested     CodeStatus = "requested"
+	CodeReserved      CodeStatus = "reserved"
+	CodeAvailable     CodeStatus = "available"
+	CodePrinted       CodeStatus = "printed"
+	CodeApplied       CodeStatus = "applied"
+	CodeAggregated    CodeStatus = "aggregated"
+	CodeIntroduced    CodeStatus = "introduced"
+	CodeInCirculation CodeStatus = "in_circulation"
+	CodeSold          CodeStatus = "sold"
+	CodeWithdrawn     CodeStatus = "withdrawn"
+	CodeWrittenOff    CodeStatus = "written_off"
+	CodeReturned      CodeStatus = "returned"
+	CodeRejected      CodeStatus = "rejected"
+	CodeUnknown       CodeStatus = "unknown"
 )
 
 func (s CodeStatus) Valid() bool {
@@ -144,12 +147,14 @@ func CodeFingerprint(raw string) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func validRef(value string) bool       { return refPattern.MatchString(value) }
-func validDigest(value string) bool    { return digestPattern.MatchString(value) }
-func validGTIN(value string) bool      { return gtinPattern.MatchString(value) }
-func validSKU(value string) bool       { return skuPattern.MatchString(value) && strings.TrimSpace(value) == value }
-func validTime(value time.Time) bool   { return !value.IsZero() && value.Location() == time.UTC }
-func validQuantity(value int64) bool   { return value > 0 && value <= 1000000000 }
+func validRef(value string) bool    { return refPattern.MatchString(value) }
+func validDigest(value string) bool { return digestPattern.MatchString(value) }
+func validGTIN(value string) bool   { return gtinPattern.MatchString(value) }
+func validSKU(value string) bool {
+	return skuPattern.MatchString(value) && strings.TrimSpace(value) == value
+}
+func validTime(value time.Time) bool { return !value.IsZero() && value.Location() == time.UTC }
+func validQuantity(value int64) bool { return value > 0 && value <= 1000000000 }
 
 // CodeBatch describes a request/response batch without retaining its raw
 // codes. RawArtifactRef is an expiring reference owned by the secret/artifact
@@ -215,18 +220,18 @@ func (c MarkingCode) Validate() error {
 type OperationKind string
 
 const (
-	OperationRequestCodes    OperationKind = "marking.codes.request"
-	OperationReserveCodes   OperationKind = "marking.codes.reserve"
-	OperationPrintLabels    OperationKind = "marking.labels.print"
-	OperationScanCode       OperationKind = "marking.codes.scan"
-	OperationAggregate      OperationKind = "marking.aggregation.write"
-	OperationIntroduce      OperationKind = "marking.circulation.introduce"
-	OperationWithdraw       OperationKind = "marking.circulation.withdraw"
-	OperationTransfer       OperationKind = "marking.transfer.write"
-	OperationCreateUPD      OperationKind = "marking.upd.create"
-	OperationSignUPD        OperationKind = "marking.upd.sign"
-	OperationSendEDO        OperationKind = "marking.edo.send"
-	OperationReconcile      OperationKind = "marking.reconciliation.run"
+	OperationRequestCodes OperationKind = "marking.codes.request"
+	OperationReserveCodes OperationKind = "marking.codes.reserve"
+	OperationPrintLabels  OperationKind = "marking.labels.print"
+	OperationScanCode     OperationKind = "marking.codes.scan"
+	OperationAggregate    OperationKind = "marking.aggregation.write"
+	OperationIntroduce    OperationKind = "marking.circulation.introduce"
+	OperationWithdraw     OperationKind = "marking.circulation.withdraw"
+	OperationTransfer     OperationKind = "marking.transfer.write"
+	OperationCreateUPD    OperationKind = "marking.upd.create"
+	OperationSignUPD      OperationKind = "marking.upd.sign"
+	OperationSendEDO      OperationKind = "marking.edo.send"
+	OperationReconcile    OperationKind = "marking.reconciliation.run"
 )
 
 func (k OperationKind) Valid() bool {
@@ -292,13 +297,15 @@ func (o Operation) Validate() error {
 type PackageKind string
 
 const (
-	PackageUnit    PackageKind = "unit"
-	PackageKit     PackageKind = "kit"
-	PackageBox     PackageKind = "box"
-	PackagePallet  PackageKind = "pallet"
+	PackageUnit   PackageKind = "unit"
+	PackageKit    PackageKind = "kit"
+	PackageBox    PackageKind = "box"
+	PackagePallet PackageKind = "pallet"
 )
 
-func (k PackageKind) Valid() bool { return k == PackageUnit || k == PackageKit || k == PackageBox || k == PackagePallet }
+func (k PackageKind) Valid() bool {
+	return k == PackageUnit || k == PackageKit || k == PackageBox || k == PackagePallet
+}
 
 type PackageLink struct {
 	ParentID string `json:"parent_id"`
@@ -307,19 +314,19 @@ type PackageLink struct {
 }
 
 type MarkingPackage struct {
-	ID             string         `json:"id"`
-	OrganizationID string         `json:"organization_id"`
-	WorkspaceID    string         `json:"workspace_id"`
-	Kind           PackageKind    `json:"kind"`
-	CodeFingerprint string        `json:"code_fingerprint"`
-	ParentID       string         `json:"parent_id,omitempty"`
-	Status         string         `json:"status"`
-	ShipmentRef    string         `json:"shipment_ref,omitempty"`
-	OrderRef       string         `json:"order_ref,omitempty"`
-	UPDRef         string         `json:"upd_ref,omitempty"`
-	Version        int64          `json:"version"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID              string      `json:"id"`
+	OrganizationID  string      `json:"organization_id"`
+	WorkspaceID     string      `json:"workspace_id"`
+	Kind            PackageKind `json:"kind"`
+	CodeFingerprint string      `json:"code_fingerprint"`
+	ParentID        string      `json:"parent_id,omitempty"`
+	Status          string      `json:"status"`
+	ShipmentRef     string      `json:"shipment_ref,omitempty"`
+	OrderRef        string      `json:"order_ref,omitempty"`
+	UPDRef          string      `json:"upd_ref,omitempty"`
+	Version         int64       `json:"version"`
+	CreatedAt       time.Time   `json:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at"`
 }
 
 func (p MarkingPackage) Validate() error {
@@ -392,19 +399,21 @@ const (
 	PrintUnknown   PrintJobState = "unknown"
 )
 
-func (s PrintJobState) Valid() bool { return s == PrintQueued || s == PrintRunning || s == PrintCompleted || s == PrintFailed || s == PrintUnknown }
+func (s PrintJobState) Valid() bool {
+	return s == PrintQueued || s == PrintRunning || s == PrintCompleted || s == PrintFailed || s == PrintUnknown
+}
 
 type PrintJob struct {
-	ID             string        `json:"id"`
-	TemplateRef    string        `json:"template_ref"`
-	TemplateVersion int64        `json:"template_version"`
-	PrinterRef     string        `json:"printer_ref"`
-	CodeCount      int64         `json:"code_count"`
-	State          PrintJobState `json:"state"`
-	Attempt        int           `json:"attempt"`
-	IdempotencyKey string        `json:"idempotency_key"`
-	CreatedAt      time.Time     `json:"created_at"`
-	UpdatedAt      time.Time     `json:"updated_at"`
+	ID              string        `json:"id"`
+	TemplateRef     string        `json:"template_ref"`
+	TemplateVersion int64         `json:"template_version"`
+	PrinterRef      string        `json:"printer_ref"`
+	CodeCount       int64         `json:"code_count"`
+	State           PrintJobState `json:"state"`
+	Attempt         int           `json:"attempt"`
+	IdempotencyKey  string        `json:"idempotency_key"`
+	CreatedAt       time.Time     `json:"created_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
 }
 
 func (p PrintJob) Validate() error {
@@ -414,27 +423,74 @@ func (p PrintJob) Validate() error {
 	return nil
 }
 
+// PrintUseRegistry is a short-lived host-side guard against printing the same
+// code twice. It must be backed by a durable print-job ledger by the adapter;
+// the registry itself intentionally contains only fingerprints.
+type PrintUseRegistry struct {
+	mu   sync.Mutex
+	used map[string]string
+}
+
+// Reserve claims fingerprints for one print job. A retry with the same job is
+// idempotent; a different job cannot reuse an already claimed code.
+func (r *PrintUseRegistry) Reserve(jobID string, fingerprints []string) error {
+	if r == nil || !validRef(jobID) || len(fingerprints) == 0 {
+		return ErrInvalid
+	}
+	ordered, err := SortFingerprints(fingerprints)
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.used == nil {
+		r.used = make(map[string]string, len(ordered))
+	}
+	for _, fingerprint := range ordered {
+		if owner, exists := r.used[fingerprint]; exists && owner != jobID {
+			return ErrConflict
+		}
+	}
+	for _, fingerprint := range ordered {
+		r.used[fingerprint] = jobID
+	}
+	return nil
+}
+
+// PrintUsed reports whether a fingerprint has been claimed by any print job.
+func (r *PrintUseRegistry) PrintUsed(fingerprint string) bool {
+	if r == nil || !validDigest(fingerprint) {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, exists := r.used[fingerprint]
+	return exists
+}
+
 type ScanResult string
 
 const (
-	ScanAccepted ScanResult = "accepted"
-	ScanRejected ScanResult = "rejected"
+	ScanAccepted  ScanResult = "accepted"
+	ScanRejected  ScanResult = "rejected"
 	ScanDuplicate ScanResult = "duplicate"
-	ScanOverflow ScanResult = "overflow"
+	ScanOverflow  ScanResult = "overflow"
 )
 
-func (r ScanResult) Valid() bool { return r == ScanAccepted || r == ScanRejected || r == ScanDuplicate || r == ScanOverflow }
+func (r ScanResult) Valid() bool {
+	return r == ScanAccepted || r == ScanRejected || r == ScanDuplicate || r == ScanOverflow
+}
 
 type Scan struct {
-	ID             string     `json:"id"`
-	Fingerprint    string     `json:"fingerprint"`
-	SKU            string     `json:"sku"`
-	GTIN           string     `json:"gtin"`
-	WMSAction      string     `json:"wms_action"`
-	Result         ScanResult `json:"result"`
-	ReasonCode     string     `json:"reason_code,omitempty"`
-	ActorID        string     `json:"actor_id"`
-	OccurredAt     time.Time  `json:"occurred_at"`
+	ID          string     `json:"id"`
+	Fingerprint string     `json:"fingerprint"`
+	SKU         string     `json:"sku"`
+	GTIN        string     `json:"gtin"`
+	WMSAction   string     `json:"wms_action"`
+	Result      ScanResult `json:"result"`
+	ReasonCode  string     `json:"reason_code,omitempty"`
+	ActorID     string     `json:"actor_id"`
+	OccurredAt  time.Time  `json:"occurred_at"`
 }
 
 func (s Scan) Validate() error {
@@ -450,14 +506,14 @@ func (s Scan) Validate() error {
 type DocumentState string
 
 const (
-	DocumentDraft       DocumentState = "draft"
-	DocumentReady       DocumentState = "ready"
-	DocumentSigning     DocumentState = "signing"
-	DocumentSent        DocumentState = "sent"
-	DocumentConfirmed   DocumentState = "confirmed"
-	DocumentRejected    DocumentState = "rejected"
-	DocumentCorrection  DocumentState = "correction_required"
-	DocumentUnknown     DocumentState = "unknown"
+	DocumentDraft      DocumentState = "draft"
+	DocumentReady      DocumentState = "ready"
+	DocumentSigning    DocumentState = "signing"
+	DocumentSent       DocumentState = "sent"
+	DocumentConfirmed  DocumentState = "confirmed"
+	DocumentRejected   DocumentState = "rejected"
+	DocumentCorrection DocumentState = "correction_required"
+	DocumentUnknown    DocumentState = "unknown"
 )
 
 func (s DocumentState) Valid() bool {
@@ -470,18 +526,18 @@ func (s DocumentState) Valid() bool {
 }
 
 type Document struct {
-	ID             string        `json:"id"`
-	FormatVersion  string        `json:"format_version"`
-	Kind           string        `json:"kind"`
-	CounterpartyRef string       `json:"counterparty_ref"`
-	State          DocumentState `json:"state"`
-	ArtifactRef    string        `json:"artifact_ref"`
-	SignatureRef   string        `json:"signature_ref,omitempty"`
-	MChDRef        string        `json:"mchd_ref,omitempty"`
-	RemoteID       string        `json:"remote_id,omitempty"`
-	Version        int64         `json:"version"`
-	CreatedAt      time.Time     `json:"created_at"`
-	UpdatedAt      time.Time     `json:"updated_at"`
+	ID              string        `json:"id"`
+	FormatVersion   string        `json:"format_version"`
+	Kind            string        `json:"kind"`
+	CounterpartyRef string        `json:"counterparty_ref"`
+	State           DocumentState `json:"state"`
+	ArtifactRef     string        `json:"artifact_ref"`
+	SignatureRef    string        `json:"signature_ref,omitempty"`
+	MChDRef         string        `json:"mchd_ref,omitempty"`
+	RemoteID        string        `json:"remote_id,omitempty"`
+	Version         int64         `json:"version"`
+	CreatedAt       time.Time     `json:"created_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
 }
 
 func (d Document) Validate() error {
@@ -497,12 +553,12 @@ func (d Document) Validate() error {
 }
 
 type RemoteObservation struct {
-	ID             string    `json:"id"`
-	EntityType     string    `json:"entity_type"`
-	EntityRef      string    `json:"entity_ref"`
-	RemoteStatus   string    `json:"remote_status"`
-	RemoteRequestID string   `json:"remote_request_id,omitempty"`
-	ObservedAt     time.Time `json:"observed_at"`
+	ID              string    `json:"id"`
+	EntityType      string    `json:"entity_type"`
+	EntityRef       string    `json:"entity_ref"`
+	RemoteStatus    string    `json:"remote_status"`
+	RemoteRequestID string    `json:"remote_request_id,omitempty"`
+	ObservedAt      time.Time `json:"observed_at"`
 }
 
 func (o RemoteObservation) Validate() error {
@@ -525,7 +581,9 @@ const (
 	DriftMissing      DriftType = "missing_remote_observation"
 )
 
-func (d DriftType) Valid() bool { return d == DriftStatus || d == DriftQuantity || d == DriftComposition || d == DriftUnknownWrite || d == DriftMissing }
+func (d DriftType) Valid() bool {
+	return d == DriftStatus || d == DriftQuantity || d == DriftComposition || d == DriftUnknownWrite || d == DriftMissing
+}
 
 type Drift struct {
 	ID         string    `json:"id"`
