@@ -32,7 +32,10 @@ last ingest, distinct event count and lag. See
 `docs/reporting/049-clickhouse-foundation.md` and ADR 0052.
 
 The production `/api/v1/reports` read path uses the bounded ClickHouse HTTP
-adapter behind `reporting.QueryPort`. The report catalog and every returned
-dataset identify `source=clickhouse`; PostgreSQL is no longer a user-facing
-report fallback. An unavailable analytical store fails only the report request
-and does not affect transactional API writes.
+adapter behind `reporting.QueryPort`. The three projection reports identify
+`source=clickhouse`; the factual Task-167 `unit_economics_by_channel` report has
+a tenant-scoped PostgreSQL fallback because orders, settlements and immutable
+cost evidence remain operational truth. An unavailable analytical store fails
+only the affected projection request and does not affect transactional API
+writes. Settlement/cash views are fail-closed until their source watermarks
+are available; they are never mixed with order-accrual totals.

@@ -172,7 +172,11 @@ func newReportRoutes(repository reportReader) []ProtectedRoute {
 
 func parseReportFilter(r *http.Request) (reportrepo.Filter, error) {
 	q := r.URL.Query()
-	filter := reportrepo.Filter{Query: strings.TrimSpace(q.Get("q")), Currency: strings.ToUpper(strings.TrimSpace(q.Get("currency"))), Status: strings.TrimSpace(q.Get("status")), Basis: strings.TrimSpace(q.Get("basis")), ChannelRef: strings.ToLower(strings.TrimSpace(q.Get("channel_ref"))), Limit: 100}
+	status := strings.TrimSpace(q.Get("status"))
+	if status == "" {
+		status = strings.TrimSpace(q.Get("completeness"))
+	}
+	filter := reportrepo.Filter{Query: strings.TrimSpace(q.Get("q")), Currency: strings.ToUpper(strings.TrimSpace(q.Get("currency"))), Status: status, Basis: strings.TrimSpace(q.Get("basis")), ChannelRef: strings.ToLower(strings.TrimSpace(q.Get("channel_ref"))), Limit: 100}
 	if len(filter.Query) > 100 || len(filter.Currency) > 3 || len(filter.Status) > 32 {
 		return filter, errors.New("filter too long")
 	}

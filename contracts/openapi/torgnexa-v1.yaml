@@ -1882,6 +1882,7 @@ paths:
         - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
         - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
         - {name: status, in: query, required: false, schema: {type: string, maxLength: 32}}
+        - {name: completeness, in: query, required: false, schema: {type: string, enum: [complete, partial, stale, unmatched, conflict, mixed_currency, unsupported]}}
         - {name: basis, in: query, required: false, schema: {type: string, enum: [order_accrual, settlement, cash], default: order_accrual}}
         - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
         - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}

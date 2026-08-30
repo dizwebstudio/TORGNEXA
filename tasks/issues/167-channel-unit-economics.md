@@ -2,7 +2,13 @@
 
 ## Статус
 
-`planned` — подробная декомпозиция подготовлена, реализация не начата.
+`repository-complete` — реализованы provider-neutral fixed-decimal engine,
+tenant-scoped channel attribution/cost/run metadata with forced RLS,
+settlement-kind expansion and deduplication, factual PostgreSQL report
+`unit_economics_by_channel`, OpenAPI/SDK filters, operator UI and contract/
+architecture/migration test evidence. ClickHouse projection and live source
+watermarks remain disposable/release-topology concerns; the report fails closed
+and marks missing COGS, FX and attribution instead of zero-filling them.
 
 ## Цель
 
@@ -600,6 +606,26 @@ adjustment и disputed refund классифицируются предсказ�
 
 ## Связанные материалы
 
+## Фактически поставлено
+
+- `internal/core/uniteconomics` — deterministic aggregation, exact money,
+  basis validation, settlement/provider-reference deduplication, payout
+  separation, fixed-point margin, overflow/mixed-currency fail-closed and
+  explicit component quality states.
+- `000034_channel_unit_economics.sql` — channel dimension, order attribution,
+  historical COGS snapshots, immutable calculation-run metadata and quality
+  issues with forced tenant RLS; settlement kinds are extended additively.
+- `GET /api/v1/reports/unit_economics_by_channel` — bounded channel/currency/
+  basis filters and CSV/PDF-compatible report rows sourced from PostgreSQL;
+  ClickHouse fallback never becomes a financial source of truth.
+- Reports UI — Russian labels, basis/channel controls, exact minor-unit
+  formatting, quality/coverage visibility and explicit incomplete-data note.
+- OpenAPI, generated SDKs, event schemas, fixtures, ADR, architecture review,
+  migration catalog and operations documentation are synchronized.
+
+Release evidence must still include a Compose run with synthetic tenant data,
+source watermarks and a retained report/run digest before production admission.
+
 - `docs/00-product-scope.md`
 - `docs/01-architecture.md`
 - `docs/02-domain-model.md`
@@ -631,4 +657,3 @@ adjustment и disputed refund классифицируются предсказ�
 - `tasks/issues/061-retention-subject-requests-and-tenant-deletion.md`
 - `tasks/issues/089-fx-rate-provider.md`
 - `tasks/issues/164-returns-cancellations-refunds.md`
-

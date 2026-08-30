@@ -230,7 +230,7 @@ SDK or catalog presence.
 
 ## Юнит-экономика по каналам
 
-Task 167 is the planned provider-neutral factual channel unit-economics
+Task 167 is repository-complete: the provider-neutral factual channel unit-economics
 contour. It extends the current `profitability-v1` what-if scenario and the
 three basic reports with reproducible actuals by channel, store, order and
 Offer/SKU. The decomposition has eighteen subtasks covering accounting

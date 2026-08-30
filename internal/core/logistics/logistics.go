@@ -182,6 +182,7 @@ type Repository interface {
 	ApplyCreateResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
 	BeginCancel(context.Context, tenancy.Scope, ShipmentID, string, Mutation) (Shipment, bool, error)
 	ApplyCancelResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
+	ApplyCancelUnknown(context.Context, tenancy.Scope, ShipmentID, int64, Mutation) (Shipment, error)
 	AppendTrackingEvidence(context.Context, tenancy.Scope, ShipmentID, Status, time.Time) error
 }
 

@@ -395,6 +395,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/logisticsrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/mcpaccountsrepo",
       "kind": "infrastructure_adapter"
     },
@@ -484,6 +488,10 @@
     },
     {
       "path": "internal/platform/postgres/trustcontrolrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/uniteconomicsrepo",
       "kind": "infrastructure_adapter"
     },
     {

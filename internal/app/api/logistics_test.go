@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/logistics"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
@@ -32,6 +34,28 @@ type logisticsRuntimeStub struct {
 	points    []sdk.PickupPoint
 	rates     []sdk.RateQuote
 	tracking  sdk.ShipmentResult
+}
+
+type logisticsShipmentStub struct {
+	shipment logistics.Shipment
+	fresh    bool
+	called   bool
+	mutation logistics.Mutation
+}
+
+func (stub *logisticsShipmentStub) BeginCancel(_ context.Context, _ tenancy.Scope, _ logistics.ShipmentID, _ string, mutation logistics.Mutation) (logistics.Shipment, bool, error) {
+	stub.called = true
+	stub.mutation = mutation
+	return stub.shipment, stub.fresh, nil
+}
+
+type logisticsApprovalStub struct {
+	request approval.Request
+	err     error
+}
+
+func (stub logisticsApprovalStub) Request(context.Context, tenancy.Scope, string) (approval.Request, error) {
+	return stub.request, stub.err
 }
 
 func (stub logisticsRuntimeStub) SupportsCapability(string, string) bool { return stub.supported }
@@ -194,5 +218,57 @@ func TestLogisticsTrackingRouteFailsClosedWithoutEnabledCapability(t *testing.T)
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusConflict {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsCancellationRouteRequiresMatchingApprovalAndPersistsApprovalReference(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	shipmentID := logistics.ShipmentID("shipment-1")
+	shipment := logistics.Shipment{ID: shipmentID, Status: logistics.StatusCreated, Version: 1}
+	store := &logisticsShipmentStub{shipment: shipment, fresh: true}
+	approvalID := "approval-1"
+	routes := newLogisticsRoutes(nil, nil, nil, logisticsRouteDependency{
+		shipments: store,
+		approvals: logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.shipment.cancel", ResourceType: "shipment", ResourceID: shipmentID.String(), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsShipmentsPath {
+			route = candidate
+		}
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsShipmentsPath+shipmentID.String()+"/cancel", nil)
+	request.Header.Set("Idempotency-Key", "cancel-key")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusAccepted || !store.called || store.mutation.ApprovalRequestID != approvalID || !strings.Contains(response.Body.String(), `"accepted":true`) {
+		t.Fatalf("status=%d body=%s called=%v mutation=%+v", response.Code, response.Body.String(), store.called, store.mutation)
+	}
+}
+
+func TestLogisticsCancellationRouteRejectsNonApprovedRequest(t *testing.T) {
+	scope := validTestScope(t)
+	shipmentID := logistics.ShipmentID("shipment-1")
+	store := &logisticsShipmentStub{shipment: logistics.Shipment{ID: shipmentID, Status: logistics.StatusCreated, Version: 1}}
+	routes := newLogisticsRoutes(nil, nil, nil, logisticsRouteDependency{shipments: store, approvals: logisticsApprovalStub{request: approval.Request{ID: "approval-1", Action: "fulfillment.shipment.cancel", ResourceType: "shipment", ResourceID: shipmentID.String(), Risk: approval.RiskWriteSensitive, State: approval.StatePending}}})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsShipmentsPath {
+			route = candidate
+		}
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsShipmentsPath+shipmentID.String()+"/cancel", nil)
+	request.Header.Set("Idempotency-Key", "cancel-key")
+	request.Header.Set("Approval-Request-ID", "approval-1")
+	request = request.WithContext(context.WithValue(context.WithValue(request.Context(), requestScopeKey{}, scope), requestIdentityKey{}, Principal{Issuer: "issuer", Subject: "operator-1"}))
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict || store.called {
+		t.Fatalf("status=%d body=%s called=%v", response.Code, response.Body.String(), store.called)
 	}
 }

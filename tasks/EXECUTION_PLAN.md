@@ -1183,13 +1183,13 @@ implementation is split into thirteen subtasks:
 
 `167`
 
-Task 167 is planned as a provider-neutral factual unit-economics contour by
+Task 167 is repository-complete as a provider-neutral factual unit-economics contour by
 channel, store, order and Offer/SKU. It extends the existing `profitability-v1`
 what-if scenario and reporting foundation with explicit accounting bases,
 immutable calculation runs, historical COGS, settlement/payment deduplication,
 advertising and return allocations, sourced FX and completeness evidence. The
 ledger and canonical commerce facts remain authoritative; ClickHouse is only a
-rebuildable projection. The implementation is split into eighteen subtasks:
+rebuildable projection. The implementation is delivered as the eighteen-subtask contract:
 
 1. `167.1` ADR, terminology, accounting scope, bases and metric policy;
 2. `167.2` tenant-scoped channel identity, mapping and attribution resolution;

@@ -38,7 +38,7 @@ func TestRepositoryUsesExplicitNormalizedShipmentStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(content)
-	for _, state := range []string{"create_requested", "created", "cancel_requested", "cancelled"} {
+	for _, state := range []string{"create_requested", "created", "cancel_requested", "cancelled", "cancel_unknown", "StatusUnknown"} {
 		if !strings.Contains(source, state) {
 			t.Fatalf("shipment lifecycle must include %q", state)
 		}

@@ -13,6 +13,8 @@
     "contracts/events/unit-economics-snapshot-requested-v1.schema.json",
     "contracts/openapi/torgnexa-v1.yaml",
     "deploy/postgres/catalog.tsv",
+    "docs/12-reporting-bi.md",
+    "docs/migrations/000034-channel-unit-economics.md",
     "docs/operations/167-channel-unit-economics.md",
     "frontend/src/pages/ReportsPage.tsx",
     "internal/app/api/reports.go",
@@ -35,12 +37,12 @@
   ],
   "adr": "adr/0120-channel-unit-economics.md",
   "existing_adrs": [
-    "adr/0009-transactional-outbox.md",
     "adr/0004-clickhouse-analytics.md",
+    "adr/0009-transactional-outbox.md",
+    "adr/0031-fx-rate-provider.md",
     "adr/0054-advertising-engine.md",
     "adr/0061-marketplace-settlement-ledger.md",
-    "adr/0062-settlement-payment-reconciliation.md",
-    "adr/0031-fx-rate-provider.md"
+    "adr/0062-settlement-payment-reconciliation.md"
   ],
   "gap_audit": {"performed": true, "prompt": "prompts/05-architecture-gap-audit.txt", "decision": "architecture_change"},
   "impacts": [

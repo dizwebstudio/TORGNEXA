@@ -108,11 +108,21 @@ func unitEconomicsByChannel(ctx context.Context, tx *sql.Tx, org, ws string, fil
 	if basis != "order_accrual" && basis != "settlement" && basis != "cash" {
 		return Data{}, errors.New("report repository: invalid unit economics basis")
 	}
-	const statement = `WITH order_cost AS (
+	// The current adapter has authoritative order facts and settlement facts,
+	// but no persisted cash receipt/settlement-run watermark that can safely
+	// combine them. Return an explicit empty, fail-closed view instead of
+	// presenting a mixed-basis number.
+	if basis != "order_accrual" {
+		return Data{Columns: unitEconomicsColumns(), Rows: make([][]string, 0)}, nil
+	}
+	const statement = `WITH cost_latest AS (
+	  SELECT DISTINCT ON (order_id,order_item_id) order_id,order_item_id,currency,cogs_minor_units,cost_as_of,created_at,snapshot_id
+	  FROM unit_economics_cost_snapshots
+	  WHERE organization_id=$1 AND workspace_id=$2
+  ORDER BY order_id,order_item_id,cost_as_of DESC,created_at DESC,snapshot_id DESC
+), order_cost AS (
   SELECT order_id, currency, COALESCE(SUM(cogs_minor_units),0) AS cogs
-  FROM unit_economics_cost_snapshots
-  WHERE organization_id=$1 AND workspace_id=$2
-  GROUP BY order_id,currency
+  FROM cost_latest GROUP BY order_id,currency
 ), order_units AS (
   SELECT order_id, COALESCE(SUM(quantity_coefficient::numeric / power(10::numeric,quantity_scale)),0)::text AS units
   FROM order_items WHERE organization_id=$1 AND workspace_id=$2 GROUP BY order_id
@@ -166,31 +176,45 @@ func unitEconomicsByChannel(ctx context.Context, tx *sql.Tx, org, ws string, fil
 )
 SELECT channel_ref,currency,orders,units,
   (gross-discounts-cancellations-refunds)::bigint AS net_revenue,
-  cogs,commission,0::bigint AS payment_fee,logistics,storage,advertising,refunds,
+	  NULLIF(cogs,0)::bigint AS cogs,commission,NULL::bigint AS payment_fee,NULLIF(logistics,0)::bigint AS logistics,NULLIF(storage,0)::bigint AS storage,NULLIF(advertising,0)::bigint AS advertising,refunds,
   (gross-discounts-cancellations-refunds-cogs-commission-logistics-storage-advertising-penalties+compensation)::bigint AS contribution,
   CASE WHEN (gross-discounts-cancellations-refunds)>0 THEN ((gross-discounts-cancellations-refunds-cogs-commission-logistics-storage-advertising-penalties+compensation)*10000/(gross-discounts-cancellations-refunds)) ELSE 0 END::bigint AS margin_bps,
   CASE WHEN disputed THEN 'conflict' WHEN channel_ref='unattributed' THEN 'unmatched' WHEN cogs=0 OR logistics=0 OR storage=0 OR advertising=0 THEN 'partial' ELSE 'complete' END AS quality_status,
   CASE WHEN disputed THEN 35 WHEN channel_ref='unattributed' THEN 35 WHEN cogs=0 OR logistics=0 OR storage=0 OR advertising=0 THEN 55 ELSE 100 END::bigint AS coverage,
   payout
-FROM merged ORDER BY quality_status,channel_ref,currency LIMIT $7`
-	rows, err := tx.QueryContext(ctx, statement, org, ws, nullableTime(filter.From), nullableTime(filter.To), filter.Currency, filter.ChannelRef, filter.Limit)
+FROM merged
+WHERE ($8='' OR (CASE WHEN disputed THEN 'conflict' WHEN channel_ref='unattributed' THEN 'unmatched' WHEN cogs=0 OR logistics=0 OR storage=0 OR advertising=0 THEN 'partial' ELSE 'complete' END)=$8)
+ORDER BY quality_status,channel_ref,currency LIMIT $7`
+	rows, err := tx.QueryContext(ctx, statement, org, ws, nullableTime(filter.From), nullableTime(filter.To), filter.Currency, filter.ChannelRef, filter.Limit, filter.Status)
 	if err != nil {
 		return Data{}, fmt.Errorf("report repository: unit economics query: %w", err)
 	}
 	defer rows.Close()
-	data := Data{Columns: []Column{
-		{Key: "channel_ref", Label: "Канал"}, {Key: "currency", Label: "Валюта"}, {Key: "basis", Label: "База"}, {Key: "orders", Label: "Заказы"}, {Key: "units", Label: "Единицы"},
-		{Key: "net_revenue_minor_units", Label: "Чистая выручка"}, {Key: "cogs_minor_units", Label: "Себестоимость"}, {Key: "commission_minor_units", Label: "Комиссия"}, {Key: "payment_fee_minor_units", Label: "Эквайринг"}, {Key: "logistics_minor_units", Label: "Логистика"}, {Key: "storage_minor_units", Label: "Хранение"}, {Key: "advertising_minor_units", Label: "Реклама"}, {Key: "refunds_minor_units", Label: "Возвраты"}, {Key: "contribution_profit_minor_units", Label: "Вклад"}, {Key: "margin_basis_points", Label: "Маржа, б.п."}, {Key: "quality_status", Label: "Качество"}, {Key: "coverage_percent", Label: "Покрытие, %"}, {Key: "payout_minor_units", Label: "Выплата"},
-	}, Rows: make([][]string, 0)}
+	data := Data{Columns: unitEconomicsColumns(), Rows: make([][]string, 0)}
 	for rows.Next() {
 		var channel, currency, units, quality string
-		var orders, net, cogs, commission, paymentFee, logistics, storage, advertising, refunds, contribution, margin, coverage, payout int64
+		var orders, net, commission, refunds, contribution, margin, coverage, payout int64
+		var cogs, paymentFee, logistics, storage, advertising sql.NullInt64
 		if err := rows.Scan(&channel, &currency, &orders, &units, &net, &cogs, &commission, &paymentFee, &logistics, &storage, &advertising, &refunds, &contribution, &margin, &quality, &coverage, &payout); err != nil {
 			return Data{}, err
 		}
-		data.Rows = append(data.Rows, []string{channel, currency, basis, strconv.FormatInt(orders, 10), units, strconv.FormatInt(net, 10), strconv.FormatInt(cogs, 10), strconv.FormatInt(commission, 10), strconv.FormatInt(paymentFee, 10), strconv.FormatInt(logistics, 10), strconv.FormatInt(storage, 10), strconv.FormatInt(advertising, 10), strconv.FormatInt(refunds, 10), strconv.FormatInt(contribution, 10), strconv.FormatInt(margin, 10), quality, strconv.FormatInt(coverage, 10), strconv.FormatInt(payout, 10)})
+		data.Rows = append(data.Rows, []string{channel, currency, basis, strconv.FormatInt(orders, 10), units, strconv.FormatInt(net, 10), nullableMinor(cogs), strconv.FormatInt(commission, 10), nullableMinor(paymentFee), nullableMinor(logistics), nullableMinor(storage), nullableMinor(advertising), strconv.FormatInt(refunds, 10), strconv.FormatInt(contribution, 10), strconv.FormatInt(margin, 10), quality, strconv.FormatInt(coverage, 10), strconv.FormatInt(payout, 10)})
 	}
 	return data, rows.Err()
+}
+
+func unitEconomicsColumns() []Column {
+	return []Column{
+		{Key: "channel_ref", Label: "Канал"}, {Key: "currency", Label: "Валюта"}, {Key: "basis", Label: "База"}, {Key: "orders", Label: "Заказы"}, {Key: "units", Label: "Единицы"},
+		{Key: "net_revenue_minor_units", Label: "Чистая выручка"}, {Key: "cogs_minor_units", Label: "Себестоимость"}, {Key: "commission_minor_units", Label: "Комиссия"}, {Key: "payment_fee_minor_units", Label: "Эквайринг"}, {Key: "logistics_minor_units", Label: "Логистика"}, {Key: "storage_minor_units", Label: "Хранение"}, {Key: "advertising_minor_units", Label: "Реклама"}, {Key: "refunds_minor_units", Label: "Возвраты"}, {Key: "contribution_profit_minor_units", Label: "Вклад"}, {Key: "margin_basis_points", Label: "Маржа, б.п."}, {Key: "quality_status", Label: "Качество"}, {Key: "coverage_percent", Label: "Покрытие, %"}, {Key: "payout_minor_units", Label: "Выплата"},
+	}
+}
+
+func nullableMinor(value sql.NullInt64) string {
+	if !value.Valid {
+		return "—"
+	}
+	return strconv.FormatInt(value.Int64, 10)
 }
 
 func salesDaily(ctx context.Context, tx *sql.Tx, org, ws string, filter Filter) (Data, error) {

@@ -32,18 +32,48 @@ see incomplete cost/FX/attribution evidence instead of misleading zeroes.
    run metadata under forced RLS. ClickHouse may project report rows but is
    disposable and never becomes a financial ledger.
 
-## Compatibility and security
+## Alternatives considered
+
+- Treat payout as revenue: rejected because payout is a cash event and can
+  duplicate the sale already present in Orders or SettlementEntry.
+- Fill missing COGS/FX/attribution with zero: rejected because it creates a
+  false margin and hides a broken source mapping.
+- Make every connector calculate its own margin: rejected because provider
+  branches would diverge and settlement evidence could not be reconciled.
+
+## Compatibility impact
 
 The OpenAPI report catalog is additive (`unit_economics_by_channel`) and keeps
 the what-if endpoint unchanged. Amounts are integer minor units, quantities are
 fixed-point strings, and all cross-tenant filters come from authenticated
-scope. Reports, events and logs contain bounded references/digests only; no
+scope. Existing settlement kinds remain valid; new kinds are additive.
+
+## Migration and data impact
+
+Migration `000034_channel_unit_economics.sql` is expand-only. It adds channel
+mapping, COGS evidence, run metadata and quality issue tables, each with forced
+RLS and bounded indexes. It does not rewrite Orders, Payments, Returns,
+Inventory or SettlementEntry. Retention preserves published runs and financial
+evidence under legal hold.
+
+## Security and privacy impact
+
+Reports, events and logs contain bounded references/digests only; no
 credentials, provider payloads, bank details or unnecessary PII are retained.
+Tenant scope is taken from authentication; `reports.read` is required and
+exports are `no-store` and row/period bounded.
 
-## Operational consequences
+## Operational impact
 
-Runs are reproducible by input digest and policy versions. Corrections create a
-new run, while source ledgers remain append-only. Missing COGS, unsupported
-settlement kinds, disputes and unattributed shares are visible in the API/UI.
-Migration `000034_channel_unit_economics.sql` is expand-only, RLS-protected and
-can be retained while readers are disabled during rollback.
+The pure calculation engine has no network side effects. PostgreSQL run
+metadata is immutable and ClickHouse projections are disposable. Missing
+watermarks, stale FX and unsupported basis fail closed; projection rebuilds
+never mutate a financial source.
+
+## Consequences
+
+Operators receive an explainable channel comparison with explicit coverage and
+quality states. The system carries additional derived metadata and requires a
+source mapping/COGS backfill before a channel can become `complete`. Corrections
+create a new calculation run and digest; no report action mutates ledger,
+payment, order, inventory, advertising or channel mapping facts.

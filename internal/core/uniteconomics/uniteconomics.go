@@ -118,7 +118,7 @@ type SettlementFact struct {
 	ID            string    `json:"id"`
 	SourceSystem  string    `json:"source_system"`
 	SourceAccount string    `json:"source_account"`
-	ProviderRef   string    `json:"provider_ref"`
+	EntryRef      string    `json:"entry_ref"`
 	OrderID       string    `json:"order_id"`
 	ChannelRef    string    `json:"channel_ref"`
 	Kind          string    `json:"kind"`
@@ -235,16 +235,17 @@ func component(minor int64, currency string, status ValueStatus, reason string, 
 }
 
 type rowAccumulator struct {
-	row        Row
-	refs       map[string]struct{}
-	reasons    map[string]struct{}
-	hasCOGS    bool
-	hasDispute bool
-	conflict   bool
-	hasCommission bool
-	hasRefunds bool
-	hasPayout bool
-	hasPenalty bool
+	row             Row
+	refs            map[string]struct{}
+	reasons         map[string]struct{}
+	hasCOGS         bool
+	hasDispute      bool
+	conflict        bool
+	hasCommission   bool
+	hasRefunds      bool
+	hasPaymentFee   bool
+	hasPayout       bool
+	hasPenalty      bool
 	hasCompensation bool
 }
 
@@ -278,7 +279,7 @@ func validateInput(in Input) error {
 		}
 	}
 	for _, fact := range in.Settlements {
-		if fact.ID == "" || fact.SourceSystem == "" || fact.SourceAccount == "" || fact.ProviderRef == "" || !currencyPattern.MatchString(fact.Currency) || fact.OccurredAt.IsZero() || !fact.OccurredAt.Equal(fact.OccurredAt.UTC()) || fact.Kind == "" {
+		if fact.ID == "" || fact.SourceSystem == "" || fact.SourceAccount == "" || fact.EntryRef == "" || !currencyPattern.MatchString(fact.Currency) || fact.OccurredAt.IsZero() || !fact.OccurredAt.Equal(fact.OccurredAt.UTC()) || fact.Kind == "" {
 			return ErrInvalid
 		}
 	}
@@ -295,10 +296,10 @@ func digestInput(in Input) (string, error) {
 	sort.Slice(orders, func(i, j int) bool { return orders[i].ID < orders[j].ID })
 	settlements := append([]SettlementFact(nil), in.Settlements...)
 	sort.Slice(settlements, func(i, j int) bool {
-		if settlements[i].ProviderRef == settlements[j].ProviderRef {
+		if settlements[i].EntryRef == settlements[j].EntryRef {
 			return settlements[i].ID < settlements[j].ID
 		}
-		return settlements[i].ProviderRef < settlements[j].ProviderRef
+		return settlements[i].EntryRef < settlements[j].EntryRef
 	})
 	payments := append([]PaymentFact(nil), in.Payments...)
 	sort.Slice(payments, func(i, j int) bool { return payments[i].ID < payments[j].ID })
@@ -335,7 +336,7 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 	}
 	settlementByRef := make(map[string]SettlementFact, len(in.Settlements))
 	for _, fact := range in.Settlements {
-		key := fact.SourceSystem + "\x00" + fact.SourceAccount + "\x00" + fact.ProviderRef
+		key := fact.SourceSystem + "\x00" + fact.SourceAccount + "\x00" + fact.EntryRef
 		if existing, ok := settlementByRef[key]; ok {
 			if existing.ID != fact.ID || existing.AmountMinor != fact.AmountMinor || existing.Currency != fact.Currency || existing.Kind != fact.Kind {
 				return Snapshot{}, ErrConflict
@@ -380,6 +381,7 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 			if err := addChecked(&a.row.Refunds.MinorUnits, order.RefundMinor); err != nil {
 				return Snapshot{}, err
 			}
+			a.hasRefunds = true
 		}
 		if order.COGSMinor != nil {
 			a.hasCOGS = true
@@ -405,7 +407,9 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 		}
 		switch fact.Kind {
 		case "fee":
-			a.row.Commission.MinorUnits += value
+			if err := addChecked(&a.row.Commission.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.hasCommission = true
 			if fact.OrderID != "" {
 				settlementFeeByOrder[fact.OrderID] = true
@@ -414,25 +418,37 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 			a.row.Refunds.MinorUnits += value
 			a.hasRefunds = true
 		case "payout":
-			if err := addChecked(&a.row.Payout.MinorUnits, fact.AmountMinor); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Payout.MinorUnits, fact.AmountMinor); err != nil {
+				return Snapshot{}, err
+			}
 			a.hasPayout = true
 		case "sale": // order facts remain the revenue source; payout/sale is evidence only
 		case "adjustment":
 			a.reason("settlement_adjustment")
 		case "penalty":
-			if err := addChecked(&a.row.Penalties.MinorUnits, value); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Penalties.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.hasPenalty = true
 		case "compensation":
-			if err := addChecked(&a.row.Compensation.MinorUnits, value); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Compensation.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.hasCompensation = true
 		case "logistics":
-			if err := addChecked(&a.row.Logistics.MinorUnits, value); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Logistics.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.row.Logistics.Status = ValueObserved
 		case "storage":
-			if err := addChecked(&a.row.Storage.MinorUnits, value); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Storage.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.row.Storage.Status = ValueObserved
 		case "advertising":
-			if err := addChecked(&a.row.Advertising.MinorUnits, value); err != nil { return Snapshot{}, err }
+			if err := addChecked(&a.row.Advertising.MinorUnits, value); err != nil {
+				return Snapshot{}, err
+			}
 			a.row.Advertising.Status = ValueObserved
 		default:
 			a.row.QualityStatus = QualityUnsupported
@@ -456,7 +472,10 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 		for _, a := range rows { // payment order attribution is resolved through the order source, never a provider name
 			for _, order := range in.Orders {
 				if order.ID == fact.OrderID && normalizeChannel(order.ChannelRef) == a.row.ChannelRef && order.Currency == fact.Currency {
-					a.row.PaymentFee.MinorUnits += fact.FeeMinor
+					if err := addChecked(&a.row.PaymentFee.MinorUnits, fact.FeeMinor); err != nil {
+						return Snapshot{}, err
+					}
+					a.hasPaymentFee = true
 					a.addRef("payment:" + fact.ID)
 					break
 				}
@@ -465,20 +484,42 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 	}
 	resultRows := make([]Row, 0, len(rows))
 	for _, a := range rows {
-		if !a.hasCommission { a.row.Commission.Status = ValueMissing; a.reason("commission_missing") }
-		if !a.hasRefunds && a.row.Refunds.MinorUnits == 0 { a.row.Refunds.Status = ValueMissing; a.reason("refund_fact_missing") }
-		if !a.hasPayout { a.row.Payout.Status = ValueMissing; a.reason("payout_missing") }
-		if !a.hasPenalty { a.row.Penalties.Status = ValueMissing }
-		if !a.hasCompensation { a.row.Compensation.Status = ValueMissing }
+		if !a.hasCommission {
+			a.row.Commission.Status = ValueMissing
+			a.reason("commission_missing")
+		}
+		if !a.hasRefunds && a.row.Refunds.MinorUnits == 0 {
+			a.row.Refunds.Status = ValueMissing
+			a.reason("refund_fact_missing")
+		}
+		if !a.hasPayout {
+			a.row.Payout.Status = ValueMissing
+			a.reason("payout_missing")
+		}
+		if !a.hasPenalty {
+			a.row.Penalties.Status = ValueMissing
+		}
+		if !a.hasCompensation {
+			a.row.Compensation.Status = ValueMissing
+		}
+		if !a.hasPaymentFee {
+			a.row.PaymentFee.Status = ValueMissing
+			a.reason("payment_fee_missing")
+		}
 		a.row.NetRevenue.MinorUnits = a.row.Gross.MinorUnits - a.row.Discounts.MinorUnits - a.row.Cancellations.MinorUnits - a.row.Refunds.MinorUnits
 		if a.row.NetRevenue.MinorUnits < 0 {
 			a.conflict = true
 			a.reason("net_revenue_negative")
 		}
-		contribution := a.row.NetRevenue.MinorUnits - a.row.Commission.MinorUnits - a.row.PaymentFee.MinorUnits - a.row.COGS.MinorUnits
-		if a.row.Payout.MinorUnits < math.MinInt64 || a.row.Payout.MinorUnits > math.MaxInt64 {
+		profit := big.NewInt(a.row.NetRevenue.MinorUnits)
+		for _, expense := range []int64{a.row.Commission.MinorUnits, a.row.PaymentFee.MinorUnits, a.row.Logistics.MinorUnits, a.row.Storage.MinorUnits, a.row.Advertising.MinorUnits, a.row.Promotion.MinorUnits, a.row.COGS.MinorUnits, a.row.Penalties.MinorUnits} {
+			profit.Sub(profit, big.NewInt(expense))
+		}
+		profit.Add(profit, big.NewInt(a.row.Compensation.MinorUnits))
+		if !profit.IsInt64() {
 			return Snapshot{}, ErrInvalid
 		}
+		contribution := profit.Int64()
 		a.row.Contribution.MinorUnits = contribution
 		if a.row.NetRevenue.MinorUnits > 0 {
 			numerator := new(big.Int).Mul(big.NewInt(contribution), big.NewInt(10000))
@@ -495,7 +536,7 @@ func Calculate(in Input, generatedAt time.Time) (Snapshot, error) {
 				missing++
 			}
 		}
-		a.row.CoveragePercent = int64((14 - missing) * 100 / 14)
+		a.row.CoveragePercent = int64((9 - missing) * 100 / 9)
 		quality := QualityComplete
 		if a.row.ChannelRef == UnattributedChannel {
 			quality = QualityUnmatched

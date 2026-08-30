@@ -241,6 +241,49 @@ func (repository *Repository) ApplyCancelResult(ctx context.Context, scope tenan
 	return result, err
 }
 
+// ApplyCancelUnknown closes the claimed cancellation receipt without issuing
+// another carrier request. The local projection becomes unknown and must be
+// reconciled by a later tracking/manual workflow.
+func (repository *Repository) ApplyCancelUnknown(ctx context.Context, scope tenancy.Scope, id logistics.ShipmentID, expectedVersion int64, mutation logistics.Mutation) (logistics.Shipment, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return logistics.Shipment{}, err
+	}
+	if !id.Valid() || expectedVersion < 1 {
+		return logistics.Shipment{}, logistics.ErrInvalidRecord
+	}
+	if err := mutation.Validate(); err != nil {
+		return logistics.Shipment{}, err
+	}
+	var result logistics.Shipment
+	err := repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		current, err := loadShipment(ctx, tx, scope, id, true)
+		if err != nil {
+			return err
+		}
+		if current.Version != expectedVersion || current.RemoteID == "" || current.Status == logistics.StatusCancelled || current.Status == logistics.StatusUnknown {
+			return logistics.ErrConflict
+		}
+		row := tx.QueryRowContext(ctx, `UPDATE logistics_shipments SET status=$4,version=version+1,updated_at=$5 WHERE organization_id=$1 AND workspace_id=$2 AND shipment_id=$3 AND version=$6 RETURNING `+shipmentSelect, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String(), logistics.StatusUnknown, mutation.OccurredAt.UTC(), expectedVersion)
+		result, err = scanShipment(row)
+		if err != nil {
+			return logistics.ErrConflict
+		}
+		key, err := pendingReceiptKey(ctx, tx, scope, cancelOperation, id.String())
+		if err != nil {
+			return err
+		}
+		remote := logistics.RemoteResult{RemoteID: current.RemoteID, Status: logistics.StatusUnknown, Currency: current.Currency, ObservedAt: mutation.OccurredAt.UTC()}
+		if err := completeReceipt(ctx, tx, scope, cancelOperation, key, result, remote); err != nil {
+			return err
+		}
+		if err := appendAudit(ctx, tx, scope, mutation, "fulfillment.shipment.cancel.unknown", id.String(), audit.RiskWriteSensitive, shipmentSummary(result, "cancel_unknown")); err != nil {
+			return err
+		}
+		return enqueueShipmentEvent(ctx, tx, scope, mutation, result, "cancel_unknown")
+	})
+	return result, err
+}
+
 // AppendTrackingEvidence records normalized observation without copying raw
 // carrier payloads into the operational database.
 func (repository *Repository) AppendTrackingEvidence(ctx context.Context, scope tenancy.Scope, id logistics.ShipmentID, status logistics.Status, observedAt time.Time) error {

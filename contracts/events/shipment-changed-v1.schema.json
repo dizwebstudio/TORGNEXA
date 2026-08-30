@@ -9,7 +9,7 @@
     "shipment_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
     "status": {"enum": ["pending", "created", "in_transit", "delivered", "cancelled", "unknown"]},
     "version": {"type": "integer", "minimum": 1},
-    "operation": {"enum": ["create_requested", "created", "cancel_requested", "cancelled"]},
+    "operation": {"enum": ["create_requested", "created", "cancel_requested", "cancelled", "cancel_unknown"]},
     "approval_request_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
   }
 }

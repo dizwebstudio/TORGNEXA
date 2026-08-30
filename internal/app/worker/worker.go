@@ -219,11 +219,15 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_logistics_repository_startup_failed", err)
 	}
+	workflowApprovalRepository, err := approvalrepo.New(db)
+	if err != nil {
+		return fail("worker_workflow_approval_repository_startup_failed", err)
+	}
 	logisticsAccountRepository, err := connectorrepo.New(db)
 	if err != nil {
 		return fail("worker_logistics_connector_repository_startup_failed", err)
 	}
-	logisticsCancelRoute, routeErr := newLogisticsCancelRoute(shipmentRepository, logisticsAccountRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
+	logisticsCancelRoute, routeErr := newLogisticsCancelRoute(shipmentRepository, logisticsAccountRepository, workflowApprovalRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
 		return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
 	})
 	if routeErr != nil {
@@ -253,10 +257,6 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	workflowNotifications, err := notifications.NewService(workflowNotificationRepository, []notifications.Provider{notifications.WebUIProvider{}}, nil)
 	if err != nil {
 		return fail("worker_workflow_notification_service_startup_failed", err)
-	}
-	workflowApprovalRepository, err := approvalrepo.New(db)
-	if err != nil {
-		return fail("worker_workflow_approval_repository_startup_failed", err)
 	}
 	workflowReconciliationRepository, err := reconciliationrepo.New(db)
 	if err != nil {

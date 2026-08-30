@@ -113,7 +113,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Task 167 additions
 
-- planned provider-neutral factual unit economics by channel, extending the
+- repository-complete provider-neutral factual unit economics by channel, extending the
   existing `profitability-v1` scenario without making it a second ledger;
 - eighteen bounded subtasks covering accounting definitions/bases, channel
   identity and attribution, exact metric contracts, source normalization,
