@@ -67,10 +67,13 @@ references, Authorization headers, raw provider errors и PII в центр не
 
 ## Запуск и проверка
 
-После обновления Compose применить миграции штатным bootstrap:
+После заполнения `.env` (см. `docs/deployment/environment-variables.md`) запустить штатный
+single-host Compose-контур. Миграции, роли БД, Kafka topics и зависимости
+поднимутся через `depends_on`:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d postgres kafka backend worker frontend
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml ps
 curl -H "Authorization: Bearer <session>" \
   'http://localhost:8080/api/v1/integration-center?limit=50'
 ```
