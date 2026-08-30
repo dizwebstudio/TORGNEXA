@@ -235,6 +235,12 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if routeErr != nil {
 		return fail("worker_logistics_cancel_route_startup_failed", routeErr)
 	}
+	logisticsCreateRoute, createRouteErr := newLogisticsCreateRoute(shipmentRepository, logisticsAccountRepository, workflowApprovalRepository, runtimeRegistry, secretProvider, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
+		return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
+	})
+	if createRouteErr != nil {
+		return fail("worker_logistics_create_route_startup_failed", createRouteErr)
+	}
 	logisticsReader, readerErr := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".logistics-consumer", logisticsKafkaConsumerGroup, consumerTopics)
 	if readerErr != nil {
 		return fail("worker_logistics_kafka_reader_startup_failed", readerErr)
@@ -245,7 +251,12 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		return fail("worker_logistics_kafka_consumer_startup_failed", consumerErr)
 	}
 	components = append(components, component{name: "logistics-cancel", run: func(componentCtx context.Context) error {
-		return logisticsConsumer.Run(componentCtx, logisticsCancelRoute.Handle)
+		return logisticsConsumer.Run(componentCtx, func(deliveryCtx context.Context, delivery eventbus.Delivery) error {
+			if err := logisticsCreateRoute.Handle(deliveryCtx, delivery); err != nil {
+				return err
+			}
+			return logisticsCancelRoute.Handle(deliveryCtx, delivery)
+		})
 	}})
 
 	workflowRepository, err := workflowrepo.New(db)

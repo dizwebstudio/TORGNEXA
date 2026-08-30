@@ -38,7 +38,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 234
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3069
+- total source files (excluding local secrets/build/dependency/cache trees): 3072
 
 
 ## Connector category layout
@@ -2664,6 +2664,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/worker/integration_center_test.go`
 - `internal/app/worker/logistics_cancel_route.go`
 - `internal/app/worker/logistics_cancel_route_test.go`
+- `internal/app/worker/logistics_create_route.go`
+- `internal/app/worker/logistics_create_route_test.go`
 - `internal/app/worker/payment_reconciliation.go`
 - `internal/app/worker/payment_reconciliation_test.go`
 - `internal/app/worker/publication_quality_gate.go`
@@ -3121,6 +3123,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000033_product_publication_quality.sql`
 - `migrations/000034_channel_unit_economics.sql`
 - `migrations/000035_integration_state_center.sql`
+- `migrations/000036_logistics_shipment_payload_reference.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`

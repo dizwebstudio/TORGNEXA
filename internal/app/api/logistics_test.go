@@ -261,6 +261,33 @@ func TestLogisticsCancellationRouteRequiresMatchingApprovalAndPersistsApprovalRe
 	}
 }
 
+func TestLogisticsShipmentCreationRouteRequiresApprovalAndQueuesEncryptedPayload(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	shipmentID := logistics.ShipmentID("shipment-create-1")
+	store := &logisticsShipmentStub{fresh: true}
+	approvalID := "approval-create-1"
+	routes := newLogisticsRoutes(logisticsAccountStub{account: logisticsTestAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true}, logisticsRouteDependency{shipments: store, approvals: logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.shipment.create", ResourceType: "shipment", ResourceID: shipmentID.String(), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}}})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsShipmentCreatePath {
+			route = candidate
+		}
+	}
+	body := strings.NewReader(`{"shipment_id":"shipment-create-1","connector_account_id":"cdek-account","external_id":"order-17","service_code":"cdek_tariff_136","from":{"country":"RU","postal_code":"101000","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","postal_code":"190000","city":"Санкт-Петербург","line1":"Невский, 1"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}],"pickup_point_ref":"pvz-137","sender":{"name":"ООО Торгнекса","phone":"+74951234567"},"recipient":{"name":"Иван Петров","phone":"+79991234567"}}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsShipmentCreatePath, body)
+	request.Header.Set("Idempotency-Key", "create-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusAccepted || !store.called || store.mutation.ApprovalRequestID != approvalID || !strings.Contains(response.Body.String(), `"accepted":true`) {
+		t.Fatalf("status=%d body=%s called=%v mutation=%+v", response.Code, response.Body.String(), store.called, store.mutation)
+	}
+}
+
 func TestLogisticsCancellationRouteRejectsNonApprovedRequest(t *testing.T) {
 	scope := validTestScope(t)
 	shipmentID := logistics.ShipmentID("shipment-1")

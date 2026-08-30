@@ -733,6 +733,26 @@
       },
       "backfill": null,
       "sha256": "3899449c0a12defc82ca7b0ebca9803a20aed7dba5f35b9acd4e294a0e7a6c87"
+    },
+    {
+      "version": 36,
+      "name": "logistics_shipment_payload_reference",
+      "file": "000036_logistics_shipment_payload_reference.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [35],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "014a6bbcfdc2a341b063aea0ea5213d2bd4a73a9307c392af3d9f9b2f1f8b252"
     }
   ]
 }

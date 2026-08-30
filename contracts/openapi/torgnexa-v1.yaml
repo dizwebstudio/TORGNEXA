@@ -124,6 +124,24 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /logistics/shipments:
+    post:
+      operationId: createLogisticsShipment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsShipmentCreateRequest'}
+      responses:
+        '202': {description: Shipment creation accepted for asynchronous carrier processing, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsShipmentCreation'}}}}
+        '400': {description: Invalid shipment or idempotency key}
+        '403': {description: Caller lacks logistics.shipment.create}
+        '404': {description: Shipment not found}
+        '409': {description: Shipment state or idempotency conflict}
   /logistics/shipments/{shipment_id}/cancel:
     post:
       operationId: cancelLogisticsShipment
@@ -2723,6 +2741,29 @@ components:
         from: {$ref: '#/components/schemas/LogisticsAddress'}
         to: {$ref: '#/components/schemas/LogisticsAddress'}
         parcels: {type: array, minItems: 1, maxItems: 50, items: {$ref: '#/components/schemas/LogisticsParcel'}}
+    LogisticsContact:
+      type: object
+      additionalProperties: false
+      required: [name, phone]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 255}
+        phone: {type: string, minLength: 1, maxLength: 32}
+        email: {type: string, maxLength: 254, format: email}
+    LogisticsShipmentCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [shipment_id, connector_account_id, external_id, service_code, from, to, parcels, sender, recipient]
+      properties:
+        shipment_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        external_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        service_code: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        from: {$ref: '#/components/schemas/LogisticsAddress'}
+        to: {$ref: '#/components/schemas/LogisticsAddress'}
+        parcels: {type: array, minItems: 1, maxItems: 50, items: {$ref: '#/components/schemas/LogisticsParcel'}}
+        pickup_point_ref: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        sender: {$ref: '#/components/schemas/LogisticsContact'}
+        recipient: {$ref: '#/components/schemas/LogisticsContact'}
     LogisticsRateQuote:
       type: object
       additionalProperties: false
@@ -2749,6 +2790,16 @@ components:
         tracking_number: {type: string, maxLength: 192}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsShipmentCancellation:
+      type: object
+      additionalProperties: false
+      required: [id, status, version, accepted, fresh]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, enum: [pending, created, in_transit, delivered, cancelled, unknown]}
+        version: {type: integer, minimum: 1}
+        accepted: {const: true}
+        fresh: {type: boolean}
+    LogisticsShipmentCreation:
       type: object
       additionalProperties: false
       required: [id, status, version, accepted, fresh]

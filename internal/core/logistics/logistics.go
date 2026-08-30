@@ -113,13 +113,13 @@ func (shipment Shipment) Validate() error {
 // request payload is encrypted separately; only its opaque reference and
 // digest cross the local durable boundary.
 type CreateCommand struct {
-	ID              ShipmentID
-	AccountID       string
-	ExternalID      string
-	ServiceCode     string
-	IdempotencyKey  string
+	ID               ShipmentID
+	AccountID        string
+	ExternalID       string
+	ServiceCode      string
+	IdempotencyKey   string
 	PayloadReference string
-	PayloadDigest   string
+	PayloadDigest    string
 }
 
 // Validate checks the bounded local identity of a create request.

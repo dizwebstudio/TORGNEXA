@@ -1,5 +1,8 @@
 BEGIN;
 
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
 -- Shipment creation payloads contain purpose-limited address/contact data.
 -- Keep only an opaque SecretProvider reference in the operational projection;
 -- the encrypted payload is opened by the worker for the single remote call.

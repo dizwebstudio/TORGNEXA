@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
-	logisticsRatesPath        = "/api/v1/logistics/rates"
-	logisticsTrackingPath     = "/api/v1/logistics/tracking"
+	logisticsPickupPointsPath   = "/api/v1/logistics/pickup-points"
+	logisticsRatesPath          = "/api/v1/logistics/rates"
+	logisticsTrackingPath       = "/api/v1/logistics/tracking"
 	logisticsShipmentCreatePath = "/api/v1/logistics/shipments"
-	logisticsShipmentsPath    = "/api/v1/logistics/shipments/"
+	logisticsShipmentsPath      = "/api/v1/logistics/shipments/"
 )
 
 var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
@@ -105,14 +105,14 @@ type logisticsContactInput struct {
 }
 
 type logisticsShipmentCreateInput struct {
-	ShipmentID         string                  `json:"shipment_id"`
-	ConnectorAccountID string                  `json:"connector_account_id"`
-	ExternalID         string                  `json:"external_id"`
-	ServiceCode        string                  `json:"service_code"`
+	ShipmentID         string                 `json:"shipment_id"`
+	ConnectorAccountID string                 `json:"connector_account_id"`
+	ExternalID         string                 `json:"external_id"`
+	ServiceCode        string                 `json:"service_code"`
 	From               logisticsAddressInput  `json:"from"`
 	To                 logisticsAddressInput  `json:"to"`
 	Parcels            []logisticsParcelInput `json:"parcels"`
-	PickupPointRef     string                  `json:"pickup_point_ref"`
+	PickupPointRef     string                 `json:"pickup_point_ref"`
 	Sender             logisticsContactInput  `json:"sender"`
 	Recipient          logisticsContactInput  `json:"recipient"`
 }
@@ -221,7 +221,7 @@ func (api logisticsAPI) createShipment(w http.ResponseWriter, r *http.Request) {
 	defer func() { wipeBytes(payload) }()
 	shipment, fresh, err := api.shipments.BeginCreate(r.Context(), scope, logistics.CreateCommand{ID: shipmentID, AccountID: strings.TrimSpace(input.ConnectorAccountID), ExternalID: request.ExternalID, ServiceCode: request.ServiceCode, IdempotencyKey: key, PayloadReference: metadata.Reference.String(), PayloadDigest: hex.EncodeToString(digest[:])}, logistics.Mutation{EventID: newApprovalID(), AuditID: newApprovalID(), ActorID: principal.Subject, Source: "api.logistics", CorrelationID: key, ApprovalRequestID: approvalID, OccurredAt: time.Now().UTC()})
 	if err != nil {
-		_ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
+		_, _ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
 		switch {
 		case errors.Is(err, logistics.ErrNotFound):
 			writeProblem(w, http.StatusNotFound, "Not Found")
@@ -233,7 +233,7 @@ func (api logisticsAPI) createShipment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !fresh {
-		_ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
+		_, _ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": shipment.ID.String(), "status": string(shipment.Status), "version": shipment.Version, "accepted": true, "fresh": fresh})
 }

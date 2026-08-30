@@ -95,15 +95,15 @@ func (q RateQuote) Validate() error {
 }
 
 type ShipmentCreateRequest struct {
-	ExternalID     string            `json:"external_id"`
-	ServiceCode    string            `json:"service_code"`
-	IdempotencyKey string            `json:"idempotency_key"`
-	From           Address           `json:"from"`
-	To             Address           `json:"to"`
-	Parcels        []Parcel          `json:"parcels"`
-	PickupPointRef string            `json:"pickup_point_ref,omitempty"`
-	Sender         LogisticsContact  `json:"sender"`
-	Recipient      LogisticsContact  `json:"recipient"`
+	ExternalID     string           `json:"external_id"`
+	ServiceCode    string           `json:"service_code"`
+	IdempotencyKey string           `json:"idempotency_key"`
+	From           Address          `json:"from"`
+	To             Address          `json:"to"`
+	Parcels        []Parcel         `json:"parcels"`
+	PickupPointRef string           `json:"pickup_point_ref,omitempty"`
+	Sender         LogisticsContact `json:"sender"`
+	Recipient      LogisticsContact `json:"recipient"`
 }
 type ShipmentResult struct {
 	RemoteID, Status string
