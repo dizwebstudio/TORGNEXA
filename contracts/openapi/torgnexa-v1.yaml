@@ -124,6 +124,20 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /logistics/labels:
+    get:
+      operationId: readLogisticsLabel
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: remote_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [pdf, a4, a5, a6], default: pdf}}
+      responses:
+        '200': {description: Remote transport-label artifact reference, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsLabel'}}}}
+        '400': {description: Invalid label query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
   /logistics/shipments:
     post:
       operationId: createLogisticsShipment
@@ -2788,6 +2802,14 @@ components:
         remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
         tracking_number: {type: string, maxLength: 192}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsLabel:
+      type: object
+      additionalProperties: false
+      required: [artifact_ref, media_type, observed_at]
+      properties:
+        artifact_ref: {type: string, minLength: 1, maxLength: 192}
+        media_type: {type: string, const: application/pdf}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsShipmentCancellation:
       type: object

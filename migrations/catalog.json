@@ -753,6 +753,26 @@
       },
       "backfill": null,
       "sha256": "014a6bbcfdc2a341b063aea0ea5213d2bd4a73a9307c392af3d9f9b2f1f8b252"
+    },
+    {
+      "version": 37,
+      "name": "marking_execution",
+      "file": "000037_marking_execution.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [36],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "1725f107001a6705400186b411efb440e84c5a1adb90b86ffffa25bfe2ee43e4"
     }
   ]
 }

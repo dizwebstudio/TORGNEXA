@@ -34,6 +34,7 @@ type logisticsRuntimeStub struct {
 	points    []sdk.PickupPoint
 	rates     []sdk.RateQuote
 	tracking  sdk.ShipmentResult
+	label     sdk.LabelResult
 }
 
 type logisticsShipmentStub struct {
@@ -89,6 +90,13 @@ func (stub logisticsRuntimeStub) LogisticsTracking(_ context.Context, _ sdk.Acco
 		return sdk.ShipmentResult{}, errors.New("runtime or tracking request missing")
 	}
 	return stub.tracking, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsLabel(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LabelRequest) (sdk.LabelResult, error) {
+	if runtime == nil || query.Validate() != nil {
+		return sdk.LabelResult{}, errors.New("runtime or label request missing")
+	}
+	return stub.label, nil
 }
 
 type logisticsSecretsStub struct{}
@@ -224,6 +232,47 @@ func TestLogisticsTrackingRouteFailsClosedWithoutEnabledCapability(t *testing.T)
 		}
 	}
 	request := logisticsRequest(t, scope, logisticsTrackingPath+"?connector_account_id=cdek-account&remote_id=1100285492")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsLabelRouteReturnsArtifactReference(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.label.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, label: sdk.LabelResult{ArtifactRef: "cdek:print:barcode:72753031-1820-4f99-9240-aab139f05ca5", MediaType: "application/pdf", ObservedAt: now}})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsLabelsPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("label route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsLabelsPath+"?connector_account_id=cdek-account&remote_id=1100285492&format=pdf")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"artifact_ref":"cdek:print:barcode:`) || !strings.Contains(response.Body.String(), `"media_type":"application/pdf"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsLabelRouteFailsClosedWithoutEnabledCapability(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsLabelsPath {
+			route = candidate
+		}
+	}
+	request := logisticsRequest(t, scope, logisticsLabelsPath+"?connector_account_id=cdek-account&remote_id=1100285492")
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusConflict {

@@ -327,16 +327,16 @@ func safeHex(value string) bool {
 }
 
 var validStatuses = map[string]map[string]struct{}{
-	"runtime":        {string(RuntimeReady): {}, string(RuntimeSeparateSurface): {}, string(RuntimeHealthOnly): {}, string(RuntimeUnsupported): {}, string(RuntimeNotRegistered): {}, string(RuntimeDrifted): {}},
-	"account":        {string(AccountNotCreated): {}, string(AccountDisabled): {}, string(AccountActive): {}, string(AccountSuspended): {}, string(AccountError): {}},
+	"runtime":        {"unknown": {}, string(RuntimeReady): {}, string(RuntimeSeparateSurface): {}, string(RuntimeHealthOnly): {}, string(RuntimeUnsupported): {}, string(RuntimeNotRegistered): {}, string(RuntimeDrifted): {}},
+	"account":        {"unknown": {}, string(AccountNotCreated): {}, string(AccountDisabled): {}, string(AccountActive): {}, string(AccountSuspended): {}, string(AccountError): {}},
 	"credential":     {string(CredentialMissing): {}, string(CredentialPresent): {}, string(CredentialExpired): {}, string(CredentialReauthorizationRequired): {}, string(CredentialInvalid): {}, string(CredentialUnknown): {}},
 	"configuration":  {string(ConfigurationMissing): {}, string(ConfigurationInvalid): {}, string(ConfigurationValid): {}, string(ConfigurationStale): {}, string(ConfigurationUnknown): {}},
 	"health":         {string(HealthUnknown): {}, string(HealthHealthy): {}, string(HealthDegraded): {}, string(HealthUnavailable): {}, string(HealthStale): {}},
-	"capability":     {string(CapabilityNotDeclared): {}, string(CapabilityDeclared): {}, string(CapabilityGranted): {}, string(CapabilityEnabled): {}, string(CapabilityBlocked): {}, string(CapabilityQualificationRequired): {}, string(CapabilityStale): {}},
-	"sync":           {string(SyncNotConfigured): {}, string(SyncIdle): {}, string(SyncRunning): {}, string(SyncRetrying): {}, string(SyncFailed): {}, string(SyncStale): {}, string(SyncPaused): {}},
-	"reconciliation": {string(ReconciliationNotConfigured): {}, string(ReconciliationHealthy): {}, string(ReconciliationDriftOpen): {}, string(ReconciliationFailed): {}, string(ReconciliationStale): {}},
-	"webhook":        {string(WebhookNotConfigured): {}, string(WebhookReceiving): {}, string(WebhookFailing): {}, string(WebhookStale): {}, string(WebhookUnsupported): {}},
-	"rate_limit":     {string(RateLimitNotObserved): {}, string(RateLimitAvailable): {}, string(RateLimitLimited): {}, string(RateLimitResetUnknown): {}, string(RateLimitStale): {}},
+	"capability":     {"unknown": {}, string(CapabilityNotDeclared): {}, string(CapabilityDeclared): {}, string(CapabilityGranted): {}, string(CapabilityEnabled): {}, string(CapabilityBlocked): {}, string(CapabilityQualificationRequired): {}, string(CapabilityStale): {}},
+	"sync":           {"unknown": {}, string(SyncNotConfigured): {}, string(SyncIdle): {}, string(SyncRunning): {}, string(SyncRetrying): {}, string(SyncFailed): {}, string(SyncStale): {}, string(SyncPaused): {}},
+	"reconciliation": {"unknown": {}, string(ReconciliationNotConfigured): {}, string(ReconciliationHealthy): {}, string(ReconciliationDriftOpen): {}, string(ReconciliationFailed): {}, string(ReconciliationStale): {}},
+	"webhook":        {"unknown": {}, string(WebhookNotConfigured): {}, string(WebhookReceiving): {}, string(WebhookFailing): {}, string(WebhookStale): {}, string(WebhookUnsupported): {}},
+	"rate_limit":     {"unknown": {}, string(RateLimitNotObserved): {}, string(RateLimitAvailable): {}, string(RateLimitLimited): {}, string(RateLimitResetUnknown): {}, string(RateLimitStale): {}},
 }
 
 func validVisibility(v Visibility) bool {

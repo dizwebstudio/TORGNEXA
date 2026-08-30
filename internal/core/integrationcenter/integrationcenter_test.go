@@ -87,6 +87,9 @@ func TestReduceFreshnessAndRedaction(t *testing.T) {
 	if got.Dimensions.Sync.Status != "unknown" {
 		t.Fatalf("redacted sync status=%s", got.Dimensions.Sync.Status)
 	}
+	if err := got.Validate(); err != nil {
+		t.Fatalf("redacted snapshot must remain a valid persisted/public contract: %v", err)
+	}
 }
 
 func TestReduceDigestIsDeterministicAndSafe(t *testing.T) {

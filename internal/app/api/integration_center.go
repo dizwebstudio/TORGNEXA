@@ -100,31 +100,40 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 		partial = true
 	}
 	policies := make([]syncengine.Policy, 0)
+	policiesReadable := true
 	if s.policies != nil {
 		policies, err = s.policies.ListPolicies(ctx, scope, 100)
 		if err != nil {
 			partial = true
+			policiesReadable = false
 		}
 	} else {
 		partial = true
+		policiesReadable = false
 	}
 	runs := make([]reconciliation.Run, 0)
+	runsReadable := true
 	if s.reconciliation != nil {
 		runs, err = s.reconciliation.ListRuns(ctx, scope, 100)
 		if err != nil {
 			partial = true
+			runsReadable = false
 		}
 	} else {
 		partial = true
+		runsReadable = false
 	}
 	drifts := make([]reconciliation.Drift, 0)
+	driftsReadable := true
 	if s.reconciliation != nil {
 		drifts, err = s.reconciliation.ListRecentDrifts(ctx, scope, 100)
 		if err != nil {
 			partial = true
+			driftsReadable = false
 		}
 	} else {
 		partial = true
+		driftsReadable = false
 	}
 	policyByAccount := make(map[string][]syncengine.Policy)
 	for _, p := range policies {
@@ -145,7 +154,7 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 	}
 	rows := make([]integrationcenter.Snapshot, 0, centerMin(len(accounts), request.Limit))
 	for _, account := range accounts {
-		row, rowPartial := s.reduceAccount(account, policyByAccount[account.ID], latestRunByPolicy, openDriftByPolicy, capabilityByAccount[account.ID], configByAccount[account.ID], capabilitiesReadable, configsReadable)
+		row, rowPartial := s.reduceAccount(account, policyByAccount[account.ID], latestRunByPolicy, openDriftByPolicy, capabilityByAccount[account.ID], configByAccount[account.ID], capabilitiesReadable, configsReadable, policiesReadable, runsReadable, driftsReadable)
 		partial = partial || rowPartial
 		if !centerMatches(row, request) {
 			continue
@@ -160,7 +169,7 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 	return result, nil
 }
 
-func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []syncengine.Policy, runs map[string]reconciliation.Run, drifts map[string]bool, settings []sdk.AccountCapabilitySetting, configState connectorconfigrepo.State, capabilitiesReadable, configsReadable bool) (integrationcenter.Snapshot, bool) {
+func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []syncengine.Policy, runs map[string]reconciliation.Run, drifts map[string]bool, settings []sdk.AccountCapabilitySetting, configState connectorconfigrepo.State, capabilitiesReadable, configsReadable, policiesReadable, runsReadable, driftsReadable bool) (integrationcenter.Snapshot, bool) {
 	now := time.Now().UTC()
 	partial := false
 	support, supported := builtinruntime.SupportFor(account.ConnectorID)
@@ -267,7 +276,11 @@ func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []s
 		}
 	}
 	syncStatus := integrationcenter.SyncNotConfigured
-	if len(policies) > 0 {
+	syncVisibility := integrationcenter.VisibilityFull
+	if !policiesReadable || !runsReadable {
+		syncStatus = "unknown"
+		syncVisibility = integrationcenter.VisibilityRedacted
+	} else if len(policies) > 0 {
 		syncStatus = integrationcenter.SyncIdle
 		allDisabled := true
 		for _, policy := range policies {
@@ -288,7 +301,11 @@ func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []s
 		}
 	}
 	reconStatus := integrationcenter.ReconciliationNotConfigured
-	if len(policies) > 0 {
+	reconVisibility := integrationcenter.VisibilityFull
+	if !policiesReadable || !driftsReadable {
+		reconStatus = "unknown"
+		reconVisibility = integrationcenter.VisibilityRedacted
+	} else if len(policies) > 0 {
 		reconStatus = integrationcenter.ReconciliationHealthy
 		for _, policy := range policies {
 			if drifts[policy.ID] {
@@ -300,7 +317,11 @@ func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []s
 	configurationEvidence.Visibility = configurationVisibility
 	capabilityEvidence := e
 	capabilityEvidence.Visibility = capabilityVisibility
-	dims := integrationcenter.Dimensions{Runtime: integrationcenter.Dimension{Status: string(runtimeStatus), Evidence: e}, Account: integrationcenter.Dimension{Status: string(accountStatus), Evidence: e}, Credential: integrationcenter.Dimension{Status: string(credential), Evidence: e}, Configuration: integrationcenter.Dimension{Status: string(configuration), Evidence: configurationEvidence}, Health: integrationcenter.Dimension{Status: string(healthStatus), Evidence: healthEvidence}, Capability: integrationcenter.Dimension{Status: string(capStatus), Evidence: capabilityEvidence}, Sync: integrationcenter.Dimension{Status: string(syncStatus), Evidence: e}, Reconciliation: integrationcenter.Dimension{Status: string(reconStatus), Evidence: e}, Webhook: integrationcenter.Dimension{Status: string(integrationcenter.WebhookNotConfigured), Evidence: e}, RateLimit: integrationcenter.Dimension{Status: string(integrationcenter.RateLimitNotObserved), Evidence: e}}
+	syncEvidence := e
+	syncEvidence.Visibility = syncVisibility
+	reconEvidence := e
+	reconEvidence.Visibility = reconVisibility
+	dims := integrationcenter.Dimensions{Runtime: integrationcenter.Dimension{Status: string(runtimeStatus), Evidence: e}, Account: integrationcenter.Dimension{Status: string(accountStatus), Evidence: e}, Credential: integrationcenter.Dimension{Status: string(credential), Evidence: e}, Configuration: integrationcenter.Dimension{Status: string(configuration), Evidence: configurationEvidence}, Health: integrationcenter.Dimension{Status: string(healthStatus), Evidence: healthEvidence}, Capability: integrationcenter.Dimension{Status: string(capStatus), Evidence: capabilityEvidence}, Sync: integrationcenter.Dimension{Status: syncStatus, Evidence: syncEvidence}, Reconciliation: integrationcenter.Dimension{Status: reconStatus, Evidence: reconEvidence}, Webhook: integrationcenter.Dimension{Status: string(integrationcenter.WebhookNotConfigured), Evidence: e}, RateLimit: integrationcenter.Dimension{Status: string(integrationcenter.RateLimitNotObserved), Evidence: e}}
 	input := integrationcenter.Input{AccountID: account.ID, ConnectorID: account.ConnectorID, Family: string(account.Family), Surface: support.Surface, Version: account.Version, Dimensions: dims, Capabilities: capabilities, Now: now}
 	if !supported {
 		input.Surface = "unknown"
