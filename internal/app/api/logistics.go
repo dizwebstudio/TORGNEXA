@@ -26,6 +26,7 @@ const (
 	logisticsPickupPointsPath   = "/api/v1/logistics/pickup-points"
 	logisticsRatesPath          = "/api/v1/logistics/rates"
 	logisticsTrackingPath       = "/api/v1/logistics/tracking"
+	logisticsLabelsPath         = "/api/v1/logistics/labels"
 	logisticsShipmentCreatePath = "/api/v1/logistics/shipments"
 	logisticsShipmentsPath      = "/api/v1/logistics/shipments/"
 )
@@ -53,6 +54,7 @@ type logisticsRuntime interface {
 	PickupPoints(context.Context, sdk.Account, sdk.Runtime, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
 	LogisticsRates(context.Context, sdk.Account, sdk.Runtime, sdk.RateRequest) ([]sdk.RateQuote, error)
 	LogisticsTracking(context.Context, sdk.Account, sdk.Runtime, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
+	LogisticsLabel(context.Context, sdk.Account, sdk.Runtime, sdk.LabelRequest) (sdk.LabelResult, error)
 }
 
 type logisticsAPI struct {
@@ -132,16 +134,23 @@ type logisticsTrackingView struct {
 	ObservedAt     time.Time `json:"observed_at"`
 }
 
+type logisticsLabelView struct {
+	ArtifactRef string    `json:"artifact_ref"`
+	MediaType   string    `json:"media_type"`
+	ObservedAt  time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime, dependencies ...logisticsRouteDependency) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
 	if len(dependencies) > 0 {
 		api.shipments = dependencies[0].shipments
 		api.approvals = dependencies[0].approvals
 	}
-	routes := []ProtectedRoute{
+		routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
+		{Method: http.MethodGet, Path: logisticsLabelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readLabel)},
 	}
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentCreatePath, Permission: "logistics.shipment.create", Handler: http.HandlerFunc(api.createShipment)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
@@ -458,6 +467,55 @@ func (api logisticsAPI) readTracking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, logisticsTrackingView{RemoteID: result.RemoteID, Status: result.Status, TrackingNumber: result.TrackingNumber, ObservedAt: result.ObservedAt})
+}
+
+func (api logisticsAPI) readLabel(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	remoteID := strings.TrimSpace(r.URL.Query().Get("remote_id"))
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "pdf"
+	}
+	request := sdk.LabelRequest{RemoteID: remoteID, Format: format}
+	if accountID == "" || !logisticsRemoteIDPattern.MatchString(remoteID) || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.label.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Label operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Label capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	result, err := api.runtime.LogisticsLabel(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if result.ArtifactRef == "" || len(result.ArtifactRef) > 192 || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, logisticsLabelView{ArtifactRef: result.ArtifactRef, MediaType: result.MediaType, ObservedAt: result.ObservedAt})
 }
 
 func (input logisticsRatesInput) toSDK() sdk.RateRequest {

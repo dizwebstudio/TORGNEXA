@@ -278,6 +278,23 @@ type cdekCreateResponse struct {
 	} `json:"entity"`
 }
 
+type cdekPrintOrder struct {
+	OrderUUID string `json:"order_uuid"`
+}
+
+type cdekPrintRequest struct {
+	Orders    []cdekPrintOrder `json:"orders"`
+	CopyCount int              `json:"copy_count"`
+	Format    string           `json:"format"`
+}
+
+type cdekPrintResponse struct {
+	Entity struct {
+		UUID string `json:"uuid"`
+		URL  string `json:"url"`
+	} `json:"entity"`
+}
+
 type cdekTariffQuote struct {
 	TariffCode  json.RawMessage `json:"tariff_code"`
 	TotalSum    json.RawMessage `json:"total_sum"`
@@ -579,6 +596,19 @@ func validCdekContact(contact sdk.LogisticsContact) bool {
 	return true
 }
 
+func cdekLabelFormat(value string) (string, error) {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "PDF", "A4":
+		return "A4", nil
+	case "A5":
+		return "A5", nil
+	case "A6":
+		return "A6", nil
+	default:
+		return "", errors.New("СДЭК label format is not supported")
+	}
+}
+
 func (transport cdekHTTP) Create(ctx context.Context, secret []byte, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
 	if transport.h == nil || request.Validate() != nil || len(request.Parcels) > 50 || request.PickupPointRef != "" && !cdekRemotePattern.MatchString(request.PickupPointRef) || !validCdekContact(request.Sender) || !validCdekContact(request.Recipient) {
 		return sdk.ShipmentResult{}, errors.New("СДЭК shipment creation request is unavailable")
@@ -691,8 +721,54 @@ func (transport cdekHTTP) Cancel(ctx context.Context, secret []byte, request sdk
 func (cdekHTTP) Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
-func (cdekHTTP) Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error) {
-	return sdk.LabelResult{}, errLogisticsOperationNotAdmitted
+func (transport cdekHTTP) Label(ctx context.Context, secret []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || request.Validate() != nil || remoteID == "" {
+		return sdk.LabelResult{}, errors.New("СДЭК label request is unavailable")
+	}
+	format, err := cdekLabelFormat(request.Format)
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	token, err := transport.accessToken(ctx, secret)
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	headers := http.Header{"Authorization": []string{"Bearer " + token}, "Accept": []string{"application/json"}}
+	uuid := remoteID
+	if !cdekUUIDPattern.MatchString(uuid) {
+		status, body, _, _, _, requestErr := transport.h.do(ctx, http.MethodGet, "api.cdek.ru", "/v2/orders", url.Values{"cdek_number": []string{remoteID}}, nil, headers, nil, nil)
+		if requestErr != nil {
+			return sdk.LabelResult{}, requestErr
+		}
+		if status < http.StatusOK || status >= http.StatusMultipleChoices {
+			return sdk.LabelResult{}, fmt.Errorf("СДЭК label lookup rejected with status %d", status)
+		}
+		var response cdekOrderEnvelope
+		if json.Unmarshal(body, &response) != nil || !cdekUUIDPattern.MatchString(strings.TrimSpace(response.Entity.UUID)) {
+			return sdk.LabelResult{}, errors.New("СДЭК label lookup returned no UUID")
+		}
+		if number := cdekScalarText(response.Entity.CDEKNumber); number != "" && number != remoteID {
+			return sdk.LabelResult{}, errors.New("СДЭК label lookup identifier mismatch")
+		}
+		uuid = strings.TrimSpace(response.Entity.UUID)
+	}
+	body, err := json.Marshal(cdekPrintRequest{Orders: []cdekPrintOrder{{OrderUUID: uuid}}, CopyCount: 1, Format: format})
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.cdek.ru", "/v2/print/barcodes", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LabelResult{}, fmt.Errorf("СДЭК label request rejected with status %d", status)
+	}
+	var response cdekPrintResponse
+	if json.Unmarshal(responseBody, &response) != nil || !cdekUUIDPattern.MatchString(strings.TrimSpace(response.Entity.UUID)) {
+		return sdk.LabelResult{}, errors.New("СДЭК label response rejected")
+	}
+	return sdk.LabelResult{ArtifactRef: "cdek:print:barcode:" + strings.TrimSpace(response.Entity.UUID), MediaType: "application/pdf", ObservedAt: time.Now().UTC()}, nil
 }
 func (cdekHTTP) Webhook(context.Context, []byte, []byte, []byte) (sdk.LogisticsWebhook, error) {
 	return sdk.LogisticsWebhook{}, errLogisticsOperationNotAdmitted

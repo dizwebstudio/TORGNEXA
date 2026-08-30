@@ -209,6 +209,17 @@ func (r *Registry) LogisticsTracking(ctx context.Context, account sdk.Account, r
 	}
 }
 
+// LogisticsLabel reads a qualified CDEK transport-label artifact reference.
+// The carrier returns a host-neutral reference to its asynchronous print
+// request; downloading or storing the binary remains outside this connector
+// operation.
+func (r *Registry) LogisticsLabel(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "cdek" || !SupportsCapability(account.ConnectorID, "logistics.label.read") {
+		return sdk.LabelResult{}, ErrUnavailable
+	}
+	return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+}
+
 // LogisticsCanceler resolves the explicitly qualified CDEK cancellation
 // surface. The host must still enforce tenant scope, capability settings,
 // policy/approval and operation idempotency before invoking it.
