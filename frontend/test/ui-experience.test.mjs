@@ -20,15 +20,21 @@ test("shell exposes icon navigation, command search, theme and activity center",
   assert.match(shell, /Повторить/);
 });
 
-test("dashboard is operational and includes onboarding and orchestration state", () => {
+test("dashboard is operational, permission-aware and loads metrics independently", () => {
   const dashboard = read("pages/DashboardPage.tsx");
-  assert.match(dashboard, /Открытые расхождения/);
-  assert.match(dashboard, /Складские инциденты/);
-  assert.match(dashboard, /Требуют человека/);
-  assert.match(dashboard, /Первый запуск/);
-  assert.match(dashboard, /Оркестрация Commerce/);
+  assert.match(dashboard, /Расхождения/);
+  assert.match(dashboard, /Проблемы на складе/);
+  assert.match(dashboard, /Ждут решения/);
+  assert.match(dashboard, /Первые шаги/);
+  assert.match(dashboard, /enabled: canReadStock/);
+  assert.match(dashboard, /kpi-value-skeleton/);
+  assert.equal((dashboard.match(/listConnectorAccounts/g) ?? []).length, 1);
+  assert.equal((dashboard.match(/getSyncStatus/g) ?? []).length, 1);
+  assert.match(dashboard, /href="\/approvals"/);
+  assert.doesNotMatch(dashboard, /Оркестрация Commerce/);
+  assert.doesNotMatch(dashboard, /рабочий контур/);
   assert.match(dashboard, /DemoDatasetButton/);
-  assert.match(dashboard, /Заполнить рабочий контур/);
+  assert.match(dashboard, /Быстро заполнить систему/);
 });
 
 test("data table provides search sort pagination columns selection and bookmarkable views without browser persistence", () => {
@@ -169,7 +175,7 @@ test("catalog product creation starts from a real product card", () => {
   assert.match(catalog, /api\.createProductImage\(\{productId:productID/);
   assert.doesNotMatch(catalog, /Заполнить демо-каталог/);
   assert.doesNotMatch(catalog, /createDemoOrders/);
-  assert.match(demoButton, /Заполнить весь демо-контур/);
+  assert.match(demoButton, /Добавить демо-данные/);
   assert.match(demoButton, /demo-dataset:all/);
   assert.match(demoCache, /cache\.invalidateQueries\(\)/);
   assert.match(catalog, /catalog-product-thumbnail/);
@@ -353,7 +359,7 @@ test("public documentation follows current navigation, settings and sign-in beha
   const envExample = readRoot(".env.example");
   const navigationLabels = [...navigation.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   const settingsLabels = [...settings.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
-  assert.equal(navigationLabels.length, 19);
+  assert.equal(navigationLabels.length, 20);
   assert.equal(settingsLabels.length, 7);
   for (const label of [...navigationLabels, ...settingsLabels]) assert.ok(docs.includes(label), label);
   for (const route of ["/catalog", "/publication-quality", "/orders", "/returns", "/inventory", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/audit", "/settings"]) {
