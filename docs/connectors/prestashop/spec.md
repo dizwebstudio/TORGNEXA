@@ -9,3 +9,6 @@
 - Inventory: only `stock_availables.quantity`.
 - Orders: `orders` + `order_details`; PII excluded.
 - Order status: POST `order_histories` with `id_order_state` and `id_order`.
+- Production order routing requires a tenant runtime map for `pending`,
+  `confirmed`, `processing`, `fulfilled` and `cancelled`; state IDs must be
+  positive, unique decimal strings.

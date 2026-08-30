@@ -7,6 +7,11 @@ Baseline surfaces:
 - inventory: `GET /report/stock/bystore` with `groupBy=product`;
 - customer orders: `GET /entity/customerorder`.
 
+All three read surfaces are admitted by the built-in runtime registry. ERP
+inventory quantities remain exact decimal strings, and ERP orders stay on the
+ERP-specific projection because their minimal rows do not claim the full
+storefront order-line semantics.
+
 The provider authenticates with a bearer token obtained only through the Task-021 secret boundary, requests gzip, and uses the host-injected connector transport. It has no direct network, SQL, filesystem, process, Core, or App authority.
 
 Official references:

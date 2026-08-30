@@ -24,4 +24,4 @@ Repository implementation is complete.
 - Provider code has no direct HTTP/socket/DNS, database, filesystem/process, Core or App authority; actual egress is host-injected.
 - Deterministic fixtures and `docs/connectors/onec/conformance-report.json` qualify the adapter; all 13 mandatory Task-064 checks pass including Linux namespace/chroot isolation.
 
-Operational note: production enablement still requires a least-privilege read-only 1C user, TLS publication, a live `$metadata` smoke test, confirmation of configured OData resource/field names, and existing Task-080 hosted architecture controls.
+Operational note: production enablement still requires a least-privilege read-only 1C user, TLS publication, a live `$metadata` smoke test, confirmation of configured OData catalog/register and field names, and existing Task-080 hosted architecture controls. The exact-decimal ERP inventory reader is exposed through the reviewed built-in runtime registry and remains separate from the integer-based commerce inventory route.

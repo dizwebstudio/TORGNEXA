@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/core/inventory"
 )
 
 func TestWMSTaskCursorRoundTrip(t *testing.T) {
@@ -40,6 +42,37 @@ func TestWMSFiltersAndReasonCodes(t *testing.T) {
 	if !validReasonValue("scan_mismatch") || validReasonValue("ScanMismatch") || validReasonValue("_invalid") || validReasonValue("scan-mismatch") {
 		t.Fatal("reason-code validation is not fail-closed")
 	}
+}
+
+func TestWMSStandaloneContextAndBatchBounds(t *testing.T) {
+	quantity, err := inventory.NewQuantity(mustTestDecimal(t, "2.5"), inventory.UnitCode("PCS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := CreateWMSTask{ID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670", IdempotencyKey: "standalone-1", TaskType: "put_away", WarehouseID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0671", SKU: "SKU-1", SourceLocationCode: "A-01", TargetLocationCode: "B-01", ExpectedQuantity: quantity}
+	if !validWMSStandaloneContext(valid) {
+		t.Fatal("valid put-away context was rejected")
+	}
+	valid.TargetLocationCode = ""
+	if validWMSStandaloneContext(valid) {
+		t.Fatal("put-away without target location was accepted")
+	}
+	if validWMSStandaloneContext(CreateWMSTask{TaskType: "cycle_count", SourceLocationCode: "A\n01"}) {
+		t.Fatal("control character in location was accepted")
+	}
+	ids := []string{"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670"}
+	if !validWMSBatchTaskIDs(ids) || validWMSBatchTaskIDs([]string{ids[0], ids[0]}) {
+		t.Fatal("batch task bounds are not fail-closed")
+	}
+}
+
+func mustTestDecimal(t *testing.T, value string) inventory.Decimal {
+	t.Helper()
+	decimal, err := inventory.ParseDecimal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return decimal
 }
 
 func TestWMSDerivedIdentitiesAreStableAndSortable(t *testing.T) {

@@ -45,6 +45,20 @@ cross-currency и over-allocation.
 `commerce.orders.cancellation_state_changed.v1`,
 `commerce.returns.requested.v1` и `commerce.returns.state_changed.v1`.
 
+## Операторский экран
+
+После входа раздел **Возвраты** доступен в левом меню ролям с
+`orders.returns.read`. Таблица показывает возврат, заказ, причину, статус,
+сумму доставки/налога и дату создания. Открытие строки ведёт в карточку с
+позициями, requested/received/accepted quantities и disposition. Роли с
+`orders.returns.write` видят только допустимые переходы текущей state machine;
+каждый переход отправляется с текущей `version` и новым `Idempotency-Key`.
+
+UI не создаёт refund автоматически и не показывает секреты или сырые ответы
+провайдера. Инспекцию, allocation возврата денег, fiscal correction и
+reconciliation выполняйте через соответствующие API после approval и проверки
+runtime capability.
+
 ## Approval и runtime qualification
 
 Sensitive/legal действия проходят Task-017 policy/approval и повторную

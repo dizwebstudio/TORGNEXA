@@ -268,7 +268,10 @@ func (c *Connector) WriteOrderStatus(ctx context.Context, account sdk.Account, r
 		if e != nil || current != request.StatusRemoteID {
 			return ErrInvalidResponse
 		}
-		receipt = sdk.CommerceWriteReceipt{RemoteID: request.OrderRemoteID, Applied: true}
+		// The successful read-after-write is part of the operation contract, so
+		// expose the reconciliation proof to the runtime rather than reporting
+		// an unverified write.
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.OrderRemoteID, Applied: true, Reconciled: true}
 		return receipt.Validate()
 	})
 	return receipt, err

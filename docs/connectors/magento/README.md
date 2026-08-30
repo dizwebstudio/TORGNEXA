@@ -1,9 +1,10 @@
 # Magento / Adobe Commerce
 
 Коннектор для self-hosted Magento Open Source и Adobe Commerce. Авторизация —
-долгоживущий bearer-токен активированной Integration в Admin. В runtime сейчас
-маршрутизируются только `products.read` и `products.write`; остальные операции
-доступны на уровне Connector SDK, но не заявляются как generic worker-синхронизация.
+долгоживущий bearer-токен активированной Integration в Admin. В runtime
+маршрутизируются чтение товаров, цен, остатков, заказов и возвратов,
+запись цен/остатков, обновление товара и отмена заказа. Возвраты остаются
+отдельной read-поверхностью и не заявляются как generic worker-синхронизация.
 
 Создание товара, переименование SKU и приём webhook намеренно не поддерживаются
 (см. [capability-audit.md](capability-audit.md)). Для реальной проверки нужен

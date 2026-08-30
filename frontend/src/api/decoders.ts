@@ -6,6 +6,35 @@ export interface NotificationHit {id: string; severity: string; title: string; b
 export interface ProductPage {items: ProductHit[]; next_cursor?: string}
 export interface OrderPage {items: OrderHit[]; next_cursor?: string}
 export interface NotificationPage {items: NotificationHit[]}
+export interface ReturnQuantity {coefficient: number; scale: number; unit: string}
+export interface ReturnSummary {
+  id: string;
+  order_id: string;
+  status: string;
+  reason_code: string;
+  source: string;
+  currency: string;
+  requested_shipping_minor: number;
+  requested_tax_minor: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+export interface ReturnItemHit {
+  id: string;
+  return_id: string;
+  order_item_id: string;
+  unit: string;
+  disposition: string;
+  requested: ReturnQuantity;
+  received: ReturnQuantity;
+  accepted: ReturnQuantity;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+export interface ReturnPage {items: ReturnSummary[]}
+export interface ReturnDetails {return: ReturnSummary; items: ReturnItemHit[]}
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -55,4 +84,37 @@ export function decodeNotificationPage(value: unknown): NotificationPage {
     return readAt ? {id, severity, title, body, occurrence_count: count, updated_at: updated, read_at: readAt} : {id, severity, title, body, occurrence_count: count, updated_at: updated};
   });
   return {items};
+}
+
+function decodeQuantity(value: unknown): ReturnQuantity {
+  const row = object(value);
+  const coefficient = row && integer(row.coefficient), scale = row && integer(row.scale), unit = row && text(row.unit);
+  if (coefficient === undefined || coefficient < 0 || scale === undefined || scale < 0 || scale > 9 || !unit || !/^[A-Z0-9_.-]{1,16}$/.test(unit)) throw new Error("invalid return quantity");
+  return {coefficient, scale, unit};
+}
+
+function decodeReturn(value: unknown): ReturnSummary {
+  const row = object(value);
+  const id = row && text(row.id), orderID = row && text(row.order_id), status = row && text(row.status), reason = row && text(row.reason_code), source = row && text(row.source), currency = row && text(row.currency), shipping = row && integer(row.requested_shipping_minor), tax = row && integer(row.requested_tax_minor), version = row && integer(row.version), created = row && text(row.created_at), updated = row && text(row.updated_at);
+  if (!id || !orderID || !status || !reason || !source || !currency || !/^[A-Z]{3}$/.test(currency) || shipping === undefined || shipping < 0 || tax === undefined || tax < 0 || version === undefined || version < 1 || !created || !updated) throw new Error("invalid return");
+  return {id, order_id: orderID, status, reason_code: reason, source, currency, requested_shipping_minor: shipping, requested_tax_minor: tax, version, created_at: created, updated_at: updated};
+}
+
+function decodeReturnItem(value: unknown): ReturnItemHit {
+  const row = object(value);
+  const id = row && text(row.id), returnID = row && text(row.return_id), orderItemID = row && text(row.order_item_id), unit = row && text(row.unit), disposition = row && text(row.disposition), version = row && integer(row.version), created = row && text(row.created_at), updated = row && text(row.updated_at);
+  if (!id || !returnID || !orderItemID || !unit || !/^[A-Z0-9_.-]{1,16}$/.test(unit) || !disposition || version === undefined || version < 1 || !created || !updated) throw new Error("invalid return item");
+  return {id, return_id: returnID, order_item_id: orderItemID, unit, disposition, requested: decodeQuantity(row.requested), received: decodeQuantity(row.received), accepted: decodeQuantity(row.accepted), version, created_at: created, updated_at: updated};
+}
+
+export function decodeReturnPage(value: unknown): ReturnPage {
+  const root = object(value);
+  if (!root || !Array.isArray(root.items)) throw new Error("invalid return page");
+  return {items: root.items.map(decodeReturn)};
+}
+
+export function decodeReturnDetails(value: unknown): ReturnDetails {
+  const root = object(value);
+  if (!root || !Array.isArray(root.items)) throw new Error("invalid return details");
+  return {return: decodeReturn(root.return), items: root.items.map(decodeReturnItem)};
 }

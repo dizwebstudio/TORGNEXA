@@ -49,6 +49,25 @@ func TestManifestAndInterfaces(t *testing.T) {
 		}
 	}
 }
+
+func TestOrderStatusConfigurationRequiresCompleteUniqueIDs(t *testing.T) {
+	valid := Configuration{OrderStatusMapping: map[string]string{
+		"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5",
+	}}
+	if _, err := valid.OrderStatuses(); err != nil {
+		t.Fatalf("valid status configuration rejected: %v", err)
+	}
+	for name, mapping := range map[string]map[string]string{
+		"missing state": {"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4"},
+		"duplicate id":  {"pending": "1", "confirmed": "1", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+		"zero id":       {"pending": "0", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+		"non numeric":   {"pending": "1", "confirmed": "two", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+	} {
+		if _, err := (Configuration{OrderStatusMapping: mapping}).OrderStatuses(); err == nil {
+			t.Fatalf("%s configuration was accepted", name)
+		}
+	}
+}
 func implementsProductReader(v any) bool     { _, ok := v.(sdk.ProductReader); return ok }
 func implementsPriceReader(v any) bool       { _, ok := v.(sdk.PriceReader); return ok }
 func implementsPriceWriter(v any) bool       { _, ok := v.(sdk.PriceWriter); return ok }
@@ -131,5 +150,36 @@ func TestOfficialWebservicePluralEnvelopeForSingleResources(t *testing.T) {
 	state, err := c.fetchOrderState(context.Background(), cfg, cred, 9001)
 	if err != nil || state != "2" {
 		t.Fatalf("order envelope: %q, %v", state, err)
+	}
+}
+
+func TestOrdersReadAndStateWriteUseOrderHistory(t *testing.T) {
+	state := "2"
+	tr := scriptedTransport{fn: func(r Request) (Response, error) {
+		switch {
+		case r.Method == "GET" && r.Path == "/api/orders":
+			return Response{StatusCode: 200, Body: []byte(`{"orders":[{"id":9001,"reference":"REF-1","current_state":2,"date_add":"2026-08-12 08:00:00","date_upd":"2026-08-12 08:05:00"}]}`)}, nil
+		case r.Method == "GET" && r.Path == "/api/order_details":
+			return Response{StatusCode: 200, Body: []byte(`{"order_details":[{"id":1,"id_order":9001,"product_id":7,"product_attribute_id":0,"product_quantity":2}]}`)}, nil
+		case r.Method == "GET" && r.Path == "/api/orders/9001":
+			return Response{StatusCode: 200, Body: []byte(`{"orders":[{"id":9001,"current_state":` + state + `}]}`)}, nil
+		case r.Method == "POST" && r.Path == "/api/order_histories":
+			if !strings.Contains(string(r.Body), "<id_order_state>3</id_order_state>") || !strings.Contains(string(r.Body), "<id_order>9001</id_order>") {
+				t.Fatalf("unexpected order history body: %s", r.Body)
+			}
+			state = "3"
+			return Response{StatusCode: 201, Body: []byte(`{}`)}, nil
+		default:
+			return Response{StatusCode: 404}, nil
+		}
+	}}
+	c := New(tr, testConfig{}, nil)
+	page, err := c.ReadOrders(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != nil || len(page.Items) != 1 || page.Items[0].StatusRemoteID != "2" || len(page.Items[0].Items) != 1 {
+		t.Fatalf("unexpected order page: %#v, %v", page, err)
+	}
+	receipt, err := c.WriteOrderStatus(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.OrderStatusWriteRequest{OrderRemoteID: "9001", StatusRemoteID: "3", IdempotencyKey: "order-status-9001"})
+	if err != nil || !receipt.Applied || !receipt.Reconciled {
+		t.Fatalf("unexpected order status receipt: %#v, %v", receipt, err)
 	}
 }

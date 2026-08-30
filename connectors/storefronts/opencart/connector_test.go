@@ -2,6 +2,7 @@ package opencart
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -122,5 +123,59 @@ func TestProductCreateReconcilesBySKU(t *testing.T) {
 	}
 	if !receipt.Applied || !receipt.Reconciled || receipt.RemoteID != "99" {
 		t.Fatalf("unexpected %#v", receipt)
+	}
+}
+
+func TestOrdersReadAndStateWriteUseBridgeV1(t *testing.T) {
+	state := "2"
+	tr := scriptedTransport{fn: func(r Request) (Response, error) {
+		route := ""
+		for _, q := range r.Query {
+			if q.Name == "route" {
+				route = q.Value
+			}
+		}
+		switch {
+		case r.Method == "GET" && route == "extension/torgnexa/api/orders":
+			return Response{StatusCode: 200, Body: []byte(`{"items":[{"id":9001,"external_id":"OC-9001","status_remote_id":"` + state + `","created_at":"2026-08-12T08:00:00Z","updated_at":"2026-08-12T08:05:00Z","items":[{"id":1,"variant_remote_id":"product:7","quantity":2}]}],"page":1,"total_pages":1}`)}, nil
+		case r.Method == "GET" && route == "extension/torgnexa/api/order":
+			return Response{StatusCode: 200, Body: []byte(`{"id":9001,"external_id":"OC-9001","status_remote_id":"` + state + `"}`)}, nil
+		case r.Method == "PUT" && route == "extension/torgnexa/api/order-status":
+			if !strings.Contains(string(r.Body), `"id":9001`) || !strings.Contains(string(r.Body), `"status_remote_id":"3"`) {
+				t.Fatalf("unexpected order status body: %s", r.Body)
+			}
+			state = "3"
+			return Response{StatusCode: 200, Body: []byte(`{"ok":true}`)}, nil
+		default:
+			return Response{StatusCode: 404}, nil
+		}
+	}}
+	c := New(tr, testConfig{}, nil)
+	page, err := c.ReadOrders(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != nil || len(page.Items) != 1 || page.Items[0].StatusRemoteID != "2" || len(page.Items[0].Items) != 1 {
+		t.Fatalf("unexpected order page: %#v, %v", page, err)
+	}
+	receipt, err := c.WriteOrderStatus(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.OrderStatusWriteRequest{OrderRemoteID: "9001", StatusRemoteID: "3", IdempotencyKey: "order-status-9001"})
+	if err != nil || !receipt.Applied || !receipt.Reconciled {
+		t.Fatalf("unexpected order status receipt: %#v, %v", receipt, err)
+	}
+}
+
+func TestOrderStatusConfigurationRequiresCompleteUniqueIDs(t *testing.T) {
+	valid := Configuration{OrderStatusMapping: map[string]string{
+		"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5",
+	}}
+	if _, err := valid.OrderStatuses(); err != nil {
+		t.Fatalf("valid status configuration rejected: %v", err)
+	}
+	for name, mapping := range map[string]map[string]string{
+		"missing state": {"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4"},
+		"duplicate id":  {"pending": "1", "confirmed": "1", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+		"zero id":       {"pending": "0", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+		"non numeric":   {"pending": "1", "confirmed": "two", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+	} {
+		if _, err := (Configuration{OrderStatusMapping: mapping}).OrderStatuses(); err == nil {
+			t.Fatalf("%s configuration was accepted", name)
+		}
 	}
 }

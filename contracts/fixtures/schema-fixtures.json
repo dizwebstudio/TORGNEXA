@@ -1285,6 +1285,27 @@
       }
     },
     {
+      "schema": "events/fulfillment-batch-changed-v1.schema.json",
+      "valid": {
+        "batch_id": "018f0000-0000-7000-8000-000000000703",
+        "kind": "pack_handoff",
+        "state": "ready",
+        "warehouse_id": "018f0000-0000-7000-8000-000000000702",
+        "task_ids": ["018f0000-0000-7000-8000-000000000701"],
+        "version": 1,
+        "change": "created"
+      },
+      "invalid": {
+        "batch_id": "bad",
+        "kind": "shipment",
+        "state": "ready",
+        "warehouse_id": "bad",
+        "task_ids": [],
+        "version": 0,
+        "change": "created"
+      }
+    },
+    {
       "schema": "events/fulfillment-task-changed-v1.schema.json",
       "valid": {
         "task_id": "018f0000-0000-7000-8000-000000000701",

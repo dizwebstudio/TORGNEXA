@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-batch-changed-v1.json",
+  "title": "commerce.fulfillment.batch_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["batch_id", "kind", "state", "warehouse_id", "task_ids", "version", "change"],
+  "properties": {
+    "batch_id": {"$ref": "#/$defs/id"},
+    "kind": {"const": "pack_handoff"},
+    "state": {"enum": ["ready", "handed_off", "exception", "cancelled"]},
+    "warehouse_id": {"$ref": "#/$defs/id"},
+    "task_ids": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"$ref": "#/$defs/id"}},
+    "version": {"type": "integer", "minimum": 1},
+    "change": {"enum": ["created", "handed_off"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}
+  }
+}

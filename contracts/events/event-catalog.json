@@ -22,6 +22,10 @@
       "payload_schema": "events/fulfillment-allocation-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.fulfillment.batch_changed.v1",
+      "payload_schema": "events/fulfillment-batch-changed-v1.schema.json"
+    },
+    {
       "event_type": "commerce.fulfillment.task_changed.v1",
       "payload_schema": "events/fulfillment-task-changed-v1.schema.json"
     },

@@ -19,6 +19,7 @@ import (
 var (
 	ErrWMSTaskState      = errors.New("inventory repository: invalid wms task state")
 	ErrWMSTaskAssignment = errors.New("inventory repository: wms task is assigned to another operator")
+	ErrWMSBatchState     = errors.New("inventory repository: invalid wms batch state")
 )
 
 // WMSTask is the public repository view of a durable provider-neutral WMS task.
@@ -56,8 +57,38 @@ type CreateOrderPickTasks struct {
 	OrderID, WarehouseID, IdempotencyKey string
 }
 
+// CreateWMSTask is a standalone provider-neutral warehouse execution command.
+// It deliberately has no order or remote-provider fields.
+type CreateWMSTask struct {
+	ID, IdempotencyKey, TaskType, WarehouseID, SKU string
+	SourceLocationCode, TargetLocationCode         string
+	ExpectedQuantity                               inventory.Quantity
+}
+
+// WMSBatch is a bounded internal grouping of completed pick tasks for the
+// local pack handoff. It is not a marketplace shipment.
+type WMSBatch struct {
+	ID, IdempotencyKey, Kind, State, WarehouseID string
+	TaskIDs                                      []string
+	Version                                      int64
+	CreatedAt, UpdatedAt                         time.Time
+}
+
+// WMSBatchEvent is an immutable local batch command/effect record.
+type WMSBatchEvent struct {
+	ID, BatchID, IdempotencyKey, Kind, ActorID string
+	OccurredAt                                 time.Time
+}
+
+// CreateWMSBatch groups completed pick tasks in one tenant-scoped transaction.
+type CreateWMSBatch struct {
+	ID, IdempotencyKey, WarehouseID string
+	TaskIDs                         []string
+}
+
 const wmsTaskSelect = `SELECT task_id,idempotency_key,task_type,state,warehouse_id,sku,unit,order_id,order_item_id,fulfillment_allocation_id,source_location_code,target_location_code,expected_quantity_coefficient,expected_quantity_scale,processed_quantity_coefficient,processed_quantity_scale,assigned_to,exception_code,cancel_reason,version,claimed_at,started_at,completed_at,created_at,updated_at FROM wms_execution_tasks WHERE organization_id=$1 AND workspace_id=$2`
 const wmsTaskEventSelect = `SELECT event_id,task_id,idempotency_key,kind,barcode_digest,location_code,quantity_coefficient,quantity_scale,unit,reason_code,actor_id,occurred_at FROM wms_execution_task_events WHERE organization_id=$1 AND workspace_id=$2`
+const wmsBatchSelect = `SELECT batch_id,idempotency_key,kind,state,warehouse_id,version,created_at,updated_at FROM wms_execution_batches WHERE organization_id=$1 AND workspace_id=$2`
 
 // ListWMSTasks returns a bounded newest-first tenant-scoped queue page.
 func (r *Repository) ListWMSTasks(ctx context.Context, s inventory.Scope, options WMSTaskListOptions) ([]WMSTask, string, error) {
@@ -130,6 +161,70 @@ func (r *Repository) WMSTask(ctx context.Context, s inventory.Scope, id string) 
 		return err
 	})
 	return out, err
+}
+
+// WMSCreateTask creates or replays one standalone warehouse task. It records
+// the initial event and outbox message in the same transaction as the task.
+func (r *Repository) WMSCreateTask(ctx context.Context, s inventory.Scope, command CreateWMSTask, mutation inventory.Mutation) (WMSTask, bool, error) {
+	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(command.ID) || !validTokenValue(command.IdempotencyKey) || !validWMSTaskType(command.TaskType) || !validSortableIDValue(command.WarehouseID) || !validTokenValue(command.SKU) || !validWMSStandaloneContext(command) || command.ExpectedQuantity.Validate() != nil || command.ExpectedQuantity.Value.IsZero() {
+		return WMSTask{}, false, inventory.ErrInvalidRecord
+	}
+	var out WMSTask
+	created := false
+	err := r.withTx(ctx, false, s, func(tx *sql.Tx) error {
+		if err := requireWarehouseAllocatable(ctx, tx, s, inventory.WarehouseID(command.WarehouseID)); err != nil {
+			return err
+		}
+		var existingID string
+		err := tx.QueryRowContext(ctx, `SELECT task_id FROM wms_execution_tasks WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existingID)
+		if err == nil {
+			existing, loadErr := loadWMSTask(ctx, tx, s, existingID, false)
+			if loadErr != nil {
+				return loadErr
+			}
+			if !sameStandaloneWMSTask(existing, command) {
+				return inventory.ErrConflict
+			}
+			out = existing
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		out = WMSTask{ID: command.ID, IdempotencyKey: command.IdempotencyKey, TaskType: command.TaskType, State: "pending", WarehouseID: command.WarehouseID, SKU: command.SKU, SourceLocationCode: command.SourceLocationCode, TargetLocationCode: command.TargetLocationCode, ExpectedQuantity: command.ExpectedQuantity, ProcessedQuantity: mustInventoryQuantity(0, command.ExpectedQuantity.Unit), Version: 1, CreatedAt: mutation.OccurredAt.UTC(), UpdatedAt: mutation.OccurredAt.UTC()}
+		insert, insertErr := tx.ExecContext(ctx, `INSERT INTO wms_execution_tasks(organization_id,workspace_id,task_id,idempotency_key,task_type,state,warehouse_id,sku,unit,order_id,order_item_id,fulfillment_allocation_id,source_location_code,target_location_code,expected_quantity_coefficient,expected_quantity_scale,processed_quantity_coefficient,processed_quantity_scale,assigned_to,exception_code,cancel_reason,version,claimed_at,started_at,completed_at,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'pending',$6,$7,$8,NULL,NULL,NULL,$9,$10,$11,$12,0,0,'','','',1,$13,$13) ON CONFLICT (organization_id,workspace_id,idempotency_key) DO NOTHING`, s.OrganizationID(), s.WorkspaceID(), out.ID, out.IdempotencyKey, out.TaskType, out.WarehouseID, out.SKU, out.ExpectedQuantity.Unit.String(), out.SourceLocationCode, out.TargetLocationCode, out.ExpectedQuantity.Value.Coefficient(), out.ExpectedQuantity.Value.Scale(), out.CreatedAt)
+		if insertErr != nil {
+			return insertErr
+		}
+		rows, rowsErr := insert.RowsAffected()
+		if rowsErr != nil {
+			return rowsErr
+		}
+		if rows == 0 {
+			if err := tx.QueryRowContext(ctx, `SELECT task_id FROM wms_execution_tasks WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existingID); err != nil {
+				return err
+			}
+			existing, loadErr := loadWMSTask(ctx, tx, s, existingID, false)
+			if loadErr != nil {
+				return loadErr
+			}
+			if !sameStandaloneWMSTask(existing, command) {
+				return inventory.ErrConflict
+			}
+			out = existing
+			return nil
+		}
+		created = true
+		event := WMSTaskEvent{ID: mutation.EventID, TaskID: out.ID, IdempotencyKey: out.IdempotencyKey, Kind: "created", Quantity: mustInventoryQuantity(0, out.ExpectedQuantity.Unit), ActorID: mutation.ActorID, OccurredAt: mutation.OccurredAt.UTC()}
+		if err := insertWMSTaskEvent(ctx, tx, s, event); err != nil {
+			return err
+		}
+		if err := appendWMSTaskAudit(ctx, tx, s, mutation, out, "created", map[string]any{"standalone": true, "version": out.Version}); err != nil {
+			return err
+		}
+		return enqueueWMSTaskEvent(ctx, tx, s, mutation, out, "created")
+	})
+	return out, created, err
 }
 
 // WMSClaimTask assigns a pending task to one operator.
@@ -433,6 +528,270 @@ func (r *Repository) WMSCreateOrderPickTasks(ctx context.Context, s inventory.Sc
 	return out, err
 }
 
+// WMSCreateBatch groups completed pick tasks into one local pack handoff. The
+// operation is bounded to 50 tasks and is idempotent by the caller key.
+func (r *Repository) WMSCreateBatch(ctx context.Context, s inventory.Scope, command CreateWMSBatch, mutation inventory.Mutation) (WMSBatch, bool, error) {
+	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(command.ID) || !validTokenValue(command.IdempotencyKey) || !validSortableIDValue(command.WarehouseID) || !validWMSBatchTaskIDs(command.TaskIDs) {
+		return WMSBatch{}, false, inventory.ErrInvalidRecord
+	}
+	var out WMSBatch
+	created := false
+	err := r.withTx(ctx, false, s, func(tx *sql.Tx) error {
+		if err := requireWarehouseAllocatable(ctx, tx, s, inventory.WarehouseID(command.WarehouseID)); err != nil {
+			return err
+		}
+		var existingID string
+		err := tx.QueryRowContext(ctx, `SELECT batch_id FROM wms_execution_batches WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existingID)
+		if err == nil {
+			existing, loadErr := loadWMSBatch(ctx, tx, s, existingID, false)
+			if loadErr != nil {
+				return loadErr
+			}
+			if !sameWMSBatch(existing, command) {
+				return inventory.ErrConflict
+			}
+			out = existing
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		placeholders := make([]string, len(command.TaskIDs))
+		args := []any{s.OrganizationID(), s.WorkspaceID()}
+		for index, taskID := range command.TaskIDs {
+			placeholders[index] = fmt.Sprintf("$%d", len(args)+1)
+			args = append(args, taskID)
+		}
+		rows, queryErr := tx.QueryContext(ctx, `SELECT task_id,task_type,state,warehouse_id FROM wms_execution_tasks WHERE organization_id=$1 AND workspace_id=$2 AND task_id IN (`+strings.Join(placeholders, ",")+") FOR UPDATE", args...)
+		if queryErr != nil {
+			return queryErr
+		}
+		type taskReference struct{ Type, State, WarehouseID string }
+		found := make(map[string]taskReference, len(command.TaskIDs))
+		for rows.Next() {
+			var id string
+			var ref taskReference
+			if err := rows.Scan(&id, &ref.Type, &ref.State, &ref.WarehouseID); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			found[id] = ref
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		for _, taskID := range command.TaskIDs {
+			ref, ok := found[taskID]
+			if !ok {
+				return inventory.ErrNotFound
+			}
+			if ref.Type != "pick" || ref.State != "completed" || ref.WarehouseID != command.WarehouseID {
+				return ErrWMSBatchState
+			}
+			var existingBatchID string
+			err := tx.QueryRowContext(ctx, `SELECT batch_id FROM wms_execution_batch_tasks WHERE organization_id=$1 AND workspace_id=$2 AND task_id=$3`, s.OrganizationID(), s.WorkspaceID(), taskID).Scan(&existingBatchID)
+			if err == nil {
+				return inventory.ErrConflict
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
+		out = WMSBatch{ID: command.ID, IdempotencyKey: command.IdempotencyKey, Kind: "pack_handoff", State: "ready", WarehouseID: command.WarehouseID, TaskIDs: append([]string(nil), command.TaskIDs...), Version: 1, CreatedAt: mutation.OccurredAt.UTC(), UpdatedAt: mutation.OccurredAt.UTC()}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO wms_execution_batches(organization_id,workspace_id,batch_id,idempotency_key,kind,state,warehouse_id,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,1,$8,$8)`, s.OrganizationID(), s.WorkspaceID(), out.ID, out.IdempotencyKey, out.Kind, out.State, out.WarehouseID, out.CreatedAt); err != nil {
+			return err
+		}
+		for index, taskID := range command.TaskIDs {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO wms_execution_batch_tasks(organization_id,workspace_id,batch_id,task_id,position) VALUES($1,$2,$3,$4,$5)`, s.OrganizationID(), s.WorkspaceID(), out.ID, taskID, index+1); err != nil {
+				return err
+			}
+		}
+		created = true
+		event := WMSBatchEvent{ID: mutation.EventID, BatchID: out.ID, IdempotencyKey: out.IdempotencyKey, Kind: "created", ActorID: mutation.ActorID, OccurredAt: mutation.OccurredAt.UTC()}
+		if err := insertWMSBatchEvent(ctx, tx, s, event); err != nil {
+			return err
+		}
+		if err := appendWMSBatchAudit(ctx, tx, s, mutation, out, "created"); err != nil {
+			return err
+		}
+		return enqueueWMSBatchEvent(ctx, tx, s, mutation, out, "created")
+	})
+	return out, created, err
+}
+
+// WMSBatch returns one tenant-scoped local pack handoff batch.
+func (r *Repository) WMSBatch(ctx context.Context, s inventory.Scope, id string) (WMSBatch, error) {
+	if err := validate(ctx, r, s); err != nil || !validSortableIDValue(id) {
+		return WMSBatch{}, inventory.ErrInvalidRecord
+	}
+	var out WMSBatch
+	err := r.withTx(ctx, true, s, func(tx *sql.Tx) error {
+		var err error
+		out, err = loadWMSBatch(ctx, tx, s, id, false)
+		return err
+	})
+	return out, err
+}
+
+// WMSHandoffBatch marks a ready local batch as handed off to the pack work
+// area. No external shipment or on-hand mutation is performed.
+func (r *Repository) WMSHandoffBatch(ctx context.Context, s inventory.Scope, id, actor, idempotencyKey string, expectedVersion int64, mutation inventory.Mutation) (WMSBatch, error) {
+	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(id) || !validTokenValue(idempotencyKey) || actor == "" || expectedVersion < 1 {
+		return WMSBatch{}, inventory.ErrInvalidRecord
+	}
+	var out WMSBatch
+	err := r.withTx(ctx, false, s, func(tx *sql.Tx) error {
+		if replay, err := replayWMSBatchEvent(ctx, tx, s, id, idempotencyKey); err != nil {
+			return err
+		} else if replay != nil {
+			out = *replay
+			return nil
+		}
+		current, err := loadWMSBatch(ctx, tx, s, id, true)
+		if err != nil {
+			return err
+		}
+		if current.Version != expectedVersion {
+			return inventory.ErrConflict
+		}
+		if current.State != "ready" {
+			return ErrWMSBatchState
+		}
+		if err := tx.QueryRowContext(ctx, `UPDATE wms_execution_batches SET state='handed_off',version=version+1,updated_at=$4 WHERE organization_id=$1 AND workspace_id=$2 AND batch_id=$3 AND version=$5 RETURNING batch_id,idempotency_key,kind,state,warehouse_id,version,created_at,updated_at`, s.OrganizationID(), s.WorkspaceID(), id, mutation.OccurredAt.UTC(), current.Version).Scan(&out.ID, &out.IdempotencyKey, &out.Kind, &out.State, &out.WarehouseID, &out.Version, &out.CreatedAt, &out.UpdatedAt); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return inventory.ErrConflict
+			}
+			return err
+		}
+		out.CreatedAt, out.UpdatedAt = out.CreatedAt.UTC(), out.UpdatedAt.UTC()
+		out.TaskIDs, err = loadWMSBatchTaskIDs(ctx, tx, s, id)
+		if err != nil {
+			return err
+		}
+		event := WMSBatchEvent{ID: mutation.EventID, BatchID: id, IdempotencyKey: idempotencyKey, Kind: "handed_off", ActorID: actor, OccurredAt: mutation.OccurredAt.UTC()}
+		if err := insertWMSBatchEvent(ctx, tx, s, event); err != nil {
+			return err
+		}
+		if err := appendWMSBatchAudit(ctx, tx, s, mutation, out, "handed_off"); err != nil {
+			return err
+		}
+		return enqueueWMSBatchEvent(ctx, tx, s, mutation, out, "handed_off")
+	})
+	return out, err
+}
+
+func loadWMSBatch(ctx context.Context, tx *sql.Tx, s inventory.Scope, id string, lock bool) (WMSBatch, error) {
+	query := wmsBatchSelect + ` AND batch_id=$3`
+	if lock {
+		query += ` FOR UPDATE`
+	}
+	var out WMSBatch
+	if err := tx.QueryRowContext(ctx, query, s.OrganizationID(), s.WorkspaceID(), id).Scan(&out.ID, &out.IdempotencyKey, &out.Kind, &out.State, &out.WarehouseID, &out.Version, &out.CreatedAt, &out.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return WMSBatch{}, inventory.ErrNotFound
+		}
+		return WMSBatch{}, err
+	}
+	var err error
+	out.TaskIDs, err = loadWMSBatchTaskIDs(ctx, tx, s, id)
+	if err != nil {
+		return WMSBatch{}, err
+	}
+	out.CreatedAt, out.UpdatedAt = out.CreatedAt.UTC(), out.UpdatedAt.UTC()
+	return out, nil
+}
+
+func loadWMSBatchTaskIDs(ctx context.Context, tx *sql.Tx, s inventory.Scope, id string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT task_id FROM wms_execution_batch_tasks WHERE organization_id=$1 AND workspace_id=$2 AND batch_id=$3 ORDER BY position`, s.OrganizationID(), s.WorkspaceID(), id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]string, 0, 50)
+	for rows.Next() {
+		var taskID string
+		if err := rows.Scan(&taskID); err != nil {
+			return nil, err
+		}
+		items = append(items, taskID)
+	}
+	return items, rows.Err()
+}
+
+func sameStandaloneWMSTask(existing WMSTask, command CreateWMSTask) bool {
+	return existing.TaskType == command.TaskType && existing.WarehouseID == command.WarehouseID && existing.SKU == command.SKU && existing.SourceLocationCode == command.SourceLocationCode && existing.TargetLocationCode == command.TargetLocationCode && sameWMSQuantity(existing.ExpectedQuantity, command.ExpectedQuantity)
+}
+
+func sameWMSQuantity(left, right inventory.Quantity) bool {
+	if left.Unit != right.Unit {
+		return false
+	}
+	cmp, err := left.Value.Cmp(right.Value)
+	return err == nil && cmp == 0
+}
+
+func sameWMSBatch(existing WMSBatch, command CreateWMSBatch) bool {
+	if existing.WarehouseID != command.WarehouseID || len(existing.TaskIDs) != len(command.TaskIDs) {
+		return false
+	}
+	for index := range command.TaskIDs {
+		if existing.TaskIDs[index] != command.TaskIDs[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func validWMSTaskType(value string) bool {
+	switch value {
+	case "receiving", "put_away", "pick", "pack", "cycle_count", "transfer", "return_receiving":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWMSLocation(value string) bool {
+	return value == "" || (len(value) <= 128 && strings.TrimSpace(value) == value && !strings.ContainsAny(value, "\r\n\x00"))
+}
+
+func validWMSStandaloneContext(command CreateWMSTask) bool {
+	if !validWMSLocation(command.SourceLocationCode) || !validWMSLocation(command.TargetLocationCode) {
+		return false
+	}
+	switch command.TaskType {
+	case "receiving", "return_receiving":
+		return command.TargetLocationCode != ""
+	case "put_away", "transfer":
+		return command.SourceLocationCode != "" && command.TargetLocationCode != "" && command.SourceLocationCode != command.TargetLocationCode
+	case "cycle_count", "pick", "pack":
+		return command.SourceLocationCode != ""
+	default:
+		return false
+	}
+}
+
+func validWMSBatchTaskIDs(values []string) bool {
+	if len(values) < 1 || len(values) > 50 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if !validSortableIDValue(value) {
+			return false
+		}
+		if _, ok := seen[value]; ok {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	return true
+}
+
 // WMSHistory returns immutable task command history.
 func (r *Repository) WMSHistory(ctx context.Context, s inventory.Scope, id string, limit int) ([]WMSTaskEvent, error) {
 	if err := validate(ctx, r, s); err != nil || !validSortableIDValue(id) || limit < 1 || limit > 200 {
@@ -698,6 +1057,56 @@ func enqueueWMSTaskEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mut
 		return err
 	}
 	ev, err := eventBase(s, mutation, "commerce.fulfillment.task_changed.v1", "wms_execution_task", task.ID, data)
+	if err != nil {
+		return err
+	}
+	return enqueue(ctx, tx, ev)
+}
+
+func insertWMSBatchEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, event WMSBatchEvent) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO wms_execution_batch_events(organization_id,workspace_id,event_id,batch_id,idempotency_key,kind,actor_id,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, s.OrganizationID(), s.WorkspaceID(), event.ID, event.BatchID, event.IdempotencyKey, event.Kind, event.ActorID, event.OccurredAt.UTC())
+	return err
+}
+
+func replayWMSBatchEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, batchID, idempotencyKey string) (*WMSBatch, error) {
+	var existingBatchID string
+	err := tx.QueryRowContext(ctx, `SELECT batch_id FROM wms_execution_batch_events WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), idempotencyKey).Scan(&existingBatchID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if existingBatchID != batchID {
+		return nil, inventory.ErrConflict
+	}
+	out, err := loadWMSBatch(ctx, tx, s, batchID, false)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func appendWMSBatchAudit(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, batch WMSBatch, action string) error {
+	summary := audit.Summary{"batch_id": batch.ID, "kind": batch.Kind, "state": batch.State, "warehouse_id": batch.WarehouseID, "task_ids": batch.TaskIDs, "version": batch.Version}
+	return appendAudit(ctx, tx, s, mutation, "wms_execution_batch."+action, "wms_execution_batch", batch.ID, audit.RiskWriteSafe, summary)
+}
+
+func enqueueWMSBatchEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, batch WMSBatch, change string) error {
+	payload := struct {
+		BatchID     string   `json:"batch_id"`
+		Kind        string   `json:"kind"`
+		State       string   `json:"state"`
+		WarehouseID string   `json:"warehouse_id"`
+		TaskIDs     []string `json:"task_ids"`
+		Version     int64    `json:"version"`
+		Change      string   `json:"change"`
+	}{batch.ID, batch.Kind, batch.State, batch.WarehouseID, batch.TaskIDs, batch.Version, change}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	ev, err := eventBase(s, mutation, "commerce.fulfillment.batch_changed.v1", "wms_execution_batch", batch.ID, data)
 	if err != nil {
 		return err
 	}

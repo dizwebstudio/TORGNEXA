@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "a7df6da99d0fee1d5775c180538eabaf242c578d1374fdb63f9176aa30768f5a",
+    "sha256": "f6106a9ca60adf351013289f09b9c54308672d870392ab4e05ad1e58b5d79859",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -213,6 +213,16 @@
       "operation_id": "createUpload",
       "method": "POST",
       "path": "/uploads"
+    },
+    {
+      "operation_id": "createWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks"
+    },
+    {
+      "operation_id": "createWarehouseTaskBatch",
+      "method": "POST",
+      "path": "/warehouse-task-batches"
     },
     {
       "operation_id": "createWarehouseTasksFromOrder",
@@ -435,6 +445,11 @@
       "path": "/warehouse-tasks/{task_id}"
     },
     {
+      "operation_id": "getWarehouseTaskBatch",
+      "method": "GET",
+      "path": "/warehouse-task-batches/{batch_id}"
+    },
+    {
       "operation_id": "getWebhookDeliveryHistory",
       "method": "GET",
       "path": "/webhook-deliveries/{delivery_id}/history"
@@ -458,6 +473,11 @@
       "operation_id": "getWorkspaceSettings",
       "method": "GET",
       "path": "/settings/workspace"
+    },
+    {
+      "operation_id": "handoffWarehouseTaskBatch",
+      "method": "POST",
+      "path": "/warehouse-task-batches/{batch_id}/handoff"
     },
     {
       "operation_id": "importInventory",

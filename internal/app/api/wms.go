@@ -14,6 +14,7 @@ import (
 )
 
 const WarehouseTasksPath = "/api/v1/warehouse-tasks"
+const WarehouseTaskBatchesPath = "/api/v1/warehouse-task-batches"
 
 type wmsAPI struct{ repository *inventoryrepo.Repository }
 
@@ -32,6 +33,21 @@ type wmsScanInput struct {
 type wmsCreateFromOrderInput struct {
 	OrderID     string `json:"order_id"`
 	WarehouseID string `json:"warehouse_id"`
+}
+
+type wmsCreateTaskInput struct {
+	TaskType           string `json:"task_type"`
+	WarehouseID        string `json:"warehouse_id"`
+	SKU                string `json:"sku"`
+	SourceLocationCode string `json:"source_location_code"`
+	TargetLocationCode string `json:"target_location_code"`
+	Quantity           string `json:"quantity"`
+	Unit               string `json:"unit"`
+}
+
+type wmsCreateBatchInput struct {
+	WarehouseID string   `json:"warehouse_id"`
+	TaskIDs     []string `json:"task_ids"`
 }
 
 type wmsQuantityResponse struct {
@@ -75,13 +91,28 @@ type wmsTaskEventResponse struct {
 	OccurredAt    string              `json:"occurred_at"`
 }
 
+type wmsBatchResponse struct {
+	ID          string   `json:"id"`
+	Kind        string   `json:"kind"`
+	State       string   `json:"state"`
+	WarehouseID string   `json:"warehouse_id"`
+	TaskIDs     []string `json:"task_ids"`
+	Version     int64    `json:"version"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
+}
+
 func newWMSTaskRoutes(repository *inventoryrepo.Repository) []ProtectedRoute {
 	a := wmsAPI{repository: repository}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: WarehouseTasksPath, Permission: "wms.read", Handler: http.HandlerFunc(a.list)},
+		{Method: http.MethodPost, Path: WarehouseTasksPath, Permission: "wms.write", Handler: http.HandlerFunc(a.create)},
 		{Method: http.MethodPost, Path: WarehouseTasksPath + "/from-order", Permission: "wms.write", Handler: http.HandlerFunc(a.createFromOrder)},
 		{Method: http.MethodGet, Path: WarehouseTasksPath + "/", PathPrefix: true, Permission: "wms.read", Handler: http.HandlerFunc(a.taskRoute)},
 		{Method: http.MethodPost, Path: WarehouseTasksPath + "/", PathPrefix: true, Permission: "wms.write", Handler: http.HandlerFunc(a.taskRoute)},
+		{Method: http.MethodPost, Path: WarehouseTaskBatchesPath, Permission: "wms.write", Handler: http.HandlerFunc(a.createBatch)},
+		{Method: http.MethodGet, Path: WarehouseTaskBatchesPath + "/", PathPrefix: true, Permission: "wms.read", Handler: http.HandlerFunc(a.batchRoute)},
+		{Method: http.MethodPost, Path: WarehouseTaskBatchesPath + "/", PathPrefix: true, Permission: "wms.write", Handler: http.HandlerFunc(a.batchRoute)},
 	}
 }
 
@@ -114,6 +145,52 @@ func (a wmsAPI) list(w http.ResponseWriter, r *http.Request) {
 		result = append(result, renderWMSTask(item))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": result, "next_cursor": next})
+}
+
+func (a wmsAPI) create(w http.ResponseWriter, r *http.Request) {
+	scope, principal, ok := inventoryRequestScope(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if a.repository == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+		return
+	}
+	var input wmsCreateTaskInput
+	if !decodeWMS(w, r, &input) {
+		return
+	}
+	quantity, err := inventory.ParseDecimal(strings.TrimSpace(input.Quantity))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	unit, err := inventory.NewUnitCode(strings.TrimSpace(input.Unit))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	expected, err := inventory.NewQuantity(quantity, unit)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	item, created, err := a.repository.WMSCreateTask(r.Context(), scope, inventoryrepo.CreateWMSTask{ID: newApprovalID(), IdempotencyKey: key, TaskType: strings.TrimSpace(input.TaskType), WarehouseID: strings.TrimSpace(input.WarehouseID), SKU: strings.TrimSpace(input.SKU), SourceLocationCode: strings.TrimSpace(input.SourceLocationCode), TargetLocationCode: strings.TrimSpace(input.TargetLocationCode), ExpectedQuantity: expected}, inventoryMutation(principal, r))
+	if err != nil {
+		writeWMSError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	writeJSON(w, status, renderWMSTask(item))
 }
 
 func (a wmsAPI) createFromOrder(w http.ResponseWriter, r *http.Request) {
@@ -258,6 +335,83 @@ func (a wmsAPI) taskRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, renderWMSTask(item))
 }
 
+func (a wmsAPI) createBatch(w http.ResponseWriter, r *http.Request) {
+	scope, principal, ok := inventoryRequestScope(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if a.repository == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+		return
+	}
+	var input wmsCreateBatchInput
+	if !decodeWMS(w, r, &input) {
+		return
+	}
+	item, created, err := a.repository.WMSCreateBatch(r.Context(), scope, inventoryrepo.CreateWMSBatch{ID: newApprovalID(), IdempotencyKey: key, WarehouseID: strings.TrimSpace(input.WarehouseID), TaskIDs: input.TaskIDs}, inventoryMutation(principal, r))
+	if err != nil {
+		writeWMSError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	writeJSON(w, status, renderWMSBatch(item))
+}
+
+func (a wmsAPI) batchRoute(w http.ResponseWriter, r *http.Request) {
+	scope, principal, ok := inventoryRequestScope(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if a.repository == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	tail := strings.Trim(strings.TrimPrefix(r.URL.Path, WarehouseTaskBatchesPath+"/"), "/")
+	parts := strings.Split(tail, "/")
+	if len(parts) < 1 || parts[0] == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if r.Method == http.MethodGet && len(parts) == 1 {
+		item, err := a.repository.WMSBatch(r.Context(), scope, parts[0])
+		if err != nil {
+			writeWMSError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, renderWMSBatch(item))
+		return
+	}
+	if r.Method != http.MethodPost || len(parts) != 2 || parts[1] != "handoff" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+		return
+	}
+	var input wmsTaskCommandInput
+	if !decodeWMS(w, r, &input) {
+		return
+	}
+	item, err := a.repository.WMSHandoffBatch(r.Context(), scope, parts[0], principal.Subject, key, input.Version, inventoryMutation(principal, r))
+	if err != nil {
+		writeWMSError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, renderWMSBatch(item))
+}
+
 func decodeWMS(w http.ResponseWriter, r *http.Request, value any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(value); err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
@@ -268,6 +422,10 @@ func decodeWMS(w http.ResponseWriter, r *http.Request, value any) bool {
 
 func renderWMSTask(item inventoryrepo.WMSTask) wmsTaskResponse {
 	return wmsTaskResponse{ID: item.ID, TaskType: item.TaskType, State: item.State, WarehouseID: item.WarehouseID, SKU: item.SKU, OrderID: item.OrderID, OrderItemID: item.OrderItemID, FulfillmentAllocationID: item.FulfillmentAllocationID, SourceLocationCode: item.SourceLocationCode, TargetLocationCode: item.TargetLocationCode, ExpectedQuantity: wmsQuantityResponse{Value: item.ExpectedQuantity.Value.String(), Unit: item.ExpectedQuantity.Unit.String()}, ProcessedQuantity: wmsQuantityResponse{Value: item.ProcessedQuantity.Value.String(), Unit: item.ProcessedQuantity.Unit.String()}, AssignedTo: item.AssignedTo, ExceptionCode: item.ExceptionCode, CancelReason: item.CancelReason, Version: item.Version, ClaimedAt: renderTime(item.ClaimedAt), StartedAt: renderTime(item.StartedAt), CompletedAt: renderTime(item.CompletedAt), CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: item.UpdatedAt.UTC().Format(time.RFC3339Nano)}
+}
+
+func renderWMSBatch(item inventoryrepo.WMSBatch) wmsBatchResponse {
+	return wmsBatchResponse{ID: item.ID, Kind: item.Kind, State: item.State, WarehouseID: item.WarehouseID, TaskIDs: item.TaskIDs, Version: item.Version, CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: item.UpdatedAt.UTC().Format(time.RFC3339Nano)}
 }
 
 func renderWMSTaskEvent(item inventoryrepo.WMSTaskEvent) wmsTaskEventResponse {
@@ -286,7 +444,7 @@ func writeWMSError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, inventory.ErrNotFound), errors.Is(err, sql.ErrNoRows):
 		writeProblem(w, http.StatusNotFound, "Not Found")
-	case errors.Is(err, inventory.ErrConflict), errors.Is(err, inventoryrepo.ErrWMSTaskState), errors.Is(err, inventoryrepo.ErrWMSTaskAssignment):
+	case errors.Is(err, inventory.ErrConflict), errors.Is(err, inventoryrepo.ErrWMSTaskState), errors.Is(err, inventoryrepo.ErrWMSTaskAssignment), errors.Is(err, inventoryrepo.ErrWMSBatchState):
 		writeProblem(w, http.StatusConflict, "Conflict")
 	case errors.Is(err, inventory.ErrInvalidRecord), errors.Is(err, inventory.ErrInsufficientAvailable), errors.Is(err, inventory.ErrWarehouseInactive):
 		writeProblem(w, http.StatusBadRequest, "Bad Request")

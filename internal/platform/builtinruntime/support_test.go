@@ -35,8 +35,8 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if !SupportsSync("woocommerce", "products", "bidirectional") || !SupportsSync("opencart", "products", "outbound") {
 		t.Fatal("qualified storefront writes are not exposed")
 	}
-	if !SupportsSync("prestashop", "prices", "bidirectional") || !SupportsSync("prestashop", "inventory", "bidirectional") {
-		t.Fatal("PrestaShop commerce sync directions are not exact")
+	if !SupportsSync("prestashop", "prices", "bidirectional") || !SupportsSync("prestashop", "inventory", "bidirectional") || !SupportsSync("prestashop", "orders", "bidirectional") || !SupportsSync("opencart", "orders", "bidirectional") {
+		t.Fatal("storefront commerce sync directions are not exact")
 	}
 	if !SupportsAccountConfiguration("avito") || !HealthOnly("avito") || SupportsCapability("avito", "classified.listings.read") || SupportsSync("avito", "products", "inbound") {
 		t.Fatal("classified health-only surface projection is inaccurate")
@@ -178,6 +178,138 @@ func TestEveryReadyIntegrationResolvesProductReader(t *testing.T) {
 	}
 }
 
+func TestERPInventoryReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "onec")
+	if !SupportsCapability("onec", "erp.inventory.read") {
+		t.Fatal("1C ERP inventory capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"host":"erp.example.ru","base_path":"/odata/standard.odata","catalog":{"resource":"Catalog_Номенклатура","id_field":"Ref_Key","code_field":"Code","sku_field":"Артикул","title_field":"Description","brand_field":"Бренд","revision_field":"DataVersion","archived_field":"DeletionMark"},"inventory":{"resource":"AccumulationRegister_ТоварыНаСкладах","function":"Balance","product_field":"Номенклатура_Key","location_field":"Склад_Key","quantity_field":"КоличествоBalance"}}`), nil
+	}
+	reader, err := registry.ERPInventoryReader(account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("1C ERP inventory reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ERPInventoryReader); !ok {
+		t.Fatalf("unexpected ERP inventory reader type %T", reader)
+	}
+	if _, err := registry.ERPInventoryReader(supportTestAccount(t, "moysklad"), supportTestRuntime{}, load); err != nil {
+		t.Fatalf("MoySklad ERP inventory reader unavailable: %v", err)
+	}
+}
+
+func TestERPOrderReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "moysklad")
+	if !SupportsCapability("moysklad", "erp.orders.read") {
+		t.Fatal("MoySklad ERP order capability is not admitted")
+	}
+	reader, err := registry.ERPOrderReader(account, supportTestRuntime{}, nil)
+	if err != nil {
+		t.Fatalf("MoySklad ERP order reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ERPOrderReader); !ok {
+		t.Fatalf("unexpected ERP order reader type %T", reader)
+	}
+	if _, err := registry.ERPOrderReader(supportTestAccount(t, "onec"), supportTestRuntime{}, nil); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("1C ERP order reader unexpectedly resolved: %v", err)
+	}
+}
+
+func TestMagentoReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "magento")
+	if !SupportsCapability("magento", "returns.read") {
+		t.Fatal("Magento return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"USD"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Magento return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected Magento return reader type %T", reader)
+	}
+	if _, err := registry.ReturnReader(context.Background(), supportTestAccount(t, "woocommerce"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted WooCommerce return reader resolved: %v", err)
+	}
+}
+
+func TestMedusaReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "medusa")
+	if !SupportsCapability("medusa", "returns.read") {
+		t.Fatal("Medusa return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"USD"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Medusa return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected Medusa return reader type %T", reader)
+	}
+}
+
+func TestShopifyReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "shopify")
+	if !SupportsCapability("shopify", "returns.read") {
+		t.Fatal("Shopify return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"shop_domain":"demo.myshopify.com","store_currency":"USD"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Shopify return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected Shopify return reader type %T", reader)
+	}
+}
+
+func TestShopwareReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "shopware")
+	if !SupportsCapability("shopware", "returns.read") {
+		t.Fatal("Shopware return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"USD"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Shopware return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected Shopware return reader type %T", reader)
+	}
+}
+
+func TestSaleorReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "saleor")
+	if !SupportsCapability("saleor", "returns.read") {
+		t.Fatal("Saleor return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","channel":"default-channel","warehouse":"default"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Saleor return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected Saleor return reader type %T", reader)
+	}
+}
+
 func TestPrestaShopCommerceWriteAdmissionIsExact(t *testing.T) {
 	registry := New()
 	account := supportTestAccount(t, "prestashop")
@@ -292,6 +424,8 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 	cases := map[string]map[string]string{
 		"magento":     {"cancelled": "canceled"},
 		"medusa":      {"cancelled": "canceled"},
+		"opencart":    {"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5"},
+		"prestashop":  {"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5"},
 		"saleor":      {"cancelled": "CANCELED"},
 		"shopify":     {"cancelled": "cancelled"},
 		"shopware":    {"cancelled": "cancelled"},
@@ -299,18 +433,27 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 	}
 	for connectorID, statuses := range cases {
 		account := supportTestAccount(t, connectorID)
+		currentLoad := load
+		if connectorID == "prestashop" || connectorID == "opencart" {
+			currentLoad = func(context.Context, string) (json.RawMessage, error) {
+				if connectorID == "prestashop" {
+					return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"EUR","language_id":1,"order_statuses":{"pending":"1","confirmed":"2","processing":"3","fulfilled":"4","cancelled":"5"}}`), nil
+				}
+				return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"EUR","order_statuses":{"pending":"1","confirmed":"2","processing":"3","fulfilled":"4","cancelled":"5"}}`), nil
+			}
+		}
 		if !registry.SupportsOrderStatusWrite(account) || !SupportsCapability(connectorID, "orders.status.write") || !SupportsSync(connectorID, "orders", "outbound") {
 			t.Fatalf("%s order status write support is not admitted", connectorID)
 		}
-		if _, err := registry.OrderStatusWriter(context.Background(), account, supportTestRuntime{}, load); err != nil {
+		if _, err := registry.OrderStatusWriter(context.Background(), account, supportTestRuntime{}, currentLoad); err != nil {
 			t.Fatalf("%s order status writer unavailable: %v", connectorID, err)
 		}
 		for canonical, expected := range statuses {
-			if got, ok := registry.OrderStatus(context.Background(), account, canonical, load); !ok || got != expected {
+			if got, ok := registry.OrderStatus(context.Background(), account, canonical, currentLoad); !ok || got != expected {
 				t.Fatalf("%s status %q = %q, %v; want %q, true", connectorID, canonical, got, ok, expected)
 			}
 		}
-		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", load); connectorID != "woocommerce" && ok {
+		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", currentLoad); connectorID != "woocommerce" && connectorID != "prestashop" && connectorID != "opencart" && ok {
 			t.Fatalf("%s exposed an unsupported non-cancel status transition", connectorID)
 		}
 	}
@@ -337,20 +480,26 @@ func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 			t.Fatalf("%s inventory reader unavailable: %v", connectorID, err)
 		}
 	}
-	for _, connectorID := range []string{"magnit-market", "megamarket", "medusa", "magento", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+	for _, connectorID := range []string{"magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
+		currentLoad := load
+		if connectorID == "prestashop" || connectorID == "opencart" {
+			currentLoad = func(context.Context, string) (json.RawMessage, error) {
+				if connectorID == "prestashop" {
+					return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"EUR","language_id":1,"order_statuses":{"pending":"1","confirmed":"2","processing":"3","fulfilled":"4","cancelled":"5"}}`), nil
+				}
+				return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"EUR","order_statuses":{"pending":"1","confirmed":"2","processing":"3","fulfilled":"4","cancelled":"5"}}`), nil
+			}
+		}
 		if !SupportsCapability(connectorID, "orders.read") || !SupportsSync(connectorID, "orders", "inbound") {
 			t.Fatalf("%s order reader capability is not admitted", connectorID)
 		}
-		if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, load); err != nil {
+		if _, err := registry.OrderReader(context.Background(), account, supportTestRuntime{}, currentLoad); err != nil {
 			t.Fatalf("%s order reader unavailable: %v", connectorID, err)
 		}
 	}
 	if _, err := registry.PriceReader(supportTestAccount(t, "wildberries"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("Wildberries price reader unexpectedly resolved: %v", err)
-	}
-	if _, err := registry.OrderReader(context.Background(), supportTestAccount(t, "prestashop"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("PrestaShop order reader unexpectedly resolved: %v", err)
 	}
 }
 

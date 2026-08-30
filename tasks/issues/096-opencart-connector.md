@@ -1,7 +1,7 @@
 # Task 096: OpenCart Connector
 
 ## Status
-`repository-complete` — 2026-08-12; reference bridge extension packaged — 2026-08-28.
+`runtime-complete` — 2026-08-12; reference bridge extension packaged — 2026-08-28; order sync admission and tenant status mapping — 2026-08-30.
 
 ## Objective
 Add a bidirectional OpenCart storefront connector without coupling TORGNEXA to admin sessions, direct remote database access, or unstable provider-specific Core branches.
@@ -29,6 +29,9 @@ OpenCart 4.x has a native storefront API used heavily by order/checkout flows, b
 5. Price/inventory/order-status writes are desired-state operations with read-after verification.
 6. The bridge advertises API version `v1`; incompatible bridges fail health checks closed.
 7. Customer billing/shipping identity is not part of canonical order projection.
+8. Order reads and status writes are admitted only with an explicit complete
+   tenant `order_statuses` map; the generic worker translates canonical states
+   at the runtime composition boundary.
 
 ## Deferred deliberately
 OpenCart option/variant authoring semantics, returns, webhook provisioning and a distributable marketplace-signed `.ocmod.zip` are separate follow-up packaging work. The connector contract already supports variant remote IDs supplied by a bridge implementation.

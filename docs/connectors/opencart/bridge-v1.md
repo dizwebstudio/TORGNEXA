@@ -17,6 +17,11 @@ Required routes:
 
 Every write receives an idempotency key. The bridge must persist/reject conflicting replays in store-local extension storage and must not return customer billing/shipping PII in order JSON.
 
+The OpenCart connector runtime requires a tenant-scoped `order_statuses` map
+with unique positive numeric IDs for `pending`, `confirmed`, `processing`,
+`fulfilled` and `cancelled`. Status IDs are installation-specific and are sent
+to the bridge only after this explicit configuration is validated.
+
 OpenCart option/variant authoring and distribution as a signed Marketplace `.ocmod.zip` are deliberately separate from connector admission.
 
 ## Reference extension

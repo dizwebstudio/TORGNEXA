@@ -21,11 +21,11 @@ var hostPattern = regexp.MustCompile(`^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-
 var baseSegmentPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{1,64}$`)
 
 type Configuration struct {
-	StoreHost     string
-	BasePath      string
-	StoreCurrency string
-	LanguageID    int64
-	ShopID        int64
+	StoreHost          string
+	BasePath           string
+	StoreCurrency      string
+	LanguageID         int64
+	ShopID             int64
 	OrderStatusMapping map[string]string
 }
 

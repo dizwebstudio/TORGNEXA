@@ -57,10 +57,11 @@ var (
 	// in the regex either. When the group doesn't participate in the match,
 	// strconv.ParseBool("") below returns its false zero value, which is
 	// exactly the correct default.
-	inlineParameterLine    = regexp.MustCompile(`^- \{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
-	inlineParametersLine   = regexp.MustCompile(`^parameters: \[\{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
-	refParameterLine       = regexp.MustCompile(`^- \{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}$`)
-	inlineRefParameterLine = regexp.MustCompile(`^parameters: \[\{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}\]$`)
+	inlineParameterLine          = regexp.MustCompile(`^- \{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
+	inlineSchemaRefParameterLine = regexp.MustCompile(`^- \{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{\$ref: '#/components/schemas/([A-Za-z0-9_-]+)'\}\}$`)
+	inlineParametersLine         = regexp.MustCompile(`^parameters: \[\{name: ([A-Za-z0-9_-]+), in: (query|path|header)(?:, required: (true|false))?, schema: \{type: (string|integer|boolean)(?:,|\})`)
+	refParameterLine             = regexp.MustCompile(`^- \{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}$`)
+	inlineRefParameterLine       = regexp.MustCompile(`^parameters: \[\{\$ref: '#/components/parameters/([A-Za-z0-9_]+)'\}\]$`)
 )
 
 func main() {
@@ -162,6 +163,21 @@ func parseSpec(data []byte) (spec, error) {
 		}
 		*target = append(*target, value)
 	}
+	parseSchemaRefParameter := func(trimmed string) (parameter, bool, error) {
+		match := inlineSchemaRefParameterLine.FindStringSubmatch(trimmed)
+		if match == nil {
+			return parameter{}, false, nil
+		}
+		var typ string
+		switch match[4] {
+		case "SortableID":
+			typ = "string"
+		default:
+			return parameter{}, true, fmt.Errorf("unsupported parameter schema reference %q", match[4])
+		}
+		required, _ := strconv.ParseBool(match[3])
+		return parameter{Name: match[1], Location: match[2], Type: typ, Required: required}, true, nil
+	}
 	flush := func() error {
 		if current == nil {
 			return nil
@@ -237,6 +253,12 @@ func parseSpec(data []byte) (spec, error) {
 			if match != nil {
 				required, _ := strconv.ParseBool(match[3])
 				addParameter(&pathParameters, parameter{Name: match[1], Location: match[2], Type: match[4], Required: required})
+				continue
+			}
+			if parameter, ok, err := parseSchemaRefParameter(trimmed); err != nil {
+				return spec{}, err
+			} else if ok {
+				addParameter(&pathParameters, parameter)
 			}
 			continue
 		}
@@ -251,6 +273,12 @@ func parseSpec(data []byte) (spec, error) {
 		if match := inlineParameterLine.FindStringSubmatch(trimmed); match != nil {
 			required, _ := strconv.ParseBool(match[3])
 			addParameter(&current.Parameters, parameter{Name: match[1], Location: match[2], Type: match[4], Required: required})
+			continue
+		}
+		if parameter, ok, err := parseSchemaRefParameter(trimmed); err != nil {
+			return spec{}, err
+		} else if ok {
+			addParameter(&current.Parameters, parameter)
 			continue
 		}
 		if match := inlineParametersLine.FindStringSubmatch(trimmed); match != nil {

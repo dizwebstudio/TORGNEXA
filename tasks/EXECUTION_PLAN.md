@@ -1094,12 +1094,17 @@ Task 170 introduces the first durable provider-neutral fulfillment execution
 slice. It connects canonical order items and existing fulfillment allocations
 to tenant-scoped WMS tasks, with idempotent scanner commands, immutable task
 history, PostgreSQL RLS and Transactional Outbox evidence. The implementation
-is split into four requested stages:
+is split into the completed foundation and the selected follow-up stages:
 
 1. `170.1` ADR, scope, state machine and policy matrix;
 2. `170.2` durable PostgreSQL task/event model and repository;
 3. `170.3` permission-aware WMS REST/OpenAPI and generated SDK;
 4. `170.4` atomic order → allocation → pick-task orchestration.
+5. `170.5` task context, locations and scan traceability;
+6. `170.6` standalone receiving, put-away and cycle-count execution;
+7. `170.7` bounded work batches and local pack handoff;
+8. `170.9` operator workspace UI;
+9. `170.12` qualification checks, documentation and evidence summary.
 
 ### Gate RUNTIME-170
 
@@ -1111,8 +1116,9 @@ is split into four requested stages:
   insufficient stock;
 - the public API exposes only bounded provider-neutral task contracts and all
   generated SDKs remain in parity with OpenAPI;
-- marketplace order writes, labels, ChZ, shipment, UI and production
-  qualification remain explicit follow-up tasks.
+- marketplace order writes, labels, ChZ, external shipment/status writes and
+  production qualification remain explicit follow-up tasks; 170.9 covers only
+  the internal operator workspace.
 
 ## Phase 36 — Центр качества публикации товаров
 

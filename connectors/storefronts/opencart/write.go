@@ -146,7 +146,7 @@ func (c *Connector) WritePrice(ctx context.Context, a sdk.Account, r sdk.Runtime
 		if e != nil || v.Price != req.Value || v.CompareAt != req.CompareAt {
 			return ErrInvalidResponse
 		}
-		receipt = sdk.CommerceWriteReceipt{RemoteID: req.VariantRemoteID, Applied: true}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: req.VariantRemoteID, Applied: true, Reconciled: true}
 		return receipt.Validate()
 	})
 	return receipt, e
@@ -186,7 +186,7 @@ func (c *Connector) WriteInventory(ctx context.Context, a sdk.Account, r sdk.Run
 		if e != nil || v.Quantity != req.Quantity {
 			return ErrInvalidResponse
 		}
-		receipt = sdk.CommerceWriteReceipt{RemoteID: req.VariantRemoteID, Applied: true}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: req.VariantRemoteID, Applied: true, Reconciled: true}
 		return receipt.Validate()
 	})
 	return receipt, e
@@ -238,7 +238,7 @@ func (c *Connector) WriteOrderStatus(ctx context.Context, a sdk.Account, r sdk.R
 		if e != nil || status != req.StatusRemoteID {
 			return ErrInvalidResponse
 		}
-		receipt = sdk.CommerceWriteReceipt{RemoteID: req.OrderRemoteID, Applied: true}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: req.OrderRemoteID, Applied: true, Reconciled: true}
 		return receipt.Validate()
 	})
 	return receipt, e

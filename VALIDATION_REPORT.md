@@ -1,4 +1,22 @@
-# Repository validation report — Tasks through 159 — 2026-08-28
+# Repository validation report — Tasks through 170 — 2026-08-30
+
+## Task 170 follow-up repository validation
+
+- 170.5: WMS task context keeps warehouse/SKU/location/exact quantity bounded;
+  scans persist only SHA-256 barcode digests, location, quantity, actor and
+  UTC time;
+- 170.6: standalone receiving, put-away and cycle-count tasks use the same
+  idempotent lifecycle and PostgreSQL task history; automatic on-hand
+  consumption is not performed;
+- 170.7: migration `000031` adds forced-RLS `pack_handoff` batches of up to 50
+  completed pick tasks with immutable events and audit/outbox evidence; the
+  handoff is local and does not claim marketplace shipment or label support;
+- 170.9: Inventory → «Задания WMS» provides queue filters, task detail,
+  scanning, lifecycle commands, standalone task creation and pack handoff;
+- 170.12 repository checks: **PASS** for Go tests/vet, contracts, migrations,
+  architecture, generated SDK drift, frontend typecheck/logic tests and
+  repository diff hygiene. Environment-specific deployment, backup/restore
+  and live marketplace qualification remain separate gates.
 
 ## Task 159 repository validation
 

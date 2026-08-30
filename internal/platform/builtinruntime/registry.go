@@ -98,6 +98,22 @@ type PriceReader = sdk.PriceReader
 // allocation.
 type InventoryReader = sdk.InventoryReader
 
+// ERPInventoryReader resolves the exact-decimal inventory read surface for
+// ERP connectors. It remains separate from InventoryReader because ERP
+// balances may be fractional and therefore cannot be narrowed to the
+// integer-based commerce inventory contract without losing data.
+type ERPInventoryReader = sdk.ERPInventoryReader
+
+// ERPOrderReader resolves the minimal read-only ERP order projection. It is
+// separate from the commerce OrderReader because ERP order rows do not carry
+// the customer-order line model required by the storefront route.
+type ERPOrderReader = sdk.ERPOrderReader
+
+// ReturnReader resolves the bounded storefront return projection. Returns
+// remain a separate read surface because the generic order sync model does not
+// own provider refund/credit-memo semantics.
+type ReturnReader = sdk.ReturnReader
+
 // OrderReader is the provider-neutral order read surface admitted by the
 // production registry. The registry normalizes configured provider statuses
 // before handing the page to the worker.
@@ -452,6 +468,65 @@ func (r *Registry) InventoryReader(account sdk.Account, runtime sdk.Runtime, loa
 	}
 }
 
+// ERPInventoryReader resolves an admitted ERP inventory reader. The
+// provider-specific OData/register mapping is loaded from tenant-scoped
+// non-secret configuration before the adapter is returned.
+func (r *Registry) ERPInventoryReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (ERPInventoryReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "erp.inventory.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "onec":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return onec.New(onecHTTP{r.http}, onecConfigSource{load: load}, nil), nil
+	case "moysklad":
+		return moysklad.New(msHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// ERPOrderReader resolves an admitted ERP order reader. The reader is kept on
+// the ERP-specific SDK surface until a provider-neutral commerce order
+// projection can represent its semantics without loss.
+func (r *Registry) ERPOrderReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (ERPOrderReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "erp.orders.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "moysklad":
+		return moysklad.New(msHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// ReturnReader resolves an admitted storefront return reader.
+func (r *Registry) ReturnReader(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (ReturnReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "returns.read") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	switch account.ConnectorID {
+	case "magento":
+		return magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil), nil
+	case "medusa":
+		return medusa.New(medusaHTTP{r.http}, medusaConfigSource{load: load}, nil), nil
+	case "shopify":
+		return shopify.New(shopifyHTTP{r.http}, shopifyConfigSource{load: load}, nil), nil
+	case "shopware":
+		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
+	case "saleor":
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 // OrderReader resolves an admitted storefront order reader. Provider status
 // identifiers are translated at this composition boundary; the worker only
 // sees the canonical order lifecycle vocabulary.
@@ -523,6 +598,18 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 		remoteToCanonical = reverseConfiguredOrderStatuses(canonical)
 		unknownStatusError = ErrConfigurationNeeded
 		value = prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil)
+	case "opencart":
+		configuration, err := (openCartConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		canonical, err := configuration.OrderStatuses()
+		if err != nil {
+			return nil, ErrConfigurationNeeded
+		}
+		remoteToCanonical = reverseConfiguredOrderStatuses(canonical)
+		unknownStatusError = ErrConfigurationNeeded
+		value = opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil)
 	default:
 		return nil, ErrUnavailable
 	}
@@ -623,6 +710,18 @@ func (r *Registry) OrderStatusWriter(ctx context.Context, account sdk.Account, r
 			return nil, ErrConfigurationNeeded
 		}
 		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
+	case "opencart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		configuration, err := (openCartConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := configuration.OrderStatuses(); err != nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -676,7 +775,7 @@ func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status 
 	if r == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
 		return "", false
 	}
-	if account.ConnectorID != "bitrix" && account.ConnectorID != "prestashop" {
+	if account.ConnectorID != "bitrix" && account.ConnectorID != "prestashop" && account.ConnectorID != "opencart" {
 		value, ok := map[string]map[string]string{
 			"magento":     {"cancelled": "canceled"},
 			"medusa":      {"cancelled": "canceled"},
@@ -698,8 +797,14 @@ func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status 
 			return "", false
 		}
 		statuses, err = configuration.OrderStatuses()
-	} else {
+	} else if account.ConnectorID == "prestashop" {
 		configuration, resolveErr := (prestaShopConfigSource{load: load}).Resolve(ctx, account)
+		if resolveErr != nil {
+			return "", false
+		}
+		statuses, err = configuration.OrderStatuses()
+	} else {
+		configuration, resolveErr := (openCartConfigSource{load: load}).Resolve(ctx, account)
 		if resolveErr != nil {
 			return "", false
 		}
@@ -810,7 +915,7 @@ func (r *Registry) SupportsOrderStatusWrite(account sdk.Account) bool {
 		return false
 	}
 	switch account.ConnectorID {
-	case "bitrix", "magento", "medusa", "saleor", "shopify", "shopware", "woocommerce":
+	case "bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce":
 		return true
 	default:
 		return false
@@ -1706,14 +1811,15 @@ func (source openCartConfigSource) Resolve(ctx context.Context, account sdk.Acco
 		return opencart.Configuration{}, err
 	}
 	var value struct {
-		StoreHost     string `json:"store_host"`
-		BasePath      string `json:"base_path"`
-		StoreCurrency string `json:"store_currency"`
+		StoreHost     string            `json:"store_host"`
+		BasePath      string            `json:"base_path"`
+		StoreCurrency string            `json:"store_currency"`
+		OrderStatuses map[string]string `json:"order_statuses"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return opencart.Configuration{}, opencart.ErrInvalidConfiguration
 	}
-	configuration := opencart.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency}
+	configuration := opencart.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency, OrderStatusMapping: value.OrderStatuses}
 	if configuration.Validate() != nil {
 		return opencart.Configuration{}, opencart.ErrInvalidConfiguration
 	}
@@ -1728,16 +1834,17 @@ func (source prestaShopConfigSource) Resolve(ctx context.Context, account sdk.Ac
 		return prestashop.Configuration{}, err
 	}
 	var value struct {
-		StoreHost     string `json:"store_host"`
-		BasePath      string `json:"base_path"`
-		StoreCurrency string `json:"store_currency"`
-		LanguageID    int64  `json:"language_id"`
-		ShopID        int64  `json:"shop_id"`
+		StoreHost     string            `json:"store_host"`
+		BasePath      string            `json:"base_path"`
+		StoreCurrency string            `json:"store_currency"`
+		LanguageID    int64             `json:"language_id"`
+		ShopID        int64             `json:"shop_id"`
+		OrderStatuses map[string]string `json:"order_statuses"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return prestashop.Configuration{}, prestashop.ErrInvalidConfiguration
 	}
-	configuration := prestashop.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency, LanguageID: value.LanguageID, ShopID: value.ShopID}
+	configuration := prestashop.Configuration{StoreHost: value.StoreHost, BasePath: value.BasePath, StoreCurrency: value.StoreCurrency, LanguageID: value.LanguageID, ShopID: value.ShopID, OrderStatusMapping: value.OrderStatuses}
 	if configuration.Validate() != nil {
 		return prestashop.Configuration{}, prestashop.ErrInvalidConfiguration
 	}

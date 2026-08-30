@@ -260,6 +260,46 @@ components:
 	}
 }
 
+func TestParseSpecResolvesSortableIDPathReference(t *testing.T) {
+	input := `openapi: 3.1.0
+info:
+  title: demo
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /returns/{return_id}:
+    get:
+      operationId: getReturn
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+      responses: {'200': {description: ok}}
+components:
+  schemas:
+    SortableID:
+      type: string
+`
+	s, err := parseSpec([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Operations) != 1 || len(s.Operations[0].Parameters) != 1 || s.Operations[0].Parameters[0].Type != "string" {
+		t.Fatalf("unexpected operation: %#v", s.Operations)
+	}
+	files, err := generate(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if file.Path == "sdk/typescript/src/client.gen.mjs" {
+			content := string(file.Data)
+			if !strings.Contains(content, "input.returnId") || strings.Contains(content, `path.replace("{return_id}", encodeURIComponent(undefined))`) {
+				t.Fatalf("typescript client does not bind SortableID path parameter: %s", content)
+			}
+		}
+	}
+}
+
 // An optional parameter is legitimately written without a `required:` key at
 // all in the source spec (omitted means false per OpenAPI 3.1), e.g. the
 // `limit`/`base`/`quote` query parameters on listFXRates. The old regex

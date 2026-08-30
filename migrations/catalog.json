@@ -633,6 +633,26 @@
       },
       "backfill": null,
       "sha256": "a0e2a2149c7341028e75fa0b2dec5ab032031fa23a2ee1c036b69e2a8d99c407"
+    },
+    {
+      "version": 31,
+      "name": "wms_task_batches",
+      "file": "000031_wms_task_batches.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [30],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "18ca6b0a8279b8de87a2ca04ed3a41f49a6dcb5f7e9ef493d5d0bda597b9407e"
     }
   ]
 }

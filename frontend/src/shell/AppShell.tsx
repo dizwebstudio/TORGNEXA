@@ -18,6 +18,7 @@ import {UserAvatar} from "../components/UserAvatar";
 const DashboardPage = lazy(() => import("../pages/DashboardPage").then(module => ({default: module.DashboardPage})));
 const CatalogPage = lazy(() => import("../pages/CatalogPage").then(module => ({default: module.CatalogPage})));
 const OrdersPage = lazy(() => import("../pages/OrdersPage").then(module => ({default: module.OrdersPage})));
+const ReturnsPage = lazy(() => import("../pages/ReturnsPage").then(module => ({default: module.ReturnsPage})));
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
 const InventoryPage = lazy(() => import("../pages/InventoryPage").then(module => ({default: module.InventoryPage})));
 const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then(module => ({default: module.CounterpartiesPage})));
@@ -41,6 +42,7 @@ function content(path: string) {
   if (path === "/") return <DashboardPage />;
   if (path === "/catalog" || path.startsWith("/catalog/")) return <CatalogPage />;
   if (path === "/orders" || path.startsWith("/orders/")) return <OrdersPage />;
+  if (path === "/returns" || path.startsWith("/returns/")) return <ReturnsPage />;
   if (path === "/inventory") return <InventoryPage />;
   if (path === "/incidents" || path.startsWith("/incidents/")) return <IncidentCenterPage />;
   if (path === "/compliance") return <CompliancePage />;

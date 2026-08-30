@@ -524,8 +524,10 @@ separate-surface / 0 planned** across 61 providers.
 
 ## Task 170 — WMS operator workspace and marketplace fulfillment
 
-Done: the first vertical slice connects canonical orders and durable
-fulfillment allocations to tenant-scoped WMS execution tasks. It includes the
-ADR/policy, PostgreSQL task history with RLS, operator API/SDK, and atomic
-order → allocation → pick-task creation. Marketplace write APIs, labels,
-Честный знак, shipment and the operator UI remain separately scoped.
+In progress: 170.1 → 170.4 connects canonical orders and durable fulfillment
+allocations to tenant-scoped WMS execution tasks. The selected continuation is
+170.5 task context/traceability, 170.6 standalone receiving and inventory
+execution, 170.7 bounded batches/local pack handoff, 170.9 operator UI and
+170.12 qualification/docs. Marketplace write APIs, labels, Честный знак,
+external shipment/status writes and automatic on-hand consumption remain
+separately scoped.
