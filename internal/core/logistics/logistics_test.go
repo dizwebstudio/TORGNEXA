@@ -1,12 +1,13 @@
 package logistics
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestCreateCommandRejectsUnboundedOrMissingIdempotency(t *testing.T) {
-	command := CreateCommand{ID: "shipment-1", AccountID: "account-1", ExternalID: "order-1", ServiceCode: "cdek-136"}
+	command := CreateCommand{ID: "shipment-1", AccountID: "account-1", ExternalID: "order-1", ServiceCode: "cdek-136", PayloadReference: "sec:v1:0123456789abcdef0123456789abcdef", PayloadDigest: strings.Repeat("a", 64)}
 	if command.Validate() == nil {
 		t.Fatal("expected missing idempotency key to be rejected")
 	}

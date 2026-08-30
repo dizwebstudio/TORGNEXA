@@ -4,8 +4,10 @@ package logistics
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -21,6 +23,7 @@ var (
 )
 
 var referencePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // ShipmentID is the canonical TORGNEXA identity of a shipment.
 type ShipmentID string
@@ -106,23 +109,37 @@ func (shipment Shipment) Validate() error {
 	return nil
 }
 
-// CreateCommand starts a local shipment before the remote side effect.
-// The full address/parcel payload is intentionally not persisted here; the
-// worker receives it from its owning order/fulfillment boundary.
+// CreateCommand starts a local shipment before the remote side effect. The
+// request payload is encrypted separately; only its opaque reference and
+// digest cross the local durable boundary.
 type CreateCommand struct {
-	ID             ShipmentID
-	AccountID      string
-	ExternalID     string
-	ServiceCode    string
-	IdempotencyKey string
+	ID              ShipmentID
+	AccountID       string
+	ExternalID      string
+	ServiceCode     string
+	IdempotencyKey  string
+	PayloadReference string
+	PayloadDigest   string
 }
 
 // Validate checks the bounded local identity of a create request.
 func (command CreateCommand) Validate() error {
-	if !command.ID.Valid() || !referencePattern.MatchString(command.AccountID) || !referencePattern.MatchString(command.ExternalID) || !referencePattern.MatchString(command.ServiceCode) || !referencePattern.MatchString(command.IdempotencyKey) {
+	if !command.ID.Valid() || !referencePattern.MatchString(command.AccountID) || !referencePattern.MatchString(command.ExternalID) || !referencePattern.MatchString(command.ServiceCode) || !referencePattern.MatchString(command.IdempotencyKey) || !referencePattern.MatchString(command.PayloadReference) || !digestPattern.MatchString(command.PayloadDigest) {
 		return ErrInvalidRecord
 	}
 	return nil
+}
+
+// ParsePayloadDigest validates the lowercase SHA-256 digest used to bind an
+// encrypted request payload to its idempotent shipment command.
+func ParsePayloadDigest(value string) (string, error) {
+	if !digestPattern.MatchString(value) {
+		return "", ErrInvalidRecord
+	}
+	if _, err := hex.DecodeString(value); err != nil {
+		return "", ErrInvalidRecord
+	}
+	return strings.ToLower(value), nil
 }
 
 // RemoteResult contains only normalized data returned by a connector adapter.
@@ -180,6 +197,7 @@ type Repository interface {
 	Shipment(context.Context, tenancy.Scope, ShipmentID) (Shipment, error)
 	BeginCreate(context.Context, tenancy.Scope, CreateCommand, Mutation) (Shipment, bool, error)
 	ApplyCreateResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
+	ApplyCreateUnknown(context.Context, tenancy.Scope, ShipmentID, int64, Mutation) (Shipment, error)
 	BeginCancel(context.Context, tenancy.Scope, ShipmentID, string, Mutation) (Shipment, bool, error)
 	ApplyCancelResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
 	ApplyCancelUnknown(context.Context, tenancy.Scope, ShipmentID, int64, Mutation) (Shipment, error)

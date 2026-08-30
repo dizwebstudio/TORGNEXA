@@ -29,7 +29,7 @@ func (s *centerReaderStub) Read(_ context.Context, _ tenancy.Scope, request inte
 func TestIntegrationCenterListIsTenantScopedAndFiltered(t *testing.T) {
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	d := integrationcenterTestDimensions(now)
-	row, err := integrationcenter.Reduce(integrationcenter.Input{AccountID: "account-1", ConnectorID: "woocommerce", Family: "storefront", Surface: "integrations", Version: 1, Dimensions: d, SourceWatermarks: []string{"accounts:1"}, Now: now})
+	row, err := integrationcenter.Reduce(integrationcenter.Input{AccountID: "account-1", ConnectorID: "test-storefront", Family: "storefront", Surface: "integrations", Version: 1, Dimensions: d, SourceWatermarks: []string{"accounts:1"}, Now: now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestIntegrationCenterRejectsTenantSelectorsAndBadFilters(t *testing.T) {
 
 func TestIntegrationCenterListSupportsNoStoreAndConditionalRead(t *testing.T) {
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
-	row, err := integrationcenter.Reduce(integrationcenter.Input{AccountID: "account-1", ConnectorID: "woocommerce", Family: "storefront", Surface: "integrations", Version: 1, Dimensions: integrationcenterTestDimensions(now), SourceWatermarks: []string{"accounts:1"}, Now: now})
+	row, err := integrationcenter.Reduce(integrationcenter.Input{AccountID: "account-1", ConnectorID: "test-storefront", Family: "storefront", Surface: "integrations", Version: 1, Dimensions: integrationcenterTestDimensions(now), SourceWatermarks: []string{"accounts:1"}, Now: now})
 	if err != nil {
 		t.Fatal(err)
 	}

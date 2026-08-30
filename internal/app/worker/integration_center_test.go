@@ -12,7 +12,7 @@ func TestReduceWorkerAccountDoesNotInferCredentialFromSecretReference(t *testing
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	account := sdk.Account{
 		ID:              "account-1",
-		ConnectorID:     "woocommerce",
+		ConnectorID:     "test-storefront",
 		Family:          sdk.FamilyStorefront,
 		Status:          sdk.AccountActive,
 		SecretReference: sdk.SecretReference("sec:v1:0123456789abcdef0123456789abcdef"),

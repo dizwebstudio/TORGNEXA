@@ -217,6 +217,17 @@ func (registry *runtimeRegistry) logisticsCanceler(ctx context.Context, scope te
 	return canceler, err
 }
 
+func (registry *runtimeRegistry) logisticsCreator(ctx context.Context, scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsShipmentCreator, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	creator, err := registry.builtins.LogisticsCreator(ctx, account, runtime)
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return creator, err
+}
+
 func (registry *runtimeRegistry) orderStatus(scope tenancy.Scope, account sdk.Account, status string) (string, bool) {
 	if registry == nil || registry.builtins == nil || !scope.Valid() {
 		return "", false

@@ -27,7 +27,12 @@ func (m LogisticsMoney) Validate() error {
 	return nil
 }
 
-type Address struct{ Country, PostalCode, City, Line1 string }
+type Address struct {
+	Country    string `json:"country"`
+	PostalCode string `json:"postal_code,omitempty"`
+	City       string `json:"city"`
+	Line1      string `json:"line1"`
+}
 
 func (a Address) Validate() error { return validateAddress(a) }
 func validateAddress(a Address) error {
@@ -37,7 +42,12 @@ func validateAddress(a Address) error {
 	return nil
 }
 
-type Parcel struct{ WeightGrams, LengthMM, WidthMM, HeightMM int64 }
+type Parcel struct {
+	WeightGrams int64 `json:"weight_grams"`
+	LengthMM    int64 `json:"length_mm"`
+	WidthMM     int64 `json:"width_mm"`
+	HeightMM    int64 `json:"height_mm"`
+}
 
 func (p Parcel) Validate() error {
 	if p.WeightGrams <= 0 || p.LengthMM <= 0 || p.WidthMM <= 0 || p.HeightMM <= 0 {
@@ -50,14 +60,15 @@ func (p Parcel) Validate() error {
 // needed by a carrier shipment request. It is request-scoped and is never
 // part of the canonical shipment projection.
 type LogisticsContact struct {
-	Name  string
-	Phone string
-	Email string
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Email string `json:"email,omitempty"`
 }
 
 type RateRequest struct {
-	From, To Address
-	Parcels  []Parcel
+	From    Address  `json:"from"`
+	To      Address  `json:"to"`
+	Parcels []Parcel `json:"parcels"`
 }
 type RateQuote struct {
 	ServiceCode                              string
@@ -84,11 +95,15 @@ func (q RateQuote) Validate() error {
 }
 
 type ShipmentCreateRequest struct {
-	ExternalID, ServiceCode, IdempotencyKey string
-	From, To                                Address
-	Parcels                                 []Parcel
-	PickupPointRef                          string
-	Sender, Recipient                       LogisticsContact
+	ExternalID     string            `json:"external_id"`
+	ServiceCode    string            `json:"service_code"`
+	IdempotencyKey string            `json:"idempotency_key"`
+	From           Address           `json:"from"`
+	To             Address           `json:"to"`
+	Parcels        []Parcel          `json:"parcels"`
+	PickupPointRef string            `json:"pickup_point_ref,omitempty"`
+	Sender         LogisticsContact  `json:"sender"`
+	Recipient      LogisticsContact  `json:"recipient"`
 }
 type ShipmentResult struct {
 	RemoteID, Status string

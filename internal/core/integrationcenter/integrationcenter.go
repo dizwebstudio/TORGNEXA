@@ -293,7 +293,14 @@ type Summary struct {
 // Validate checks the persisted/public snapshot envelope. It intentionally
 // does not validate source payloads because those never cross this boundary.
 func (s Snapshot) Validate() error {
-	if !safeRef(s.SnapshotID, 64) || !strings.HasPrefix(s.SnapshotID, "ic:") || len(s.SnapshotDigest) != 64 || !safeHex(s.SnapshotDigest) || s.SnapshotVersion < 1 || s.GeneratedAt.IsZero() || s.GeneratedAt.Location() != time.UTC || !safeRef(s.AccountID, 128) || !safeRef(s.ConnectorID, 96) || !safeRef(s.Family, 64) || !safeRef(s.Surface, 64) || s.Version < 1 || len(s.Issues) > MaxIssues || len(s.Actions) > MaxActions || len(s.Capabilities) > MaxCapabilities {
+	if !safeRef(s.SnapshotID, 64) || !strings.HasPrefix(s.SnapshotID, "ic:") || len(s.SnapshotDigest) != 64 || !safeHex(s.SnapshotDigest) || s.SnapshotVersion < 1 || s.GeneratedAt.IsZero() || s.GeneratedAt.Location() != time.UTC {
+		return errors.New("integration center: invalid snapshot")
+	}
+	if !safeRef(s.AccountID, 128) || !safeRef(s.Family, 64) || !safeRef(s.Surface, 64) || s.Version < 1 || len(s.Issues) > MaxIssues || len(s.Actions) > MaxActions || len(s.Capabilities) > MaxCapabilities {
+		return errors.New("integration center: invalid snapshot")
+	}
+	bindingID := s.ConnectorID
+	if !safeRef(bindingID, 96) {
 		return errors.New("integration center: invalid snapshot")
 	}
 	if _, ok := map[OverallStatus]struct{}{OverallHealthy: {}, OverallAttention: {}, OverallDegraded: {}, OverallSyncing: {}, OverallBlocked: {}, OverallSetupRequired: {}, OverallReauthorizationRequired: {}, OverallStale: {}, OverallDisabled: {}, OverallUnsupported: {}, OverallUnknown: {}}[s.Overall]; !ok {
@@ -372,7 +379,11 @@ func (d Dimensions) Validate(now time.Time) error {
 }
 
 func (i Input) Validate() error {
-	if !safeRef(i.AccountID, 128) || !safeRef(i.ConnectorID, 96) || !safeRef(i.Family, 64) || !safeRef(i.Surface, 64) || i.Version < 1 || i.Now.IsZero() || i.Now.Location() != time.UTC || len(i.Capabilities) > MaxCapabilities || len(i.Issues) > MaxIssues {
+	if !safeRef(i.AccountID, 128) || !safeRef(i.Family, 64) || !safeRef(i.Surface, 64) || i.Version < 1 || i.Now.IsZero() || i.Now.Location() != time.UTC || len(i.Capabilities) > MaxCapabilities || len(i.Issues) > MaxIssues {
+		return errors.New("integration center: invalid input")
+	}
+	bindingID := i.ConnectorID
+	if !safeRef(bindingID, 96) {
 		return errors.New("integration center: invalid input")
 	}
 	if i.DisplayName != "" && (len(i.DisplayName) > 160 || strings.ContainsAny(i.DisplayName, "\x00\r\n")) {

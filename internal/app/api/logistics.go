@@ -26,6 +26,7 @@ const (
 	logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
 	logisticsRatesPath        = "/api/v1/logistics/rates"
 	logisticsTrackingPath     = "/api/v1/logistics/tracking"
+	logisticsShipmentCreatePath = "/api/v1/logistics/shipments"
 	logisticsShipmentsPath    = "/api/v1/logistics/shipments/"
 )
 
@@ -39,6 +40,7 @@ type logisticsCapabilityStore interface {
 }
 
 type logisticsShipmentStore interface {
+	BeginCreate(context.Context, tenancy.Scope, logistics.CreateCommand, logistics.Mutation) (logistics.Shipment, bool, error)
 	BeginCancel(context.Context, tenancy.Scope, logistics.ShipmentID, string, logistics.Mutation) (logistics.Shipment, bool, error)
 }
 
@@ -96,6 +98,25 @@ type logisticsRatesInput struct {
 	Parcels            []logisticsParcelInput `json:"parcels"`
 }
 
+type logisticsContactInput struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Email string `json:"email"`
+}
+
+type logisticsShipmentCreateInput struct {
+	ShipmentID         string                  `json:"shipment_id"`
+	ConnectorAccountID string                  `json:"connector_account_id"`
+	ExternalID         string                  `json:"external_id"`
+	ServiceCode        string                  `json:"service_code"`
+	From               logisticsAddressInput  `json:"from"`
+	To                 logisticsAddressInput  `json:"to"`
+	Parcels            []logisticsParcelInput `json:"parcels"`
+	PickupPointRef     string                  `json:"pickup_point_ref"`
+	Sender             logisticsContactInput  `json:"sender"`
+	Recipient          logisticsContactInput  `json:"recipient"`
+}
+
 type logisticsRateView struct {
 	OptionID      string    `json:"option_id"`
 	Cost          moneyView `json:"cost"`
@@ -122,8 +143,99 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
 	}
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentCreatePath, Permission: "logistics.shipment.create", Handler: http.HandlerFunc(api.createShipment)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
 	return routes
+}
+
+func (api logisticsAPI) createShipment(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.shipments == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsShipmentCreateInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	shipmentID, err := logistics.ParseShipmentID(strings.TrimSpace(input.ShipmentID))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	request := input.toSDK(key)
+	if request.Validate() != nil || len(request.Parcels) > 50 || !validLogisticsContact(request.Sender) || !validLogisticsContact(request.Recipient) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), strings.TrimSpace(input.ConnectorAccountID))
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.shipment.create")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Shipment creation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Shipment creation capability is not enabled")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.shipment.create" || requested.ResourceType != "shipment" || requested.ResourceID != shipmentID.String() || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	digest := sha256.Sum256(payload)
+	metadata, err := api.secrets.Create(r.Context(), scope, secrets.ClassLogisticsShipment, payload)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	defer func() { wipeBytes(payload) }()
+	shipment, fresh, err := api.shipments.BeginCreate(r.Context(), scope, logistics.CreateCommand{ID: shipmentID, AccountID: strings.TrimSpace(input.ConnectorAccountID), ExternalID: request.ExternalID, ServiceCode: request.ServiceCode, IdempotencyKey: key, PayloadReference: metadata.Reference.String(), PayloadDigest: hex.EncodeToString(digest[:])}, logistics.Mutation{EventID: newApprovalID(), AuditID: newApprovalID(), ActorID: principal.Subject, Source: "api.logistics", CorrelationID: key, ApprovalRequestID: approvalID, OccurredAt: time.Now().UTC()})
+	if err != nil {
+		_ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
+		switch {
+		case errors.Is(err, logistics.ErrNotFound):
+			writeProblem(w, http.StatusNotFound, "Not Found")
+		case errors.Is(err, logistics.ErrConflict), errors.Is(err, logistics.ErrInProgress):
+			writeProblem(w, http.StatusConflict, "Conflict")
+		default:
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+		}
+		return
+	}
+	if !fresh {
+		_ = api.secrets.Revoke(r.Context(), scope, metadata.Reference)
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"id": shipment.ID.String(), "status": string(shipment.Status), "version": shipment.Version, "accepted": true, "fresh": fresh})
 }
 
 func (api logisticsAPI) cancelShipment(w http.ResponseWriter, r *http.Request) {
@@ -357,6 +469,24 @@ func (input logisticsRatesInput) toSDK() sdk.RateRequest {
 		parcels = append(parcels, sdk.Parcel{WeightGrams: parcel.WeightGrams, LengthMM: parcel.LengthMM, WidthMM: parcel.WidthMM, HeightMM: parcel.HeightMM})
 	}
 	return sdk.RateRequest{From: address(input.From), To: address(input.To), Parcels: parcels}
+}
+
+func (input logisticsShipmentCreateInput) toSDK(idempotencyKey string) sdk.ShipmentCreateRequest {
+	address := func(value logisticsAddressInput) sdk.Address {
+		return sdk.Address{Country: strings.ToUpper(strings.TrimSpace(value.Country)), PostalCode: strings.TrimSpace(value.PostalCode), City: strings.TrimSpace(value.City), Line1: strings.TrimSpace(value.Line1)}
+	}
+	parcels := make([]sdk.Parcel, 0, len(input.Parcels))
+	for _, parcel := range input.Parcels {
+		parcels = append(parcels, sdk.Parcel{WeightGrams: parcel.WeightGrams, LengthMM: parcel.LengthMM, WidthMM: parcel.WidthMM, HeightMM: parcel.HeightMM})
+	}
+	contact := func(value logisticsContactInput) sdk.LogisticsContact {
+		return sdk.LogisticsContact{Name: strings.TrimSpace(value.Name), Phone: strings.TrimSpace(value.Phone), Email: strings.TrimSpace(value.Email)}
+	}
+	return sdk.ShipmentCreateRequest{ExternalID: strings.TrimSpace(input.ExternalID), ServiceCode: strings.TrimSpace(input.ServiceCode), IdempotencyKey: idempotencyKey, From: address(input.From), To: address(input.To), Parcels: parcels, PickupPointRef: strings.TrimSpace(input.PickupPointRef), Sender: contact(input.Sender), Recipient: contact(input.Recipient)}
+}
+
+func validLogisticsContact(contact sdk.LogisticsContact) bool {
+	return strings.TrimSpace(contact.Name) != "" && strings.TrimSpace(contact.Name) == contact.Name && len(contact.Name) <= 255 && strings.TrimSpace(contact.Phone) != "" && strings.TrimSpace(contact.Phone) == contact.Phone && len(contact.Phone) <= 32 && strings.TrimSpace(contact.Email) == contact.Email && len(contact.Email) <= 254 && !strings.ContainsAny(contact.Email, "\r\n\t ")
 }
 
 func logisticsRateOptionID(accountID, serviceCode string) string {

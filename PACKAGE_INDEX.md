@@ -1,6 +1,6 @@
-# Package status — 2026-08-28
+# Package status — 2026-08-30
 
-**Tasks 001–159 are repository-implemented.** Task 159 adds Google Gemini and
+**Tasks 001–168 are repository-implemented.** Task 159 adds Google Gemini and
 Grok to the governed AI-provider surface. Midjourney remains intentionally
 unavailable because its official policy disallows third-party automation. Task
 158 adds «Долями» to the
@@ -22,7 +22,7 @@ generic product integrations and 43 separate-surface providers; there are no
 planned connectors. Architecture policy: **127 modules / 61 providers / 150
 reviews**. Active migrations are **22**, latest `000022`, with
 the original **74-file / legacy head 000074** chain archived as immutable
-evidence. Public OpenAPI is **138 operations / 0.21.1**.
+evidence. Public OpenAPI is **194 operations / 0.21.2**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 

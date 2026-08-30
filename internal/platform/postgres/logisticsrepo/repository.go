@@ -63,6 +63,32 @@ func (repository *Repository) Shipment(ctx context.Context, scope tenancy.Scope,
 	return result, err
 }
 
+// CreateRequestReference returns the opaque SecretProvider reference for the
+// one-time shipment payload. The payload itself never enters the repository.
+func (repository *Repository) CreateRequestReference(ctx context.Context, scope tenancy.Scope, id logistics.ShipmentID) (string, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return "", err
+	}
+	if !id.Valid() {
+		return "", logistics.ErrInvalidRecord
+	}
+	var reference string
+	err := repository.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx, `SELECT create_request_ref FROM logistics_shipments WHERE organization_id=$1 AND workspace_id=$2 AND shipment_id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String()).Scan(&reference)
+		if errors.Is(err, sql.ErrNoRows) {
+			return logistics.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if !validReference(reference) {
+			return logistics.ErrConflict
+		}
+		return nil
+	})
+	return reference, err
+}
+
 // BeginCreate claims a shipment creation command. fresh is true only for the
 // caller that owns the subsequent remote side effect.
 func (repository *Repository) BeginCreate(ctx context.Context, scope tenancy.Scope, command logistics.CreateCommand, mutation logistics.Mutation) (logistics.Shipment, bool, error) {
@@ -93,7 +119,7 @@ func (repository *Repository) BeginCreate(ctx context.Context, scope tenancy.Sco
 
 		fresh = true
 		at := mutation.OccurredAt.UTC()
-		_, err = tx.ExecContext(ctx, `INSERT INTO logistics_shipments(organization_id,workspace_id,shipment_id,provider_account_id,external_id,remote_id,service_code,status,tracking_number,cost_minor_units,currency,version,updated_at) VALUES($1,$2,$3,$4,$5,'',$6,$7,'',0,'RUB',1,$8)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), command.ID.String(), command.AccountID, command.ExternalID, command.ServiceCode, logistics.StatusPending, at)
+		_, err = tx.ExecContext(ctx, `INSERT INTO logistics_shipments(organization_id,workspace_id,shipment_id,provider_account_id,external_id,remote_id,service_code,status,tracking_number,cost_minor_units,currency,create_request_ref,version,updated_at) VALUES($1,$2,$3,$4,$5,'',$6,$7,'',0,'RUB',$8,1,$9)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), command.ID.String(), command.AccountID, command.ExternalID, command.ServiceCode, logistics.StatusPending, command.PayloadReference, at)
 		if err != nil {
 			return fmt.Errorf("insert pending shipment: %w", err)
 		}
@@ -149,6 +175,48 @@ func (repository *Repository) ApplyCreateResult(ctx context.Context, scope tenan
 			return err
 		}
 		return enqueueShipmentEvent(ctx, tx, scope, mutation, result, "created")
+	})
+	return result, err
+}
+
+// ApplyCreateUnknown closes an ambiguous create attempt without issuing a
+// second carrier request. Reconciliation or manual review must resolve it.
+func (repository *Repository) ApplyCreateUnknown(ctx context.Context, scope tenancy.Scope, id logistics.ShipmentID, expectedVersion int64, mutation logistics.Mutation) (logistics.Shipment, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return logistics.Shipment{}, err
+	}
+	if !id.Valid() || expectedVersion < 1 {
+		return logistics.Shipment{}, logistics.ErrInvalidRecord
+	}
+	if err := mutation.Validate(); err != nil {
+		return logistics.Shipment{}, err
+	}
+	var result logistics.Shipment
+	err := repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		current, err := loadShipment(ctx, tx, scope, id, true)
+		if err != nil {
+			return err
+		}
+		if current.Version != expectedVersion || current.Status != logistics.StatusPending {
+			return logistics.ErrConflict
+		}
+		row := tx.QueryRowContext(ctx, `UPDATE logistics_shipments SET status=$4,version=version+1,updated_at=$5 WHERE organization_id=$1 AND workspace_id=$2 AND shipment_id=$3 AND version=$6 RETURNING `+shipmentSelect, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String(), logistics.StatusUnknown, mutation.OccurredAt.UTC(), expectedVersion)
+		result, err = scanShipment(row)
+		if err != nil {
+			return logistics.ErrConflict
+		}
+		key, err := pendingReceiptKey(ctx, tx, scope, createOperation, id.String())
+		if err != nil {
+			return err
+		}
+		remote := logistics.RemoteResult{Status: logistics.StatusUnknown, Currency: current.Currency, ObservedAt: mutation.OccurredAt.UTC()}
+		if err := completeReceipt(ctx, tx, scope, createOperation, key, result, remote); err != nil {
+			return err
+		}
+		if err := appendAudit(ctx, tx, scope, mutation, "fulfillment.shipment.create.unknown", id.String(), audit.RiskWriteSensitive, shipmentSummary(result, "create_unknown")); err != nil {
+			return err
+		}
+		return enqueueShipmentEvent(ctx, tx, scope, mutation, result, "create_unknown")
 	})
 	return result, err
 }
@@ -502,7 +570,7 @@ func enqueueShipmentEvent(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, 
 }
 
 func mutationApprovalRequestID(mutation logistics.Mutation, operation string) string {
-	if operation == "cancel_requested" {
+	if operation == "cancel_requested" || operation == "create_requested" {
 		return mutation.ApprovalRequestID
 	}
 	return ""
@@ -513,7 +581,7 @@ func shipmentSummary(shipment logistics.Shipment, operation string) audit.Summar
 }
 
 func createDigest(command logistics.CreateCommand) [32]byte {
-	return sha256.Sum256([]byte(command.ID.String() + "\x00" + command.AccountID + "\x00" + command.ExternalID + "\x00" + command.ServiceCode))
+	return sha256.Sum256([]byte(command.ID.String() + "\x00" + command.AccountID + "\x00" + command.ExternalID + "\x00" + command.ServiceCode + "\x00" + command.PayloadDigest))
 }
 
 func cancelDigest(id logistics.ShipmentID, remoteID string) [32]byte {

@@ -128,7 +128,8 @@ func (s integrationCenterSource) Read(ctx context.Context, scope tenancy.Scope, 
 	}
 	policyByAccount := make(map[string][]syncengine.Policy)
 	for _, p := range policies {
-		policyByAccount[p.ConnectorAccountID] = append(policyByAccount[p.ConnectorAccountID], p)
+		accountKey := p.ConnectorAccountID
+		policyByAccount[accountKey] = append(policyByAccount[accountKey], p)
 	}
 	latestRunByPolicy := make(map[string]reconciliation.Run)
 	for _, run := range runs {
@@ -238,6 +239,7 @@ func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []s
 	capabilityVisibility := integrationcenter.VisibilityFull
 	manifest, manifestErr := sdk.CatalogManifest(account.ConnectorID)
 	if manifestErr == nil && len(manifest.Capabilities) > 0 {
+		bindingID := account.ConnectorID
 		if !capabilitiesReadable {
 			capStatus = integrationcenter.CapabilityStale
 			capabilityVisibility = integrationcenter.VisibilityRedacted
@@ -250,7 +252,7 @@ func (s integrationCenterSource) reduceAccount(account sdk.Account, policies []s
 				for _, setting := range settings {
 					status := integrationcenter.CapabilityDeclared
 					if setting.Enabled {
-						if builtinruntime.SupportsCapability(account.ConnectorID, string(setting.Capability)) {
+						if builtinruntime.SupportsCapability(bindingID, string(setting.Capability)) {
 							status = integrationcenter.CapabilityEnabled
 						} else {
 							status = integrationcenter.CapabilityQualificationRequired

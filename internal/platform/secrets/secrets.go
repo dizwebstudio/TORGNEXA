@@ -51,13 +51,14 @@ const (
 	ClassNotificationDestination Class = "notification_destination"
 	ClassPrivacyExport           Class = "privacy_export"
 	ClassAIProviderCredential    Class = "ai_provider_credential"
+	ClassLogisticsShipment       Class = "logistics_shipment"
 )
 
 func (class Class) Valid() bool {
 	switch class {
 	case ClassConnectorToken, ClassOAuthClient, ClassOAuthState, ClassOAuthRefresh, ClassERPCredential,
 		ClassWebhookSigning, ClassCertificate, ClassStorageCredential, ClassNotificationDestination, ClassPrivacyExport,
-		ClassAIProviderCredential:
+		ClassAIProviderCredential, ClassLogisticsShipment:
 		return true
 	default:
 		return false

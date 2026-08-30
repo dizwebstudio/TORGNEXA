@@ -43,6 +43,16 @@ type logisticsShipmentStub struct {
 	mutation logistics.Mutation
 }
 
+func (stub *logisticsShipmentStub) BeginCreate(_ context.Context, _ tenancy.Scope, command logistics.CreateCommand, mutation logistics.Mutation) (logistics.Shipment, bool, error) {
+	stub.called = true
+	stub.mutation = mutation
+	stub.shipment.ID = command.ID
+	stub.shipment.AccountID = command.AccountID
+	stub.shipment.ExternalID = command.ExternalID
+	stub.shipment.ServiceCode = command.ServiceCode
+	return stub.shipment, stub.fresh, nil
+}
+
 func (stub *logisticsShipmentStub) BeginCancel(_ context.Context, _ tenancy.Scope, _ logistics.ShipmentID, _ string, mutation logistics.Mutation) (logistics.Shipment, bool, error) {
 	stub.called = true
 	stub.mutation = mutation

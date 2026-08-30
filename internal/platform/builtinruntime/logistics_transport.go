@@ -258,15 +258,15 @@ type cdekCreatePackage struct {
 }
 
 type cdekCreateOrder struct {
-	Type           int                `json:"type"`
-	Number        string             `json:"number"`
-	TariffCode    int                `json:"tariff_code"`
-	ShipmentPoint string             `json:"shipment_point,omitempty"`
-	DeliveryPoint string             `json:"delivery_point,omitempty"`
-	FromLocation  cdekRateLocation   `json:"from_location"`
-	ToLocation    cdekRateLocation   `json:"to_location"`
-	Sender        cdekCreateContact  `json:"sender"`
-	Recipient     cdekCreateContact  `json:"recipient"`
+	Type          int                 `json:"type"`
+	Number        string              `json:"number"`
+	TariffCode    int                 `json:"tariff_code"`
+	ShipmentPoint string              `json:"shipment_point,omitempty"`
+	DeliveryPoint string              `json:"delivery_point,omitempty"`
+	FromLocation  cdekRateLocation    `json:"from_location"`
+	ToLocation    cdekRateLocation    `json:"to_location"`
+	Sender        cdekCreateContact   `json:"sender"`
+	Recipient     cdekCreateContact   `json:"recipient"`
 	Packages      []cdekCreatePackage `json:"packages"`
 }
 
@@ -605,9 +605,9 @@ func (transport cdekHTTP) Create(ctx context.Context, secret []byte, request sdk
 		})
 	}
 	body, err := json.Marshal(cdekCreateOrder{
-		Type:           1,
-		Number:         request.ExternalID,
-		TariffCode:     tariffCode,
+		Type:          1,
+		Number:        request.ExternalID,
+		TariffCode:    tariffCode,
 		DeliveryPoint: request.PickupPointRef,
 		FromLocation:  cdekAddress(request.From),
 		ToLocation:    cdekAddress(request.To),
@@ -1271,8 +1271,8 @@ type dellinRateResponse struct {
 		DeliveryTerm int             `json:"deliveryTerm"`
 		OrderDates   struct {
 			Pickup                    string `json:"pickup"`
-			ArrivalToOspReceiver     string `json:"arrivalToOspReceiver"`
-			GiveoutFromOspReceiver   string `json:"giveoutFromOspReceiver"`
+			ArrivalToOspReceiver      string `json:"arrivalToOspReceiver"`
+			GiveoutFromOspReceiver    string `json:"giveoutFromOspReceiver"`
 			GiveoutFromOspReceiverMax string `json:"giveoutFromOspReceiverMax"`
 		} `json:"orderDates"`
 	} `json:"data"`

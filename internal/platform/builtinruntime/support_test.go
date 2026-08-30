@@ -113,7 +113,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.cancel") {
-				 t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
+				t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
 				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)

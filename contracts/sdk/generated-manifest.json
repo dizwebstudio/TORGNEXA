@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "53b304849655dc72590e60dd18653abee89d584a28dd77163617cb18f18a36ed",
+    "sha256": "eb015ed0ac8107b149aa220ef3edc14abc2dcefaa8f1257dfa1f29edc40e5a7c",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"

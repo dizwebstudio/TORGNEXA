@@ -148,6 +148,66 @@ func TestCDEKRatesRejectDuplicateTariffs(t *testing.T) {
 	}
 }
 
+func TestCDEKShipmentCreationUsesOfficialOrderPayload(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "create-token"})
+		case "/v2/orders":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer create-token" || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected CDEK create request: method=%s authorization=%q content-type=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "secret-1") {
+				t.Fatalf("credential leaked into CDEK create request: %s", body)
+			}
+			var request cdekCreateOrder
+			if json.Unmarshal(body, &request) != nil || request.Type != 1 || request.Number != "order-17" || request.TariffCode != 136 || request.DeliveryPoint != "pvz-137" || request.FromLocation.City != "Москва" || request.ToLocation.City != "Санкт-Петербург" || request.Recipient.Name != "Иван Петров" || len(request.Recipient.Phones) != 1 || request.Recipient.Phones[0].Number != "+79991234567" || len(request.Packages) != 1 || request.Packages[0].Weight != 1000 || request.Packages[0].Length != 10 {
+				t.Fatalf("unexpected CDEK create body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": "72753031-1820-4f99-9240-aab139f05ca5", "cdek_number": "1100285492", "number": "order-17"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order-17", ServiceCode: "cdek_tariff_136", IdempotencyKey: "create-17",
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}}, PickupPointRef: "pvz-137",
+		Sender: sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"}, Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567", Email: "ivan@example.com"},
+	}
+	result, err := transport.Create(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), request)
+	if err != nil {
+		t.Fatalf("CDEK create request failed: %v", err)
+	}
+	if result.RemoteID != "1100285492" || result.Status != "created" || result.TrackingNumber != "1100285492" || result.Cost.Currency != "RUB" || result.Cost.MinorUnits != 0 || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized CDEK shipment: %+v", result)
+	}
+}
+
+func TestCDEKShipmentCreationRejectsUnqualifiedServiceCodeAndMalformedResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "create-token"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"number": "order-17"}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{ExternalID: "order-17", ServiceCode: "remote_tariff_136", IdempotencyKey: "create-17", From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", City: "Казань", Line1: "Баумана, 1"}, Parcels: []sdk.Parcel{{WeightGrams: 1, LengthMM: 1, WidthMM: 1, HeightMM: 1}}, Sender: sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"}, Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567"}}
+	if _, err := transport.Create(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), request); err == nil {
+		t.Fatal("unqualified CDEK service code accepted")
+	}
+	request.ServiceCode = "cdek_tariff_136"
+	if _, err := transport.Create(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), request); err == nil {
+		t.Fatal("malformed CDEK create response accepted")
+	}
+}
+
 func TestCDEKTrackingReadsLatestStatusWithoutExposingCredentials(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
