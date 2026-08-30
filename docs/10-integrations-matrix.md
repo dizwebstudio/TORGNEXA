@@ -132,10 +132,12 @@ outside the v1 runtime claim.
 SecretProvider и запустить проверку официального API. Для СДЭК используется
 JSON с OAuth client credentials, для «Деловых Линий» — appkey и PAT, для
 «Почты России» — токен приложения и ключ пользователя. Товарная синхронизация
-не заявляется; для CDEK, ПЭК, «Деловых Линий» и «Почты России» доступно только
+не заявляется; для CDEK, ПЭК, «Деловых Линий» и «Почты России» доступно
 bounded read-only чтение справочника ПВЗ/терминалов через `pickup.points.read`.
-Создание
-отправлений, расчёт, статусы и этикетки остаются закрытыми до квалификации
+Для CDEK также доступен bounded предпросмотр тарифов через
+`POST /api/v1/logistics/rates` с capability `logistics.rates.read`; запрос
+ограничен 50 местами, ответ — 100 вариантами и не раскрывает код тарифа.
+Создание отправлений, статусы и этикетки остаются закрытыми до квалификации
 актуального API и тестового кабинета.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
@@ -170,7 +172,8 @@ capabilities.
 The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
 and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Линии» and «Почта России»
 expose a bounded, read-only `pickup.points.read` application route for their
-official ПВЗ/terminal directories; shipment writes, rates and other carrier
+official ПВЗ/terminal directories; CDEK additionally exposes a bounded
+read-only rate preview. Shipment writes, tracking, labels and other carrier
 operations remain fail-closed until provider qualification. 5Post and Ozon
 Доставка expose only the separately reviewed credential-check surface.
 

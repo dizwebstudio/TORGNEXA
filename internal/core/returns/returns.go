@@ -304,7 +304,7 @@ type ReturnItem struct {
 }
 
 func (i ReturnItem) Validate() error {
-	if !i.ID.Valid() || !i.ReturnID.Valid() || !refPattern.MatchString(i.OrderItemID) || i.Requested.Validate() != nil || !i.Requested.Positive() || i.Received.Validate() != nil || i.Accepted.Validate() != nil || i.Requested.Unit != i.Received.Unit || i.Requested.Unit != i.Accepted.Unit || !i.Disposition.Valid() || i.Version < 1 || !utc(i.CreatedAt) || !utc(i.UpdatedAt) || i.UpdatedAt.Before(i.CreatedAt) {
+	if !i.ID.Valid() || !i.ReturnID.Valid() || !refPattern.MatchString(i.OrderItemID) || i.Requested.Validate() != nil || !i.Requested.Positive() || i.Received.Validate() != nil || i.Accepted.Validate() != nil || i.Received.Coefficient < 0 || i.Accepted.Coefficient < 0 || i.Requested.Unit != i.Received.Unit || i.Requested.Unit != i.Accepted.Unit || !i.Disposition.Valid() || i.Version < 1 || !utc(i.CreatedAt) || !utc(i.UpdatedAt) || i.UpdatedAt.Before(i.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	if cmp, _ := i.Accepted.Compare(i.Received); cmp > 0 {
@@ -323,7 +323,7 @@ func ValidateLineAllocation(orderQuantity, requested, received, accepted Quantit
 			return err
 		}
 	}
-	if !requested.Positive() {
+	if !requested.Positive() || received.Coefficient < 0 || accepted.Coefficient < 0 {
 		return ErrInvalidRecord
 	}
 	if cmp, _ := requested.Compare(orderQuantity); cmp > 0 {

@@ -604,6 +604,9 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .pickup-lookup .drawer-inline { align-items:flex-end; flex-wrap:wrap; }
 .pickup-lookup .drawer-inline .field { flex:1 1 160px; min-width:0; }
 .pickup-lookup .drawer-inline .button { flex:0 0 auto; }
+.logistics-rate-lookup .drawer-inline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; }
+.logistics-rate-lookup .drawer-inline .field { min-width:0; }
+.logistics-rate-lookup .drawer-inline .button { justify-self:start; }
 .drawer-inline input { flex:1; min-width:0; }
 .detail-list { display:grid; gap:0; margin:0; }
 .detail-list > div { display:grid; grid-template-columns:140px 1fr; gap:14px; padding:10px 0; border-bottom:1px solid var(--border); }

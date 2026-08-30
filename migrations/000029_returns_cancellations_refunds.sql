@@ -226,6 +226,13 @@ CREATE INDEX return_items_return_idx ON return_items(organization_id,workspace_i
 CREATE INDEX refund_allocations_payment_idx ON refund_allocations(organization_id,workspace_id,payment_id,created_at,id);
 CREATE INDEX commerce_operation_evidence_operation_idx ON commerce_operation_evidence(organization_id,workspace_id,operation_type,operation_id,occurred_at,id);
 
+-- Cross-aggregate invariants which cannot be expressed by a single-column FK.
+CREATE FUNCTION returns_refund_allocation_guard() RETURNS trigger LANGUAGE plpgsql AS 'DECLARE refund_payment text; refund_amount bigint; refund_currency text; BEGIN SELECT payment_id,amount_minor_units,currency INTO refund_payment,refund_amount,refund_currency FROM payment_refunds WHERE organization_id=NEW.organization_id AND workspace_id=NEW.workspace_id AND id=NEW.refund_id; IF refund_payment IS NULL OR refund_payment <> NEW.payment_id OR refund_currency <> NEW.currency OR NEW.amount_minor_units > refund_amount THEN RAISE EXCEPTION USING ERRCODE = ''23514'', MESSAGE = ''refund allocation does not match refund''; END IF; RETURN NEW; END';
+CREATE TRIGGER refund_allocations_guard BEFORE INSERT OR UPDATE OF payment_id,refund_id,amount_minor_units,currency ON refund_allocations FOR EACH ROW EXECUTE FUNCTION returns_refund_allocation_guard();
+
+CREATE FUNCTION returns_item_order_guard() RETURNS trigger LANGUAGE plpgsql AS 'DECLARE return_order text; item_order text; BEGIN SELECT order_id INTO return_order FROM commerce_returns WHERE organization_id=NEW.organization_id AND workspace_id=NEW.workspace_id AND id=NEW.return_id; SELECT order_id INTO item_order FROM order_items WHERE organization_id=NEW.organization_id AND workspace_id=NEW.workspace_id AND id=NEW.order_item_id; IF return_order IS NULL OR item_order IS NULL OR return_order <> item_order THEN RAISE EXCEPTION USING ERRCODE = ''23514'', MESSAGE = ''return item does not belong to return order''; END IF; RETURN NEW; END';
+CREATE TRIGGER return_items_order_guard BEFORE INSERT OR UPDATE OF return_id,order_item_id ON return_items FOR EACH ROW EXECUTE FUNCTION returns_item_order_guard();
+
 ALTER TABLE order_cancellations ENABLE ROW LEVEL SECURITY; ALTER TABLE order_cancellations FORCE ROW LEVEL SECURITY;
 ALTER TABLE commerce_returns ENABLE ROW LEVEL SECURITY; ALTER TABLE commerce_returns FORCE ROW LEVEL SECURITY;
 ALTER TABLE cancellation_state_history ENABLE ROW LEVEL SECURITY; ALTER TABLE cancellation_state_history FORCE ROW LEVEL SECURITY;

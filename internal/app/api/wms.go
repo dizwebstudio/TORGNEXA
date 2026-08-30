@@ -23,10 +23,10 @@ type wmsTaskCommandInput struct {
 }
 
 type wmsScanInput struct {
-	Version     int64  `json:"version"`
-	Barcode     string `json:"barcode"`
+	Version      int64  `json:"version"`
+	Barcode      string `json:"barcode"`
 	LocationCode string `json:"location_code"`
-	Quantity    string `json:"quantity"`
+	Quantity     string `json:"quantity"`
 }
 
 type wmsCreateFromOrderInput struct {
@@ -40,39 +40,39 @@ type wmsQuantityResponse struct {
 }
 
 type wmsTaskResponse struct {
-	ID                       string              `json:"id"`
-	TaskType                 string              `json:"task_type"`
-	State                    string              `json:"state"`
-	WarehouseID              string              `json:"warehouse_id"`
-	SKU                      string              `json:"sku"`
-	OrderID                  string              `json:"order_id,omitempty"`
-	OrderItemID              string              `json:"order_item_id,omitempty"`
-	FulfillmentAllocationID  string              `json:"fulfillment_allocation_id,omitempty"`
-	SourceLocationCode       string              `json:"source_location_code,omitempty"`
-	TargetLocationCode       string              `json:"target_location_code,omitempty"`
-	ExpectedQuantity         wmsQuantityResponse `json:"expected_quantity"`
-	ProcessedQuantity        wmsQuantityResponse `json:"processed_quantity"`
-	AssignedTo               string              `json:"assigned_to,omitempty"`
-	ExceptionCode            string              `json:"exception_code,omitempty"`
-	CancelReason             string              `json:"cancel_reason,omitempty"`
-	Version                  int64               `json:"version"`
-	ClaimedAt                *string             `json:"claimed_at,omitempty"`
-	StartedAt                *string             `json:"started_at,omitempty"`
-	CompletedAt              *string             `json:"completed_at,omitempty"`
-	CreatedAt                string              `json:"created_at"`
-	UpdatedAt                string              `json:"updated_at"`
+	ID                      string              `json:"id"`
+	TaskType                string              `json:"task_type"`
+	State                   string              `json:"state"`
+	WarehouseID             string              `json:"warehouse_id"`
+	SKU                     string              `json:"sku"`
+	OrderID                 string              `json:"order_id,omitempty"`
+	OrderItemID             string              `json:"order_item_id,omitempty"`
+	FulfillmentAllocationID string              `json:"fulfillment_allocation_id,omitempty"`
+	SourceLocationCode      string              `json:"source_location_code,omitempty"`
+	TargetLocationCode      string              `json:"target_location_code,omitempty"`
+	ExpectedQuantity        wmsQuantityResponse `json:"expected_quantity"`
+	ProcessedQuantity       wmsQuantityResponse `json:"processed_quantity"`
+	AssignedTo              string              `json:"assigned_to,omitempty"`
+	ExceptionCode           string              `json:"exception_code,omitempty"`
+	CancelReason            string              `json:"cancel_reason,omitempty"`
+	Version                 int64               `json:"version"`
+	ClaimedAt               *string             `json:"claimed_at,omitempty"`
+	StartedAt               *string             `json:"started_at,omitempty"`
+	CompletedAt             *string             `json:"completed_at,omitempty"`
+	CreatedAt               string              `json:"created_at"`
+	UpdatedAt               string              `json:"updated_at"`
 }
 
 type wmsTaskEventResponse struct {
-	ID             string              `json:"id"`
-	TaskID         string              `json:"task_id"`
-	Kind           string              `json:"kind"`
-	BarcodeDigest  string              `json:"barcode_digest,omitempty"`
-	LocationCode   string              `json:"location_code,omitempty"`
-	Quantity       wmsQuantityResponse `json:"quantity"`
-	ReasonCode     string              `json:"reason_code,omitempty"`
-	ActorID        string              `json:"actor_id"`
-	OccurredAt     string              `json:"occurred_at"`
+	ID            string              `json:"id"`
+	TaskID        string              `json:"task_id"`
+	Kind          string              `json:"kind"`
+	BarcodeDigest string              `json:"barcode_digest,omitempty"`
+	LocationCode  string              `json:"location_code,omitempty"`
+	Quantity      wmsQuantityResponse `json:"quantity"`
+	ReasonCode    string              `json:"reason_code,omitempty"`
+	ActorID       string              `json:"actor_id"`
+	OccurredAt    string              `json:"occurred_at"`
 }
 
 func newWMSTaskRoutes(repository *inventoryrepo.Repository) []ProtectedRoute {

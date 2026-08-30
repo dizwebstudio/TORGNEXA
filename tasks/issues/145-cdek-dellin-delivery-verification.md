@@ -6,7 +6,8 @@
 separate Delivery surface and the Деловые Линии connector is added. Both
 providers expose encrypted account credentials and an authenticated health
 check. CDEK and Деловые Линии additionally expose the bounded read-only
-`pickup.points.read` route; shipment operations remain qualification-gated.
+`pickup.points.read` route; CDEK also exposes the bounded read-only
+`logistics.rates.read` preview. Shipment operations remain qualification-gated.
 
 ## Objective
 
@@ -22,15 +23,19 @@ unqualified shipment, label or product-sync routes.
 - CDEK and Деловые Линии pickup-point reads use bounded country/city filters and
   normalized response fields; CDEK uses a short-lived OAuth token and Деловые
   Линии uses its official directory reference;
+- CDEK rate previews accept at most 50 parcels, normalize at most 100 tariff
+  results and return fixed-decimal money with neutral option identifiers;
 - credentials stay callback-scoped and session/access tokens are discarded;
-- runtime support is `separate_surface/logistics` with only
-  `pickup.points.read` and no operational writes;
+- runtime support is `separate_surface/logistics` with only CDEK's
+  `logistics.rates.read`/`pickup.points.read` and Деловые Линии's
+  `pickup.points.read`, with no operational writes;
 - deterministic SDK/conformance evidence and documentation are synchronized.
 
 ## Qualification boundary
 
-Live shipment creation, rates, tracking, labels, returns and the final carrier
+Live shipment creation, tracking, labels, returns and the final carrier
 qualification of pickup reads need current provider fixtures, tenant-scoped
 non-production credentials and an idempotent host bridge. Until then, the UI
-clearly offers account setup, «Проверить» and the bounded read-only CDEK/
-Деловые Линии directory route only when its capability is explicitly enabled.
+clearly offers account setup, «Проверить», the bounded read-only CDEK/
+Деловые Линии directory route and the CDEK rate preview only when each
+capability is explicitly enabled.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 )
 
 var errLogisticsOperationNotAdmitted = errors.New("logistics operation requires carrier qualification")
+var safeCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 
 // fivepostHTTP is the reviewed host-side credential probe. The partner API
 // publishes the token endpoint, while shipment payload mappings remain behind

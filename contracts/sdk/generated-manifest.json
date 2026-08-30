@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "97cd3d29d0c53cd6394a7d4a2280242ee816d2611ee52a8cf9500032be9ca770",
+    "sha256": "a7df6da99d0fee1d5775c180538eabaf242c578d1374fdb63f9176aa30768f5a",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -35,9 +35,24 @@
       "path": "/products/{product_id}/categories/{category_id}"
     },
     {
+      "operation_id": "calculateLogisticsRates",
+      "method": "POST",
+      "path": "/logistics/rates"
+    },
+    {
+      "operation_id": "cancelWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/cancel"
+    },
+    {
       "operation_id": "cancelWorkflowRun",
       "method": "POST",
       "path": "/workflow-run-commands/cancel"
+    },
+    {
+      "operation_id": "changeOrderCancellationStatus",
+      "method": "PATCH",
+      "path": "/order-cancellations/{cancellation_id}/status"
     },
     {
       "operation_id": "changeOrderStatus",
@@ -45,14 +60,29 @@
       "path": "/orders/{order_id}/status"
     },
     {
+      "operation_id": "changeReturnStatus",
+      "method": "PATCH",
+      "path": "/returns/{return_id}/status"
+    },
+    {
       "operation_id": "checkConnectorAccount",
       "method": "POST",
       "path": "/connector-accounts:check"
     },
     {
+      "operation_id": "claimWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/claim"
+    },
+    {
       "operation_id": "completeConnectorOAuth",
       "method": "POST",
       "path": "/connector-accounts:oauth-callback"
+    },
+    {
+      "operation_id": "completeWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/complete"
     },
     {
       "operation_id": "createAIProviderAccount",
@@ -110,6 +140,11 @@
       "path": "/products/{product_id}/prices/{offer_or_price_id}"
     },
     {
+      "operation_id": "createOrderCancellation",
+      "method": "POST",
+      "path": "/order-cancellations"
+    },
+    {
       "operation_id": "createPayment",
       "method": "POST",
       "path": "/payments"
@@ -145,6 +180,21 @@
       "path": "/reconciliation/jobs"
     },
     {
+      "operation_id": "createRefundAllocation",
+      "method": "POST",
+      "path": "/refund-allocations"
+    },
+    {
+      "operation_id": "createReturn",
+      "method": "POST",
+      "path": "/returns"
+    },
+    {
+      "operation_id": "createReturnItem",
+      "method": "POST",
+      "path": "/returns/{return_id}/items"
+    },
+    {
       "operation_id": "createSocialChannel",
       "method": "POST",
       "path": "/social/channels"
@@ -163,6 +213,11 @@
       "operation_id": "createUpload",
       "method": "POST",
       "path": "/uploads"
+    },
+    {
+      "operation_id": "createWarehouseTasksFromOrder",
+      "method": "POST",
+      "path": "/warehouse-tasks/from-order"
     },
     {
       "operation_id": "createWebhookSubscription",
@@ -240,6 +295,11 @@
       "path": "/compliance/evaluate"
     },
     {
+      "operation_id": "exceptionWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/exception"
+    },
+    {
       "operation_id": "executeApproval",
       "method": "POST",
       "path": "/approvals/{request_id}/execute"
@@ -310,6 +370,11 @@
       "path": "/orders/{order_id}"
     },
     {
+      "operation_id": "getOrderCancellation",
+      "method": "GET",
+      "path": "/order-cancellations/{cancellation_id}"
+    },
+    {
       "operation_id": "getPayment",
       "method": "GET",
       "path": "/payments/{payment_id}"
@@ -323,6 +388,11 @@
       "operation_id": "getReportData",
       "method": "GET",
       "path": "/reports/{report_id}"
+    },
+    {
+      "operation_id": "getReturn",
+      "method": "GET",
+      "path": "/returns/{return_id}"
     },
     {
       "operation_id": "getRuntimeSecurityPosture",
@@ -358,6 +428,11 @@
       "operation_id": "getWarehouseOperationalState",
       "method": "GET",
       "path": "/inventory/warehouses/{warehouse_id}/operational-state"
+    },
+    {
+      "operation_id": "getWarehouseTask",
+      "method": "GET",
+      "path": "/warehouse-tasks/{task_id}"
     },
     {
       "operation_id": "getWebhookDeliveryHistory",
@@ -515,6 +590,11 @@
       "path": "/reports"
     },
     {
+      "operation_id": "listReturns",
+      "method": "GET",
+      "path": "/returns"
+    },
+    {
       "operation_id": "listSecurityEvidence",
       "method": "GET",
       "path": "/settings/security/evidence"
@@ -558,6 +638,16 @@
       "operation_id": "listWarehouseIncidents",
       "method": "GET",
       "path": "/inventory/warehouse-incidents"
+    },
+    {
+      "operation_id": "listWarehouseTaskHistory",
+      "method": "GET",
+      "path": "/warehouse-tasks/{task_id}/history"
+    },
+    {
+      "operation_id": "listWarehouseTasks",
+      "method": "GET",
+      "path": "/warehouse-tasks"
     },
     {
       "operation_id": "listWebhookSubscriptions",
@@ -640,6 +730,11 @@
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
     },
     {
+      "operation_id": "recordReturnInspection",
+      "method": "POST",
+      "path": "/returns/{return_id}/inspection"
+    },
+    {
       "operation_id": "refundPayment",
       "method": "POST",
       "path": "/payments/{payment_id}/refund"
@@ -715,6 +810,11 @@
       "path": "/settings/identity-providers/{provider_id}"
     },
     {
+      "operation_id": "scanWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/scan"
+    },
+    {
       "operation_id": "searchLegalParties",
       "method": "GET",
       "path": "/counterparties/search"
@@ -733,6 +833,11 @@
       "operation_id": "startConnectorOAuth",
       "method": "POST",
       "path": "/connector-accounts:oauth-start"
+    },
+    {
+      "operation_id": "startWarehouseTask",
+      "method": "POST",
+      "path": "/warehouse-tasks/{task_id}/start"
     },
     {
       "operation_id": "streamRealtimeInvalidations",

@@ -24,25 +24,25 @@ var (
 // WMSTask is the public repository view of a durable provider-neutral WMS task.
 // Quantities stay exact and are never represented by float64.
 type WMSTask struct {
-	ID, IdempotencyKey, TaskType, State string
-	WarehouseID, SKU                    string
-	OrderID, OrderItemID                string
-	FulfillmentAllocationID             string
-	SourceLocationCode, TargetLocationCode string
-	ExpectedQuantity, ProcessedQuantity  inventory.Quantity
+	ID, IdempotencyKey, TaskType, State     string
+	WarehouseID, SKU                        string
+	OrderID, OrderItemID                    string
+	FulfillmentAllocationID                 string
+	SourceLocationCode, TargetLocationCode  string
+	ExpectedQuantity, ProcessedQuantity     inventory.Quantity
 	AssignedTo, ExceptionCode, CancelReason string
-	Version                              int64
-	ClaimedAt, StartedAt, CompletedAt    *time.Time
-	CreatedAt, UpdatedAt                 time.Time
+	Version                                 int64
+	ClaimedAt, StartedAt, CompletedAt       *time.Time
+	CreatedAt, UpdatedAt                    time.Time
 }
 
 // WMSTaskEvent is an immutable command/effect record for a WMS task.
 type WMSTaskEvent struct {
 	ID, TaskID, IdempotencyKey, Kind string
 	BarcodeDigest, LocationCode      string
-	Quantity                          inventory.Quantity
-	ActorID, ReasonCode               string
-	OccurredAt                        time.Time
+	Quantity                         inventory.Quantity
+	ActorID, ReasonCode              string
+	OccurredAt                       time.Time
 }
 
 // WMSTaskListOptions contains bounded tenant-local queue filters.
@@ -170,7 +170,7 @@ func (r *Repository) WMSStartTask(ctx context.Context, s inventory.Scope, id, ac
 
 // WMSScanTask applies one exact-quantity scan and records only a barcode digest.
 func (r *Repository) WMSScanTask(ctx context.Context, s inventory.Scope, id, actor, idempotencyKey, barcode, locationCode string, quantity inventory.Quantity, expectedVersion int64, mutation inventory.Mutation) (WMSTask, error) {
-	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(id) || !validTokenValue(idempotencyKey) || actor == "" || strings.TrimSpace(barcode) == "" || len(barcode) > 256 || len(locationCode) > 128 || expectedVersion < 1 || quantity.Validate() != nil {
+	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(id) || !validTokenValue(idempotencyKey) || actor == "" || strings.TrimSpace(barcode) == "" || len(barcode) > 256 || len(locationCode) > 128 || expectedVersion < 1 || quantity.Validate() != nil || quantity.Value.IsZero() {
 		return WMSTask{}, inventory.ErrInvalidRecord
 	}
 	var out WMSTask
@@ -210,10 +210,10 @@ func (r *Repository) WMSScanTask(ctx context.Context, s inventory.Scope, id, act
 			return inventory.ErrInvalidRecord
 		}
 		state := "in_progress"
-		var completed any
+		var completed *time.Time
 		if cmp == 0 {
 			state = "completed"
-			completed = mutation.OccurredAt.UTC()
+			completed = timePtr(mutation.OccurredAt)
 		}
 		started := current.StartedAt
 		if started == nil {
@@ -380,9 +380,6 @@ func (r *Repository) WMSCreateOrderPickTasks(ctx context.Context, s inventory.Sc
 				if err := targets.finish(); err != nil {
 					return inventory.ErrInvalidRecord
 				}
-				if err := targets.finish(); err != nil {
-					return inventory.ErrInvalidRecord
-				}
 				if task.OrderID != command.OrderID || task.OrderItemID != itemID || task.WarehouseID != command.WarehouseID || task.TaskType != "pick" {
 					return inventory.ErrConflict
 				}
@@ -397,7 +394,8 @@ func (r *Repository) WMSCreateOrderPickTasks(ctx context.Context, s inventory.Sc
 				return err
 			}
 			if err == nil {
-				if allocation.WarehouseID.String() != command.WarehouseID || allocation.OrderID != command.OrderID || allocation.OfferID.String() != offerID || allocation.Quantity != quantity {
+				cmp, quantityErr := allocation.Quantity.Value.Cmp(quantity.Value)
+				if allocation.WarehouseID.String() != command.WarehouseID || allocation.OrderID != command.OrderID || allocation.OfferID.String() != offerID || allocation.Quantity.Unit != quantity.Unit || quantityErr != nil || cmp != 0 {
 					return inventory.ErrConflict
 				}
 			} else {
@@ -543,12 +541,12 @@ func scanWMSTask(row scanner) (WMSTask, error) {
 }
 
 type wmsTaskScanner struct {
-	out *WMSTask
-	orderID, orderItemID, allocationID sql.NullString
-	unit string
+	out                                       *WMSTask
+	orderID, orderItemID, allocationID        sql.NullString
+	unit                                      string
 	expectedCoefficient, processedCoefficient int64
-	expectedScale, processedScale int16
-	claimedAt, startedAt, completedAt sql.NullTime
+	expectedScale, processedScale             int16
+	claimedAt, startedAt, completedAt         sql.NullTime
 }
 
 func newWMSTaskScanner(out *WMSTask) *wmsTaskScanner { return &wmsTaskScanner{out: out} }
@@ -600,9 +598,10 @@ func (t *wmsTaskScanner) finish() error {
 }
 
 func updateWMSTask(ctx context.Context, tx *sql.Tx, s inventory.Scope, current WMSTask, state string, processed inventory.Quantity, assigned, exceptionCode, cancelReason string, startedAt, completedAt *time.Time, at time.Time) (WMSTask, error) {
-	var completed any
+	var completed *time.Time
 	if completedAt != nil {
-		completed = completedAt.UTC()
+		value := completedAt.UTC()
+		completed = &value
 	}
 	var out WMSTask
 	targets := newWMSTaskScanner(&out)
@@ -680,19 +679,19 @@ func appendWMSTaskAudit(ctx context.Context, tx *sql.Tx, s inventory.Scope, muta
 
 func enqueueWMSTaskEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, task WMSTask, change string) error {
 	payload := struct {
-		TaskID string `json:"task_id"`
-		TaskType string `json:"task_type"`
-		State string `json:"state"`
-		WarehouseID string `json:"warehouse_id"`
-		SKU string `json:"sku"`
-		OrderID string `json:"order_id,omitempty"`
-		OrderItemID string `json:"order_item_id,omitempty"`
-		FulfillmentAllocationID string `json:"fulfillment_allocation_id,omitempty"`
-		ExpectedQuantity wmsWireQuantity `json:"expected_quantity"`
-		ProcessedQuantity wmsWireQuantity `json:"processed_quantity"`
-		AssignedTo string `json:"assigned_to,omitempty"`
-		Version int64 `json:"version"`
-		Change string `json:"change"`
+		TaskID                  string          `json:"task_id"`
+		TaskType                string          `json:"task_type"`
+		State                   string          `json:"state"`
+		WarehouseID             string          `json:"warehouse_id"`
+		SKU                     string          `json:"sku"`
+		OrderID                 string          `json:"order_id,omitempty"`
+		OrderItemID             string          `json:"order_item_id,omitempty"`
+		FulfillmentAllocationID string          `json:"fulfillment_allocation_id,omitempty"`
+		ExpectedQuantity        wmsWireQuantity `json:"expected_quantity"`
+		ProcessedQuantity       wmsWireQuantity `json:"processed_quantity"`
+		AssignedTo              string          `json:"assigned_to,omitempty"`
+		Version                 int64           `json:"version"`
+		Change                  string          `json:"change"`
 	}{task.ID, task.TaskType, task.State, task.WarehouseID, task.SKU, task.OrderID, task.OrderItemID, task.FulfillmentAllocationID, wmsWireQuantity{task.ExpectedQuantity.Value.String(), task.ExpectedQuantity.Unit.String()}, wmsWireQuantity{task.ProcessedQuantity.Value.String(), task.ProcessedQuantity.Unit.String()}, task.AssignedTo, task.Version, change}
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -707,7 +706,7 @@ func enqueueWMSTaskEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mut
 
 type wmsWireQuantity struct {
 	Value string `json:"value"`
-	Unit string `json:"unit"`
+	Unit  string `json:"unit"`
 }
 
 func activeAllocationForItemTx(ctx context.Context, tx *sql.Tx, s inventory.Scope, itemID string) (inventory.FulfillmentAllocation, error) {

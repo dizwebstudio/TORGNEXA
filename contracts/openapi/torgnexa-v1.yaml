@@ -921,7 +921,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTasksFromOrderWrite'}}}}
       responses:
         '201': {description: Order items reserved and converted into durable pick tasks, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskPage'}}}}
-        '400': {description: Invalid order, inactive warehouse or insufficient ATP}
+        '400': {description: 'Invalid order, inactive warehouse or insufficient ATP'}
         '401': {description: Authenticated tenant scope missing}
         '403': {description: Caller lacks wms.write}
         '409': {description: Idempotency or allocation conflict}
@@ -958,7 +958,7 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskScan'}}}}
-      responses: {'200': {description: Exact scan applied and task progress advanced, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version, assignment or lifecycle conflict}}
+      responses: {'200': {description: Exact scan applied and task progress advanced, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: 'Version, assignment or lifecycle conflict'}}
   /warehouse-tasks/{task_id}/complete:
     parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
     post:

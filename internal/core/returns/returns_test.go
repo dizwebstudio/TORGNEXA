@@ -36,6 +36,10 @@ func TestReturnLifecycleAndQuantityBounds(t *testing.T) {
 	if err := ValidateLineAllocation(order, tooMany, received, accepted); err != ErrOverAllocated {
 		t.Fatalf("over allocation error = %v", err)
 	}
+	negativeReceived, _ := NewQuantity(-1, 0, "PCS")
+	if err := ValidateLineAllocation(order, requested, negativeReceived, accepted); err != ErrInvalidRecord {
+		t.Fatalf("negative received quantity error = %v", err)
+	}
 }
 
 func TestRefundAllocationRequiresExactPositiveMoney(t *testing.T) {

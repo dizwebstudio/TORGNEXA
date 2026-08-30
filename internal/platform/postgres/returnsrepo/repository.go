@@ -293,7 +293,7 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
 		var paymentAmount int64
 		var paymentCurrency string
-		if err := tx.QueryRowContext(ctx, `SELECT amount_minor_units,currency FROM payments WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID).Scan(&paymentAmount, &paymentCurrency); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT amount_minor_units,currency FROM payments WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID).Scan(&paymentAmount, &paymentCurrency); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return core.ErrNotFound
 			}
@@ -301,6 +301,35 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 		}
 		if paymentCurrency != allocation.Currency.String() {
 			return core.ErrInvalidRecord
+		}
+		var refundPaymentID, refundCurrency string
+		var refundAmount int64
+		if err := tx.QueryRowContext(ctx, `SELECT payment_id,amount_minor_units,currency FROM payment_refunds WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), allocation.RefundID).Scan(&refundPaymentID, &refundAmount, &refundCurrency); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return core.ErrNotFound
+			}
+			return err
+		}
+		if refundPaymentID != allocation.PaymentID || refundCurrency != allocation.Currency.String() {
+			return core.ErrConflict
+		}
+		if allocation.Amount.MinorUnits() > refundAmount {
+			return core.ErrOverAllocated
+		}
+		var existingID string
+		existingErr := tx.QueryRowContext(ctx, `SELECT id FROM refund_allocations WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, scope.OrganizationID(), scope.WorkspaceID(), allocation.IdempotencyKey).Scan(&existingID)
+		if existingErr == nil {
+			result, existingErr = scanRefundAllocation(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,payment_id,refund_id,return_id,COALESCE(order_item_id,''),component,amount_minor_units,currency,idempotency_key,version,created_at FROM refund_allocations WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), existingID))
+			if existingErr != nil {
+				return existingErr
+			}
+			if result.PaymentID != allocation.PaymentID || result.ReturnID != allocation.ReturnID || result.Amount != allocation.Amount || result.Component != allocation.Component {
+				return core.ErrConflict
+			}
+			return nil
+		}
+		if !errors.Is(existingErr, sql.ErrNoRows) {
+			return existingErr
 		}
 		var allocated int64
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount_minor_units),0) FROM refund_allocations WHERE organization_id=$1 AND workspace_id=$2 AND payment_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID).Scan(&allocated); err != nil {
@@ -310,15 +339,12 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 			return core.ErrOverAllocated
 		}
 		var err error
-		result, err = scanRefundAllocation(tx.QueryRowContext(ctx, `INSERT INTO refund_allocations(id,organization_id,workspace_id,payment_id,refund_id,return_id,order_item_id,component,amount_minor_units,currency,idempotency_key,version,created_at) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),$8,$9,$10,$11,1,$12) ON CONFLICT (organization_id,workspace_id,idempotency_key) DO UPDATE SET id=refund_allocations.id RETURNING id,organization_id,workspace_id,payment_id,refund_id,return_id,COALESCE(order_item_id,''),component,amount_minor_units,currency,idempotency_key,version,created_at`, allocation.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID, allocation.RefundID, allocation.ReturnID.String(), allocation.OrderItemID, allocation.Component, allocation.Amount.MinorUnits(), allocation.Currency.String(), allocation.IdempotencyKey, mutation.OccurredAt))
+		result, err = scanRefundAllocation(tx.QueryRowContext(ctx, `INSERT INTO refund_allocations(id,organization_id,workspace_id,payment_id,refund_id,return_id,order_item_id,component,amount_minor_units,currency,idempotency_key,version,created_at) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),$8,$9,$10,$11,1,$12) ON CONFLICT DO NOTHING RETURNING id,organization_id,workspace_id,payment_id,refund_id,return_id,COALESCE(order_item_id,''),component,amount_minor_units,currency,idempotency_key,version,created_at`, allocation.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID, allocation.RefundID, allocation.ReturnID.String(), allocation.OrderItemID, allocation.Component, allocation.Amount.MinorUnits(), allocation.Currency.String(), allocation.IdempotencyKey, mutation.OccurredAt))
 		if err != nil {
-			return err
-		}
-		if result.ID != allocation.ID {
-			if result.PaymentID != allocation.PaymentID || result.ReturnID != allocation.ReturnID || result.Amount != allocation.Amount || result.Component != allocation.Component {
+			if errors.Is(err, core.ErrNotFound) {
 				return core.ErrConflict
 			}
-			return nil
+			return err
 		}
 		return appendAudit(ctx, tx, scope, mutation, "returns.refund_allocation.created", "refund_allocation", allocation.ID.String(), audit.RiskLegallySignificant, audit.Summary{"payment_id": allocation.PaymentID, "return_id": allocation.ReturnID.String(), "component": string(allocation.Component), "amount_minor_units": allocation.Amount.MinorUnits(), "currency": allocation.Currency.String()})
 	})
