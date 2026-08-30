@@ -713,6 +713,26 @@
       },
       "backfill": null,
       "sha256": "53159042fa0cf2cfe191d31407b5caf7e1560efc837ae8b0a490e3b8288699d4"
+    },
+    {
+      "version": 35,
+      "name": "integration_state_center",
+      "file": "000035_integration_state_center.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [34],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "c209c96ba030c18fbe6e75e7a4ac19b7994276fe5100f5143ceacb8c1cc8df47"
     }
   ]
 }

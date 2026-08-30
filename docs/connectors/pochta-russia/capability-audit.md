@@ -13,13 +13,19 @@
 - [Спецификация сервиса отслеживания](https://tracking.pochta.ru/specification) — SOAP-трекинг и отдельный доступ;
 - [Как получить доступ к API](https://tracking.pochta.ru/support/faq/how_to_get_access) — регистрация и параметры доступа.
 
-В текущем runtime включены credential-проверка, bounded `pickup.points.read` и
-read-only `logistics.rates.read`. Для тарифа используется официальный
+В текущем runtime включены credential-проверка, bounded `pickup.points.read`,
+read-only `logistics.rates.read` и единичное `logistics.track.read`. Для тарифа используется официальный
 `GET https://tariff.pochta.ru/v2/calculate/tariff/delivery` с объектом
 «Посылка онлайн обыкновенная» (`23030`); запрос передаёт индексы и суммарный
 вес, а ответ проверяется по `paynds` и контрольному сроку доставки. Тарифный
 калькулятор не получает секреты кабинета.
 
-Создание и отмена заказов, документы, возвраты и трекинг требуют актуальных
+Для tracking используется отдельный SOAP 1.2 endpoint
+`https://tracking.russianpost.ru/rtm34`, метод `getOperationHistory`, русский
+язык и отдельные `tracking_login`/`tracking_password`. Принимается один
+14-значный российский или 13-значный S10 barcode; история ограничена 100
+записями, а в runtime выходит только последний нормализованный статус.
+
+Создание и отмена заказов, документы и возвраты требуют актуальных
 обезличенных fixtures, маппинга почтовых сервисов и доказанной идемпотентности
 на тестовом кабинете. До этого они остаются fail-closed.

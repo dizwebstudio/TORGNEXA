@@ -784,10 +784,10 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             ["Пробный запуск", "Перед импортом доступна предварительная проверка: она считает политики, чтение и запись, но не меняет внешний сервис."],
           ]}/>
           <RuntimeMatrix/>
-          <DocsScreenshot src="/docs/integrations.png" width={1265} height={791} alt="Раздел «Интеграции» TORGNEXA с карточками подключения" caption="Экран каталога: карточка провайдера ведёт к подключению кабинета и проверке доступа."/>
+          <DocsScreenshot src="/docs/integrations.png" width={1265} height={712} alt="Раздел «Интеграции» TORGNEXA с карточками подключения" caption="Экран каталога: карточка провайдера ведёт к подключению кабинета и проверке доступа."/>
           <IntegrationConnectionGuide/>
           <IntegrationQualificationGuides/>
-          <DocsScreenshot src="/docs/integration-connection.png" width={1265} height={791} alt="Пошаговое подключение кабинета интеграции TORGNEXA" caption="Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта."/>
+          <DocsScreenshot src="/docs/integration-connection.png" width={1265} height={712} alt="Пошаговое подключение кабинета интеграции TORGNEXA" caption="Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта."/>
           <p>Для OAuth-подключения нажмите «Войти». Токен доступа обновляется сервером автоматически до истечения срока. Повторный вход требуется только если площадка отозвала доступ, отклонила токен обновления или не выдала его; карточка кабинета покажет «Войти снова».</p>
           <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур ограничен товарами и явно указанными направлениями синхронизации. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>
           <p>В разделе «Качество публикации» (<code>/publication-quality</code>) оператор видит target-specific score, проблемы карточки и срок действия evidence. `ready` допускает запись, а `blocked`, `approval_required`, `stale`, `unsupported` и `unknown` останавливают её; старый receipt не может пройти preflight после изменения товара или capability.</p>
@@ -924,7 +924,7 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
           <dl className="docs-faq">
             {troubleshootingFaq.map(({question, answer}) => <div key={question}><dt>{question}</dt><dd>{answer}</dd></div>)}
           </dl>
-          <DocsScreenshot src="/docs/documentation.png" width={1265} height={791} alt="Публичная документация TORGNEXA" caption="Руководство доступно до входа и адаптируется под настольный и мобильный экран."/>
+          <DocsScreenshot src="/docs/documentation.png" width={1265} height={712} alt="Публичная документация TORGNEXA" caption="Руководство доступно до входа и адаптируется под настольный и мобильный экран."/>
         </DocSection>
         </DocumentationSectionContext.Provider>
       </main>
