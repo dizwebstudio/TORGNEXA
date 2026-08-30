@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/events/return-requested-v1.json",
+  "title":"commerce.returns.requested.v1",
+  "type":"object","additionalProperties":false,
+  "required":["return_id","order_id","status","currency","version"],
+  "properties":{
+    "return_id":{"$ref":"#/$defs/id"},
+    "order_id":{"$ref":"#/$defs/id"},
+    "status":{"const":"requested"},
+    "currency":{"type":"string","pattern":"^[A-Z]{3}$"},
+    "version":{"type":"integer","minimum":1}
+  },
+  "$defs":{"id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}}
+}

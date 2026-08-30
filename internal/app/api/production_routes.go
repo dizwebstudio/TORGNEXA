@@ -25,6 +25,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
@@ -88,6 +89,7 @@ type productionRouteDependencies struct {
 	aiAdvisory         *aiadvisoryrepo.Repository
 	aiRegistry         *builtinruntime.Registry
 	workflows          *workflowrepo.Repository
+	returns            *returnsrepo.Repository
 	mcpAccounts        *mcpaccountsrepo.Repository
 	agentGovernance    *agentgovernancerepo.Repository
 	runtimePosture     *runtimeposture.Inspector
@@ -114,6 +116,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
 	routes = append(routes, newLogisticsRoutes(deps.accounts, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
+	routes = append(routes, newReturnsRoutes(deps.returns)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)

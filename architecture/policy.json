@@ -107,6 +107,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/returns",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/social",
       "kind": "core_domain"
     },
@@ -420,6 +424,10 @@
     },
     {
       "path": "internal/platform/postgres/reconciliationrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/returnsrepo",
       "kind": "infrastructure_adapter"
     },
     {

@@ -45,6 +45,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/securitysettingsrepo"
@@ -144,6 +145,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workflowRepository, err := workflowrepo.New(db)
 	if err != nil {
 		return newRuntimeError("workflow_repository_startup_failed", err)
+	}
+	returnsRepository, err := returnsrepo.New(db)
+	if err != nil {
+		return newRuntimeError("returns_repository_startup_failed", err)
 	}
 	auditService, err := audit.NewService(auditRepository)
 	if err != nil {
@@ -389,7 +394,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
-		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository,
+		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository,
 	}
 	routes := newProductionRoutes(routeDeps)
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))

@@ -237,11 +237,18 @@ const (
 	RefundAccepted  RefundStatus = "accepted"
 	RefundSucceeded RefundStatus = "succeeded"
 	RefundFailed    RefundStatus = "failed"
+	// RefundUnknown means the remote provider may have accepted the request but
+	// the caller could not observe a definitive result. It is reconciled, never
+	// blindly re-issued.
+	RefundUnknown RefundStatus = "unknown"
+	// RefundManualAttention is a terminal operational hold for ambiguous or
+	// policy-invalid outcomes requiring an operator decision.
+	RefundManualAttention RefundStatus = "manual_attention"
 )
 
 func (s RefundStatus) Valid() bool {
 	switch s {
-	case RefundPending, RefundAccepted, RefundSucceeded, RefundFailed:
+	case RefundPending, RefundAccepted, RefundSucceeded, RefundFailed, RefundUnknown, RefundManualAttention:
 		return true
 	default:
 		return false
@@ -254,11 +261,15 @@ func ValidateRefundTransition(from, to RefundStatus) error {
 	}
 	switch from {
 	case RefundPending:
-		if to == RefundAccepted || to == RefundFailed {
+		if to == RefundAccepted || to == RefundFailed || to == RefundUnknown || to == RefundManualAttention {
 			return nil
 		}
 	case RefundAccepted:
-		if to == RefundSucceeded || to == RefundFailed {
+		if to == RefundSucceeded || to == RefundFailed || to == RefundUnknown || to == RefundManualAttention {
+			return nil
+		}
+	case RefundUnknown, RefundManualAttention:
+		if to == RefundAccepted || to == RefundSucceeded || to == RefundFailed || to == RefundManualAttention {
 			return nil
 		}
 	}
@@ -285,10 +296,10 @@ func (r Refund) Validate() error {
 		r.Amount.Validate() != nil || !r.Status.Valid() || !validMetadata(r.Version, r.CreatedAt, r.UpdatedAt) {
 		return ErrInvalidRecord
 	}
-	if r.Status == RefundPending && r.RemoteRefundID != "" {
+	if (r.Status == RefundPending || r.Status == RefundUnknown || r.Status == RefundManualAttention) && r.RemoteRefundID != "" {
 		return ErrInvalidRecord
 	}
-	if r.Status != RefundPending && r.RemoteRefundID == "" {
+	if r.Status != RefundPending && r.Status != RefundUnknown && r.Status != RefundManualAttention && r.RemoteRefundID == "" {
 		return ErrInvalidRecord
 	}
 	return nil

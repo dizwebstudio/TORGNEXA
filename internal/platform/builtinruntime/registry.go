@@ -131,6 +131,10 @@ func (r *Registry) PickupPoints(ctx context.Context, account sdk.Account, runtim
 	switch account.ConnectorID {
 	case "cdek":
 		return cdek.New(cdekHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
 	default:
 		return nil, ErrUnavailable
 	}

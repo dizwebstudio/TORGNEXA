@@ -5,24 +5,26 @@
 `repository-complete` — 2026-08-28. CDEK is moved from `planned` to the
 separate Delivery surface and the Деловые Линии connector is added. Both
 providers expose encrypted account credentials and an authenticated health
-check. CDEK additionally exposes the bounded read-only `pickup.points.read`
-route; shipment operations remain qualification-gated.
+check. CDEK and Деловые Линии additionally expose the bounded read-only
+`pickup.points.read` route; shipment operations remain qualification-gated.
 
 ## Objective
 
 Make the existing CDEK reference visible and honest in the frontend, and add
-Деловые Линии without claiming unqualified shipment, label or product-sync
-routes.
+Деловые Линии with a bounded terminal/PUDO read route without claiming
+unqualified shipment, label or product-sync routes.
 
 ## Acceptance
 
 - CDEK and Деловые Линии appear under `Интеграции → Доставка`;
 - CDEK checks OAuth client credentials and a bounded city-directory request;
 - Деловые Линии checks appkey/PAT through the official v4 login endpoint;
-- CDEK pickup-point reads use a short-lived OAuth token, bounded country/city
-  filters and normalized response fields;
+- CDEK and Деловые Линии pickup-point reads use bounded country/city filters and
+  normalized response fields; CDEK uses a short-lived OAuth token and Деловые
+  Линии uses its official directory reference;
 - credentials stay callback-scoped and session/access tokens are discarded;
-- runtime support is `separate_surface/logistics` with no operational writes;
+- runtime support is `separate_surface/logistics` with only
+  `pickup.points.read` and no operational writes;
 - deterministic SDK/conformance evidence and documentation are synchronized.
 
 ## Qualification boundary
@@ -30,5 +32,5 @@ routes.
 Live shipment creation, rates, tracking, labels, returns and the final carrier
 qualification of pickup reads need current provider fixtures, tenant-scoped
 non-production credentials and an idempotent host bridge. Until then, the UI
-clearly offers account setup, «Проверить» and the bounded read-only CDEK
-directory route only when its capability is explicitly enabled.
+clearly offers account setup, «Проверить» and the bounded read-only CDEK/
+Деловые Линии directory route only when its capability is explicitly enabled.

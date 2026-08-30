@@ -17,3 +17,8 @@
 `ShipmentCreateRequest`, `ShipmentStatusRequest` и `PickupPointQuery`. Коды
 тарифов, филиалов и грузов остаются внутри адаптера и не становятся полями
 Core.
+
+Runtime сейчас включает только `pickup.points.read`. Запрос выполняется через
+`POST https://kabinet.pecom.ru/api/v1/branches/all/`, ограничивается по размеру
+ответа и городу, а в результат попадают только склады с явной операцией
+«Выдача грузов». Остальные capability из манифеста остаются закрытыми.

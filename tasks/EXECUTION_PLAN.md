@@ -624,6 +624,8 @@ non-production credentials are qualified.
 
 - 5Post uses the partner API-key token probe; ПЭК uses the official personal
   cabinet Basic login/access-key probe;
+- ПЭК additionally exposes only the bounded read-only `pickup.points.read`
+  branch/warehouse directory route; no shipment or rate route is advertised;
 - no carrier credential or recipient data is logged, persisted in plaintext or
   copied into events;
 - runtime support is `separate_surface/logistics`, never `planned`, while no
@@ -639,11 +641,12 @@ Task 145 moves CDEK out of `planned` and adds Деловые Линии to the s
 «Доставка» surface. Both connectors support encrypted account enrollment and a
 bounded authenticated health probe: CDEK uses OAuth client credentials plus a
 city-directory read, while Деловые Линии uses appkey/PAT session login. CDEK
-also has a bounded read-only ПВЗ route (`pickup.points.read`); no shipment,
+also has a bounded read-only ПВЗ route (`pickup.points.read`), and Деловые Линии
+has the same bounded terminal/PUDO read route; no shipment,
 rate, label, return or product-sync route is advertised until the current
 carrier contracts and an idempotent host bridge are qualified. Runtime
-inventory keeps logistics as a separate surface and only admits the CDEK
-pickup-point read capability.
+inventory keeps logistics as a separate surface and admits only the CDEK and
+Деловые Линии pickup-point read capability.
 
 ### Gate RUNTIME-145
 

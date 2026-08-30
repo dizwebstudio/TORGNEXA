@@ -1390,6 +1390,40 @@
       }
     },
     {
+      "schema": "events/cancellation-requested-v1.schema.json",
+      "valid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "status": "requested",
+        "reason_code": "customer_request",
+        "version": 1
+      },
+      "invalid": {
+        "cancellation_id": "bad",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "status": "cancelled",
+        "reason_code": "customer_request",
+        "version": 0
+      }
+    },
+    {
+      "schema": "events/cancellation-state-changed-v1.schema.json",
+      "valid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "from_status": "requested",
+        "status": "approved",
+        "version": 2
+      },
+      "invalid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "from_status": "cancelled",
+        "status": "requested",
+        "version": 0
+      }
+    },
+    {
       "schema": "events/order-changed-v1.schema.json",
       "valid": {
         "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0601",
@@ -1519,6 +1553,40 @@
         },
         "version": 2,
         "change": "updated"
+      }
+    },
+    {
+      "schema": "events/return-requested-v1.schema.json",
+      "valid": {
+        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "status": "requested",
+        "currency": "RUB",
+        "version": 1
+      },
+      "invalid": {
+        "return_id": "bad",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "status": "closed",
+        "currency": "rub",
+        "version": 0
+      }
+    },
+    {
+      "schema": "events/return-state-changed-v1.schema.json",
+      "valid": {
+        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "from_status": "inspecting",
+        "status": "partially_accepted",
+        "version": 3
+      },
+      "invalid": {
+        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "from_status": "closed",
+        "status": "requested",
+        "version": 0
       }
     },
     {

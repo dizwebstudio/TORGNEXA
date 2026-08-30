@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/events/return-state-changed-v1.json",
+  "title":"commerce.returns.state_changed.v1",
+  "type":"object","additionalProperties":false,
+  "required":["return_id","order_id","from_status","status","version"],
+  "properties":{
+    "return_id":{"$ref":"#/$defs/id"},
+    "order_id":{"$ref":"#/$defs/id"},
+    "from_status":{"enum":["requested","approved","authorized","in_transit","received","inspecting","accepted","partially_accepted","rejected"]},
+    "status":{"enum":["approved","authorized","in_transit","received","inspecting","accepted","partially_accepted","rejected","closed","cancelled","expired"]},
+    "version":{"type":"integer","minimum":1}
+  },
+  "$defs":{"id":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}}
+}

@@ -32,6 +32,13 @@ func TestHealthUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestPickupPointsUseCandidateTransport(t *testing.T) {
+	points, err := New(candidateTransport{}, nil).ReadPickupPoints(context.Background(), testAccount(), testRuntime{}, sdk.PickupPointQuery{Country: "RU", City: "Санкт-Петербург", Limit: 10})
+	if err != nil || len(points) != 1 || points[0].RemoteID != "39" {
+		t.Fatalf("points=%+v err=%v", points, err)
+	}
+}
+
 type rejectingSecrets struct{}
 
 func (rejectingSecrets) UseSecret(context.Context, sdk.SecretReference, func([]byte) error) error {

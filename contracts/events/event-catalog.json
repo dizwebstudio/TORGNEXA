@@ -34,6 +34,14 @@
       "payload_schema": "events/warehouse-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.orders.cancellation_requested.v1",
+      "payload_schema": "events/cancellation-requested-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.orders.cancellation_state_changed.v1",
+      "payload_schema": "events/cancellation-state-changed-v1.schema.json"
+    },
+    {
       "event_type": "commerce.orders.order_changed.v1",
       "payload_schema": "events/order-changed-v1.schema.json"
     },
@@ -48,6 +56,14 @@
     {
       "event_type": "commerce.pricing.price_changed.v1",
       "payload_schema": "events/price-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.returns.requested.v1",
+      "payload_schema": "events/return-requested-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.returns.state_changed.v1",
+      "payload_schema": "events/return-state-changed-v1.schema.json"
     },
     {
       "event_type": "commerce.social.channel_account_changed.v1",

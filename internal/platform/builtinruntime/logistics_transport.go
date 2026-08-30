@@ -236,21 +236,31 @@ func (cdekHTTP) Webhook(context.Context, []byte, []byte, []byte) (sdk.LogisticsW
 
 var _ cdek.Transport = cdekHTTP{}
 
-// pekHTTP probes the official ПЭК personal-cabinet API with the documented
-// Basic login/access-key pair. The operation methods stay fail-closed until
-// request/response fixtures are qualified against the current API revision.
+// pekHTTP probes and reads the official ПЭК personal-cabinet API with the
+// documented Basic login/access-key pair. Only the bounded branch/warehouse
+// directory is admitted; rate and shipment operations stay qualification-gated.
 type pekHTTP struct{ h *httpTransport }
+
+type pekCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func readPekCredentials(secret []byte) (pekCredentials, error) {
+	var credentials pekCredentials
+	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.Username) == "" || credentials.Password == "" {
+		return pekCredentials{}, errors.New("ПЭК credentials must be JSON with username and password")
+	}
+	return credentials, nil
+}
 
 func (transport pekHTTP) Ping(ctx context.Context, secret []byte) error {
 	if transport.h == nil {
 		return errors.New("ПЭК credential probe unavailable")
 	}
-	var credentials struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if json.Unmarshal(secret, &credentials) != nil || strings.TrimSpace(credentials.Username) == "" || credentials.Password == "" {
-		return errors.New("ПЭК credentials must be JSON with username and password")
+	credentials, err := readPekCredentials(secret)
+	if err != nil {
+		return err
 	}
 	headers := http.Header{"Content-Type": []string{"application/json;charset=utf-8"}, "Accept": []string{"application/json"}}
 	status, _, _, _, _, err := transport.h.do(ctx, http.MethodPost, "kabinet.pecom.ru", "/api/v1/branches/all/", url.Values{}, []byte(`{}`), headers, []byte(credentials.Username), []byte(credentials.Password))
@@ -263,6 +273,154 @@ func (transport pekHTTP) Ping(ctx context.Context, secret []byte) error {
 	return nil
 }
 
+type pekDirectoryOperation struct {
+	Operations []string `json:"operations"`
+}
+
+type pekDirectoryWarehouse struct {
+	ID                    string                  `json:"id"`
+	Name                  string                  `json:"name"`
+	DivisionName          string                  `json:"divisionName"`
+	Address               string                  `json:"address"`
+	AddressDivision       string                  `json:"addressDivision"`
+	DepartmentClosingDate string                  `json:"departmentClosingDate"`
+	KindsOfTransportation []pekDirectoryOperation `json:"kindsOfTransportation"`
+}
+
+type pekDirectoryDivision struct {
+	ID                    string                  `json:"id"`
+	Name                  string                  `json:"name"`
+	DepartmentTypeID      int                     `json:"departmentTypeId"`
+	DepartmentType        string                  `json:"departmentType"`
+	DepartmentClosingDate string                  `json:"departmentClosingDate"`
+	KindsOfTransportation []pekDirectoryOperation `json:"kindsOfTransportation"`
+	Warehouses            []pekDirectoryWarehouse `json:"warehouses"`
+}
+
+type pekDirectoryCity struct {
+	Title     string   `json:"title"`
+	Divisions []string `json:"divisions"`
+}
+
+type pekDirectoryBranch struct {
+	Title     string                 `json:"title"`
+	Country   string                 `json:"country"`
+	Cities    []pekDirectoryCity     `json:"cities"`
+	Divisions []pekDirectoryDivision `json:"divisions"`
+}
+
+type pekDirectoryResponse struct {
+	Branches []pekDirectoryBranch `json:"branches"`
+}
+
+func pekHasPickupOperation(operations []pekDirectoryOperation) bool {
+	for _, kind := range operations {
+		for _, operation := range kind.Operations {
+			if strings.Contains(strings.ToLower(strings.TrimSpace(operation)), "выда") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (transport pekHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
+	if transport.h == nil || query.Validate(500) != nil || query.Country != "RU" {
+		return nil, errors.New("ПЭК pickup-point request is unavailable")
+	}
+	credentials, err := readPekCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json;charset=utf-8"}, "Accept": []string{"application/json"}}
+	status, body, _, _, _, err := transport.h.do(ctx, http.MethodPost, "kabinet.pecom.ru", "/api/v1/branches/all/", url.Values{}, []byte(`{}`), headers, []byte(credentials.Username), []byte(credentials.Password))
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("ПЭК branch directory request rejected with status %d", status)
+	}
+	var directory pekDirectoryResponse
+	if json.Unmarshal(body, &directory) != nil || len(directory.Branches) > 10000 {
+		return nil, errors.New("ПЭК branch directory response rejected")
+	}
+
+	wantedCity := strings.TrimSpace(query.City)
+	points := make([]sdk.PickupPoint, 0, query.Limit)
+	now := time.Now().UTC()
+	for _, branch := range directory.Branches {
+		if len(branch.Cities) > 10000 || len(branch.Divisions) > 10000 {
+			return nil, errors.New("ПЭК branch directory response exceeds bounds")
+		}
+		divisionIDs := make(map[string]struct{})
+		matchedCity := ""
+		cityRecordMatched := false
+		for _, city := range branch.Cities {
+			if strings.EqualFold(strings.TrimSpace(city.Title), wantedCity) {
+				cityRecordMatched = true
+				matchedCity = strings.TrimSpace(city.Title)
+				for _, divisionID := range city.Divisions {
+					if divisionID = strings.TrimSpace(divisionID); divisionID != "" {
+						divisionIDs[divisionID] = struct{}{}
+					}
+				}
+			}
+		}
+		if matchedCity == "" && strings.EqualFold(strings.TrimSpace(branch.Title), wantedCity) {
+			matchedCity = strings.TrimSpace(branch.Title)
+		}
+		if matchedCity == "" {
+			continue
+		}
+		for _, division := range branch.Divisions {
+			if len(points) >= query.Limit {
+				return points, nil
+			}
+			if len(division.Warehouses) > 10000 {
+				return nil, errors.New("ПЭК branch directory response exceeds bounds")
+			}
+			if cityRecordMatched {
+				if _, ok := divisionIDs[strings.TrimSpace(division.ID)]; !ok {
+					continue
+				}
+			}
+			divisionHasPickup := pekHasPickupOperation(division.KindsOfTransportation)
+			if !divisionHasPickup && len(division.KindsOfTransportation) > 0 {
+				continue
+			}
+			for _, warehouse := range division.Warehouses {
+				if len(points) >= query.Limit {
+					return points, nil
+				}
+				if !divisionHasPickup && !pekHasPickupOperation(warehouse.KindsOfTransportation) {
+					continue
+				}
+				remoteID := strings.TrimSpace(warehouse.ID)
+				address := strings.TrimSpace(warehouse.AddressDivision)
+				if address == "" {
+					address = strings.TrimSpace(warehouse.Address)
+				}
+				if remoteID == "" || address == "" {
+					return nil, errors.New("ПЭК branch directory has incomplete pickup point")
+				}
+				name := strings.TrimSpace(warehouse.Name)
+				if name == "" {
+					name = strings.TrimSpace(warehouse.DivisionName)
+				}
+				if name == "" {
+					name = strings.TrimSpace(division.Name)
+				}
+				if name == "" {
+					name = "ПЭК · отделение " + remoteID
+				}
+				active := strings.TrimSpace(division.DepartmentClosingDate) == "" && strings.TrimSpace(warehouse.DepartmentClosingDate) == ""
+				points = append(points, sdk.PickupPoint{RemoteID: remoteID, Name: name, Country: query.Country, City: matchedCity, Address: address, Active: active, UpdatedAt: now})
+			}
+		}
+	}
+	return points, nil
+}
+
 func (pekHTTP) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error) {
 	return nil, errLogisticsOperationNotAdmitted
 }
@@ -272,9 +430,6 @@ func (pekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.S
 func (pekHTTP) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
-func (pekHTTP) Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
-	return nil, errLogisticsOperationNotAdmitted
-}
 
 var _ pek.Transport = pekHTTP{}
 
@@ -283,16 +438,26 @@ var _ pek.Transport = pekHTTP{}
 // future operational calls remain qualification-gated.
 type dellinHTTP struct{ h *httpTransport }
 
+type dellinCredentials struct {
+	AppKey string `json:"appkey"`
+	PAT    string `json:"pat"`
+}
+
+func readDellinCredentials(secret []byte) (dellinCredentials, error) {
+	var credentials dellinCredentials
+	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.AppKey) == "" || strings.TrimSpace(credentials.PAT) == "" {
+		return dellinCredentials{}, errors.New("Деловые Линии credentials must be JSON with appkey and pat")
+	}
+	return credentials, nil
+}
+
 func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
 	if transport.h == nil {
 		return errors.New("Деловые Линии credential probe unavailable")
 	}
-	var credentials struct {
-		AppKey string `json:"appkey"`
-		PAT    string `json:"pat"`
-	}
-	if json.Unmarshal(secret, &credentials) != nil || strings.TrimSpace(credentials.AppKey) == "" || strings.TrimSpace(credentials.PAT) == "" {
-		return errors.New("Деловые Линии credentials must be JSON with appkey and pat")
+	credentials, err := readDellinCredentials(secret)
+	if err != nil {
+		return err
 	}
 	body, err := json.Marshal(credentials)
 	if err != nil {
@@ -318,6 +483,97 @@ func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
 		return errors.New("Деловые Линии credential probe returned no session")
 	}
 	return nil
+}
+
+type dellinDirectoryCity struct {
+	Name      string `json:"name"`
+	Terminals struct {
+		Terminal []struct {
+			ID           string `json:"id"`
+			Name         string `json:"name"`
+			Address      string `json:"address"`
+			FullAddress  string `json:"fullAddress"`
+			IsPVZ        bool   `json:"isPVZ"`
+			GiveoutCargo bool   `json:"giveoutCargo"`
+		} `json:"terminal"`
+	} `json:"terminals"`
+}
+
+type dellinDirectoryResponse struct {
+	Hash string `json:"hash"`
+	URL  string `json:"url"`
+}
+
+func (transport dellinHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
+	if transport.h == nil || query.Validate(500) != nil || query.Country != "RU" {
+		return nil, errors.New("Деловые Линии pickup-point request is unavailable")
+	}
+	credentials, err := readDellinCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(struct {
+		AppKey string `json:"appkey"`
+	}{AppKey: credentials.AppKey})
+	if err != nil {
+		return nil, err
+	}
+	status, response, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v3/public/terminals.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Деловые Линии terminal directory request rejected with status %d", status)
+	}
+	var reference dellinDirectoryResponse
+	if json.Unmarshal(response, &reference) != nil || strings.TrimSpace(reference.Hash) == "" || strings.TrimSpace(reference.URL) == "" {
+		return nil, errors.New("Деловые Линии terminal directory returned no catalog reference")
+	}
+	catalogURL, err := url.Parse(reference.URL)
+	if err != nil || catalogURL.User != nil || catalogURL.Port() != "" || !strings.EqualFold(catalogURL.Hostname(), "api.dellin.ru") || (catalogURL.Scheme != "http" && catalogURL.Scheme != "https") || catalogURL.Path != "/catalog/terminals_v3.json" || len(catalogURL.Query()) == 0 {
+		return nil, errors.New("Деловые Линии terminal catalog URL rejected")
+	}
+	status, response, _, _, _, err = transport.h.do(ctx, http.MethodGet, "api.dellin.ru", catalogURL.Path, catalogURL.Query(), nil, http.Header{"Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Деловые Линии terminal catalog request rejected with status %d", status)
+	}
+	var directory struct {
+		Cities []dellinDirectoryCity `json:"city"`
+	}
+	if json.Unmarshal(response, &directory) != nil || len(directory.Cities) > 10000 {
+		return nil, errors.New("Деловые Линии terminal catalog response rejected")
+	}
+	wantedCity := strings.TrimSpace(query.City)
+	for _, city := range directory.Cities {
+		if !strings.EqualFold(strings.TrimSpace(city.Name), wantedCity) {
+			continue
+		}
+		points := make([]sdk.PickupPoint, 0, min(query.Limit, len(city.Terminals.Terminal)))
+		now := time.Now().UTC()
+		for _, terminal := range city.Terminals.Terminal {
+			if len(points) >= query.Limit || (!terminal.GiveoutCargo && !terminal.IsPVZ) {
+				continue
+			}
+			remoteID := strings.TrimSpace(terminal.ID)
+			address := strings.TrimSpace(terminal.Address)
+			if address == "" {
+				address = strings.TrimSpace(terminal.FullAddress)
+			}
+			if remoteID == "" || address == "" {
+				return nil, errors.New("Деловые Линии terminal catalog has incomplete pickup point")
+			}
+			name := strings.TrimSpace(terminal.Name)
+			if name == "" {
+				name = "Деловые Линии · терминал " + remoteID
+			}
+			points = append(points, sdk.PickupPoint{RemoteID: remoteID, Name: name, Country: query.Country, City: city.Name, Address: address, Active: true, UpdatedAt: now})
+		}
+		return points, nil
+	}
+	return []sdk.PickupPoint{}, nil
 }
 
 var _ dellin.Transport = dellinHTTP{}

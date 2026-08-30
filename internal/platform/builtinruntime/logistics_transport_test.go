@@ -113,6 +113,91 @@ func TestDellinCredentialProbe(t *testing.T) {
 	}
 }
 
+func TestDellinPickupPointsReadCatalogAndBoundResults(t *testing.T) {
+	badURL := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v3/public/terminals.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии directory request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			var request struct {
+				AppKey string `json:"appkey"`
+			}
+			if json.NewDecoder(r.Body).Decode(&request) != nil || request.AppKey != "app-1" {
+				t.Fatalf("unexpected Деловые Линии directory body")
+			}
+			catalogURL := "https://api.dellin.ru/catalog/terminals_v3.json?sk=directory-key&e=123"
+			if badURL {
+				catalogURL = "https://example.invalid/catalog/terminals_v3.json?sk=directory-key&e=123"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"hash": "directory-hash", "url": catalogURL})
+		case "/catalog/terminals_v3.json":
+			if r.Method != http.MethodGet || r.URL.Query().Get("sk") != "directory-key" || r.URL.Query().Get("e") != "123" {
+				t.Fatalf("unexpected Деловые Линии catalog request: method=%s query=%s", r.Method, r.URL.RawQuery)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"city": []any{
+				map[string]any{"name": "Москва", "terminals": map[string]any{"terminal": []any{
+					map[string]any{"id": "101", "name": "Терминал Москва", "address": "ул. Примерная, 1", "giveoutCargo": true},
+					map[string]any{"id": "102", "name": "ПВЗ Москва", "fullAddress": "г. Москва, ул. Вторая, 2", "isPVZ": true},
+					map[string]any{"id": "103", "name": "Офис без выдачи", "address": "ул. Третья, 3", "giveoutCargo": false, "isPVZ": false},
+				}}},
+				map[string]any{"name": "Казань", "terminals": map[string]any{"terminal": []any{map[string]any{"id": "201", "name": "ПВЗ Казань", "address": "ул. Четвёртая, 4", "isPVZ": true}}}},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	points, err := transport.Pickup(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 2})
+	if err != nil {
+		t.Fatalf("Деловые Линии pickup request failed: %v", err)
+	}
+	if len(points) != 2 || points[0].RemoteID != "101" || points[0].Address != "ул. Примерная, 1" || points[1].RemoteID != "102" || points[1].Address != "г. Москва, ул. Вторая, 2" {
+		t.Fatalf("unexpected normalized Деловые Линии points: %+v", points)
+	}
+	badURL = true
+	if _, err := transport.Pickup(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 2}); err == nil {
+		t.Fatal("untrusted Деловые Линии catalog URL accepted")
+	}
+}
+
+func TestPekPickupPointsReadBranchDirectoryAndFilterOperations(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/branches/all/" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {
+			t.Fatalf("unexpected ПЭК branch request: method=%s path=%s content-type=%q", r.Method, r.URL.Path, r.Header.Get("Content-Type"))
+		}
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user-1" || password != "password-1" {
+			t.Fatalf("unexpected ПЭК basic credentials: user=%q password=%q ok=%v", user, password, ok)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"branches": []any{
+			map[string]any{
+				"title":  "Москва",
+				"cities": []any{map[string]any{"title": "Москва", "divisions": []string{"division-1", "division-2"}}},
+				"divisions": []any{
+					map[string]any{"id": "division-1", "name": "Москва Центр", "warehouses": []any{
+						map[string]any{"id": "warehouse-1", "name": "Москва 01", "addressDivision": "Россия, Москва, Тверская, 1", "kindsOfTransportation": []any{map[string]any{"operations": []string{"Выдача грузов"}}}},
+					}},
+					map[string]any{"id": "division-2", "name": "Москва только приём", "warehouses": []any{
+						map[string]any{"id": "warehouse-2", "name": "Москва 02", "address": "Москва, Вторая, 2", "kindsOfTransportation": []any{map[string]any{"operations": []string{"Приём грузов"}}}},
+					}},
+				},
+			},
+		}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	points, err := transport.Pickup(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 10})
+	if err != nil {
+		t.Fatalf("ПЭК pickup request failed: %v", err)
+	}
+	if len(points) != 1 || points[0].RemoteID != "warehouse-1" || points[0].Name != "Москва 01" || points[0].Address != "Россия, Москва, Тверская, 1" || !points[0].Active {
+		t.Fatalf("unexpected normalized ПЭК points: %+v", points)
+	}
+}
+
 func TestOzonDeliveryCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v2/warehouse/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {
