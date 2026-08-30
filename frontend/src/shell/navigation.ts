@@ -57,7 +57,7 @@ export function canOpenPath(pathname: string, capabilities: readonly string[]): 
 export function isKnownPath(pathname: string): boolean {
   const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
   if (normalized === "/" || navigationItems.some((item) => item.path === normalized)) return true;
-  if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/(orders|returns)\/[^/]+$/.test(normalized)) return true;
+  if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/(orders|returns)\/[^/]+$/.test(normalized) || /^\/integrations\/status\/[^/]+$/.test(normalized)) return true;
   if (normalized === "/oauth/connectors/callback") return true;
   return /^\/incidents\/(warehouse|drift|connector|approval)\/[^/]+$/.test(normalized);
 }

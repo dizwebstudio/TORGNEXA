@@ -103,6 +103,12 @@ var capabilityDefinitions = map[Capability]CapabilityDefinition{
 	"edo.documents.sign_request": writeSensitive("edo.documents.sign_request", families(FamilyEDO)),
 
 	"marking.status.read":           readable("marking.status.read", families(FamilyGovernment)),
+	"marking.codes.request":         writeSensitive("marking.codes.request", families(FamilyGovernment)),
+	"marking.codes.reserve":         writeSensitive("marking.codes.reserve", families(FamilyGovernment)),
+	"marking.aggregation.write":     writeSensitive("marking.aggregation.write", families(FamilyGovernment)),
+	"marking.circulation.introduce": writeSensitive("marking.circulation.introduce", families(FamilyGovernment)),
+	"marking.circulation.withdraw":  writeSensitive("marking.circulation.withdraw", families(FamilyGovernment)),
+	"marking.transfer.write":        writeSensitive("marking.transfer.write", families(FamilyGovernment)),
 	"marking.documents.write":       writeSensitive("marking.documents.write", families(FamilyGovernment)),
 	"fiscal.receipts.write":         writeSensitive("fiscal.receipts.write", families(FamilyGovernment)),
 	"vetis.documents.read":          readable("vetis.documents.read", families(FamilyGovernment)),

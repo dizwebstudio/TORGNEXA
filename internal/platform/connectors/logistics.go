@@ -120,6 +120,16 @@ type LabelResult struct {
 	ObservedAt             time.Time
 }
 
+// Validate checks the bounded remote reference and provider-neutral format
+// requested by a label read. Provider adapters may narrow the format further
+// when their official API exposes a smaller allow-list.
+func (r LabelRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(r.RemoteID) || !logisticsRefPattern.MatchString(r.Format) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 func (r ShipmentCreateRequest) Validate() error {
 	if !logisticsRefPattern.MatchString(r.ExternalID) || !safeCodePattern.MatchString(r.ServiceCode) || !logisticsRefPattern.MatchString(r.IdempotencyKey) || r.From.Validate() != nil || r.To.Validate() != nil || len(r.Parcels) < 1 {
 		return ErrInvalidLogisticsRequest

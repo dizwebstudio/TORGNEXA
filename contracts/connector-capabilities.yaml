@@ -45,6 +45,12 @@ capabilities:
   edo.documents.send: Send EDO documents
   edo.documents.sign_request: Request signing workflow
   marking.status.read: Read marking status
+  marking.codes.request: Request traceability codes
+  marking.codes.reserve: Reserve or cancel traceability codes
+  marking.aggregation.write: Form, close or dissolve marking packages
+  marking.circulation.introduce: Introduce marked goods into circulation
+  marking.circulation.withdraw: Withdraw marked goods from circulation
+  marking.transfer.write: Transfer marked goods between locations
   marking.documents.write: Submit regulated marking documents
   fiscal.receipts.write: Create fiscal receipt/refund/correction
   vetis.documents.read: Read VetIS/Mercury documents

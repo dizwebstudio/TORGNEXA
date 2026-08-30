@@ -30,5 +30,7 @@ test("navigation shortcuts are unique and unknown nested routes are 404 candidat
   assert.equal(navigationItems.find((item) => item.id === "orders")?.shortcut, "G O");
   assert.equal(isKnownPath("/orders/order-1"), true);
   assert.equal(isKnownPath("/orders/order-1/unknown"), false);
+  assert.equal(isKnownPath("/integrations/status/account-1"), true);
+  assert.equal(canOpenPath("/integrations/status/account-1", ["connectors.read"]), true);
   assert.equal(isKnownPath("/missing"), false);
 });

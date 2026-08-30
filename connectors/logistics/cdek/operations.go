@@ -79,7 +79,7 @@ func (c *Connector) CreateLogisticsReturn(ctx context.Context, a sdk.Account, r 
 	return validateShipment(out)
 }
 func (c *Connector) ReadLogisticsLabel(ctx context.Context, a sdk.Account, r sdk.Runtime, q sdk.LabelRequest) (sdk.LabelResult, error) {
-	if q.RemoteID == "" || q.Format == "" {
+	if q.Validate() != nil {
 		return sdk.LabelResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var out sdk.LabelResult
