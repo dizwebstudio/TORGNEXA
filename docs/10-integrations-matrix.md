@@ -130,8 +130,9 @@ outside the v1 runtime claim.
 СДЭК, 5Post, ПЭК, «Деловые Линии» и «Почта России» доступны на отдельной поверхности
 «Доставка». Для перевозчиков можно создать кабинет, сохранить credentials в
 SecretProvider и запустить проверку официального API. Для СДЭК используется
-JSON с OAuth client credentials, для «Деловых Линий» — appkey и PAT. Товарная
-синхронизация не заявляется; для CDEK, ПЭК и «Деловых Линий» доступно только
+JSON с OAuth client credentials, для «Деловых Линий» — appkey и PAT, для
+«Почты России» — токен приложения и ключ пользователя. Товарная синхронизация
+не заявляется; для CDEK, ПЭК, «Деловых Линий» и «Почты России» доступно только
 bounded read-only чтение справочника ПВЗ/терминалов через `pickup.points.read`.
 Создание
 отправлений, расчёт, статусы и этикетки остаются закрытыми до квалификации
@@ -167,11 +168,11 @@ therefore has zero `planned` entries while retaining fail-closed domain
 capabilities.
 
 The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
-and Ozon Доставка SDK adapters. CDEK, ПЭК and «Деловые Линии» expose a bounded,
-read-only `pickup.points.read` application route for their official ПВЗ/terminal
-directories; shipment writes, rates and other carrier operations remain
-fail-closed until provider qualification. The other three expose only the
-separately reviewed credential-check surface.
+and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Линии» and «Почта России»
+expose a bounded, read-only `pickup.points.read` application route for their
+official ПВЗ/terminal directories; shipment writes, rates and other carrier
+operations remain fail-closed until provider qualification. 5Post and Ozon
+Доставка expose only the separately reviewed credential-check surface.
 
 Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
 карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded

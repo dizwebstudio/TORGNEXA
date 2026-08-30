@@ -879,22 +879,24 @@ for SKU `111223580`.
 
 Task 155 adds «Почта России» to the separate «Доставка» surface. The official
 Otpravka application token and user authorization key are stored encrypted and
-checked through a fixed HTTPS settings probe. Shipment, tariff, document,
-return, pickup and tracking operations remain closed until a current test
-account and fixtures qualify the REST/API contracts.
+checked through a fixed HTTPS settings probe. A bounded read-only
+`pickup.points.read` route searches offices by city and loads each returned
+office card by postal index. Shipment, tariff, document, return and tracking
+operations remain closed until a current test account and fixtures qualify the
+REST/API contracts.
 
 ### Gate RUNTIME-155
 
 - the Delivery card, manifest, runtime-support contract, policy/review and
-  generated catalogs agree on `separate_surface/logistics` with zero admitted
-  operational capabilities;
+  generated catalogs agree on `separate_surface/logistics` with only bounded
+  `pickup.points.read` admitted;
 - credentials stay callback-scoped, strict JSON decoding rejects unknown fields,
   and the host sends only the documented authentication headers to the fixed
   `otpravka-api.pochta.ru` host;
 - deterministic connector, transport, conformance, contract and frontend
   checks pass without production credentials or network access;
-- rates, shipments, labels, returns, pickup points and tracking cannot be
-  enabled until non-production provider qualification is retained.
+- rates, shipments, labels, returns and tracking cannot be enabled until
+  non-production provider qualification is retained.
 
 ## Phase 29 — Категорийные health-check поверхности
 
@@ -1082,6 +1084,34 @@ ports. The implementation is split into twelve subtasks:
   connection pools and Kafka lag bounded on the small-VPS Compose topology;
 - Go, contract, architecture, migration, frontend, conformance, performance,
   Compose E2E and documentation checks pass before production admission.
+
+## Phase 40 — Рабочее место WMS-оператора и marketplace fulfillment
+
+`170`
+
+Task 170 introduces the first durable provider-neutral fulfillment execution
+slice. It connects canonical order items and existing fulfillment allocations
+to tenant-scoped WMS tasks, with idempotent scanner commands, immutable task
+history, PostgreSQL RLS and Transactional Outbox evidence. The implementation
+is split into four requested stages:
+
+1. `170.1` ADR, scope, state machine and policy matrix;
+2. `170.2` durable PostgreSQL task/event model and repository;
+3. `170.3` permission-aware WMS REST/OpenAPI and generated SDK;
+4. `170.4` atomic order → allocation → pick-task orchestration.
+
+### Gate RUNTIME-170
+
+- every task and event is tenant-scoped, versioned, idempotent and auditable;
+- exact quantities, allocation ownership and ATP remain authoritative in
+  PostgreSQL; task execution never silently rewrites order snapshots;
+- claim/start/scan/complete/exception/cancel commands are replay-safe and
+  fail closed on terminal state, version conflict, inactive warehouse or
+  insufficient stock;
+- the public API exposes only bounded provider-neutral task contracts and all
+  generated SDKs remain in parity with OpenAPI;
+- marketplace order writes, labels, ChZ, shipment, UI and production
+  qualification remain explicit follow-up tasks.
 
 ## Phase 36 — Центр качества публикации товаров
 

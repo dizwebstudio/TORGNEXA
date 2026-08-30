@@ -53,3 +53,12 @@ func TestHealthPropagatesSecretProviderFailure(t *testing.T) {
 		t.Fatalf("expected secret provider failure, got %v", err)
 	}
 }
+
+func TestPickupUsesCandidateTransport(t *testing.T) {
+	points, err := New(candidateTransport{}, nil).ReadPickupPoints(context.Background(), testAccount(), testRuntime{}, sdk.PickupPointQuery{
+		Country: "RU", City: "Москва", Limit: 10,
+	})
+	if err != nil || len(points) != 1 || points[0].RemoteID != "101000" || points[0].Address == "" {
+		t.Fatalf("points=%+v err=%v", points, err)
+	}
+}

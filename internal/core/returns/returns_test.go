@@ -32,7 +32,7 @@ func TestReturnLifecycleAndQuantityBounds(t *testing.T) {
 	if err := ValidateLineAllocation(order, requested, received, accepted); err != nil {
 		t.Fatalf("valid allocation: %v", err)
 	}
-	tooMany, _ := NewQuantity(4, 0, "PCS")
+	tooMany, _ := NewQuantity(11, 0, "PCS")
 	if err := ValidateLineAllocation(order, tooMany, received, accepted); err != ErrOverAllocated {
 		t.Fatalf("over allocation error = %v", err)
 	}

@@ -1,6 +1,6 @@
 # Task 155 — «Почта России» logistics connector
 
-Status: Repository implementation complete
+Status: Repository implementation complete; bounded pickup read enabled
 
 ## Problem
 
@@ -17,11 +17,13 @@ Status: Repository implementation complete
   application access token и user authorization key;
 - host-side HTTPS probe `GET /1.0/settings` с фиксированным публичным
   доменом `otpravka-api.pochta.ru`;
+- bounded `pickup.points.read` через `/postoffice/1.0/by-address` и карточку
+  ОПС `/postoffice/1.0/{postal-code}`;
 - карточка «Почта России» на поверхности «Доставка», фирменная презентация и
   понятная подсказка формата credentials;
-- runtime support `separate_surface/logistics`: кабинет и health-check
-  доступны, тарифы, отправления, документы, возвраты и трекинг остаются
-  fail-closed.
+- runtime support `separate_surface/logistics`: кабинет, health-check и
+  bounded чтение ОПС доступны, тарифы, отправления, документы, возвраты и
+  трекинг остаются fail-closed.
 
 ## Acceptance criteria
 
@@ -30,6 +32,8 @@ Status: Repository implementation complete
   логи, события или ответы приложения;
 - health probe использует официальные заголовки `Authorization: AccessToken`
   и `X-User-Authorization: Basic` и проверяет корректный JSON-ответ;
+- `pickup.points.read` использует официальный поиск по адресу, ограничивает
+  число результатов и возвращает только валидированные карточки ОПС;
 - SDK-тесты и conformance-отчёт выполняются без сети и production secrets;
 - generated catalogs, runtime-support contract, policy/review и документация
   синхронизированы.

@@ -252,7 +252,7 @@ CREATE TRIGGER operation_evidence_no_mutation BEFORE UPDATE OR DELETE OR TRUNCAT
 REVOKE DELETE,TRUNCATE ON cancellation_state_history,return_state_history,return_inspections,commerce_operation_evidence FROM PUBLIC;
 
 COMMENT ON TABLE order_cancellations IS 'Tenant-scoped cancellation state; remote unknown outcomes require reconciliation and are never blindly retried.';
-COMMENT ON TABLE commerce_returns IS 'Tenant-scoped return authorization and inspection lifecycle, separate from order snapshot and payment state.';
+COMMENT ON TABLE commerce_returns IS 'Tenant-scoped return approval and inspection lifecycle, separate from order snapshot and payment state.';
 COMMENT ON TABLE refund_allocations IS 'Append-oriented links between a payment refund and order/return components; exact amounts only.';
 COMMENT ON TABLE commerce_operation_evidence IS 'Bounded opaque evidence for remote operations; raw provider payloads and credentials are excluded.';
 

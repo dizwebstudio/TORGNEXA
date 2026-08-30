@@ -67,6 +67,94 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /order-cancellations:
+    post:
+      operationId: createOrderCancellation
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCancellationCreate'}}}}
+      responses:
+        '202': {description: Cancellation request accepted, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCancellation'}}}}
+        '409': {description: Cancellation state or idempotency conflict}
+  /order-cancellations/{cancellation_id}:
+    get:
+      operationId: getOrderCancellation
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: cancellation_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+      responses:
+        '200': {description: One order cancellation, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCancellation'}}}}
+        '404': {description: Cancellation not found}
+  /order-cancellations/{cancellation_id}/status:
+    patch:
+      operationId: changeOrderCancellationStatus
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: cancellation_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCancellationStatusUpdate'}}}}
+      responses:
+        '200': {description: Cancellation state changed, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCancellation'}}}}
+        '409': {description: State or version conflict}
+  /returns:
+    get:
+      operationId: listReturns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200': {description: Tenant returns, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnPage'}}}}
+    post:
+      operationId: createReturn
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnCreate'}}}}
+      responses:
+        '202': {description: Return request accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Return'}}}}
+        '409': {description: Return or idempotency conflict}
+  /returns/{return_id}:
+    get:
+      operationId: getReturn
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+      responses:
+        '200': {description: Return with line allocations, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnDetails'}}}}
+        '404': {description: Return not found}
+  /returns/{return_id}/status:
+    patch:
+      operationId: changeReturnStatus
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnStatusUpdate'}}}}
+      responses:
+        '200': {description: Return state changed, content: {application/json: {schema: {$ref: '#/components/schemas/Return'}}}}
+        '409': {description: State or version conflict}
+  /returns/{return_id}/inspection:
+    post:
+      operationId: recordReturnInspection
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnInspectionCreate'}}}}
+      responses:
+        '202': {description: Inspection evidence recorded}
+        '409': {description: Return inspection conflict}
+  /refund-allocations:
+    post:
+      operationId: createRefundAllocation
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RefundAllocationCreate'}}}}
+      responses:
+        '202': {description: Refund allocation accepted, content: {application/json: {schema: {$ref: '#/components/schemas/RefundAllocation'}}}}
+        '409': {description: Payment allocation or idempotency conflict}
   /payments:
     get:
       operationId: listPayments
@@ -2252,6 +2340,150 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/LogisticsPickupPoint'}}
+    Quantity:
+      type: object
+      additionalProperties: false
+      required: [coefficient, scale, unit]
+      properties:
+        coefficient: {type: integer}
+        scale: {type: integer, minimum: 0, maximum: 9}
+        unit: {type: string, pattern: '^[A-Z0-9_.-]{1,16}$'}
+    OrderCancellation:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, status, reason_code, source, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        status: {type: string, enum: [requested, approved, executing, cancelled, rejected, failed, unknown]}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        source: {type: string, minLength: 1, maxLength: 192}
+        idempotency_key: {type: string, minLength: 1, maxLength: 192}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    OrderCancellationCreate:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, reason_code]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+    OrderCancellationStatusUpdate:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status: {type: string, enum: [requested, approved, executing, cancelled, rejected, failed, unknown]}
+        version: {type: integer, minimum: 1}
+    ReturnItem:
+      type: object
+      additionalProperties: false
+      required: [id, return_id, order_item_id, unit, disposition, requested, received, accepted, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        return_id: {$ref: '#/components/schemas/SortableID'}
+        order_item_id: {type: string, minLength: 1, maxLength: 192}
+        unit: {type: string, pattern: '^[A-Z0-9_.-]{1,16}$'}
+        disposition: {type: string, enum: [restock, quarantine, scrap, replace]}
+        requested: {$ref: '#/components/schemas/Quantity'}
+        received: {$ref: '#/components/schemas/Quantity'}
+        accepted: {$ref: '#/components/schemas/Quantity'}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    Return:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, status, reason_code, source, currency, requested_shipping_minor, requested_tax_minor, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        status: {type: string, enum: [requested, approved, authorized, in_transit, received, inspecting, accepted, partially_accepted, rejected, closed, cancelled, expired]}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        source: {type: string, minLength: 1, maxLength: 192}
+        idempotency_key: {type: string, minLength: 1, maxLength: 192}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        requested_shipping_minor: {type: integer, minimum: 0}
+        requested_tax_minor: {type: integer, minimum: 0}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ReturnDetails:
+      type: object
+      additionalProperties: false
+      required: [return, items]
+      properties:
+        return: {$ref: '#/components/schemas/Return'}
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ReturnItem'}}
+    ReturnPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/Return'}}
+    ReturnCreate:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, reason_code, currency]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        shipping_minor: {type: integer, minimum: 0, default: 0}
+        tax_minor: {type: integer, minimum: 0, default: 0}
+    ReturnStatusUpdate:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status: {type: string, enum: [requested, approved, authorized, in_transit, received, inspecting, accepted, partially_accepted, rejected, closed, cancelled, expired]}
+        version: {type: integer, minimum: 1}
+    ReturnInspectionCreate:
+      type: object
+      additionalProperties: false
+      required: [id, return_item_id, outcome, condition_code, unit, disposition, coefficient, scale]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        return_item_id: {$ref: '#/components/schemas/SortableID'}
+        outcome: {type: string, enum: [accepted, partially_accepted, rejected]}
+        condition_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        discrepancy_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        unit: {type: string, pattern: '^[A-Z0-9_.-]{1,16}$'}
+        disposition: {type: string, enum: [restock, quarantine, scrap, replace]}
+        artifact_ref: {type: string, minLength: 1, maxLength: 192}
+        coefficient: {type: integer, minimum: 0}
+        scale: {type: integer, minimum: 0, maximum: 9}
+    RefundAllocation:
+      type: object
+      additionalProperties: false
+      required: [id, payment_id, refund_id, return_id, component, amount, version, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        payment_id: {$ref: '#/components/schemas/SortableID'}
+        refund_id: {$ref: '#/components/schemas/SortableID'}
+        return_id: {$ref: '#/components/schemas/SortableID'}
+        order_item_id: {type: string, minLength: 1, maxLength: 192}
+        component: {type: string, enum: [line, shipping, tax, discount]}
+        amount: {$ref: '#/components/schemas/Money'}
+        idempotency_key: {type: string, minLength: 1, maxLength: 192}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+    RefundAllocationCreate:
+      type: object
+      additionalProperties: false
+      required: [id, payment_id, refund_id, return_id, component, amount_minor, currency]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        payment_id: {$ref: '#/components/schemas/SortableID'}
+        refund_id: {$ref: '#/components/schemas/SortableID'}
+        return_id: {$ref: '#/components/schemas/SortableID'}
+        order_item_id: {type: string, minLength: 1, maxLength: 192}
+        component: {type: string, enum: [line, shipping, tax, discount]}
+        amount_minor: {type: integer, minimum: 1}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
     Money:
       type: object
       additionalProperties: false
@@ -2303,7 +2535,7 @@ components:
         external_id: {type: string, minLength: 1, maxLength: 192}
         remote_refund_id: {type: string, minLength: 1, maxLength: 192}
         amount: {$ref: '#/components/schemas/Money'}
-        status: {type: string, enum: [pending, accepted, succeeded, failed]}
+        status: {type: string, enum: [pending, accepted, succeeded, failed, unknown, manual_attention]}
         version: {type: integer, minimum: 1}
         created_at: {type: string, format: date-time}
     RefundCreate:

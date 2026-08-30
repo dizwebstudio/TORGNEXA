@@ -299,6 +299,7 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 		if allocation.Amount.MinorUnits() > paymentAmount || allocated > paymentAmount-allocation.Amount.MinorUnits() {
 			return core.ErrOverAllocated
 		}
+		var err error
 		result, err = scanRefundAllocation(tx.QueryRowContext(ctx, `INSERT INTO refund_allocations(id,organization_id,workspace_id,payment_id,refund_id,return_id,order_item_id,component,amount_minor_units,currency,idempotency_key,version,created_at) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),$8,$9,$10,$11,1,$12) ON CONFLICT (organization_id,workspace_id,idempotency_key) DO UPDATE SET id=refund_allocations.id RETURNING id,organization_id,workspace_id,payment_id,refund_id,return_id,COALESCE(order_item_id,''),component,amount_minor_units,currency,idempotency_key,version,created_at`, allocation.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), allocation.PaymentID, allocation.RefundID, allocation.ReturnID.String(), allocation.OrderItemID, allocation.Component, allocation.Amount.MinorUnits(), allocation.Currency.String(), allocation.IdempotencyKey, mutation.OccurredAt))
 		if err != nil {
 			return err

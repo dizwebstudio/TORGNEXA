@@ -584,23 +584,50 @@ var _ dellin.Transport = dellinHTTP{}
 // callback-scoped secret path or is persisted by the transport.
 type pochtarussiaHTTP struct{ h *httpTransport }
 
+type pochtarussiaCredentials struct {
+	Token string `json:"token"`
+	Key   string `json:"key"`
+}
+
+type pochtarussiaOfficeSearch struct {
+	Postoffices []json.RawMessage `json:"postoffices"`
+}
+
+type pochtarussiaOffice struct {
+	AddressSource     string          `json:"address-source"`
+	IsClosed          bool            `json:"is-closed"`
+	IsTemporaryClosed bool            `json:"is-temporary-closed"`
+	PostalCode        json.RawMessage `json:"postal-code"`
+	Settlement        string          `json:"settlement"`
+	TypeCode          string          `json:"type-code"`
+}
+
+func readPochtaRussiaCredentials(secret []byte) (pochtarussiaCredentials, error) {
+	var credentials pochtarussiaCredentials
+	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.Token) == "" || strings.TrimSpace(credentials.Key) == "" {
+		return pochtarussiaCredentials{}, errors.New("Почта России credentials must be JSON with token and key")
+	}
+	return credentials, nil
+}
+
+func pochtarussiaHeaders(credentials pochtarussiaCredentials) http.Header {
+	return http.Header{
+		"Authorization":        []string{"AccessToken " + credentials.Token},
+		"X-User-Authorization": []string{"Basic " + credentials.Key},
+		"Accept":               []string{"application/json;charset=UTF-8"},
+		"Content-Type":         []string{"application/json"},
+	}
+}
+
 func (transport pochtarussiaHTTP) Ping(ctx context.Context, secret []byte) error {
 	if transport.h == nil {
 		return errors.New("Почта России credential probe unavailable")
 	}
-	var credentials struct {
-		Token string `json:"token"`
-		Key   string `json:"key"`
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return err
 	}
-	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.Token) == "" || strings.TrimSpace(credentials.Key) == "" {
-		return errors.New("Почта России credentials must be JSON with token and key")
-	}
-	headers := http.Header{
-		"Authorization":        []string{"AccessToken " + credentials.Token},
-		"X-User-Authorization": []string{"Basic " + credentials.Key},
-		"Accept":               []string{"application/json"},
-	}
-	status, response, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/1.0/settings", url.Values{}, nil, headers, nil, nil)
+	status, response, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/1.0/settings", url.Values{}, nil, pochtarussiaHeaders(credentials), nil, nil)
 	if err != nil {
 		return err
 	}
@@ -611,6 +638,104 @@ func (transport pochtarussiaHTTP) Ping(ctx context.Context, secret []byte) error
 		return errors.New("Почта России credential probe returned invalid JSON")
 	}
 	return nil
+}
+
+func pochtarussiaPostalCode(raw json.RawMessage) (string, error) {
+	var value string
+	if len(raw) > 0 && raw[0] == '"' {
+		if json.Unmarshal(raw, &value) != nil {
+			return "", errors.New("Почта России postoffice code is invalid")
+		}
+	} else {
+		decoder := json.NewDecoder(strings.NewReader(string(raw)))
+		decoder.UseNumber()
+		var number json.Number
+		if decoder.Decode(&number) != nil {
+			return "", errors.New("Почта России postoffice code is invalid")
+		}
+		value = number.String()
+	}
+	value = strings.TrimSpace(value)
+	if len(value) != 6 {
+		return "", errors.New("Почта России postoffice code has invalid length")
+	}
+	for _, digit := range []byte(value) {
+		if digit < '0' || digit > '9' {
+			return "", errors.New("Почта России postoffice code is invalid")
+		}
+	}
+	return value, nil
+}
+
+func (transport pochtarussiaHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
+	if transport.h == nil || query.Validate(500) != nil || query.Country != "RU" {
+		return nil, errors.New("Почта России pickup request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	headers := pochtarussiaHeaders(credentials)
+	status, response, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/postoffice/1.0/by-address", url.Values{
+		"address": []string{strings.TrimSpace(query.City)},
+		"top":     []string{strconv.Itoa(query.Limit)},
+	}, nil, headers, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Почта России pickup search rejected with status %d", status)
+	}
+	var search pochtarussiaOfficeSearch
+	if json.Unmarshal(response, &search) != nil || len(search.Postoffices) > query.Limit || len(search.Postoffices) > 500 {
+		return nil, errors.New("Почта России pickup search response rejected")
+	}
+	points := make([]sdk.PickupPoint, 0, len(search.Postoffices))
+	seen := make(map[string]struct{}, len(search.Postoffices))
+	for _, rawCode := range search.Postoffices {
+		code, codeErr := pochtarussiaPostalCode(rawCode)
+		if codeErr != nil {
+			return nil, codeErr
+		}
+		if _, duplicate := seen[code]; duplicate {
+			return nil, errors.New("Почта России pickup search returned duplicate postoffice")
+		}
+		seen[code] = struct{}{}
+		detailStatus, detailResponse, _, _, _, detailErr := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/postoffice/1.0/"+code, url.Values{
+			"filter-by-office-type": []string{"true"},
+		}, nil, headers, nil, nil)
+		if detailErr != nil {
+			return nil, detailErr
+		}
+		if detailStatus < http.StatusOK || detailStatus >= http.StatusMultipleChoices {
+			return nil, fmt.Errorf("Почта России postoffice %s rejected with status %d", code, detailStatus)
+		}
+		var office pochtarussiaOffice
+		if json.Unmarshal(detailResponse, &office) != nil {
+			return nil, errors.New("Почта России postoffice response rejected")
+		}
+		if officeCode, officeErr := pochtarussiaPostalCode(office.PostalCode); officeErr != nil || officeCode != code {
+			return nil, errors.New("Почта России postoffice response has mismatched code")
+		}
+		address := strings.TrimSpace(office.AddressSource)
+		if address == "" {
+			return nil, errors.New("Почта России postoffice response has no address")
+		}
+		city := strings.TrimSpace(office.Settlement)
+		if city == "" {
+			city = strings.TrimSpace(query.City)
+		}
+		name := "Почта России · ОПС " + code
+		if typeCode := strings.TrimSpace(office.TypeCode); typeCode != "" {
+			name += " · " + typeCode
+		}
+		points = append(points, sdk.PickupPoint{
+			RemoteID: code, Name: name, Country: query.Country, City: city,
+			Address: address, Active: !office.IsClosed && !office.IsTemporaryClosed,
+			UpdatedAt: time.Now().UTC(),
+		})
+	}
+	return points, nil
 }
 
 var _ pochtarussia.Transport = pochtarussiaHTTP{}

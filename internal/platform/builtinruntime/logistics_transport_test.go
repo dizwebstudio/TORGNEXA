@@ -235,6 +235,43 @@ func TestRussianPostCredentialProbe(t *testing.T) {
 	}
 }
 
+func TestRussianPostPickupPointsReadDirectoryAndOfficeDetails(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России pickup credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		switch r.URL.Path {
+		case "/postoffice/1.0/by-address":
+			if r.Method != http.MethodGet || r.URL.Query().Get("address") != "Москва" || r.URL.Query().Get("top") != "2" {
+				t.Fatalf("unexpected Почта России pickup search: method=%s query=%v", r.Method, r.URL.Query())
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"is-matched": false, "postoffices": []any{"101000", 101001}})
+		case "/postoffice/1.0/101000":
+			if r.URL.Query().Get("filter-by-office-type") != "true" {
+				t.Fatalf("office type filter missing: %v", r.URL.Query())
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"postal-code": "101000", "settlement": "Москва", "address-source": "Москва, Чистопрудный бульвар, 1", "type-code": "ГОПС",
+			})
+		case "/postoffice/1.0/101001":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"postal-code": 101001, "settlement": "Москва", "address-source": "Москва, Мясницкая улица, 26", "is-closed": true,
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	points, err := transport.Pickup(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 2})
+	if err != nil {
+		t.Fatalf("Почта России pickup request failed: %v", err)
+	}
+	if len(points) != 2 || points[0].RemoteID != "101000" || points[0].Address != "Москва, Чистопрудный бульвар, 1" || !points[0].Active || points[1].RemoteID != "101001" || points[1].Active {
+		t.Fatalf("unexpected normalized Почта России points: %+v", points)
+	}
+}
+
 func TestOzonPayCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/product/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {

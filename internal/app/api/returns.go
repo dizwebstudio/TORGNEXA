@@ -24,11 +24,14 @@ type returnsAPIRepository interface{ core.Repository }
 func newReturnsRoutes(repository returnsAPIRepository) []ProtectedRoute {
 	api := returnsAPI{repository: repository}
 	return []ProtectedRoute{
-		{Method: http.MethodGet, Path: orderCancellationsPath + "/", PathPrefix: true, Permission: "orders.read", Handler: http.HandlerFunc(api.cancellationRoute)},
+		{Method: http.MethodGet, Path: orderCancellationsPath + "/", PathPrefix: true, Permission: "orders.returns.read", Handler: http.HandlerFunc(api.cancellationRoute)},
+		{Method: http.MethodPatch, Path: orderCancellationsPath + "/", PathPrefix: true, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.cancellationRoute)},
 		{Method: http.MethodPost, Path: orderCancellationsPath, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.createCancellation)},
-		{Method: http.MethodGet, Path: returnsPath, Permission: "orders.read", Handler: http.HandlerFunc(api.listReturns)},
+		{Method: http.MethodGet, Path: returnsPath, Permission: "orders.returns.read", Handler: http.HandlerFunc(api.listReturns)},
 		{Method: http.MethodPost, Path: returnsPath, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.createReturn)},
-		{Method: http.MethodGet, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.read", Handler: http.HandlerFunc(api.returnRoute)},
+		{Method: http.MethodGet, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.read", Handler: http.HandlerFunc(api.returnRoute)},
+		{Method: http.MethodPatch, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.returnRoute)},
+		{Method: http.MethodPost, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.returnRoute)},
 		{Method: http.MethodPost, Path: refundAllocationsPath, Permission: "payments.refunds.write", Handler: http.HandlerFunc(api.createRefundAllocation)},
 	}
 }
@@ -36,24 +39,44 @@ func newReturnsRoutes(repository returnsAPIRepository) []ProtectedRoute {
 type returnsAPI struct{ repository returnsAPIRepository }
 
 type cancellationView struct {
-	ID, OrderID, Status, ReasonCode, Source, IdempotencyKey string
-	Version                                                 int64
-	CreatedAt, UpdatedAt                                    time.Time
+	ID             string    `json:"id"`
+	OrderID        string    `json:"order_id"`
+	Status         string    `json:"status"`
+	ReasonCode     string    `json:"reason_code"`
+	Source         string    `json:"source"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	Version        int64     `json:"version"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type returnView struct {
-	ID, OrderID, Status, ReasonCode, Source, IdempotencyKey string
-	Currency                                                string
-	RequestedShippingMinor, RequestedTaxMinor               int64
-	Version                                                 int64
-	CreatedAt, UpdatedAt                                    time.Time
+	ID                     string    `json:"id"`
+	OrderID                string    `json:"order_id"`
+	Status                 string    `json:"status"`
+	ReasonCode             string    `json:"reason_code"`
+	Source                 string    `json:"source"`
+	IdempotencyKey         string    `json:"idempotency_key"`
+	Currency               string    `json:"currency"`
+	RequestedShippingMinor int64     `json:"requested_shipping_minor"`
+	RequestedTaxMinor      int64     `json:"requested_tax_minor"`
+	Version                int64     `json:"version"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 type returnItemView struct {
-	ID, ReturnID, OrderItemID, Unit, Disposition string
-	Requested, Received, Accepted                quantityView
-	Version                                      int64
-	CreatedAt, UpdatedAt                         time.Time
+	ID          string       `json:"id"`
+	ReturnID    string       `json:"return_id"`
+	OrderItemID string       `json:"order_item_id"`
+	Unit        string       `json:"unit"`
+	Disposition string       `json:"disposition"`
+	Requested   quantityView `json:"requested"`
+	Received    quantityView `json:"received"`
+	Accepted    quantityView `json:"accepted"`
+	Version     int64        `json:"version"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
 }
 
 type quantityView struct {
@@ -63,10 +86,16 @@ type quantityView struct {
 }
 
 type refundAllocationView struct {
-	ID, PaymentID, RefundID, ReturnID, OrderItemID, Component, IdempotencyKey string
-	Amount                                                                    moneyView
-	Version                                                                   int64
-	CreatedAt                                                                 time.Time
+	ID             string    `json:"id"`
+	PaymentID      string    `json:"payment_id"`
+	RefundID       string    `json:"refund_id"`
+	ReturnID       string    `json:"return_id"`
+	OrderItemID    string    `json:"order_item_id,omitempty"`
+	Component      string    `json:"component"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	Amount         moneyView `json:"amount"`
+	Version        int64     `json:"version"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func (a returnsAPI) createCancellation(w http.ResponseWriter, r *http.Request) {
@@ -167,6 +196,10 @@ func (a returnsAPI) createReturn(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := core.ParseReturnID(input.ID)
 	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	if _, err := orders.ParseOrderID(input.OrderID); err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}

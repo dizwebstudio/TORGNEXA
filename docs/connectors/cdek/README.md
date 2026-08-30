@@ -6,9 +6,10 @@
 
 Host transport также умеет bounded read-only запрос списка ПВЗ по стране и
 городу: OAuth-токен живёт только внутри callback, а ответ нормализуется в
-канонический `PickupPoint`. Операция пока не включена в application runtime:
-для этого нужны актуальные provider fixtures, host-side маршрут и отдельная
-квалификация окружения.
+канонический `PickupPoint`. Операция доступна через защищённый маршрут
+`GET /api/v1/logistics/pickup-points` только при явно включённом
+`pickup.points.read`; provider-specific идентификаторы не становятся
+идентификаторами складов Core.
 
 SDK-кандидат по-прежнему покрывает rates, shipment lifecycle, tracking,
 cancellation, labels, pickup points и return flow, но тарифы и операции с

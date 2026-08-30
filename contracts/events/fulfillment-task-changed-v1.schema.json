@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-task-changed-v1.json",
+  "title": "commerce.fulfillment.task_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "task_type", "state", "warehouse_id", "sku", "expected_quantity", "processed_quantity", "version", "change"],
+  "properties": {
+    "task_id": {"$ref": "#/$defs/id"},
+    "task_type": {"enum": ["receiving", "put_away", "pick", "pack", "cycle_count", "transfer", "return_receiving"]},
+    "state": {"enum": ["pending", "in_progress", "completed", "cancelled", "exception"]},
+    "warehouse_id": {"$ref": "#/$defs/id"},
+    "sku": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"},
+    "order_id": {"$ref": "#/$defs/id"},
+    "order_item_id": {"$ref": "#/$defs/id"},
+    "fulfillment_allocation_id": {"$ref": "#/$defs/id"},
+    "expected_quantity": {"$ref": "#/$defs/quantity"},
+    "processed_quantity": {"$ref": "#/$defs/quantity"},
+    "assigned_to": {"type": "string", "maxLength": 191},
+    "version": {"type": "integer", "minimum": 1},
+    "change": {"enum": ["created", "claimed", "started", "scan_applied", "completed", "exception", "cancelled"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "quantity": {"type": "object", "additionalProperties": false, "required": ["value", "unit"], "properties": {"value": {"type": "string", "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?$"}, "unit": {"type": "string", "pattern": "^[A-Z][A-Z0-9._-]{0,15}$"}}}
+  }
+}

@@ -593,6 +593,46 @@
       },
       "backfill": null,
       "sha256": "b1fc38aac11aa4440e9740a3a7b6e3ff472e8f16d5133d3d408aa396dc20f365"
+    },
+    {
+      "version": 29,
+      "name": "returns_cancellations_refunds",
+      "file": "000029_returns_cancellations_refunds.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [28],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "87e434d23b321ee9a01ecf160c921b5659f46ead0cfa1b4ac4d7cc35bf305a0f"
+    },
+    {
+      "version": 30,
+      "name": "wms_operator_tasks",
+      "file": "000030_wms_operator_tasks.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [29],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "cd95c07e027ee0158d2b5c798bb0123aa891c40d5cfbfd6f5292b3d19cce7930"
     }
   ]
 }

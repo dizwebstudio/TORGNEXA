@@ -12,6 +12,8 @@
 `2xx` с корректным JSON; тело ответа не выходит из host-side transport.
 
 Манифест перечисляет нормализуемые операции расчёта, отправлений, отмены,
-возврата, этикетки, трекинга и пунктов выдачи. Они пока не являются
-исполняемыми runtime-маршрутами: в runtime support коннектор зарегистрирован
-как `separate_surface/logistics` с нулём operational capabilities.
+возврата, этикетки, трекинга и пунктов выдачи. В runtime включено только
+bounded read-only `pickup.points.read`: поиск выполняется через официальный
+`GET /postoffice/1.0/by-address`, а данные отделения — через
+`GET /postoffice/1.0/{postal-code}`. Тарифы, отправления, возвраты, этикетки и
+трекинг остаются fail-closed до qualification.

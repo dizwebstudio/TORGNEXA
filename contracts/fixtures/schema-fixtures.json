@@ -1373,23 +1373,6 @@
       }
     },
     {
-      "schema": "events/offer-changed-v1.schema.json",
-      "valid": {
-        "offer_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102",
-        "product_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101",
-        "version": 1,
-        "status": "draft",
-        "change": "created"
-      },
-      "invalid": {
-        "offer_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102",
-        "product_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101",
-        "version": 1,
-        "status": "draft",
-        "change": "remote_synced"
-      }
-    },
-    {
       "schema": "events/cancellation-requested-v1.schema.json",
       "valid": {
         "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
@@ -1410,17 +1393,34 @@
       "schema": "events/cancellation-state-changed-v1.schema.json",
       "valid": {
         "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "order_id": "018f0e8b-8a58-7f42-5c2f9b1a0702",
         "from_status": "requested",
         "status": "approved",
         "version": 2
       },
       "invalid": {
         "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "order_id": "018f0e8b-8a58-7f42-5c2f9b1a0702",
         "from_status": "cancelled",
         "status": "requested",
         "version": 0
+      }
+    },
+    {
+      "schema": "events/offer-changed-v1.schema.json",
+      "valid": {
+        "offer_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102",
+        "product_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101",
+        "version": 1,
+        "status": "draft",
+        "change": "created"
+      },
+      "invalid": {
+        "offer_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102",
+        "product_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101",
+        "version": 1,
+        "status": "draft",
+        "change": "remote_synced"
       }
     },
     {

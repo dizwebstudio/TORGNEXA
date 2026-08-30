@@ -234,7 +234,9 @@ func (r *Repository) CreateRefund(ctx context.Context, scope payments.Scope, com
 	}
 	var result payments.Refund
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		payment, err := scanPayment(tx.QueryRowContext(ctx, paymentSelect+` FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), command.PaymentID.String()))
+		// Serialize all refund reservations on the parent payment. This makes
+		// the amount check safe when two operators retry a refund concurrently.
+		payment, err := scanPayment(tx.QueryRowContext(ctx, paymentSelect+` FOR UPDATE`, scope.OrganizationID(), scope.WorkspaceID(), command.PaymentID.String()))
 		if err != nil {
 			return err
 		}
@@ -243,6 +245,13 @@ func (r *Repository) CreateRefund(ctx context.Context, scope payments.Scope, com
 		}
 		if command.Amount.Currency() != payment.Amount.Currency() {
 			return payments.ErrInvalidRecord
+		}
+		var reservedMinor int64
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount_minor_units),0) FROM payment_refunds WHERE organization_id=$1 AND workspace_id=$2 AND payment_id=$3 AND status IN ('pending','accepted','succeeded','unknown','manual_attention')`, scope.OrganizationID(), scope.WorkspaceID(), command.PaymentID.String()).Scan(&reservedMinor); err != nil {
+			return fmt.Errorf("payments repository: sum reserved refunds: %w", err)
+		}
+		if command.Amount.MinorUnits() > payment.Amount.MinorUnits() || reservedMinor > payment.Amount.MinorUnits()-command.Amount.MinorUnits() {
+			return payments.ErrConflict
 		}
 		result, err = scanRefund(tx.QueryRowContext(ctx, `INSERT INTO payment_refunds(id,organization_id,workspace_id,payment_id,external_id,amount_minor_units,currency) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING RETURNING id,organization_id,workspace_id,payment_id,external_id,COALESCE(remote_refund_id,''),amount_minor_units,currency,status,version,created_at,updated_at`,
 			command.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), command.PaymentID.String(), command.ExternalID, command.Amount.MinorUnits(), string(command.Amount.Currency())))

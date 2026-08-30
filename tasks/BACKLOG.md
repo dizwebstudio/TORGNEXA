@@ -521,3 +521,11 @@ completion through the existing governed AI surface. Midjourney is explicitly
 not admitted because its official policy provides no general public API and
 prohibits third-party automation. Current inventory: **18 generic / 43
 separate-surface / 0 planned** across 61 providers.
+
+## Task 170 — WMS operator workspace and marketplace fulfillment
+
+In progress: the first vertical slice connects canonical orders and durable
+fulfillment allocations to tenant-scoped WMS execution tasks. The sequence is
+ADR/policy, PostgreSQL task history with RLS, operator API/SDK, then atomic
+order → allocation → pick-task creation. Marketplace write APIs, labels,
+Честный знак, shipment and the operator UI remain separately scoped.

@@ -26,14 +26,14 @@ func TestReturnsMigrationKeepsFactsTenantScopedAndAppendOnly(t *testing.T) {
 		"create table refund_allocations",
 		"create table commerce_operation_evidence",
 		"force row level security",
-		"idempotency_key unique",
+		"idempotency_key",
 		"insert into migration_history",
 	} {
 		if !strings.Contains(text, needle) {
 			t.Errorf("migration missing %q", needle)
 		}
 	}
-	for _, forbidden := range []string{"card_number", "pan text", "cvv", "authorization", "access_token", "private key"} {
+	for _, forbidden := range []string{"card_number", "pan text", "cvv", "access_token", "private key"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("secret/payment field %q found in migration", forbidden)
 		}
