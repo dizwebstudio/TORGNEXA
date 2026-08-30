@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -1096,6 +1097,193 @@ type dellinTrackingResponse struct {
 	} `json:"data"`
 }
 
+type dellinRateAddress struct {
+	Variant string `json:"variant"`
+	Address struct {
+		Search string `json:"search"`
+	} `json:"address"`
+}
+
+type dellinRateRequest struct {
+	AppKey    string `json:"appkey"`
+	SessionID string `json:"sessionID"`
+	Delivery  struct {
+		DeliveryType struct {
+			Type string `json:"type"`
+		} `json:"deliveryType"`
+		Derival dellinRateAddress `json:"derival"`
+		Arrival dellinRateAddress `json:"arrival"`
+	} `json:"delivery"`
+	Payment struct {
+		PaymentCitySearch struct {
+			Search string `json:"search"`
+		} `json:"paymentCitySearch"`
+		Type string `json:"type"`
+	} `json:"payment"`
+	Cargo struct {
+		Quantity    int         `json:"quantity"`
+		Length      json.Number `json:"length"`
+		Width       json.Number `json:"width"`
+		Height      json.Number `json:"height"`
+		Weight      json.Number `json:"weight"`
+		TotalVolume json.Number `json:"totalVolume"`
+		TotalWeight json.Number `json:"totalWeight"`
+		HazardClass int         `json:"hazardClass"`
+	} `json:"cargo"`
+}
+
+type dellinRateResponse struct {
+	Metadata struct {
+		Status int `json:"status"`
+	} `json:"metadata"`
+	Data struct {
+		Price        json.RawMessage `json:"price"`
+		PriceMinimal string          `json:"priceMinimal"`
+		DeliveryTerm int             `json:"deliveryTerm"`
+		OrderDates   struct {
+			Pickup                    string `json:"pickup"`
+			ArrivalToOspReceiver     string `json:"arrivalToOspReceiver"`
+			GiveoutFromOspReceiver   string `json:"giveoutFromOspReceiver"`
+			GiveoutFromOspReceiverMax string `json:"giveoutFromOspReceiverMax"`
+		} `json:"orderDates"`
+	} `json:"data"`
+}
+
+func dellinAddressSearch(address sdk.Address) (string, error) {
+	parts := make([]string, 0, 4)
+	for _, part := range []string{address.Country, address.PostalCode, address.City, address.Line1} {
+		if value := strings.TrimSpace(part); value != "" {
+			parts = append(parts, value)
+		}
+	}
+	result := strings.Join(parts, ", ")
+	if len(result) < 2 || len(result) > 1024 {
+		return "", errors.New("Деловые Линии address search is out of bounds")
+	}
+	return result, nil
+}
+
+func dellinFixedDecimal(numerator, denominator *big.Int, scale int) (json.Number, error) {
+	if numerator == nil || denominator == nil || denominator.Sign() <= 0 || numerator.Sign() < 0 || scale < 0 || scale > 18 {
+		return "", errors.New("Деловые Линии decimal value is invalid")
+	}
+	value := new(big.Rat).SetFrac(new(big.Int).Set(numerator), new(big.Int).Set(denominator))
+	text := strings.TrimRight(strings.TrimRight(value.FloatString(scale), "0"), ".")
+	if text == "" {
+		text = "0"
+	}
+	return json.Number(text), nil
+}
+
+func dellinParcelTotals(parcels []sdk.Parcel) (length, width, height, weight, volume json.Number, err error) {
+	if len(parcels) == 0 || len(parcels) > 50 {
+		return "", "", "", "", "", errors.New("Деловые Линии cargo quantity is out of bounds")
+	}
+	maxLength, maxWidth, maxHeight := int64(0), int64(0), int64(0)
+	totalWeight := new(big.Int)
+	totalVolume := new(big.Int)
+	for _, parcel := range parcels {
+		if parcel.Validate() != nil {
+			return "", "", "", "", "", errors.New("Деловые Линии cargo contains an invalid parcel")
+		}
+		if parcel.LengthMM > maxLength {
+			maxLength = parcel.LengthMM
+		}
+		if parcel.WidthMM > maxWidth {
+			maxWidth = parcel.WidthMM
+		}
+		if parcel.HeightMM > maxHeight {
+			maxHeight = parcel.HeightMM
+		}
+		totalWeight.Add(totalWeight, big.NewInt(parcel.WeightGrams))
+		parcelVolume := new(big.Int).Mul(big.NewInt(parcel.LengthMM), big.NewInt(parcel.WidthMM))
+		parcelVolume.Mul(parcelVolume, big.NewInt(parcel.HeightMM))
+		totalVolume.Add(totalVolume, parcelVolume)
+	}
+	length, err = dellinFixedDecimal(big.NewInt(maxLength), big.NewInt(1000), 3)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	width, err = dellinFixedDecimal(big.NewInt(maxWidth), big.NewInt(1000), 3)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	height, err = dellinFixedDecimal(big.NewInt(maxHeight), big.NewInt(1000), 3)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	weight, err = dellinFixedDecimal(totalWeight, big.NewInt(1000), 3)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	volume, err = dellinFixedDecimal(totalVolume, big.NewInt(1000000000), 9)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	return length, width, height, weight, volume, nil
+}
+
+func dellinRateServiceCode(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		value = "auto"
+	}
+	switch value {
+	case "auto", "small", "avia", "express", "letter":
+		return "dellin_" + value, nil
+	default:
+		return "", errors.New("Деловые Линии tariff response has unsupported priceMinimal")
+	}
+}
+
+func dellinRateTime(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+	return time.Time{}, errors.New("Деловые Линии tariff response has invalid delivery date")
+}
+
+func dellinRateDates(response dellinRateResponse, now time.Time) (time.Time, time.Time, error) {
+	minDate := time.Time{}
+	for _, value := range []string{response.Data.OrderDates.ArrivalToOspReceiver, response.Data.OrderDates.GiveoutFromOspReceiver, response.Data.OrderDates.Pickup} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		parsed, err := dellinRateTime(value)
+		if err == nil {
+			minDate = parsed
+			break
+		}
+	}
+	if minDate.IsZero() {
+		minDate = now
+	}
+	maxDate := time.Time{}
+	for _, value := range []string{response.Data.OrderDates.GiveoutFromOspReceiverMax, response.Data.OrderDates.GiveoutFromOspReceiver, response.Data.OrderDates.ArrivalToOspReceiver} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		parsed, err := dellinRateTime(value)
+		if err == nil {
+			maxDate = parsed
+			break
+		}
+	}
+	if response.Data.DeliveryTerm < 0 || response.Data.DeliveryTerm > 3660 {
+		return time.Time{}, time.Time{}, errors.New("Деловые Линии tariff response has invalid delivery term")
+	}
+	if maxDate.IsZero() {
+		maxDate = minDate.Add(time.Duration(response.Data.DeliveryTerm) * 24 * time.Hour)
+	}
+	if maxDate.Before(minDate) {
+		maxDate = minDate.Add(time.Duration(response.Data.DeliveryTerm) * 24 * time.Hour)
+	}
+	return minDate, maxDate, nil
+}
+
 func dellinTrackingStatus(state string) string {
 	switch strings.ToLower(strings.TrimSpace(state)) {
 	case "finished":
@@ -1175,6 +1363,76 @@ func (transport dellinHTTP) Track(ctx context.Context, secret []byte, request sd
 		}
 	}
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: statusCode, Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: latest.UTC()}, nil
+}
+
+func (transport dellinHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return nil, errors.New("Деловые Линии tariff request is unavailable")
+	}
+	fromSearch, err := dellinAddressSearch(request.From)
+	if err != nil {
+		return nil, err
+	}
+	toSearch, err := dellinAddressSearch(request.To)
+	if err != nil {
+		return nil, err
+	}
+	length, width, height, weight, volume, err := dellinParcelTotals(request.Parcels)
+	if err != nil {
+		return nil, err
+	}
+	credentials, err := readDellinCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	sessionID, err := transport.login(ctx, credentials)
+	if err != nil {
+		return nil, err
+	}
+	requestBody := dellinRateRequest{AppKey: credentials.AppKey, SessionID: sessionID}
+	requestBody.Delivery.DeliveryType.Type = "auto"
+	requestBody.Delivery.Derival.Variant = "address"
+	requestBody.Delivery.Derival.Address.Search = fromSearch
+	requestBody.Delivery.Arrival.Variant = "address"
+	requestBody.Delivery.Arrival.Address.Search = toSearch
+	requestBody.Payment.PaymentCitySearch.Search = strings.TrimSpace(request.From.City)
+	requestBody.Payment.Type = "cash"
+	requestBody.Cargo.Quantity = len(request.Parcels)
+	requestBody.Cargo.Length = length
+	requestBody.Cargo.Width = width
+	requestBody.Cargo.Height = height
+	requestBody.Cargo.Weight = weight
+	requestBody.Cargo.TotalVolume = volume
+	requestBody.Cargo.TotalWeight = weight
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v2/calculator.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Деловые Линии tariff request rejected with status %d", status)
+	}
+	var response dellinRateResponse
+	if json.Unmarshal(responseBody, &response) != nil || (response.Metadata.Status != 0 && response.Metadata.Status != http.StatusOK) {
+		return nil, errors.New("Деловые Линии tariff response rejected")
+	}
+	minorUnits, err := cdekMinorUnits(response.Data.Price)
+	if err != nil {
+		return nil, err
+	}
+	serviceCode, err := dellinRateServiceCode(response.Data.PriceMinimal)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	minDate, maxDate, err := dellinRateDates(response, now)
+	if err != nil {
+		return nil, err
+	}
+	return []sdk.RateQuote{{ServiceCode: serviceCode, Cost: sdk.LogisticsMoney{MinorUnits: minorUnits, Currency: "RUB"}, MinDeliveryAt: minDate, MaxDeliveryAt: maxDate, ObservedAt: now}}, nil
 }
 
 func (transport dellinHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {

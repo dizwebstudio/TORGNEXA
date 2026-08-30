@@ -489,7 +489,7 @@
         "organization_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "document_type": "certificate",
-        "number": "EA\u042d\u0421 RU C-DE.001",
+        "number": "EAЭС RU C-DE.001",
         "jurisdiction": "RU",
         "issuer": "Registry",
         "registry_source": "official_registry",
@@ -706,11 +706,15 @@
             "connector_id": "synthetic-market",
             "stage": "ready",
             "surface": "integrations",
-            "operational_capabilities": ["products.read"],
+            "operational_capabilities": [
+              "products.read"
+            ],
             "sync": [
               {
                 "entity_type": "products",
-                "directions": ["inbound"]
+                "directions": [
+                  "inbound"
+                ]
               }
             ]
           }
@@ -723,7 +727,9 @@
             "connector_id": "synthetic-market",
             "stage": "manifest_only",
             "surface": "integrations",
-            "operational_capabilities": ["products.read"],
+            "operational_capabilities": [
+              "products.read"
+            ],
             "sync": []
           }
         ]
@@ -1291,7 +1297,9 @@
         "kind": "pack_handoff",
         "state": "ready",
         "warehouse_id": "018f0000-0000-7000-8000-000000000702",
-        "task_ids": ["018f0000-0000-7000-8000-000000000701"],
+        "task_ids": [
+          "018f0000-0000-7000-8000-000000000701"
+        ],
         "version": 1,
         "change": "created"
       },
@@ -1313,8 +1321,14 @@
         "state": "pending",
         "warehouse_id": "018f0000-0000-7000-8000-000000000702",
         "sku": "SKU-RETURN-001",
-        "expected_quantity": {"value": "1", "unit": "PCS"},
-        "processed_quantity": {"value": "0", "unit": "PCS"},
+        "expected_quantity": {
+          "value": "1",
+          "unit": "PCS"
+        },
+        "processed_quantity": {
+          "value": "0",
+          "unit": "PCS"
+        },
         "version": 1,
         "change": "created"
       },
@@ -1324,8 +1338,14 @@
         "state": "pending",
         "warehouse_id": "bad",
         "sku": "SKU-RETURN-001",
-        "expected_quantity": {"value": "1", "unit": "PCS"},
-        "processed_quantity": {"value": "0", "unit": "PCS"},
+        "expected_quantity": {
+          "value": "1",
+          "unit": "PCS"
+        },
+        "processed_quantity": {
+          "value": "0",
+          "unit": "PCS"
+        },
         "version": 0,
         "change": "created"
       }
@@ -1371,6 +1391,46 @@
         "rate_type": "official",
         "observed_at": "2026-08-09T12:00:00Z",
         "effective_at": "2026-08-09T00:00:00Z"
+      }
+    },
+    {
+      "schema": "events/integration-account-status-changed-v1.schema.json",
+      "valid": {
+        "account_id": "account_demo_001",
+        "dimension": "health",
+        "from_status": "degraded",
+        "to_status": "healthy",
+        "overall": "healthy",
+        "reason_code": "health_recovered",
+        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "account_id": "account_demo_001",
+        "dimension": "health",
+        "from_status": "healthy",
+        "to_status": "healthy",
+        "overall": "green",
+        "reason_code": "unsafe text",
+        "snapshot_digest": "bad"
+      }
+    },
+    {
+      "schema": "events/integration-snapshot-published-v1.schema.json",
+      "valid": {
+        "snapshot_id": "ic:aaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot_version": 1,
+        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_count": 2,
+        "partial": false,
+        "consistency": "best_effort"
+      },
+      "invalid": {
+        "snapshot_id": "snapshot-bad",
+        "snapshot_version": 0,
+        "snapshot_digest": "bad",
+        "account_count": -1,
+        "partial": "no",
+        "consistency": "torn"
       }
     },
     {
@@ -1697,8 +1757,18 @@
     },
     {
       "schema": "events/shipment-changed-v1.schema.json",
-      "valid": {"shipment_id": "shipment-001", "status": "in_transit", "version": 1, "operation": "created"},
-      "invalid": {"shipment_id": "", "status": "broken", "version": 0, "operation": "created"}
+      "valid": {
+        "shipment_id": "shipment-001",
+        "status": "in_transit",
+        "version": 1,
+        "operation": "created"
+      },
+      "invalid": {
+        "shipment_id": "",
+        "status": "broken",
+        "version": 0,
+        "operation": "created"
+      }
     },
     {
       "schema": "events/social-channel-account-changed-v1.schema.json",
@@ -1800,13 +1870,39 @@
     },
     {
       "schema": "events/unit-economics-snapshot-published-v1.schema.json",
-      "valid": {"run_id": "ue-run-001", "run_key": "run-key-001", "basis": "order_accrual", "row_count": 1, "quality_status": "partial", "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"run_id": "", "run_key": "run-key-001", "basis": "ledger", "row_count": -1, "quality_status": "unknown", "input_digest": "bad"}
+      "valid": {
+        "run_id": "ue-run-001",
+        "run_key": "run-key-001",
+        "basis": "order_accrual",
+        "row_count": 1,
+        "quality_status": "partial",
+        "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "run_id": "",
+        "run_key": "run-key-001",
+        "basis": "ledger",
+        "row_count": -1,
+        "quality_status": "unknown",
+        "input_digest": "bad"
+      }
     },
     {
       "schema": "events/unit-economics-snapshot-requested-v1.schema.json",
-      "valid": {"run_key": "run-key-001", "basis": "order_accrual", "from": "2026-08-01T00:00:00Z", "to": "2026-08-02T00:00:00Z", "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"run_key": "", "basis": "cashflow", "from": "bad", "to": "bad", "input_digest": "bad"}
+      "valid": {
+        "run_key": "run-key-001",
+        "basis": "order_accrual",
+        "from": "2026-08-01T00:00:00Z",
+        "to": "2026-08-02T00:00:00Z",
+        "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "run_key": "",
+        "basis": "cashflow",
+        "from": "bad",
+        "to": "bad",
+        "input_digest": "bad"
+      }
     },
     {
       "schema": "events/upload-quarantined-v1.schema.json",
@@ -2462,9 +2558,9 @@
         "kind": "legal",
         "country_code": "RU",
         "postal_code": "101000",
-        "region": "\u041c\u043e\u0441\u043a\u0432\u0430",
-        "city": "\u041c\u043e\u0441\u043a\u0432\u0430",
-        "line1": "\u0443\u043b. \u041f\u0440\u0438\u043c\u0435\u0440, 1",
+        "region": "Москва",
+        "city": "Москва",
+        "line1": "ул. Пример, 1",
         "line2": "",
         "is_primary": true,
         "active": true,
@@ -2496,7 +2592,7 @@
         "counterparty_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0811",
         "authority_type": "mchd",
         "reference_number": "MCHD-42",
-        "issuer": "\u0424\u041d\u0421",
+        "issuer": "ФНС",
         "issued_at": "2026-08-10T00:00:00Z",
         "expires_at": null,
         "status": "draft",
@@ -2527,7 +2623,7 @@
         "counterparty_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0811",
         "currency": "RUB",
         "account_number": "40702810900000000001",
-        "bank_name": "\u0422\u0435\u0441\u0442 \u0411\u0430\u043d\u043a",
+        "bank_name": "Тест Банк",
         "bank_country_code": "RU",
         "bic": "044525225",
         "correspondent_account": "30101810400000000225",
@@ -2560,7 +2656,7 @@
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "legal_entity_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0811",
         "code": "acme-msk",
-        "name": "\u041c\u043e\u0441\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u0444\u0438\u043b\u0438\u0430\u043b",
+        "name": "Московский филиал",
         "country_code": "RU",
         "kpp": "773601001",
         "status": "draft",
@@ -2574,7 +2670,7 @@
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "legal_entity_id": "bad",
         "code": "acme-msk",
-        "name": "\u041c\u043e\u0441\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u0444\u0438\u043b\u0438\u0430\u043b",
+        "name": "Московский филиал",
         "country_code": "RU",
         "kpp": "773601001",
         "status": "draft",
@@ -2650,7 +2746,7 @@
         "organization_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "code": "ivanov",
-        "full_name": "\u0418\u0432\u0430\u043d\u043e\u0432 \u0418\u0432\u0430\u043d \u0418\u0432\u0430\u043d\u043e\u0432\u0438\u0447",
+        "full_name": "Иванов Иван Иванович",
         "country_code": "RU",
         "inn": "500100732259",
         "ogrnip": "304500116000157",
@@ -2664,7 +2760,7 @@
         "organization_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "code": "ivanov",
-        "full_name": "\u0418\u0432\u0430\u043d\u043e\u0432",
+        "full_name": "Иванов",
         "country_code": "RU",
         "inn": "500100732259",
         "ogrnip": "304500116000157",
@@ -2681,8 +2777,8 @@
         "organization_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
         "workspace_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
         "code": "acme-ru",
-        "legal_name": "\u041e\u041e\u041e \u0410\u041a\u041c\u0415",
-        "short_name": "\u0410\u041a\u041c\u0415",
+        "legal_name": "ООО АКМЕ",
+        "short_name": "АКМЕ",
         "country_code": "RU",
         "inn": "7707083893",
         "kpp": "773601001",
@@ -2716,7 +2812,7 @@
             "party_type": "legal_entity",
             "party_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0811",
             "code": "acme-ru",
-            "display_name": "\u0410\u041a\u041c\u0415",
+            "display_name": "АКМЕ",
             "inn": "7707083893",
             "registration_id": "1027700132195",
             "status": "active"
@@ -2729,7 +2825,7 @@
             "party_type": "marketplace",
             "party_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0811",
             "code": "acme-ru",
-            "display_name": "\u0410\u041a\u041c\u0415",
+            "display_name": "АКМЕ",
             "status": "active"
           }
         ]
@@ -4315,12 +4411,36 @@
         "jurisdiction": "RU",
         "freshness_ttl_seconds": 86400,
         "rules": [
-          {"id": "brand_required", "category": "category_attributes", "field": "brand", "kind": "required", "severity": "block", "message": "brand is required", "remediation": "set brand"},
-          {"id": "price_min", "category": "price_stock", "field": "price_minor", "kind": "min_value", "severity": "warn", "min": "100", "message": "minimum price", "remediation": "review price"}
+          {
+            "id": "brand_required",
+            "category": "category_attributes",
+            "field": "brand",
+            "kind": "required",
+            "severity": "block",
+            "message": "brand is required",
+            "remediation": "set brand"
+          },
+          {
+            "id": "price_min",
+            "category": "price_stock",
+            "field": "price_minor",
+            "kind": "min_value",
+            "severity": "warn",
+            "min": "100",
+            "message": "minimum price",
+            "remediation": "review price"
+          }
         ],
-        "weights": {"identity_content": 2, "category_attributes": 1, "price_stock": 2},
+        "weights": {
+          "identity_content": 2,
+          "category_attributes": 1,
+          "price_stock": 2
+        },
         "required_media": 1,
-        "allowed_media_formats": ["jpg", "png"],
+        "allowed_media_formats": [
+          "jpg",
+          "png"
+        ],
         "max_media_bytes": 10000000,
         "require_price": true,
         "require_stock": true,
@@ -5079,7 +5199,9 @@
         "occurred_at": "2026-08-10T09:00:00Z",
         "organization_id": "018f0000-0000-7000-8000-000000000001",
         "workspace_id": "018f0000-0000-7000-8000-000000000002",
-        "data": {"order_id": "order_test_001"}
+        "data": {
+          "order_id": "order_test_001"
+        }
       },
       "invalid": {
         "delivery_id": "whd_00000000000000000000000000000001",
@@ -5088,66 +5210,66 @@
         "occurred_at": "2026-08-10T09:00:00Z",
         "organization_id": "018f0000-0000-7000-8000-000000000001",
         "workspace_id": "018f0000-0000-7000-8000-000000000002",
-        "data": [1, 2, 3]
+        "data": [
+          1,
+          2,
+          3
+        ]
       }
     },
     {
       "schema": "workflow/definition-v1.schema.json",
       "valid": {
         "name": "Notify on product change",
-        "trigger": {"kind": "event", "event_type": "commerce.catalog.product_changed.v1", "enabled": false},
+        "trigger": {
+          "kind": "event",
+          "event_type": "commerce.catalog.product_changed.v1",
+          "enabled": false
+        },
         "nodes": [
-          {"id": "condition", "kind": "condition", "config": {"result": true}},
-          {"id": "notify", "kind": "action", "action": "notification.create", "config": {"title": "Changed"}}
+          {
+            "id": "condition",
+            "kind": "condition",
+            "config": {
+              "result": true
+            }
+          },
+          {
+            "id": "notify",
+            "kind": "action",
+            "action": "notification.create",
+            "config": {
+              "title": "Changed"
+            }
+          }
         ],
-        "edges": [{"from": "condition", "to": "notify", "condition": "always"}]
+        "edges": [
+          {
+            "from": "condition",
+            "to": "notify",
+            "condition": "always"
+          }
+        ]
       },
       "invalid": {
         "name": "Invalid workflow",
-        "trigger": {"kind": "event", "event_type": "commerce.catalog.product_changed.v1", "enabled": false},
-        "nodes": [{"id": "action", "kind": "action", "action": "sync.dry_run", "config": {"api_token": "secret"}}],
+        "trigger": {
+          "kind": "event",
+          "event_type": "commerce.catalog.product_changed.v1",
+          "enabled": false
+        },
+        "nodes": [
+          {
+            "id": "action",
+            "kind": "action",
+            "action": "sync.dry_run",
+            "config": {
+              "api_token": "secret"
+            }
+          }
+        ],
         "edges": [],
         "unknown": true
-      }
-    },
-    {
-      "schema": "events/integration-account-status-changed-v1.schema.json",
-      "valid": {
-        "account_id": "account_demo_001",
-        "dimension": "health",
-        "from_status": "degraded",
-        "to_status": "healthy",
-        "overall": "healthy",
-        "reason_code": "health_recovered",
-        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      },
-      "invalid": {
-        "account_id": "account_demo_001",
-        "dimension": "health",
-        "from_status": "healthy",
-        "to_status": "healthy",
-        "overall": "green",
-        "reason_code": "unsafe text",
-        "snapshot_digest": "bad"
-      }
-    },
-    {
-      "schema": "events/integration-snapshot-published-v1.schema.json",
-      "valid": {
-        "snapshot_id": "ic:aaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "snapshot_version": 1,
-        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "account_count": 2,
-        "partial": false,
-        "consistency": "best_effort"
-      },
-      "invalid": {
-        "snapshot_id": "snapshot-bad",
-        "snapshot_version": 0,
-        "snapshot_digest": "bad",
-        "account_count": -1,
-        "partial": "no",
-        "consistency": "torn"
       }
     },
     {
@@ -5171,7 +5293,9 @@
         "attempt_count": 0,
         "available_at": "bad",
         "version": 1,
-        "payload": {"token": "secret"}
+        "payload": {
+          "token": "secret"
+        }
       }
     },
     {

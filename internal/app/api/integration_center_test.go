@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestIntegrationCenterListIsTenantScopedAndFiltered(t *testing.T) {
 }
 
 func TestIntegrationCenterRejectsTenantSelectorsAndBadFilters(t *testing.T) {
-	for _, query := range []string{"?organization_id=other", "?limit=101", "?stale=maybe", "?cursor=" + string(make([]byte, 257))} {
+	for _, query := range []string{"?organization_id=other", "?limit=101", "?stale=maybe", "?cursor=" + strings.Repeat("a", 257)} {
 		req := httptest.NewRequest(http.MethodGet, IntegrationCenterPath+query, nil)
 		req = req.WithContext(context.WithValue(req.Context(), requestScopeKey{}, validTestScope(t)))
 		res := httptest.NewRecorder()

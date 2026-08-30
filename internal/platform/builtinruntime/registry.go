@@ -177,6 +177,8 @@ func (r *Registry) LogisticsRates(ctx context.Context, account sdk.Account, runt
 	switch account.ConnectorID {
 	case "cdek":
 		return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
 	case "pek":
 		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
 	case "pochta-russia":

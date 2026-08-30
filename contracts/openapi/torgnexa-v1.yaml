@@ -1184,7 +1184,7 @@ paths:
         '200':
           description: Tenant-scoped integration state snapshot; GET never performs remote IO
           content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationCenterResponse'}}}
-        '400': {description: Invalid cursor, filter or limit}
+        '400': {description: "Invalid cursor, filter or limit"}
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
   /integration-center/{account_id}:

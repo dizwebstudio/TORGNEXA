@@ -11,8 +11,8 @@
 callback проверки.
 
 В runtime включены bounded read-only чтение справочника терминалов/ПВЗ
-(`pickup.points.read`) и единичное чтение истории статусов
-(`logistics.track.read`): сначала выполняется `POST
+(`pickup.points.read`), предпросмотр тарифа (`logistics.rates.read`) и единичное
+чтение истории статусов (`logistics.track.read`): сначала выполняется `POST
 https://api.dellin.ru/v3/public/terminals.json` с appkey, затем загружается
 возвращённый официальный URL каталога на том же host и из выбранного города
 нормализуется не более запрошенного лимита пунктов. Внешний URL принимается
@@ -22,12 +22,16 @@ https://api.dellin.ru/v3/public/terminals.json` с appkey, затем загру
 Для tracking выполняется `POST https://api.dellin.ru/v3/orders/statuses_history.json`
 с одним `docIds`. Ответ ограничивается 100 событиями, проверяется по ключу
 документа и нормализуется в последний статус; сырой ответ и клиентские данные
-не выходят из host-side transport. Расчёт и операции отправлений остаются
-закрытыми до qualification.
+не выходят из host-side transport. Для rates выполняется `POST
+https://api.dellin.ru/v2/calculator.json` после временного login; адреса и до 50
+мест преобразуются в bounded payload, цена принимается только как неотрицательное
+десятичное значение с точностью до копейки, а `priceMinimal` ограничен известными
+типами доставки. Операции отправлений и этикетки остаются закрытыми до
+qualification.
 
 Заявленные в SDK capability (`logistics.rates.read`, `logistics.shipment.create`,
 `logistics.shipment.cancel`, `logistics.track.read` и `logistics.label.read`)
 не означают автоматическую доступность операций в production runtime. Сейчас
-runtime support явно включает только `pickup.points.read` и
-`logistics.track.read` на поверхности `separate_surface/logistics`; расчёт,
-оформление, отмена и этикетки остаются fail-closed до отдельной qualification.
+runtime support явно включает `pickup.points.read`, `logistics.rates.read` и
+`logistics.track.read` на поверхности `separate_surface/logistics`; оформление,
+отмена и этикетки остаются fail-closed до отдельной qualification.

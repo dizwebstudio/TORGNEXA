@@ -643,11 +643,11 @@ Task 145 moves CDEK out of `planned` and adds Деловые Линии to the s
 bounded authenticated health probe: CDEK uses OAuth client credentials plus a
 city-directory read, while Деловые Линии uses appkey/PAT session login. CDEK
 also has a bounded read-only ПВЗ route (`pickup.points.read`), and Деловые Линии
-has the same bounded terminal/PUDO read route plus a bounded order-status
-history read (`logistics.track.read`). CDEK and ПЭК additionally admit
-bounded read-only rate previews (`logistics.rates.read`) with fixed-decimal
-money normalization, while CDEK and ПЭК also admit a bounded
-`logistics.track.read` status lookup; no shipment, label, return or product-sync
+has the same bounded terminal/PUDO read route plus bounded rate and order-status
+history reads (`logistics.rates.read`, `logistics.track.read`). CDEK, ПЭК and
+Деловые Линии admit bounded read-only rate previews (`logistics.rates.read`)
+with fixed-decimal money normalization, while CDEK, ПЭК and Деловые Линии also
+admit a bounded `logistics.track.read` status lookup; no shipment, label, return or product-sync
 route is advertised until the current carrier contracts and an idempotent host
 bridge are qualified. Runtime inventory keeps logistics as a separate surface
 and admits only these exact CDEK rate/tracking/PVZ, ПЭК rate/tracking/PVZ and
