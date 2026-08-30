@@ -102,7 +102,7 @@ func (c *Connector) ReadPickupPoints(ctx context.Context, a sdk.Account, r sdk.R
 		return nil, e
 	}
 	for _, p := range out {
-		if p.RemoteID == "" || p.Name == "" || p.Country == "" || p.City == "" || p.Address == "" || p.UpdatedAt.IsZero() {
+		if p.Validate() != nil {
 			return nil, remote(sdk.ErrorInternal, "invalid_remote_response", 0)
 		}
 	}
