@@ -47,8 +47,23 @@ func TestListReportsRequiresScopeAndReturnsCatalog(t *testing.T) {
 	request = request.WithContext(context.WithValue(request.Context(), requestScopeKey{}, scope))
 	response := httptest.NewRecorder()
 	listReports(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"id":"sales_daily"`) || !strings.Contains(response.Body.String(), `"id":"ingestion_freshness"`) || !strings.Contains(response.Body.String(), `"source":"clickhouse"`) {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"id":"sales_daily"`) || !strings.Contains(response.Body.String(), `"id":"ingestion_freshness"`) || !strings.Contains(response.Body.String(), `"id":"unit_economics_by_channel"`) || !strings.Contains(response.Body.String(), `"source":"clickhouse"`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestReportFilterParsesUnitEconomicsBasisAndChannel(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, ReportsPath+"/unit_economics_by_channel?basis=settlement&channel_ref=channel%3Amarket", nil)
+	filter, err := parseReportFilter(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.Basis != "settlement" || filter.ChannelRef != "channel:market" {
+		t.Fatalf("unexpected unit economics filters: %+v", filter)
+	}
+	request = httptest.NewRequest(http.MethodGet, ReportsPath+"/unit_economics_by_channel?basis=ledger", nil)
+	if _, err := parseReportFilter(request); err == nil {
+		t.Fatal("invalid basis accepted")
 	}
 }
 

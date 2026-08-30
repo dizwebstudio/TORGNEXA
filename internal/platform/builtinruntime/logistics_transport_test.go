@@ -200,6 +200,52 @@ func TestCDEKTrackingUsesUUIDQueryAndRejectsInvalidStatusHistory(t *testing.T) {
 	}
 }
 
+func TestCDEKCancelResolvesNumberAndDeletesByUUID(t *testing.T) {
+	const uuid = "72753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "cancel-token"})
+		case "/v2/orders":
+			if r.Method != http.MethodGet || r.URL.Query().Get("cdek_number") != "1100285492" || r.Header.Get("Authorization") != "Bearer cancel-token" {
+				t.Fatalf("unexpected CDEK cancellation lookup: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": uuid, "cdek_number": "1100285492"}})
+		case "/v2/orders/" + uuid:
+			if r.Method != http.MethodDelete || r.Header.Get("Authorization") != "Bearer cancel-token" {
+				t.Fatalf("unexpected CDEK cancellation request: method=%s authorization=%q", r.Method, r.Header.Get("Authorization"))
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Cancel(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ShipmentCancelRequest{RemoteID: "1100285492", IdempotencyKey: "cancel-1"})
+	if err != nil {
+		t.Fatalf("CDEK cancellation failed: %v", err)
+	}
+	if result.RemoteID != "1100285492" || result.Status != "cancelled" || result.TrackingNumber != "1100285492" || result.Cost.Currency != "RUB" || !result.ObservedAt.After(time.Time{}) {
+		t.Fatalf("unexpected normalized CDEK cancellation result: %+v", result)
+	}
+}
+
+func TestCDEKCancelRejectsMismatchedLookup(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "cancel-token"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": "72753031-1820-4f99-9240-aab139f05ca5", "cdek_number": "other-number"}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Cancel(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ShipmentCancelRequest{RemoteID: "1100285492", IdempotencyKey: "cancel-1"}); err == nil {
+		t.Fatal("CDEK cancellation accepted a mismatched lookup")
+	}
+}
+
 func TestDellinCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v4/auth/login.json" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {

@@ -21,15 +21,21 @@ var (
 type Kind string
 
 const (
-	KindSale       Kind = "sale"
-	KindFee        Kind = "fee"
-	KindRefund     Kind = "refund"
-	KindPayout     Kind = "payout"
-	KindAdjustment Kind = "adjustment"
+	KindSale         Kind = "sale"
+	KindFee          Kind = "fee"
+	KindRefund       Kind = "refund"
+	KindPayout       Kind = "payout"
+	KindAdjustment   Kind = "adjustment"
+	KindLogistics    Kind = "logistics"
+	KindStorage      Kind = "storage"
+	KindAdvertising  Kind = "advertising"
+	KindPenalty      Kind = "penalty"
+	KindCompensation Kind = "compensation"
+	KindWithholding  Kind = "withholding"
 )
 
 func (k Kind) Valid() bool {
-	return k == KindSale || k == KindFee || k == KindRefund || k == KindPayout || k == KindAdjustment
+	return k == KindSale || k == KindFee || k == KindRefund || k == KindPayout || k == KindAdjustment || k == KindLogistics || k == KindStorage || k == KindAdvertising || k == KindPenalty || k == KindCompensation || k == KindWithholding
 }
 
 type Entry struct {

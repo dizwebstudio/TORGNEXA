@@ -124,6 +124,20 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /logistics/shipments/{shipment_id}/cancel:
+    post:
+      operationId: cancelLogisticsShipment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: shipment_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '202': {description: Shipment cancellation accepted for asynchronous carrier processing, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsShipmentCancellation'}}}}
+        '400': {description: Invalid shipment or idempotency key}
+        '403': {description: Caller lacks logistics.shipment.cancel}
+        '404': {description: Shipment not found}
+        '409': {description: Shipment state or idempotency conflict}
   /order-cancellations:
     post:
       operationId: createOrderCancellation
@@ -1848,7 +1862,7 @@ paths:
                       additionalProperties: false
                       required: [id, title, description, source, availability, freshness_sla_seconds, dimensions, metrics]
                       properties:
-                        id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}
+                        id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel]}
                         title: {type: string, minLength: 1, maxLength: 100}
                         description: {type: string, minLength: 1, maxLength: 300}
                         source: {type: string, enum: [clickhouse, postgresql]}
@@ -1862,12 +1876,14 @@ paths:
     get:
       operationId: getReportData
       parameters:
-        - {name: report_id, in: path, required: true, schema: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}}
+        - {name: report_id, in: path, required: true, schema: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel]}}
         - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
         - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
         - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
         - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
         - {name: status, in: query, required: false, schema: {type: string, maxLength: 32}}
+        - {name: basis, in: query, required: false, schema: {type: string, enum: [order_accrual, settlement, cash], default: order_accrual}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
         - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
         - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
       responses:
@@ -1884,13 +1900,13 @@ paths:
                 additionalProperties: false
                 required: [id, generated_at, source, columns, rows]
                 properties:
-                  id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness]}
+                  id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel]}
                   generated_at: {type: string, format: date-time}
                   source: {type: string, enum: [clickhouse, postgresql]}
                   columns:
                     type: array
                     minItems: 1
-                    maxItems: 16
+                    maxItems: 32
                     items:
                       type: object
                       additionalProperties: false
@@ -1903,7 +1919,7 @@ paths:
                     maxItems: 200
                     items:
                       type: array
-                      maxItems: 16
+                      maxItems: 32
                       items: {type: string, maxLength: 512}
             text/csv:
               schema: {type: string}
@@ -2693,6 +2709,16 @@ components:
         status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
         tracking_number: {type: string, maxLength: 192}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsShipmentCancellation:
+      type: object
+      additionalProperties: false
+      required: [id, status, version, accepted, fresh]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, enum: [pending, created, in_transit, delivered, cancelled, unknown]}
+        version: {type: integer, minimum: 1}
+        accepted: {const: true}
+        fresh: {type: boolean}
     Quantity:
       type: object
       additionalProperties: false

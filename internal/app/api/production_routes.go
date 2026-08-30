@@ -19,6 +19,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
@@ -58,6 +59,7 @@ type productionRouteDependencies struct {
 	pim                *pimrepo.Repository
 	images             *catalogimagerepo.Repository
 	inventory          *inventoryrepo.Repository
+	logistics          *logisticsrepo.Repository
 	compliance         *compliancerepo.Repository
 	notifications      *notifications.Service
 	syncPolicies       *syncrepo.Repository
@@ -118,7 +120,8 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
-	routes = append(routes, newLogisticsRoutes(deps.accounts, deps.secretProvider, deps.aiRegistry)...)
+	logisticsRoutes := newLogisticsRoutes(deps.accounts, deps.secretProvider, deps.aiRegistry, logisticsRouteDependency{shipments: deps.logistics, approvals: deps.approvals})
+	routes = append(routes, logisticsRoutes...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReturnsRoutes(deps.returns)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)

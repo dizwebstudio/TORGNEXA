@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/unit-economics-snapshot-published-v1.json",
+  "title": "finance.unit_economics.snapshot_published.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "run_key", "basis", "row_count", "quality_status", "input_digest"],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 192},
+    "run_key": {"type": "string", "minLength": 1, "maxLength": 192},
+    "basis": {"type": "string", "enum": ["order_accrual", "settlement", "cash"]},
+    "row_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "quality_status": {"type": "string", "enum": ["complete", "partial", "stale", "unmatched", "conflict", "mixed_currency", "unsupported"]},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

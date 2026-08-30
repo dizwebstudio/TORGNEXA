@@ -511,8 +511,51 @@ func (transport cdekHTTP) Track(ctx context.Context, secret []byte, request sdk.
 func (cdekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
-func (cdekHTTP) Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+func (transport cdekHTTP) Cancel(ctx context.Context, secret []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || remoteID == "" || !cdekRemotePattern.MatchString(remoteID) || request.IdempotencyKey == "" || !safeCodePattern.MatchString(request.IdempotencyKey) {
+		return sdk.ShipmentResult{}, errors.New("СДЭК cancellation request is unavailable")
+	}
+	token, err := transport.accessToken(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	headers := http.Header{"Authorization": []string{"Bearer " + token}, "Accept": []string{"application/json"}}
+	uuid := remoteID
+	if !cdekUUIDPattern.MatchString(uuid) {
+		status, body, _, _, _, requestErr := transport.h.do(ctx, http.MethodGet, "api.cdek.ru", "/v2/orders", url.Values{"cdek_number": []string{remoteID}}, nil, headers, nil, nil)
+		if requestErr != nil {
+			return sdk.ShipmentResult{}, requestErr
+		}
+		if status < http.StatusOK || status >= http.StatusMultipleChoices {
+			return sdk.ShipmentResult{}, fmt.Errorf("СДЭК cancellation lookup rejected with status %d", status)
+		}
+		var response cdekOrderEnvelope
+		if json.Unmarshal(body, &response) != nil || !cdekUUIDPattern.MatchString(strings.TrimSpace(response.Entity.UUID)) {
+			return sdk.ShipmentResult{}, errors.New("СДЭК cancellation lookup returned no UUID")
+		}
+		if number := cdekScalarText(response.Entity.CDEKNumber); number != "" && number != remoteID {
+			return sdk.ShipmentResult{}, errors.New("СДЭК cancellation lookup identifier mismatch")
+		}
+		uuid = strings.TrimSpace(response.Entity.UUID)
+	}
+	status, body, _, _, _, err := transport.h.do(ctx, http.MethodDelete, "api.cdek.ru", "/v2/orders/"+uuid, url.Values{}, nil, headers, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("СДЭК cancellation rejected with status %d", status)
+	}
+	if len(bytes.TrimSpace(body)) > 0 {
+		var response cdekOrderEnvelope
+		if json.Unmarshal(body, &response) != nil {
+			return sdk.ShipmentResult{}, errors.New("СДЭК cancellation response rejected")
+		}
+		if response.Entity.UUID != "" && strings.TrimSpace(response.Entity.UUID) != uuid {
+			return sdk.ShipmentResult{}, errors.New("СДЭК cancellation response identifier mismatch")
+		}
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
 }
 func (cdekHTTP) Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted

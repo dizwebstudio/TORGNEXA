@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/unit-economics-snapshot-requested-v1.json",
+  "title": "finance.unit_economics.snapshot_requested.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_key", "basis", "from", "to", "input_digest"],
+  "properties": {
+    "run_key": {"type": "string", "minLength": 1, "maxLength": 192},
+    "basis": {"type": "string", "enum": ["order_accrual", "settlement", "cash"]},
+    "from": {"type": "string", "format": "date-time"},
+    "to": {"type": "string", "format": "date-time"},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

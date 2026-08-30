@@ -34,6 +34,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
@@ -67,6 +68,8 @@ var ErrConnectorSourceBridgeUnavailable = errors.New("worker: connector reconcil
 // cfg.Worker.KafkaConsumerGroup: it gives Task-049 reporting ingestion its
 // own Kafka offsets so a ClickHouse outage never stalls webhook delivery.
 const reportingKafkaConsumerGroup = "torgnexa.reporting.v1"
+
+const logisticsKafkaConsumerGroup = "torgnexa.logistics.v1"
 
 type runtimeError struct {
 	code  string
@@ -207,10 +210,38 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		return fail("worker_workflow_kafka_consumer_startup_failed", err)
 	}
 
+	components := make([]component, 0, 8)
 	dispatchRepository, err := workerrepo.New(db)
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
 	}
+	shipmentRepository, err := logisticsrepo.New(db)
+	if err != nil {
+		return fail("worker_logistics_repository_startup_failed", err)
+	}
+	logisticsAccountRepository, err := connectorrepo.New(db)
+	if err != nil {
+		return fail("worker_logistics_connector_repository_startup_failed", err)
+	}
+	logisticsCancelRoute, routeErr := newLogisticsCancelRoute(shipmentRepository, logisticsAccountRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
+		return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
+	})
+	if routeErr != nil {
+		return fail("worker_logistics_cancel_route_startup_failed", routeErr)
+	}
+	logisticsReader, readerErr := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".logistics-consumer", logisticsKafkaConsumerGroup, consumerTopics)
+	if readerErr != nil {
+		return fail("worker_logistics_kafka_reader_startup_failed", readerErr)
+	}
+	defer func() { _ = logisticsReader.Close() }()
+	logisticsConsumer, consumerErr := kafkaeventbus.NewConsumer(logisticsReader, producer, cfg.Worker.KafkaTopics, kafkaeventbus.RetryPolicy{MaxAttempts: 8, InitialBackoff: time.Second, MaxBackoff: 5 * time.Minute}, nil)
+	if consumerErr != nil {
+		return fail("worker_logistics_kafka_consumer_startup_failed", consumerErr)
+	}
+	components = append(components, component{name: "logistics-cancel", run: func(componentCtx context.Context) error {
+		return logisticsConsumer.Run(componentCtx, logisticsCancelRoute.Handle)
+	}})
+
 	workflowRepository, err := workflowrepo.New(db)
 	if err != nil {
 		return fail("worker_workflow_repository_startup_failed", err)
@@ -278,7 +309,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		return reportingIngestor.Ingest(batchCtx, events, nil, "")
 	})
 
-	components := []component{
+	components = append(components, []component{
 		{name: "tenant-dispatch", run: func(componentCtx context.Context) error {
 			return runTenantDispatch(componentCtx, logger, dispatchRepository, relay, webhookDelivery, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
 		}},
@@ -312,7 +343,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 				return nil
 			})
 		}},
-	}
+	}...)
 	components = append(components, component{name: "workflow-automation", run: func(componentCtx context.Context) error {
 		return runWorkflowAutomation(componentCtx, logger, dispatchRepository, workflowRepository, workflowEngine, workerID, cfg.Worker)
 	}})

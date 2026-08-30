@@ -169,11 +169,12 @@ func (repository *Repository) BeginCancel(ctx context.Context, scope tenancy.Sco
 	var result logistics.Shipment
 	fresh := false
 	err := repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
-		result, err = loadShipment(ctx, tx, scope, id, true)
+		current, err := loadShipment(ctx, tx, scope, id, true)
 		if err != nil {
 			return err
 		}
-		if result.RemoteID == "" || result.Status == logistics.StatusDelivered || result.Status == logistics.StatusCancelled || result.Status == logistics.StatusUnknown {
+		result = current
+		if result.RemoteID == "" {
 			return logistics.ErrInvalidState
 		}
 		digest := cancelDigest(id, result.RemoteID)
@@ -184,6 +185,9 @@ func (repository *Repository) BeginCancel(ctx context.Context, scope tenancy.Sco
 		if !claimed {
 			result, err = loadShipment(ctx, tx, scope, logistics.ShipmentID(resourceID), false)
 			return err
+		}
+		if result.Status == logistics.StatusDelivered || result.Status == logistics.StatusCancelled || result.Status == logistics.StatusUnknown {
+			return logistics.ErrInvalidState
 		}
 		fresh = true
 		if err := bindReceiptResource(ctx, tx, scope, cancelOperation, idempotencyKey, id.String()); err != nil {
@@ -396,10 +400,10 @@ func pendingReceiptKey(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, ope
 
 func completeReceipt(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, operation, key string, shipment logistics.Shipment, remote logistics.RemoteResult) error {
 	resultBody, err := json.Marshal(struct {
-		ShipmentID string            `json:"shipment_id"`
-		Status     logistics.Status  `json:"status"`
-		Version    int64             `json:"version"`
-		RemoteID   string            `json:"remote_id"`
+		ShipmentID string           `json:"shipment_id"`
+		Status     logistics.Status `json:"status"`
+		Version    int64            `json:"version"`
+		RemoteID   string           `json:"remote_id"`
 	}{shipment.ID.String(), shipment.Status, shipment.Version, remote.RemoteID})
 	if err != nil {
 		return err
@@ -426,11 +430,12 @@ func appendAudit(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, mutation 
 
 func enqueueShipmentEvent(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, mutation logistics.Mutation, shipment logistics.Shipment, operation string) error {
 	data, err := json.Marshal(struct {
-		ShipmentID string           `json:"shipment_id"`
-		Status     logistics.Status `json:"status"`
-		Version    int64            `json:"version"`
-		Operation  string           `json:"operation"`
-	}{shipment.ID.String(), shipment.Status, shipment.Version, operation})
+		ShipmentID        string           `json:"shipment_id"`
+		Status            logistics.Status `json:"status"`
+		Version           int64            `json:"version"`
+		Operation         string           `json:"operation"`
+		ApprovalRequestID string           `json:"approval_request_id,omitempty"`
+	}{shipment.ID.String(), shipment.Status, shipment.Version, operation, mutationApprovalRequestID(mutation, operation)})
 	if err != nil {
 		return err
 	}
@@ -453,6 +458,13 @@ func enqueueShipmentEvent(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, 
 	return enqueuer.Enqueue(ctx, event)
 }
 
+func mutationApprovalRequestID(mutation logistics.Mutation, operation string) string {
+	if operation == "cancel_requested" {
+		return mutation.ApprovalRequestID
+	}
+	return ""
+}
+
 func shipmentSummary(shipment logistics.Shipment, operation string) audit.Summary {
 	return audit.Summary{"shipment_id": shipment.ID.String(), "provider_account_id": shipment.AccountID, "external_id": shipment.ExternalID, "remote_id": shipment.RemoteID, "status": string(shipment.Status), "version": shipment.Version, "operation": operation}
 }
@@ -469,11 +481,11 @@ func validReference(value string) bool {
 	if value == "" || len(value) > 192 || strings.TrimSpace(value) != value {
 		return false
 	}
-	for index, character := range value {
+	for _, character := range value {
 		if (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '.' || character == '_' || character == ':' || character == '/' || character == '-' {
 			continue
 		}
-		return index > 0 && false
+		return false
 	}
 	return true
 }

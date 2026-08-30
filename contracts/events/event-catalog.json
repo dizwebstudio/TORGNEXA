@@ -26,6 +26,10 @@
       "payload_schema": "events/fulfillment-batch-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.fulfillment.shipment_changed.v1",
+      "payload_schema": "events/shipment-changed-v1.schema.json"
+    },
+    {
       "event_type": "commerce.fulfillment.task_changed.v1",
       "payload_schema": "events/fulfillment-task-changed-v1.schema.json"
     },
@@ -112,6 +116,14 @@
     {
       "event_type": "finance.settlement_entry.created.v1",
       "payload_schema": "events/settlement-entry-created-v1.schema.json"
+    },
+    {
+      "event_type": "finance.unit_economics.snapshot_published.v1",
+      "payload_schema": "events/unit-economics-snapshot-published-v1.schema.json"
+    },
+    {
+      "event_type": "finance.unit_economics.snapshot_requested.v1",
+      "payload_schema": "events/unit-economics-snapshot-requested-v1.schema.json"
     },
     {
       "event_type": "governance.approval.decided.v1",

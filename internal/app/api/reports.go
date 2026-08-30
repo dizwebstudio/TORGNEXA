@@ -59,7 +59,9 @@ func newInventoryFallbackReportReader(primary, fallback reportReader) (reportRea
 
 func (r *inventoryFallbackReportReader) Report(ctx context.Context, scope tenancy.Scope, id string, filter reportrepo.Filter) (reportrepo.Data, error) {
 	data, primaryErr := r.primary.Report(ctx, scope, id, filter)
-	if id != "inventory_current" || r.fallback == nil || (primaryErr == nil && len(data.Rows) > 0) {
+	// PostgreSQL is also the truthful fallback for newly introduced factual
+	// reports whose disposable ClickHouse projection has not been built yet.
+	if r.fallback == nil || (primaryErr == nil && len(data.Rows) > 0) {
 		return data, primaryErr
 	}
 	if fallbackData, fallbackErr := r.fallback.Report(ctx, scope, id, filter); fallbackErr == nil {
@@ -170,9 +172,15 @@ func newReportRoutes(repository reportReader) []ProtectedRoute {
 
 func parseReportFilter(r *http.Request) (reportrepo.Filter, error) {
 	q := r.URL.Query()
-	filter := reportrepo.Filter{Query: strings.TrimSpace(q.Get("q")), Currency: strings.ToUpper(strings.TrimSpace(q.Get("currency"))), Status: strings.TrimSpace(q.Get("status")), Limit: 100}
+	filter := reportrepo.Filter{Query: strings.TrimSpace(q.Get("q")), Currency: strings.ToUpper(strings.TrimSpace(q.Get("currency"))), Status: strings.TrimSpace(q.Get("status")), Basis: strings.TrimSpace(q.Get("basis")), ChannelRef: strings.ToLower(strings.TrimSpace(q.Get("channel_ref"))), Limit: 100}
 	if len(filter.Query) > 100 || len(filter.Currency) > 3 || len(filter.Status) > 32 {
 		return filter, errors.New("filter too long")
+	}
+	if filter.Basis != "" && filter.Basis != "order_accrual" && filter.Basis != "settlement" && filter.Basis != "cash" {
+		return filter, errors.New("invalid basis")
+	}
+	if len(filter.ChannelRef) > 192 {
+		return filter, errors.New("channel_ref too long")
 	}
 	if raw := q.Get("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
@@ -229,5 +237,6 @@ func listReports(w http.ResponseWriter, r *http.Request) {
 		{ID: "sales_daily", Title: "Продажи по дням", Description: "Replay-safe заказы и оборот без смешивания валют.", Source: "clickhouse", Availability: "ready", FreshnessSLASeconds: 60, Dimensions: []string{"day", "currency"}, Metrics: []string{"orders", "fulfilled", "cancelled", "gross_minor_units"}},
 		{ID: "inventory_current", Title: "Текущие остатки", Description: "Последнее спроецированное состояние предложений по складам.", Source: "clickhouse", Availability: "ready", FreshnessSLASeconds: 60, Dimensions: []string{"offer_id", "warehouse_id"}, Metrics: []string{"quantity"}},
 		{ID: "ingestion_freshness", Title: "Свежесть данных", Description: "Свежесть ClickHouse-проекций по семействам событий.", Source: "clickhouse", Availability: "ready", FreshnessSLASeconds: 60, Dimensions: []string{"event_family"}, Metrics: []string{"events", "last_occurred_at", "last_ingested_at", "source_lag_seconds"}},
+		{ID: "unit_economics_by_channel", Title: "Юнит-экономика по каналам", Description: "Фактический вклад каналов с явной базой признания, источниками и покрытием данных.", Source: "postgresql", Availability: "ready", FreshnessSLASeconds: 300, Dimensions: []string{"channel_ref", "currency", "basis", "quality_status"}, Metrics: []string{"net_revenue_minor_units", "cogs_minor_units", "commission_minor_units", "logistics_minor_units", "advertising_minor_units", "refunds_minor_units", "contribution_profit_minor_units", "margin_basis_points", "coverage_percent"}},
 	}})
 }

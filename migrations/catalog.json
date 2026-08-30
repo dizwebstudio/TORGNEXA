@@ -693,6 +693,26 @@
       },
       "backfill": null,
       "sha256": "8f586e40aad503e946be13a6c25965730a4712044beba2c4c7ef615360e47ebf"
+    },
+    {
+      "version": 34,
+      "name": "channel_unit_economics",
+      "file": "000034_channel_unit_economics.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [33],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "53159042fa0cf2cfe191d31407b5caf7e1560efc837ae8b0a490e3b8288699d4"
     }
   ]
 }

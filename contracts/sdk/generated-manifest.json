@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "113a48504f2e6d97fe1d6f4649b5628f878994fe27957fc3c2cd8c9c809a98b5",
+    "sha256": "36b5cc1cb10a18e08c55b72c4977372422848b81eb97fd0458fafa916d622fb6",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -38,6 +38,11 @@
       "operation_id": "calculateLogisticsRates",
       "method": "POST",
       "path": "/logistics/rates"
+    },
+    {
+      "operation_id": "cancelLogisticsShipment",
+      "method": "POST",
+      "path": "/logistics/shipments/{shipment_id}/cancel"
     },
     {
       "operation_id": "cancelWarehouseTask",

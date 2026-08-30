@@ -32,11 +32,13 @@ type Data struct {
 // Filter contains the bounded, report-independent filters accepted by the API.
 // Empty values mean that the corresponding predicate is not applied.
 type Filter struct {
-	From, To time.Time
-	Query    string
-	Currency string
-	Status   string
-	Limit    int
+	From, To   time.Time
+	Query      string
+	Currency   string
+	Status     string
+	Basis      string
+	ChannelRef string
+	Limit      int
 }
 
 // Repository reads report projections without making PostgreSQL analytical truth.
@@ -78,6 +80,8 @@ func (r *Repository) Report(ctx context.Context, scope tenancy.Scope, id string,
 		data, err = inventoryCurrent(ctx, tx, org, ws, filter)
 	case "ingestion_freshness":
 		data, err = ingestionFreshness(ctx, tx, org, ws, filter)
+	case "unit_economics_by_channel":
+		data, err = unitEconomicsByChannel(ctx, tx, org, ws, filter)
 	default:
 		return Data{}, sql.ErrNoRows
 	}
@@ -91,6 +95,102 @@ func (r *Repository) Report(ctx context.Context, scope tenancy.Scope, id string,
 		return Data{}, fmt.Errorf("report repository: commit: %w", err)
 	}
 	return data, nil
+}
+
+// unitEconomicsByChannel is an operational fallback for the factual channel
+// report. The query only reads canonical PostgreSQL facts; ClickHouse remains
+// a disposable projection and can be rebuilt without changing these totals.
+func unitEconomicsByChannel(ctx context.Context, tx *sql.Tx, org, ws string, filter Filter) (Data, error) {
+	basis := filter.Basis
+	if basis == "" {
+		basis = "order_accrual"
+	}
+	if basis != "order_accrual" && basis != "settlement" && basis != "cash" {
+		return Data{}, errors.New("report repository: invalid unit economics basis")
+	}
+	const statement = `WITH order_cost AS (
+  SELECT order_id, currency, COALESCE(SUM(cogs_minor_units),0) AS cogs
+  FROM unit_economics_cost_snapshots
+  WHERE organization_id=$1 AND workspace_id=$2
+  GROUP BY order_id,currency
+), order_units AS (
+  SELECT order_id, COALESCE(SUM(quantity_coefficient::numeric / power(10::numeric,quantity_scale)),0)::text AS units
+  FROM order_items WHERE organization_id=$1 AND workspace_id=$2 GROUP BY order_id
+), order_rows AS (
+  SELECT COALESCE(CASE WHEN a.assignment_state='resolved' THEN NULLIF(a.channel_ref,'') END,'unattributed') AS channel_ref,
+    o.currency, count(*)::bigint AS orders,
+    COALESCE(SUM(ou.units::numeric),0)::text AS units,
+    COALESCE(SUM(o.subtotal_minor_units),0)::bigint AS gross,
+    COALESCE(SUM(o.discount_minor_units),0)::bigint AS discounts,
+    COALESCE(SUM(CASE WHEN o.status='cancelled' THEN o.grand_minor_units ELSE 0 END),0)::bigint AS cancellations,
+    COALESCE(SUM(oc.cogs),0)::bigint AS cogs
+  FROM orders o
+  LEFT JOIN unit_economics_order_attributions a ON a.organization_id=o.organization_id AND a.workspace_id=o.workspace_id AND a.order_id=o.id
+  LEFT JOIN order_cost oc ON oc.order_id=o.id AND oc.currency=o.currency
+  LEFT JOIN order_units ou ON ou.order_id=o.id
+  WHERE o.organization_id=$1 AND o.workspace_id=$2
+    AND ($3::timestamptz IS NULL OR o.placed_at >= $3) AND ($4::timestamptz IS NULL OR o.placed_at < $4)
+    AND ($5='' OR o.currency=$5)
+    AND ($6='' OR COALESCE(CASE WHEN a.assignment_state='resolved' THEN NULLIF(a.channel_ref,'') END,'unattributed')=$6)
+  GROUP BY 1,2
+), settlement_rows AS (
+  SELECT COALESCE(CASE WHEN a.assignment_state='resolved' THEN NULLIF(a.channel_ref,'') END,'unattributed') AS channel_ref,
+    s.currency,
+    COALESCE(SUM(CASE WHEN s.kind='fee' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS commission,
+    COALESCE(SUM(CASE WHEN s.kind='refund' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS refunds,
+    COALESCE(SUM(CASE WHEN s.kind='logistics' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS logistics,
+    COALESCE(SUM(CASE WHEN s.kind='storage' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS storage,
+    COALESCE(SUM(CASE WHEN s.kind='advertising' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS advertising,
+    COALESCE(SUM(CASE WHEN s.kind='penalty' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS penalties,
+    COALESCE(SUM(CASE WHEN s.kind='compensation' THEN ABS(s.amount_minor) ELSE 0 END),0)::bigint AS compensation,
+    COALESCE(SUM(CASE WHEN s.kind='payout' THEN s.amount_minor ELSE 0 END),0)::bigint AS payout,
+    bool_or(s.disputed) AS disputed
+  FROM settlement_entries s
+  LEFT JOIN unit_economics_order_attributions a ON a.organization_id=s.organization_id AND a.workspace_id=s.workspace_id AND a.order_id=s.order_id
+  WHERE s.organization_id=$1 AND s.workspace_id=$2
+    AND ($3::timestamptz IS NULL OR s.occurred_at >= $3) AND ($4::timestamptz IS NULL OR s.occurred_at < $4)
+    AND ($5='' OR s.currency=$5)
+    AND ($6='' OR COALESCE(CASE WHEN a.assignment_state='resolved' THEN NULLIF(a.channel_ref,'') END,'unattributed')=$6)
+  GROUP BY 1,2
+), merged AS (
+  SELECT COALESCE(o.channel_ref,s.channel_ref) AS channel_ref, COALESCE(o.currency,s.currency) AS currency,
+    COALESCE(o.orders,0)::bigint AS orders, COALESCE(o.units,'0') AS units,
+    COALESCE(o.gross,0)::bigint AS gross, COALESCE(o.discounts,0)::bigint AS discounts,
+    COALESCE(o.cancellations,0)::bigint AS cancellations, COALESCE(s.refunds,0)::bigint AS refunds,
+    COALESCE(o.cogs,0)::bigint AS cogs, COALESCE(s.commission,0)::bigint AS commission,
+    COALESCE(s.logistics,0)::bigint AS logistics, COALESCE(s.storage,0)::bigint AS storage,
+    COALESCE(s.advertising,0)::bigint AS advertising, COALESCE(s.penalties,0)::bigint AS penalties,
+    COALESCE(s.compensation,0)::bigint AS compensation, COALESCE(s.payout,0)::bigint AS payout,
+    COALESCE(s.disputed,false) AS disputed
+  FROM order_rows o FULL OUTER JOIN settlement_rows s ON s.channel_ref=o.channel_ref AND s.currency=o.currency
+)
+SELECT channel_ref,currency,orders,units,
+  (gross-discounts-cancellations-refunds)::bigint AS net_revenue,
+  cogs,commission,0::bigint AS payment_fee,logistics,storage,advertising,refunds,
+  (gross-discounts-cancellations-refunds-cogs-commission-logistics-storage-advertising-penalties+compensation)::bigint AS contribution,
+  CASE WHEN (gross-discounts-cancellations-refunds)>0 THEN ((gross-discounts-cancellations-refunds-cogs-commission-logistics-storage-advertising-penalties+compensation)*10000/(gross-discounts-cancellations-refunds)) ELSE 0 END::bigint AS margin_bps,
+  CASE WHEN disputed THEN 'conflict' WHEN channel_ref='unattributed' THEN 'unmatched' WHEN cogs=0 OR logistics=0 OR storage=0 OR advertising=0 THEN 'partial' ELSE 'complete' END AS quality_status,
+  CASE WHEN disputed THEN 35 WHEN channel_ref='unattributed' THEN 35 WHEN cogs=0 OR logistics=0 OR storage=0 OR advertising=0 THEN 55 ELSE 100 END::bigint AS coverage,
+  payout
+FROM merged ORDER BY quality_status,channel_ref,currency LIMIT $7`
+	rows, err := tx.QueryContext(ctx, statement, org, ws, nullableTime(filter.From), nullableTime(filter.To), filter.Currency, filter.ChannelRef, filter.Limit)
+	if err != nil {
+		return Data{}, fmt.Errorf("report repository: unit economics query: %w", err)
+	}
+	defer rows.Close()
+	data := Data{Columns: []Column{
+		{Key: "channel_ref", Label: "Канал"}, {Key: "currency", Label: "Валюта"}, {Key: "basis", Label: "База"}, {Key: "orders", Label: "Заказы"}, {Key: "units", Label: "Единицы"},
+		{Key: "net_revenue_minor_units", Label: "Чистая выручка"}, {Key: "cogs_minor_units", Label: "Себестоимость"}, {Key: "commission_minor_units", Label: "Комиссия"}, {Key: "payment_fee_minor_units", Label: "Эквайринг"}, {Key: "logistics_minor_units", Label: "Логистика"}, {Key: "storage_minor_units", Label: "Хранение"}, {Key: "advertising_minor_units", Label: "Реклама"}, {Key: "refunds_minor_units", Label: "Возвраты"}, {Key: "contribution_profit_minor_units", Label: "Вклад"}, {Key: "margin_basis_points", Label: "Маржа, б.п."}, {Key: "quality_status", Label: "Качество"}, {Key: "coverage_percent", Label: "Покрытие, %"}, {Key: "payout_minor_units", Label: "Выплата"},
+	}, Rows: make([][]string, 0)}
+	for rows.Next() {
+		var channel, currency, units, quality string
+		var orders, net, cogs, commission, paymentFee, logistics, storage, advertising, refunds, contribution, margin, coverage, payout int64
+		if err := rows.Scan(&channel, &currency, &orders, &units, &net, &cogs, &commission, &paymentFee, &logistics, &storage, &advertising, &refunds, &contribution, &margin, &quality, &coverage, &payout); err != nil {
+			return Data{}, err
+		}
+		data.Rows = append(data.Rows, []string{channel, currency, basis, strconv.FormatInt(orders, 10), units, strconv.FormatInt(net, 10), strconv.FormatInt(cogs, 10), strconv.FormatInt(commission, 10), strconv.FormatInt(paymentFee, 10), strconv.FormatInt(logistics, 10), strconv.FormatInt(storage, 10), strconv.FormatInt(advertising, 10), strconv.FormatInt(refunds, 10), strconv.FormatInt(contribution, 10), strconv.FormatInt(margin, 10), quality, strconv.FormatInt(coverage, 10), strconv.FormatInt(payout, 10)})
+	}
+	return data, rows.Err()
 }
 
 func salesDaily(ctx context.Context, tx *sql.Tx, org, ws string, filter Filter) (Data, error) {

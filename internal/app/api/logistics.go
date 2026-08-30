@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/logistics"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
@@ -24,6 +26,7 @@ const (
 	logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
 	logisticsRatesPath        = "/api/v1/logistics/rates"
 	logisticsTrackingPath     = "/api/v1/logistics/tracking"
+	logisticsShipmentsPath    = "/api/v1/logistics/shipments/"
 )
 
 var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
@@ -35,6 +38,14 @@ type logisticsCapabilityStore interface {
 	AccountCapabilities(context.Context, tenancy.Scope, string) ([]sdk.AccountCapabilitySetting, error)
 }
 
+type logisticsShipmentStore interface {
+	BeginCancel(context.Context, tenancy.Scope, logistics.ShipmentID, string, logistics.Mutation) (logistics.Shipment, bool, error)
+}
+
+type logisticsApprovalStore interface {
+	Request(context.Context, tenancy.Scope, string) (approval.Request, error)
+}
+
 type logisticsRuntime interface {
 	SupportsCapability(string, string) bool
 	PickupPoints(context.Context, sdk.Account, sdk.Runtime, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
@@ -43,9 +54,16 @@ type logisticsRuntime interface {
 }
 
 type logisticsAPI struct {
-	accounts logisticsCapabilityStore
-	secrets  secrets.SecretProvider
-	runtime  logisticsRuntime
+	accounts  logisticsCapabilityStore
+	secrets   secrets.SecretProvider
+	runtime   logisticsRuntime
+	shipments logisticsShipmentStore
+	approvals logisticsApprovalStore
+}
+
+type logisticsRouteDependency struct {
+	shipments logisticsShipmentStore
+	approvals logisticsApprovalStore
 }
 
 type pickupPointView struct {
@@ -93,13 +111,76 @@ type logisticsTrackingView struct {
 	ObservedAt     time.Time `json:"observed_at"`
 }
 
-func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime) []ProtectedRoute {
+func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime, dependencies ...logisticsRouteDependency) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
-	return []ProtectedRoute{
+	if len(dependencies) > 0 {
+		api.shipments = dependencies[0].shipments
+		api.approvals = dependencies[0].approvals
+	}
+	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
 	}
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
+	return routes
+}
+
+func (api logisticsAPI) cancelShipment(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.shipments == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if api.approvals == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	if !validIdempotencyKey(key) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")
+		return
+	}
+	if !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Approval-Request-ID Required")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsShipmentsPath), "/"), "/")
+	if len(parts) != 2 || parts[1] != "cancel" || parts[0] == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	shipmentID, err := logistics.ParseShipmentID(parts[0])
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.shipment.cancel" || requested.ResourceType != "shipment" || requested.ResourceID != shipmentID.String() || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	shipment, fresh, err := api.shipments.BeginCancel(r.Context(), scope, shipmentID, key, logistics.Mutation{EventID: newApprovalID(), AuditID: newApprovalID(), ActorID: principal.Subject, Source: "api.logistics", CorrelationID: key, ApprovalRequestID: approvalID, OccurredAt: time.Now().UTC()})
+	if err != nil {
+		switch {
+		case errors.Is(err, logistics.ErrNotFound):
+			writeProblem(w, http.StatusNotFound, "Not Found")
+		case errors.Is(err, logistics.ErrConflict), errors.Is(err, logistics.ErrInProgress), errors.Is(err, logistics.ErrInvalidState):
+			writeProblem(w, http.StatusConflict, "Conflict")
+		case errors.Is(err, logistics.ErrInvalidRecord), errors.Is(err, logistics.ErrInvalidScope):
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+		default:
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		}
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"id": shipment.ID.String(), "status": string(shipment.Status), "version": shipment.Version, "accepted": true, "fresh": fresh})
 }
 
 func (api logisticsAPI) listPickupPoints(w http.ResponseWriter, r *http.Request) {

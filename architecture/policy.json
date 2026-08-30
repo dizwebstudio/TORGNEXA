@@ -123,6 +123,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/uniteconomics",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/userprofile",
       "kind": "core_domain"
     },

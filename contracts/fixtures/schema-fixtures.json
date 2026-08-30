@@ -1696,6 +1696,11 @@
       }
     },
     {
+      "schema": "events/shipment-changed-v1.schema.json",
+      "valid": {"shipment_id": "shipment-001", "status": "in_transit", "version": 1, "operation": "created"},
+      "invalid": {"shipment_id": "", "status": "broken", "version": 0, "operation": "created"}
+    },
+    {
       "schema": "events/social-channel-account-changed-v1.schema.json",
       "valid": {
         "channel_account_id": "018f0000-0000-7000-8000-000000000003",
@@ -1792,6 +1797,16 @@
         "old_quantity": "10.000",
         "new_quantity": 9
       }
+    },
+    {
+      "schema": "events/unit-economics-snapshot-published-v1.schema.json",
+      "valid": {"run_id": "ue-run-001", "run_key": "run-key-001", "basis": "order_accrual", "row_count": 1, "quality_status": "partial", "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"run_id": "", "run_key": "run-key-001", "basis": "ledger", "row_count": -1, "quality_status": "unknown", "input_digest": "bad"}
+    },
+    {
+      "schema": "events/unit-economics-snapshot-requested-v1.schema.json",
+      "valid": {"run_key": "run-key-001", "basis": "order_accrual", "from": "2026-08-01T00:00:00Z", "to": "2026-08-02T00:00:00Z", "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"run_key": "", "basis": "cashflow", "from": "bad", "to": "bad", "input_digest": "bad"}
     },
     {
       "schema": "events/upload-quarantined-v1.schema.json",

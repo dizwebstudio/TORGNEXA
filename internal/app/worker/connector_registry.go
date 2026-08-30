@@ -206,6 +206,17 @@ func (registry *runtimeRegistry) orderStatusWriter(scope tenancy.Scope, account 
 	return writer, err
 }
 
+func (registry *runtimeRegistry) logisticsCanceler(ctx context.Context, scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsShipmentCanceler, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	canceler, err := registry.builtins.LogisticsCanceler(ctx, account, runtime)
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return canceler, err
+}
+
 func (registry *runtimeRegistry) orderStatus(scope tenancy.Scope, account sdk.Account, status string) (string, bool) {
 	if registry == nil || registry.builtins == nil || !scope.Valid() {
 		return "", false

@@ -161,12 +161,13 @@ func (result RemoteResult) Validate() error {
 // Mutation carries the audit/outbox identity of a local shipment change.
 type Mutation struct {
 	EventID, AuditID, ActorID, Source, CorrelationID, CausationID string
+	ApprovalRequestID                                             string
 	OccurredAt                                                    time.Time
 }
 
 // Validate checks the bounded mutation metadata.
 func (mutation Mutation) Validate() error {
-	if !referencePattern.MatchString(mutation.EventID) || !referencePattern.MatchString(mutation.AuditID) || !referencePattern.MatchString(mutation.ActorID) || !referencePattern.MatchString(mutation.Source) || !referencePattern.MatchString(mutation.CorrelationID) || (mutation.CausationID != "" && !referencePattern.MatchString(mutation.CausationID)) || mutation.OccurredAt.IsZero() || mutation.OccurredAt.Location() != time.UTC {
+	if !referencePattern.MatchString(mutation.EventID) || !referencePattern.MatchString(mutation.AuditID) || !referencePattern.MatchString(mutation.ActorID) || !referencePattern.MatchString(mutation.Source) || !referencePattern.MatchString(mutation.CorrelationID) || (mutation.CausationID != "" && !referencePattern.MatchString(mutation.CausationID)) || (mutation.ApprovalRequestID != "" && !referencePattern.MatchString(mutation.ApprovalRequestID)) || mutation.OccurredAt.IsZero() || mutation.OccurredAt.Location() != time.UTC {
 		return ErrInvalidRecord
 	}
 	return nil
