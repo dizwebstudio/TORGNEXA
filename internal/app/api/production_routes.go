@@ -92,6 +92,7 @@ type productionRouteDependencies struct {
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
 	aiRegistry         *builtinruntime.Registry
+	integrationCenter  integrationCenterReader
 	workflows          *workflowrepo.Repository
 	returns            *returnsrepo.Repository
 	mcpAccounts        *mcpaccountsrepo.Repository
@@ -105,6 +106,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	capabilityGuard := connectorAccountCapabilityGuard{repository: deps.accounts, runtime: deps.aiRegistry}
 	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
+	routes = append(routes, newIntegrationCenterRoutes(deps.integrationCenter)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService, deps.profiles)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)
 	routes = append(routes, newIdentityProviderSettingsRoutes(deps.identityProviders, deps.secretProvider, deps.auditService, deps.identityPolicy, deps.identityValidator)...)

@@ -533,7 +533,7 @@ func deriveActions(input Input, overall OverallStatus, issues []Issue) []Action 
 		case "setup_required":
 			add("configure", "configure", "Настроить", "connectors.accounts.write", "write", "/integrations", false)
 		case "reauthorization_required":
-			add("reauthorize", "reauthorize", "Повторно авторизовать", "connectors.accounts.write", "write_sensitive", false)
+			add("reauthorize", "reauthorize", "Повторно авторизовать", "connectors.accounts.write", "write_sensitive", "/integrations", false)
 		case "health_degraded", "health_stale":
 			add("check", "check", "Проверить подключение", "connectors.accounts.read", "read", "/integrations", false)
 		case "sync_attention", "sync_stale":

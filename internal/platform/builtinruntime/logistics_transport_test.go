@@ -322,6 +322,54 @@ func TestDellinPickupPointsReadCatalogAndBoundResults(t *testing.T) {
 	}
 }
 
+func TestDellinTrackingUsesBoundedStatusHistory(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v3/orders/statuses_history.json" || r.Header.Get("Content-Type") != "application/json" {
+			t.Fatalf("unexpected Деловые Линии tracking request: method=%s path=%s content-type=%q", r.Method, r.URL.Path, r.Header.Get("Content-Type"))
+		}
+		var request struct {
+			AppKey string   `json:"appkey"`
+			DocIDs []string `json:"docIds"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil || request.AppKey != "app-1" || len(request.DocIDs) != 1 || request.DocIDs[0] != "400267443" {
+			t.Fatalf("unexpected Деловые Линии tracking body: %+v", request)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"metadata": map[string]any{"status": 200},
+			"data": map[string]any{"statusHistory": map[string]any{"400267443": []any{
+				map[string]any{"number": "400267443", "state": "waiting", "stateDate": "2026-08-28T03:00:00+03:00"},
+				map[string]any{"number": "400267443", "state": "finished", "stateDate": "2026-08-29T03:00:00+03:00"},
+			}}},
+		})
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Track(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentStatusRequest{RemoteID: "400267443"})
+	if err != nil {
+		t.Fatalf("Деловые Линии tracking request failed: %v", err)
+	}
+	wantObservedAt := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+	if result.RemoteID != "400267443" || result.TrackingNumber != "400267443" || result.Status != "delivered" || !result.ObservedAt.Equal(wantObservedAt) || result.Cost.Currency != "RUB" || result.Cost.MinorUnits != 0 {
+		t.Fatalf("unexpected normalized Деловые Линии tracking result: %+v", result)
+	}
+}
+
+func TestDellinTrackingRejectsMismatchedDocument(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"metadata": map[string]any{"status": 200},
+			"data": map[string]any{"statusHistory": map[string]any{"400267443": []any{
+				map[string]any{"number": "400267444", "state": "inway", "stateDate": "2026-08-28T03:00:00+03:00"},
+			}}},
+		})
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Track(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentStatusRequest{RemoteID: "400267443"}); err == nil {
+		t.Fatal("mismatched Деловые Линии document accepted")
+	}
+}
+
 func TestPekPickupPointsReadBranchDirectoryAndFilterOperations(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/branches/all/" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {

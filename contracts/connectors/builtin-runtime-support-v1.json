@@ -13,7 +13,7 @@
     {"connector_id":"cian","stage":"separate_surface","surface":"classified","operational_capabilities":[],"sync":[],"health_only":true},
     {"connector_id":"claude","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
     {"connector_id":"deepseek","stage":"separate_surface","surface":"ai_providers","operational_capabilities":["ai.completion.generate"],"sync":[]},
-    {"connector_id":"dellin","stage":"separate_surface","surface":"logistics","operational_capabilities":["pickup.points.read"],"sync":[]},
+    {"connector_id":"dellin","stage":"separate_surface","surface":"logistics","operational_capabilities":["logistics.track.read","pickup.points.read"],"sync":[]},
     {"connector_id":"diadoc","stage":"separate_surface","surface":"edo","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {"connector_id":"dolyami","stage":"separate_surface","surface":"finance","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {"connector_id":"egais","stage":"separate_surface","surface":"government","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},

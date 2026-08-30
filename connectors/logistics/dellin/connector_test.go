@@ -39,6 +39,13 @@ func TestPickupPointsUseCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestTrackingUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsTracking(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentStatusRequest{RemoteID: "400267443"})
+	if err != nil || result.RemoteID != "400267443" || result.Status != "in_transit" || result.TrackingNumber != "400267443" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 type rejectingSecrets struct{}
 
 func (rejectingSecrets) UseSecret(context.Context, sdk.SecretReference, func([]byte) error) error {

@@ -405,6 +405,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
 		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository,
+		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()},
 	}
 	routes := newProductionRoutes(routeDeps)
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))

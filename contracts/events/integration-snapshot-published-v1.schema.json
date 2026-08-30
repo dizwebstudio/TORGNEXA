@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/integration-snapshot-published-v1.json",
+  "title": "commerce.integration.snapshot_published.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "snapshot_version", "snapshot_digest", "account_count", "partial", "consistency"],
+  "properties": {
+    "snapshot_id": {"type": "string", "pattern": "^ic:[0-9a-f]{26}$"},
+    "snapshot_version": {"type": "integer", "minimum": 1},
+    "snapshot_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "account_count": {"type": "integer", "minimum": 0, "maximum": 100000},
+    "partial": {"type": "boolean"},
+    "consistency": {"type": "string", "enum": ["atomic", "best_effort"]}
+  }
+}

@@ -13,9 +13,10 @@
 - [Журнал заказов](https://dev.dellin.ru/api/orders/search/) — `v3/orders.json`;
 - [Справочник терминалов](https://dev.dellin.ru/api/terminals/directory/) — `v3/public/terminals.json`.
 
-В текущем runtime включены credential-проверка и bounded read-only чтение
-справочника терминалов/ПВЗ. Чтение использует только официальный host,
-ограничивает размер ответа и не смешивает remote IDs с идентификаторами складов
-Core. Расчёт и запись требуют отдельных обезличенных fixtures, маппинга
-адресов/терминалов и подтверждения повторяемости create/status на одном
-idempotency key.
+В текущем runtime включены credential-проверка, bounded read-only чтение
+справочника терминалов/ПВЗ и единичное `logistics.track.read`. Tracking
+использует официальный `POST /v3/orders/statuses_history.json` с `appkey` и
+одним `docIds`, ограничивает историю 100 событиями, выбирает последнюю дату и
+не переносит сырой ответ или данные клиента в Core. Расчёт и запись требуют
+отдельных обезличенных fixtures, маппинга адресов/терминалов и подтверждения
+повторяемости create/status на одном idempotency key.

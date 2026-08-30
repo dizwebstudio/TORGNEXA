@@ -34,6 +34,14 @@
       "payload_schema": "events/fulfillment-task-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.integration.account_status_changed.v1",
+      "payload_schema": "events/integration-account-status-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.integration.snapshot_published.v1",
+      "payload_schema": "events/integration-snapshot-published-v1.schema.json"
+    },
+    {
       "event_type": "commerce.inventory.position_changed.v1",
       "payload_schema": "events/inventory-position-changed-v1.schema.json"
     },

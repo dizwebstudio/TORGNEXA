@@ -200,6 +200,8 @@ func (r *Registry) LogisticsTracking(ctx context.Context, account sdk.Account, r
 		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
 	case "pochta-russia":
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
 	default:
 		return sdk.ShipmentResult{}, ErrUnavailable
 	}

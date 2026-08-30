@@ -68,7 +68,7 @@ non-production API qualification.
 Task 145 admits the existing CDEK SDK on the Delivery surface with an OAuth
 client-credentials probe and adds the Деловые Линии adapter with appkey/PAT
 session verification. CDEK and ПЭК expose bounded read-only rate previews, and
-CDEK also exposes a bounded tracking read; shipment writes, labels and product
+CDEK and Деловые Линии expose bounded tracking reads; shipment writes, labels and product
 synchronization remain closed until current
 provider fixtures and an idempotent host bridge are qualified. At that point the runtime inventory was
 12 generic integrations, 18 separate-surface providers and 15 planned entries.

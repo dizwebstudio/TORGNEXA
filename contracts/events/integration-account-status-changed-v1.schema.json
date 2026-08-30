@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/integration-account-status-changed-v1.json",
+  "title": "commerce.integration.account_status_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "dimension", "from_status", "to_status", "overall", "reason_code", "snapshot_digest"],
+  "properties": {
+    "account_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "dimension": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+    "from_status": {"type": "string", "minLength": 1, "maxLength": 64},
+    "to_status": {"type": "string", "minLength": 1, "maxLength": 64},
+    "overall": {"type": "string", "enum": ["healthy", "attention", "degraded", "syncing", "blocked", "setup_required", "reauthorization_required", "stale", "disabled", "unsupported", "unknown"]},
+    "reason_code": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,95}$"},
+    "snapshot_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

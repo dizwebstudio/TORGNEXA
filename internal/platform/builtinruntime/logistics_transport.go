@@ -1074,6 +1074,103 @@ type dellinDirectoryResponse struct {
 	URL  string `json:"url"`
 }
 
+type dellinTrackingEvent struct {
+	Number             json.RawMessage `json:"number"`
+	State              string          `json:"state"`
+	StateDate          string          `json:"stateDate"`
+	DetailedStatusDate string          `json:"detailedStatusDate"`
+}
+
+type dellinTrackingResponse struct {
+	Metadata struct {
+		Status int `json:"status"`
+	} `json:"metadata"`
+	Data struct {
+		StatusHistory map[string][]dellinTrackingEvent `json:"statusHistory"`
+	} `json:"data"`
+}
+
+func dellinTrackingStatus(state string) string {
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "finished":
+		return "delivered"
+	case "declined":
+		return "exception"
+	case "draft", "processing", "waiting":
+		return "pending"
+	default:
+		return "in_transit"
+	}
+}
+
+func dellinTrackingTime(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, errors.New("Деловые Линии tracking response has no status date")
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed, nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}, errors.New("Деловые Линии tracking response has invalid status date")
+	}
+	return parsed.UTC(), nil
+}
+
+func (transport dellinHTTP) Track(ctx context.Context, secret []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || remoteID == "" || !safeCodePattern.MatchString(remoteID) {
+		return sdk.ShipmentResult{}, errors.New("Деловые Линии tracking request is unavailable")
+	}
+	credentials, err := readDellinCredentials(secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	body, err := json.Marshal(struct {
+		AppKey string   `json:"appkey"`
+		DocIDs []string `json:"docIds"`
+	}{AppKey: credentials.AppKey, DocIDs: []string{remoteID}})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v3/orders/statuses_history.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("Деловые Линии tracking request rejected with status %d", status)
+	}
+	var response dellinTrackingResponse
+	if json.Unmarshal(responseBody, &response) != nil || (response.Metadata.Status != 0 && response.Metadata.Status != http.StatusOK) {
+		return sdk.ShipmentResult{}, errors.New("Деловые Линии tracking response rejected")
+	}
+	history, ok := response.Data.StatusHistory[remoteID]
+	if !ok || len(history) == 0 || len(history) > 100 {
+		return sdk.ShipmentResult{}, errors.New("Деловые Линии tracking response has no matching history")
+	}
+	var latest time.Time
+	statusCode := "pending"
+	for _, event := range history {
+		if number := cdekScalarText(event.Number); number != "" && number != remoteID {
+			return sdk.ShipmentResult{}, errors.New("Деловые Линии tracking response has mismatched document")
+		}
+		state := strings.TrimSpace(event.State)
+		if state == "" || !safeCodePattern.MatchString(state) {
+			return sdk.ShipmentResult{}, errors.New("Деловые Линии tracking response has invalid state")
+		}
+		observedAt, parseErr := dellinTrackingTime(event.StateDate)
+		if parseErr != nil {
+			return sdk.ShipmentResult{}, parseErr
+		}
+		if latest.IsZero() || observedAt.After(latest) {
+			latest = observedAt
+			statusCode = dellinTrackingStatus(state)
+		}
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: statusCode, Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: latest.UTC()}, nil
+}
+
 func (transport dellinHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
 	if transport.h == nil || query.Validate(500) != nil || query.Country != "RU" {
 		return nil, errors.New("Деловые Линии pickup-point request is unavailable")

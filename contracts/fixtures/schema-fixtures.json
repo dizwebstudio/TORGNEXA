@@ -5111,6 +5111,46 @@
       }
     },
     {
+      "schema": "events/integration-account-status-changed-v1.schema.json",
+      "valid": {
+        "account_id": "account_demo_001",
+        "dimension": "health",
+        "from_status": "degraded",
+        "to_status": "healthy",
+        "overall": "healthy",
+        "reason_code": "health_recovered",
+        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "account_id": "account_demo_001",
+        "dimension": "health",
+        "from_status": "healthy",
+        "to_status": "healthy",
+        "overall": "green",
+        "reason_code": "unsafe text",
+        "snapshot_digest": "bad"
+      }
+    },
+    {
+      "schema": "events/integration-snapshot-published-v1.schema.json",
+      "valid": {
+        "snapshot_id": "ic:aaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot_version": 1,
+        "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_count": 2,
+        "partial": false,
+        "consistency": "best_effort"
+      },
+      "invalid": {
+        "snapshot_id": "snapshot-bad",
+        "snapshot_version": 0,
+        "snapshot_digest": "bad",
+        "account_count": -1,
+        "partial": "no",
+        "consistency": "torn"
+      }
+    },
+    {
       "schema": "workflow/run-v1.schema.json",
       "valid": {
         "id": "run_workflow_001",
