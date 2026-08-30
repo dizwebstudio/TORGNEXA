@@ -245,13 +245,23 @@ func (r *Repository) CreateReturnItem(ctx context.Context, scope core.Scope, ite
 	}
 	var result core.ReturnItem
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO return_items(id,organization_id,workspace_id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,1,$14,$14) ON CONFLICT DO NOTHING`, item.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), item.ReturnID.String(), item.OrderItemID, item.Requested.Coefficient, item.Requested.Scale, item.Received.Coefficient, item.Received.Scale, item.Accepted.Coefficient, item.Accepted.Scale, item.Requested.Unit, item.Disposition, mutation.OccurredAt)
+		inserted, err := tx.ExecContext(ctx, `INSERT INTO return_items(id,organization_id,workspace_id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,1,$14,$14) ON CONFLICT DO NOTHING`, item.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), item.ReturnID.String(), item.OrderItemID, item.Requested.Coefficient, item.Requested.Scale, item.Received.Coefficient, item.Received.Scale, item.Accepted.Coefficient, item.Accepted.Scale, item.Requested.Unit, item.Disposition, mutation.OccurredAt)
 		if err != nil {
 			return err
 		}
 		result, err = scanReturnItem(tx.QueryRowContext(ctx, `SELECT id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at FROM return_items WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), item.ID.String()))
 		if err != nil {
 			return err
+		}
+		rows, rowsErr := inserted.RowsAffected()
+		if rowsErr != nil {
+			return rowsErr
+		}
+		if rows == 0 {
+			if result.ReturnID != item.ReturnID || result.OrderItemID != item.OrderItemID || result.Requested != item.Requested || result.Disposition != item.Disposition {
+				return core.ErrConflict
+			}
+			return nil
 		}
 		return appendAudit(ctx, tx, scope, mutation, "returns.return_item.created", "return_item", item.ID.String(), audit.RiskWriteSensitive, audit.Summary{"return_id": item.ReturnID.String(), "order_item_id": item.OrderItemID, "disposition": string(item.Disposition)})
 	})

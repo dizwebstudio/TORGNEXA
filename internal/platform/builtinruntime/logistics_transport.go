@@ -1,6 +1,7 @@
 package builtinruntime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -212,8 +213,192 @@ func (transport cdekHTTP) Pickup(ctx context.Context, secret []byte, query sdk.P
 	return points, nil
 }
 
-func (cdekHTTP) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error) {
-	return nil, errLogisticsOperationNotAdmitted
+type cdekRateLocation struct {
+	CountryCode string `json:"country_code"`
+	PostalCode  string `json:"postal_code,omitempty"`
+	City        string `json:"city"`
+	Address     string `json:"address"`
+}
+
+type cdekRatePackage struct {
+	Weight int64 `json:"weight"`
+	Length int64 `json:"length"`
+	Width  int64 `json:"width"`
+	Height int64 `json:"height"`
+}
+
+type cdekRateRequest struct {
+	From     cdekRateLocation  `json:"from_location"`
+	To       cdekRateLocation  `json:"to_location"`
+	Packages []cdekRatePackage `json:"packages"`
+}
+
+type cdekTariffQuote struct {
+	TariffCode  json.RawMessage `json:"tariff_code"`
+	TotalSum    json.RawMessage `json:"total_sum"`
+	DeliverySum json.RawMessage `json:"delivery_sum"`
+	Currency    string          `json:"currency"`
+	PeriodMin   int             `json:"period_min"`
+	PeriodMax   int             `json:"period_max"`
+}
+
+type cdekTariffListResponse struct {
+	TariffCodes []cdekTariffQuote `json:"tariff_codes"`
+}
+
+const cdekTariffResponseLimit = 100
+
+func cdekAddress(value sdk.Address) cdekRateLocation {
+	return cdekRateLocation{
+		CountryCode: strings.ToUpper(strings.TrimSpace(value.Country)),
+		PostalCode:  strings.TrimSpace(value.PostalCode),
+		City:        strings.TrimSpace(value.City),
+		Address:     strings.TrimSpace(value.Line1),
+	}
+}
+
+func cdekDimensionMillimeters(value int64) int64 {
+	result := value / 10
+	if value%10 != 0 {
+		result++
+	}
+	return result
+}
+
+func cdekRateAmountText(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "", errors.New("СДЭК tariff response has no amount")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var value any
+	if decoder.Decode(&value) != nil {
+		return "", errors.New("СДЭК tariff amount is invalid")
+	}
+	switch typed := value.(type) {
+	case json.Number:
+		return typed.String(), nil
+	case string:
+		return strings.TrimSpace(typed), nil
+	default:
+		return "", errors.New("СДЭК tariff amount is invalid")
+	}
+}
+
+func cdekMinorUnits(raw json.RawMessage) (int64, error) {
+	text, err := cdekRateAmountText(raw)
+	if err != nil || text == "" || strings.HasPrefix(text, "-") || strings.ContainsAny(text, "eE+") {
+		return 0, errors.New("СДЭК tariff amount must be a non-negative decimal")
+	}
+	parts := strings.Split(text, ".")
+	if len(parts) > 2 {
+		return 0, errors.New("СДЭК tariff amount has invalid precision")
+	}
+	whole := parts[0]
+	if whole == "" {
+		whole = "0"
+	}
+	for _, symbol := range whole {
+		if symbol < '0' || symbol > '9' {
+			return 0, errors.New("СДЭК tariff amount is invalid")
+		}
+	}
+	fraction := ""
+	if len(parts) == 2 {
+		fraction = parts[1]
+		if len(fraction) > 2 {
+			return 0, errors.New("СДЭК tariff amount has more than two fractional digits")
+		}
+		for _, symbol := range fraction {
+			if symbol < '0' || symbol > '9' {
+				return 0, errors.New("СДЭК tariff amount is invalid")
+			}
+		}
+	}
+	for len(fraction) < 2 {
+		fraction += "0"
+	}
+	fractionUnits, err := strconv.ParseInt(fraction, 10, 64)
+	if err != nil {
+		return 0, errors.New("СДЭК tariff amount is invalid")
+	}
+	wholeUnits, err := strconv.ParseInt(whole, 10, 64)
+	if err != nil || wholeUnits > (int64(1<<63-1)-fractionUnits)/100 {
+		return 0, errors.New("СДЭК tariff amount is out of range")
+	}
+	minor := wholeUnits*100 + fractionUnits
+	if minor < 0 {
+		return 0, errors.New("СДЭК tariff amount is out of range")
+	}
+	return minor, nil
+}
+
+func (transport cdekHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return nil, errors.New("СДЭК tariff request is unavailable")
+	}
+	token, err := transport.accessToken(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	packages := make([]cdekRatePackage, 0, len(request.Parcels))
+	for _, parcel := range request.Parcels {
+		packages = append(packages, cdekRatePackage{Weight: parcel.WeightGrams, Length: cdekDimensionMillimeters(parcel.LengthMM), Width: cdekDimensionMillimeters(parcel.WidthMM), Height: cdekDimensionMillimeters(parcel.HeightMM)})
+	}
+	body, err := json.Marshal(cdekRateRequest{From: cdekAddress(request.From), To: cdekAddress(request.To), Packages: packages})
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.cdek.ru", "/v2/calculator/tarifflist", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("СДЭК tariff request rejected with status %d", status)
+	}
+	var response cdekTariffListResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.TariffCodes) > cdekTariffResponseLimit {
+		return nil, errors.New("СДЭК tariff response rejected")
+	}
+	now := time.Now().UTC()
+	quotes := make([]sdk.RateQuote, 0, len(response.TariffCodes))
+	seen := make(map[string]struct{}, len(response.TariffCodes))
+	for _, tariff := range response.TariffCodes {
+		remoteCode := cdekScalarText(tariff.TariffCode)
+		if remoteCode == "" {
+			return nil, errors.New("СДЭК tariff response has no identifier")
+		}
+		serviceCode := "cdek_tariff_" + remoteCode
+		if !safeCodePattern.MatchString(serviceCode) {
+			return nil, errors.New("СДЭК tariff response has an invalid identifier")
+		}
+		if _, duplicate := seen[serviceCode]; duplicate {
+			return nil, errors.New("СДЭК tariff response has duplicate identifiers")
+		}
+		seen[serviceCode] = struct{}{}
+		amount := tariff.TotalSum
+		if len(bytes.TrimSpace(amount)) == 0 || bytes.Equal(bytes.TrimSpace(amount), []byte("null")) {
+			amount = tariff.DeliverySum
+		}
+		minorUnits, err := cdekMinorUnits(amount)
+		if err != nil {
+			return nil, err
+		}
+		currency := strings.ToUpper(strings.TrimSpace(tariff.Currency))
+		if len(currency) != 3 {
+			return nil, errors.New("СДЭК tariff response has invalid currency")
+		}
+		for _, symbol := range currency {
+			if symbol < 'A' || symbol > 'Z' {
+				return nil, errors.New("СДЭК tariff response has invalid currency")
+			}
+		}
+		if tariff.PeriodMin < 0 || tariff.PeriodMax < tariff.PeriodMin || tariff.PeriodMax > 3660 {
+			return nil, errors.New("СДЭК tariff response has invalid delivery period")
+		}
+		quotes = append(quotes, sdk.RateQuote{ServiceCode: serviceCode, Cost: sdk.LogisticsMoney{MinorUnits: minorUnits, Currency: currency}, MinDeliveryAt: now.Add(time.Duration(tariff.PeriodMin) * 24 * time.Hour), MaxDeliveryAt: now.Add(time.Duration(tariff.PeriodMax) * 24 * time.Hour), ObservedAt: now})
+	}
+	return quotes, nil
 }
 func (cdekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
@@ -602,6 +787,8 @@ type pochtarussiaOffice struct {
 	TypeCode          string          `json:"type-code"`
 }
 
+const pochtarussiaPickupLimit = 50
+
 func readPochtaRussiaCredentials(secret []byte) (pochtarussiaCredentials, error) {
 	var credentials pochtarussiaCredentials
 	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.Token) == "" || strings.TrimSpace(credentials.Key) == "" {
@@ -676,9 +863,13 @@ func (transport pochtarussiaHTTP) Pickup(ctx context.Context, secret []byte, que
 		return nil, err
 	}
 	headers := pochtarussiaHeaders(credentials)
+	providerLimit := query.Limit
+	if providerLimit > pochtarussiaPickupLimit {
+		providerLimit = pochtarussiaPickupLimit
+	}
 	status, response, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/postoffice/1.0/by-address", url.Values{
 		"address": []string{strings.TrimSpace(query.City)},
-		"top":     []string{strconv.Itoa(query.Limit)},
+		"top":     []string{strconv.Itoa(providerLimit)},
 	}, nil, headers, nil, nil)
 	if err != nil {
 		return nil, err
@@ -687,7 +878,7 @@ func (transport pochtarussiaHTTP) Pickup(ctx context.Context, secret []byte, que
 		return nil, fmt.Errorf("Почта России pickup search rejected with status %d", status)
 	}
 	var search pochtarussiaOfficeSearch
-	if json.Unmarshal(response, &search) != nil || len(search.Postoffices) > query.Limit || len(search.Postoffices) > 500 {
+	if json.Unmarshal(response, &search) != nil || len(search.Postoffices) > providerLimit || len(search.Postoffices) > pochtarussiaPickupLimit {
 		return nil, errors.New("Почта России pickup search response rejected")
 	}
 	points := make([]sdk.PickupPoint, 0, len(search.Postoffices))

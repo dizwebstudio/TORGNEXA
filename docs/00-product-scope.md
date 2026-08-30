@@ -17,6 +17,9 @@ TORGNEXA is an open-source/self-hosted, API-first commerce and distribution oper
 - REST, signed webhooks, n8n node/triggers, MCP/OpenClaw;
 - bounded workflow automations with event/schedule triggers, typed conditions,
   notifications, reconciliation, dry-run and approval actions;
+- separate cancellation, physical-return, inspection and refund-allocation
+  lifecycles with partial line quantities, shipping/tax components and
+  reconciliation-safe unknown outcomes (see `docs/56-returns-cancellations-refunds.md`);
 - legal-entity/counterparty master data, privacy/data governance, approvals, audit/lineage, secrets, upload security, enterprise IAM/SIEM, Cloud billing, SMS, security-edge, conformance, SRE and upgrade controls.
 
 ## Non-goals for Core

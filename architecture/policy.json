@@ -427,15 +427,15 @@
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/returnsrepo",
-      "kind": "infrastructure_adapter"
-    },
-    {
       "path": "internal/platform/postgres/reportrepo",
       "kind": "infrastructure_adapter"
     },
     {
       "path": "internal/platform/postgres/retentionrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/returnsrepo",
       "kind": "infrastructure_adapter"
     },
     {

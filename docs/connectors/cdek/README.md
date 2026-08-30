@@ -11,9 +11,15 @@ Host transport также умеет bounded read-only запрос списка
 `pickup.points.read`; provider-specific идентификаторы не становятся
 идентификаторами складов Core.
 
-SDK-кандидат по-прежнему покрывает rates, shipment lifecycle, tracking,
-cancellation, labels, pickup points и return flow, но тарифы и операции с
-отправлениями остаются закрытыми до квалификации актуальных контрактов и
-идемпотентного маппинга.
+Также доступен bounded read-only предпросмотр тарифов через
+`POST /api/v1/logistics/rates` при явно включённом `logistics.rates.read`.
+Запрос ограничен 50 местами, ответ — 100 вариантами; стоимость переводится
+из десятичного значения провайдера в целые копейки без `float64`. В ответе
+используется нейтральный `option_id`, а тарифные коды СДЭК не выходят из
+адаптера.
+
+Создание отправлений, tracking, cancellation, labels и returns остаются
+закрытыми до квалификации актуальных контрактов, идемпотентного маппинга и
+непродакшен-проверки.
 
 Official documentation: https://apidoc.cdek.ru/

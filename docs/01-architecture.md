@@ -20,6 +20,16 @@ payloads, secrets and arbitrary code are never part of a workflow definition or
 run state. See `adr/0116-workflow-automation-builder.md` and
 `docs/55-workflow-automation.md`.
 
+Returns and cancellations are separate tenant-scoped aggregates rather than
+an overloaded order/payment status. PostgreSQL owns request state, line
+allocations, inspection evidence and optimistic versions; state changes and
+refund allocations publish through Transactional Outbox. The existing payment
+refund aggregate remains the sole payment mutation path and represents
+ambiguous remote outcomes as `unknown`/`manual_attention`. Inventory, fiscal,
+settlement and carrier side effects remain capability/policy/approval-gated
+runtime work. See `adr/0117-returns-cancellations-refunds.md` and
+`docs/56-returns-cancellations-refunds.md`.
+
 Cross-cutting: tenancy, Enterprise IAM federation/provisioning, RBAC/ABAC, approval workflow, privacy/data governance, audit/lineage/SIEM export, secrets, notification center, Cloud billing/entitlements, search, schema registry, connector conformance, plugin isolation/governance, security edge, SLO/observability, backup/DR and upgrade migrations.
 
 ## Extension rule

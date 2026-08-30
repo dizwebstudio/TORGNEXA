@@ -16,4 +16,6 @@
 bounded read-only `pickup.points.read`: поиск выполняется через официальный
 `GET /postoffice/1.0/by-address`, а данные отделения — через
 `GET /postoffice/1.0/{postal-code}`. Тарифы, отправления, возвраты, этикетки и
-трекинг остаются fail-closed до qualification.
+трекинг остаются fail-closed до qualification. Для защиты от fan-out общий
+запрос принимает SDK-лимит до 500, но один вызов к Почте России ограничен 50
+ОПС.

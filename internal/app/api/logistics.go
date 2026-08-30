@@ -2,7 +2,11 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,7 +18,10 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
 
-const logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
+const (
+	logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
+	logisticsRatesPath        = "/api/v1/logistics/rates"
+)
 
 // logisticsCapabilityStore is kept separate from the concrete PostgreSQL
 // repository so the operation remains testable without a database.
@@ -26,6 +33,7 @@ type logisticsCapabilityStore interface {
 type logisticsRuntime interface {
 	SupportsCapability(string, string) bool
 	PickupPoints(context.Context, sdk.Account, sdk.Runtime, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
+	LogisticsRates(context.Context, sdk.Account, sdk.Runtime, sdk.RateRequest) ([]sdk.RateQuote, error)
 }
 
 type logisticsAPI struct {
@@ -43,9 +51,41 @@ type pickupPointView struct {
 	Active   bool   `json:"active"`
 }
 
+type logisticsAddressInput struct {
+	Country    string `json:"country"`
+	PostalCode string `json:"postal_code"`
+	City       string `json:"city"`
+	Line1      string `json:"line1"`
+}
+
+type logisticsParcelInput struct {
+	WeightGrams int64 `json:"weight_grams"`
+	LengthMM    int64 `json:"length_mm"`
+	WidthMM     int64 `json:"width_mm"`
+	HeightMM    int64 `json:"height_mm"`
+}
+
+type logisticsRatesInput struct {
+	ConnectorAccountID string                 `json:"connector_account_id"`
+	From               logisticsAddressInput  `json:"from"`
+	To                 logisticsAddressInput  `json:"to"`
+	Parcels            []logisticsParcelInput `json:"parcels"`
+}
+
+type logisticsRateView struct {
+	OptionID      string    `json:"option_id"`
+	Cost          moneyView `json:"cost"`
+	MinDeliveryAt time.Time `json:"min_delivery_at"`
+	MaxDeliveryAt time.Time `json:"max_delivery_at"`
+	ObservedAt    time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
-	return []ProtectedRoute{{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)}}
+	return []ProtectedRoute{
+		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
+		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
+	}
 }
 
 func (api logisticsAPI) listPickupPoints(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +141,88 @@ func (api logisticsAPI) listPickupPoints(w http.ResponseWriter, r *http.Request)
 		views = append(views, pickupPointView{RemoteID: point.RemoteID, Name: point.Name, Country: point.Country, City: point.City, Address: point.Address, Active: point.Active})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (api logisticsAPI) calculateRates(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	var input logisticsRatesInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	request := input.toSDK()
+	accountID := strings.TrimSpace(input.ConnectorAccountID)
+	if accountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.rates.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Rate operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Rate capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	quotes, err := api.runtime.LogisticsRates(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	views := make([]logisticsRateView, 0, len(quotes))
+	for _, quote := range quotes {
+		if quote.Validate() != nil {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		views = append(views, logisticsRateView{
+			OptionID:      logisticsRateOptionID(account.ID, quote.ServiceCode),
+			Cost:          moneyView{MinorUnits: quote.Cost.MinorUnits, Currency: quote.Cost.Currency},
+			MinDeliveryAt: quote.MinDeliveryAt,
+			MaxDeliveryAt: quote.MaxDeliveryAt,
+			ObservedAt:    quote.ObservedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (input logisticsRatesInput) toSDK() sdk.RateRequest {
+	address := func(value logisticsAddressInput) sdk.Address {
+		return sdk.Address{Country: strings.ToUpper(strings.TrimSpace(value.Country)), PostalCode: strings.TrimSpace(value.PostalCode), City: strings.TrimSpace(value.City), Line1: strings.TrimSpace(value.Line1)}
+	}
+	parcels := make([]sdk.Parcel, 0, len(input.Parcels))
+	for _, parcel := range input.Parcels {
+		parcels = append(parcels, sdk.Parcel{WeightGrams: parcel.WeightGrams, LengthMM: parcel.LengthMM, WidthMM: parcel.WidthMM, HeightMM: parcel.HeightMM})
+	}
+	return sdk.RateRequest{From: address(input.From), To: address(input.To), Parcels: parcels}
+}
+
+func logisticsRateOptionID(accountID, serviceCode string) string {
+	digest := sha256.Sum256([]byte(accountID + "\x00" + serviceCode))
+	return "option-" + hex.EncodeToString(digest[:12])
 }
 
 // supportsLogisticsCapability keeps the route capability-driven without

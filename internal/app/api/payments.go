@@ -384,11 +384,21 @@ func (api paymentsAPI) dispatchRefund(ctx context.Context, tenantScope tenancy.S
 		RemotePaymentID: payment.RemoteID, ExternalID: refund.ExternalID, IdempotencyKey: refund.ExternalID, Amount: sdk.PaymentAmount{MinorUnits: refund.Amount.MinorUnits(), Currency: string(refund.Amount.Currency())},
 	})
 	if refundErr != nil {
+		var remoteErr *sdk.RemoteError
+		if errors.As(refundErr, &remoteErr) && (remoteErr.Category == sdk.ErrorTimeout || remoteErr.Category == sdk.ErrorTransient || remoteErr.Category == sdk.ErrorUnavailable) {
+			// The request may have reached the provider. Preserve the refund as
+			// unknown so reconciliation can query it instead of issuing a second
+			// charge/refund on a blind retry.
+			return api.repository.ChangeRefundStatus(ctx, scope, payments.ChangeRefundStatus{ID: refund.ID, ExpectedVersion: refund.Version, Status: payments.RefundUnknown}, paymentsMutation(actor, correlation))
+		}
 		return refund, refundErr
 	}
 	status := payments.RefundAccepted
-	if result.Status == "succeeded" {
+	if result.Status == "succeeded" && result.RemoteRefundID != "" {
 		status = payments.RefundSucceeded
+	}
+	if result.RemoteRefundID == "" {
+		status = payments.RefundUnknown
 	}
 	return api.repository.ChangeRefundStatus(ctx, scope, payments.ChangeRefundStatus{ID: refund.ID, ExpectedVersion: refund.Version, Status: status, RemoteRefundID: result.RemoteRefundID}, paymentsMutation(actor, correlation))
 }

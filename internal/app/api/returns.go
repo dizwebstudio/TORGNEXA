@@ -326,6 +326,36 @@ func (a returnsAPI) returnRoute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusAccepted, map[string]any{"id": inspection.ID.String(), "return_id": id.String(), "status": "recorded"})
 		return
 	}
+	if r.Method == http.MethodPost && len(parts) == 2 && parts[1] == "items" {
+		var input struct {
+			ID             string `json:"id"`
+			OrderItemID    string `json:"order_item_id"`
+			Unit           string `json:"unit"`
+			RequestedCoeff int64  `json:"requested_coefficient"`
+			RequestedScale uint8  `json:"requested_scale"`
+			Disposition    string `json:"disposition"`
+		}
+		key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+		if !validIdempotencyKey(key) || decodeStrictJSON(r, &input) != nil || input.ID == "" || input.OrderItemID == "" || input.RequestedCoeff <= 0 {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		itemID, idErr := core.ParseReturnItemID(input.ID)
+		requested, qtyErr := core.NewQuantity(input.RequestedCoeff, input.RequestedScale, strings.TrimSpace(input.Unit))
+		zero, zeroErr := core.NewQuantity(0, 0, requested.Unit)
+		if idErr != nil || qtyErr != nil || zeroErr != nil {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		item := core.ReturnItem{ID: itemID, ReturnID: id, OrderItemID: strings.TrimSpace(input.OrderItemID), Requested: requested, Received: zero, Accepted: zero, Disposition: core.Disposition(input.Disposition), Version: 1, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		result, itemErr := a.repository.CreateReturnItem(r.Context(), scopeToReturns(scope), item, returnsMutation(principal.Subject, key))
+		if itemErr != nil {
+			writeReturnsError(w, itemErr)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, returnItemResponse(result))
+		return
+	}
 	writeProblem(w, http.StatusNotFound, "Not Found")
 }
 

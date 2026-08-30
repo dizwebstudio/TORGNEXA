@@ -67,6 +67,21 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /logistics/rates:
+    post:
+      operationId: calculateLogisticsRates
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsRateRequest'}
+      responses:
+        '200': {description: Bounded neutral delivery-rate preview, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsRatePage'}}}}
+        '400': {description: Invalid rate request}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
   /order-cancellations:
     post:
       operationId: createOrderCancellation
@@ -145,6 +160,17 @@ paths:
       responses:
         '202': {description: Inspection evidence recorded}
         '409': {description: Return inspection conflict}
+  /returns/{return_id}/items:
+    post:
+      operationId: createReturnItem
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnItemCreate'}}}}
+      responses:
+        '202': {description: Return line accepted, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnItem'}}}}
+        '409': {description: Return line or idempotency conflict}
   /refund-allocations:
     post:
       operationId: createRefundAllocation
@@ -871,6 +897,102 @@ paths:
       responses:
         '200': {description: Durable fulfillment allocation including replacement/incident lineage}
         '404': {description: Allocation not found}
+  /warehouse-tasks:
+    get:
+      operationId: listWarehouseTasks
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: state, in: query, required: false, schema: {type: string, enum: [pending, in_progress, completed, cancelled, exception]}}
+        - {name: task_type, in: query, required: false, schema: {type: string, enum: [receiving, put_away, pick, pack, cycle_count, transfer, return_receiving]}}
+        - {name: warehouse_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {description: Tenant-scoped WMS operator queue, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskPage'}}}}
+        '400': {description: Invalid task filter or cursor}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks wms.read}
+    
+  /warehouse-tasks/from-order:
+    post:
+      operationId: createWarehouseTasksFromOrder
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTasksFromOrderWrite'}}}}
+      responses:
+        '201': {description: Order items reserved and converted into durable pick tasks, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskPage'}}}}
+        '400': {description: Invalid order, inactive warehouse or insufficient ATP}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks wms.write}
+        '409': {description: Idempotency or allocation conflict}
+  /warehouse-tasks/{task_id}:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: getWarehouseTask
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: One tenant-scoped WMS task, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks wms.read}
+        '404': {description: Task not found}
+  /warehouse-tasks/{task_id}/claim:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: claimWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskCommand'}}}}
+      responses: {'200': {description: Task claimed by the authenticated operator, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version or assignment conflict}}
+  /warehouse-tasks/{task_id}/start:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: startWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskCommand'}}}}
+      responses: {'200': {description: Task started, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version or lifecycle conflict}}
+  /warehouse-tasks/{task_id}/scan:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: scanWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskScan'}}}}
+      responses: {'200': {description: Exact scan applied and task progress advanced, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version, assignment or lifecycle conflict}}
+  /warehouse-tasks/{task_id}/complete:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: completeWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskCommand'}}}}
+      responses: {'200': {description: Task completed after all quantity was scanned, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version or lifecycle conflict}}
+  /warehouse-tasks/{task_id}/exception:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: exceptionWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskCommand'}}}}
+      responses: {'200': {description: Task moved to manual exception handling, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version or lifecycle conflict}}
+  /warehouse-tasks/{task_id}/cancel:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: cancelWarehouseTask
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskCommand'}}}}
+      responses: {'200': {description: Task cancelled with retained history, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTask'}}}}, '409': {description: Version or lifecycle conflict}}
+  /warehouse-tasks/{task_id}/history:
+    parameters: [{name: task_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: listWarehouseTaskHistory
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Immutable bounded WMS task history, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskHistoryPage'}}}}
+        '401': {description: Authenticated tenant scope missing}
+        '403': {description: Caller lacks wms.read}
+        '404': {description: Task not found}
   /inventory/import:
     post:
       operationId: importInventory
@@ -2340,6 +2462,49 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/LogisticsPickupPoint'}}
+    LogisticsAddress:
+      type: object
+      additionalProperties: false
+      required: [country, city, line1]
+      properties:
+        country: {type: string, pattern: '^[A-Z]{2}$'}
+        postal_code: {type: string, maxLength: 32}
+        city: {type: string, minLength: 1, maxLength: 200}
+        line1: {type: string, minLength: 1, maxLength: 500}
+    LogisticsParcel:
+      type: object
+      additionalProperties: false
+      required: [weight_grams, length_mm, width_mm, height_mm]
+      properties:
+        weight_grams: {type: integer, minimum: 1}
+        length_mm: {type: integer, minimum: 1}
+        width_mm: {type: integer, minimum: 1}
+        height_mm: {type: integer, minimum: 1}
+    LogisticsRateRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, from, to, parcels]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        from: {$ref: '#/components/schemas/LogisticsAddress'}
+        to: {$ref: '#/components/schemas/LogisticsAddress'}
+        parcels: {type: array, minItems: 1, maxItems: 50, items: {$ref: '#/components/schemas/LogisticsParcel'}}
+    LogisticsRateQuote:
+      type: object
+      additionalProperties: false
+      required: [option_id, cost, min_delivery_at, max_delivery_at, observed_at]
+      properties:
+        option_id: {type: string, pattern: '^option-[0-9a-f]{24}$'}
+        cost: {$ref: '#/components/schemas/Money'}
+        min_delivery_at: {type: string, format: date-time}
+        max_delivery_at: {type: string, format: date-time}
+        observed_at: {type: string, format: date-time}
+    LogisticsRatePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsRateQuote'}}
     Quantity:
       type: object
       additionalProperties: false
@@ -2441,6 +2606,17 @@ components:
       properties:
         status: {type: string, enum: [requested, approved, authorized, in_transit, received, inspecting, accepted, partially_accepted, rejected, closed, cancelled, expired]}
         version: {type: integer, minimum: 1}
+    ReturnItemCreate:
+      type: object
+      additionalProperties: false
+      required: [id, order_item_id, unit, requested_coefficient, requested_scale, disposition]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        order_item_id: {type: string, minLength: 1, maxLength: 192}
+        unit: {type: string, pattern: '^[A-Z0-9_.-]{1,16}$'}
+        requested_coefficient: {type: integer, minimum: 1}
+        requested_scale: {type: integer, minimum: 0, maximum: 9}
+        disposition: {type: string, enum: [restock, quarantine, scrap, replace]}
     ReturnInspectionCreate:
       type: object
       additionalProperties: false
@@ -2568,6 +2744,91 @@ components:
       properties:
         order_item_id: {type: string, pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'}
         warehouse_id: {type: string, pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'}
+    WarehouseTaskQuantity:
+      type: object
+      additionalProperties: false
+      required: [value, unit]
+      properties:
+        value: {type: string, pattern: '^(0|[1-9][0-9]*)([.][0-9]{1,9})?$'}
+        unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+    WarehouseTask:
+      type: object
+      additionalProperties: false
+      required: [id, task_type, state, warehouse_id, sku, expected_quantity, processed_quantity, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        task_type: {type: string, enum: [receiving, put_away, pick, pack, cycle_count, transfer, return_receiving]}
+        state: {type: string, enum: [pending, in_progress, completed, cancelled, exception]}
+        warehouse_id: {$ref: '#/components/schemas/SortableID'}
+        sku: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        order_item_id: {$ref: '#/components/schemas/SortableID'}
+        fulfillment_allocation_id: {$ref: '#/components/schemas/SortableID'}
+        source_location_code: {type: string, maxLength: 128}
+        target_location_code: {type: string, maxLength: 128}
+        expected_quantity: {$ref: '#/components/schemas/WarehouseTaskQuantity'}
+        processed_quantity: {$ref: '#/components/schemas/WarehouseTaskQuantity'}
+        assigned_to: {type: string, maxLength: 191}
+        exception_code: {type: string, maxLength: 64}
+        cancel_reason: {type: string, maxLength: 64}
+        version: {type: integer, minimum: 1}
+        claimed_at: {type: string, format: date-time, pattern: Z$}
+        started_at: {type: string, format: date-time, pattern: Z$}
+        completed_at: {type: string, format: date-time, pattern: Z$}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseTaskPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WarehouseTask'}}
+        next_cursor: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]*$'}
+    WarehouseTasksFromOrderWrite:
+      type: object
+      additionalProperties: false
+      required: [order_id, warehouse_id]
+      properties:
+        order_id: {$ref: '#/components/schemas/SortableID'}
+        warehouse_id: {$ref: '#/components/schemas/SortableID'}
+    WarehouseTaskCommand:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+    WarehouseTaskScan:
+      type: object
+      additionalProperties: false
+      required: [version, barcode, location_code, quantity]
+      properties:
+        version: {type: integer, minimum: 1}
+        barcode: {type: string, minLength: 1, maxLength: 256}
+        location_code: {type: string, maxLength: 128}
+        quantity: {type: string, pattern: '^(0|[1-9][0-9]*)([.][0-9]{1,9})?$'}
+    WarehouseTaskHistoryPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, task_id, kind, quantity, actor_id, occurred_at]
+            properties:
+              id: {$ref: '#/components/schemas/SortableID'}
+              task_id: {$ref: '#/components/schemas/SortableID'}
+              kind: {type: string, enum: [created, claimed, started, scan_applied, completed, exception, cancelled]}
+              barcode_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+              location_code: {type: string, maxLength: 128}
+              quantity: {$ref: '#/components/schemas/WarehouseTaskQuantity'}
+              reason_code: {type: string, maxLength: 64}
+              actor_id: {type: string, minLength: 1, maxLength: 191}
+              occurred_at: {type: string, format: date-time, pattern: Z$}
     InventoryAdjustmentWrite:
       type: object
       required: [quantity, reason, version]

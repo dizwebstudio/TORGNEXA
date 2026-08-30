@@ -142,6 +142,21 @@ func (r *Registry) PickupPoints(ctx context.Context, account sdk.Account, runtim
 	}
 }
 
+// LogisticsRates calculates bounded provider rates through the reviewed
+// logistics composition. Provider service identifiers remain inside the
+// adapter; the application exposes only its neutral rate preview.
+func (r *Registry) LogisticsRates(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.rates.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 type Registry struct {
 	http    *httpTransport
 	localAI *localAIHTTP

@@ -9,7 +9,11 @@ Production networking is host-injected through a typed transport; provider code 
 
 The pickup-point operation is available through the protected
 `GET /api/v1/logistics/pickup-points` route only when the account explicitly
-enables `pickup.points.read`. Shipment writes, rates, labels, tracking,
-returns and webhooks remain qualification-gated.
+enables `pickup.points.read`. A bounded rate preview is available through
+`POST /api/v1/logistics/rates` when `logistics.rates.read` is enabled. It
+accepts up to 50 parcels and returns up to 100 neutral options. Money is
+parsed as fixed decimal provider text into minor units; provider tariff ids
+are not returned by the application route. Shipment writes, labels,
+tracking, returns and webhooks remain qualification-gated.
 
 Official documentation: https://apidoc.cdek.ru/

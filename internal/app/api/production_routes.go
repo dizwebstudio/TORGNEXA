@@ -111,6 +111,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newOrderStatusRoutes(deps.orders)...)
 	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
+	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)

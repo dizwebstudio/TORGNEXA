@@ -30,6 +30,7 @@ func (stub logisticsAccountStub) AccountCapabilities(context.Context, tenancy.Sc
 type logisticsRuntimeStub struct {
 	supported bool
 	points    []sdk.PickupPoint
+	rates     []sdk.RateQuote
 }
 
 func (stub logisticsRuntimeStub) SupportsCapability(string, string) bool { return stub.supported }
@@ -39,6 +40,13 @@ func (stub logisticsRuntimeStub) PickupPoints(_ context.Context, _ sdk.Account, 
 		return nil, errors.New("runtime or query missing")
 	}
 	return stub.points, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsRates(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if runtime == nil || query.Validate() != nil {
+		return nil, errors.New("runtime or request missing")
+	}
+	return stub.rates, nil
 }
 
 type logisticsSecretsStub struct{}
@@ -90,6 +98,49 @@ func TestLogisticsPickupPointsRouteFailsClosedWithoutCapability(t *testing.T) {
 	account := logisticsTestAccount(t)
 	route := newLogisticsRoutes(logisticsAccountStub{account: account}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: false})[0]
 	request := logisticsRequest(t, scope, logisticsPickupPointsPath+"?connector_account_id=cdek-account&country=RU&city=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsRatesRouteReturnsNeutralPreviewOptions(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.rates.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, rates: []sdk.RateQuote{{ServiceCode: "cdek_tariff_136", Cost: sdk.LogisticsMoney{MinorUnits: 12345, Currency: "RUB"}, MinDeliveryAt: now.Add(24 * time.Hour), MaxDeliveryAt: now.Add(48 * time.Hour), ObservedAt: now}}})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsRatesPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("rates route not registered")
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","from":{"country":"RU","postal_code":"101000","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","postal_code":"190000","city":"Санкт-Петербург","line1":"Невский, 1"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}]}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsRatesPath, body).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"option_id":"option-`) || strings.Contains(response.Body.String(), "cdek_tariff_136") || !strings.Contains(response.Body.String(), `"minor_units":12345`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsRatesRouteFailsClosedWithoutEnabledCapability(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsRatesPath {
+			route = candidate
+		}
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","from":{"country":"RU","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","city":"Москва","line1":"Тверская, 2"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}]}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsRatesPath, body).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusConflict {

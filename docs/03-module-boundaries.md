@@ -1,7 +1,7 @@
 # Module Boundaries
 
 ## Core domains
-Tenancy/identity, legal-party/counterparty, catalog/PIM, product compliance, offers/pricing/FX, inventory, orders/returns, fulfillment, content/campaigns, procurement, WMS, customer service/claims, settlement ledger, Cloud billing, reporting, workflow/approval, audit/lineage, privacy metadata.
+Tenancy/identity, legal-party/counterparty, catalog/PIM, product compliance, offers/pricing/FX, inventory, orders, cancellations/returns/refund allocations, fulfillment, content/campaigns, procurement, WMS, customer service/claims, settlement ledger, Cloud billing, reporting, workflow/approval, audit/lineage, privacy metadata.
 
 ## Integration domains
 Connector runtime, sync/reconciliation, import/export/upload security, ERP, compliance/government/EGAIS, EDO/signing, payments/reference acquiring, logistics/PUDO/reference carrier, social, SMS notifications, durable webhooks.

@@ -93,8 +93,15 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
-			if len(carrier.OperationalCapabilities) != 1 || !SupportsCapability(connectorID, "pickup.points.read") {
+			wantCapabilities := 1
+			if connectorID == "cdek" {
+				wantCapabilities = 2
+			}
+			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.rates.read") {
+				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
 			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)

@@ -89,6 +89,62 @@ func TestCDEKPickupPointsRejectIncompleteResponse(t *testing.T) {
 	}
 }
 
+func TestCDEKRatesUseBoundedTariffListAndExactMoney(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "rate-token"})
+		case "/v2/calculator/tarifflist":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer rate-token" || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected CDEK tariff request: method=%s authorization=%q content-type=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Content-Type"))
+			}
+			var request cdekRateRequest
+			if json.NewDecoder(r.Body).Decode(&request) != nil || request.From.CountryCode != "RU" || request.From.PostalCode != "101000" || request.From.City != "Москва" || request.To.City != "Санкт-Петербург" || len(request.Packages) != 1 || request.Packages[0].Length != 11 || request.Packages[0].Width != 10 || request.Packages[0].Height != 10 {
+				t.Fatalf("unexpected CDEK tariff body: %+v", request)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"tariff_codes": []any{
+				map[string]any{"tariff_code": 136, "total_sum": "123.45", "currency": "RUB", "period_min": 1, "period_max": 2},
+				map[string]any{"tariff_code": "137", "delivery_sum": 9.5, "currency": "RUB", "period_min": 0, "period_max": 1},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 101, WidthMM: 100, HeightMM: 100}},
+	}
+	quotes, err := transport.Rates(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), request)
+	if err != nil {
+		t.Fatalf("CDEK rate request failed: %v", err)
+	}
+	if len(quotes) != 2 || quotes[0].ServiceCode != "cdek_tariff_136" || quotes[0].Cost.MinorUnits != 12345 || quotes[1].Cost.MinorUnits != 950 {
+		t.Fatalf("unexpected normalized CDEK quotes: %+v", quotes)
+	}
+}
+
+func TestCDEKRatesRejectDuplicateTariffs(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "rate-token"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"tariff_codes": []any{
+			map[string]any{"tariff_code": 136, "total_sum": 1, "currency": "RUB", "period_min": 1, "period_max": 1},
+			map[string]any{"tariff_code": 136, "total_sum": 2, "currency": "RUB", "period_min": 1, "period_max": 1},
+		}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 2"}, Parcels: []sdk.Parcel{{WeightGrams: 1, LengthMM: 1, WidthMM: 1, HeightMM: 1}}}
+	if _, err := transport.Rates(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), request); err == nil {
+		t.Fatal("duplicate CDEK tariffs accepted")
+	}
+}
+
 func TestDellinCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v4/auth/login.json" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
@@ -269,6 +325,20 @@ func TestRussianPostPickupPointsReadDirectoryAndOfficeDetails(t *testing.T) {
 	}
 	if len(points) != 2 || points[0].RemoteID != "101000" || points[0].Address != "Москва, Чистопрудный бульвар, 1" || !points[0].Active || points[1].RemoteID != "101001" || points[1].Active {
 		t.Fatalf("unexpected normalized Почта России points: %+v", points)
+	}
+}
+
+func TestRussianPostPickupPointsCapProviderFanout(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/postoffice/1.0/by-address" || r.URL.Query().Get("top") != "50" {
+			t.Fatalf("unexpected Почта России provider limit: path=%s query=%v", r.URL.Path, r.URL.Query())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"postoffices": []any{}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if points, err := transport.Pickup(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 500}); err != nil || len(points) != 0 {
+		t.Fatalf("points=%+v err=%v", points, err)
 	}
 }
 

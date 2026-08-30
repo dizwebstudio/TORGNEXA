@@ -1111,6 +1111,40 @@
       }
     },
     {
+      "schema": "events/cancellation-requested-v1.schema.json",
+      "valid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "status": "requested",
+        "reason_code": "customer_request",
+        "version": 1
+      },
+      "invalid": {
+        "cancellation_id": "bad",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "status": "cancelled",
+        "reason_code": "customer_request",
+        "version": 0
+      }
+    },
+    {
+      "schema": "events/cancellation-state-changed-v1.schema.json",
+      "valid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "from_status": "requested",
+        "status": "approved",
+        "version": 2
+      },
+      "invalid": {
+        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
+        "from_status": "cancelled",
+        "status": "requested",
+        "version": 0
+      }
+    },
+    {
       "schema": "events/claim-created-v1.schema.json",
       "valid": {
         "claim_id": "claim_test_001",
@@ -1251,6 +1285,31 @@
       }
     },
     {
+      "schema": "events/fulfillment-task-changed-v1.schema.json",
+      "valid": {
+        "task_id": "018f0000-0000-7000-8000-000000000701",
+        "task_type": "return_receiving",
+        "state": "pending",
+        "warehouse_id": "018f0000-0000-7000-8000-000000000702",
+        "sku": "SKU-RETURN-001",
+        "expected_quantity": {"value": "1", "unit": "PCS"},
+        "processed_quantity": {"value": "0", "unit": "PCS"},
+        "version": 1,
+        "change": "created"
+      },
+      "invalid": {
+        "task_id": "bad",
+        "task_type": "unsupported",
+        "state": "pending",
+        "warehouse_id": "bad",
+        "sku": "SKU-RETURN-001",
+        "expected_quantity": {"value": "1", "unit": "PCS"},
+        "processed_quantity": {"value": "0", "unit": "PCS"},
+        "version": 0,
+        "change": "created"
+      }
+    },
+    {
       "schema": "events/fx-rate-published-v1.schema.json",
       "valid": {
         "event_id": "evt_test_005",
@@ -1370,40 +1429,6 @@
         "title": "Approval required",
         "body": "Review the change.",
         "occurrence_count": 0
-      }
-    },
-    {
-      "schema": "events/cancellation-requested-v1.schema.json",
-      "valid": {
-        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
-        "status": "requested",
-        "reason_code": "customer_request",
-        "version": 1
-      },
-      "invalid": {
-        "cancellation_id": "bad",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0702",
-        "status": "cancelled",
-        "reason_code": "customer_request",
-        "version": 0
-      }
-    },
-    {
-      "schema": "events/cancellation-state-changed-v1.schema.json",
-      "valid": {
-        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
-        "order_id": "018f0e8b-8a58-7f42-5c2f9b1a0702",
-        "from_status": "requested",
-        "status": "approved",
-        "version": 2
-      },
-      "invalid": {
-        "cancellation_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0701",
-        "order_id": "018f0e8b-8a58-7f42-5c2f9b1a0702",
-        "from_status": "cancelled",
-        "status": "requested",
-        "version": 0
       }
     },
     {
@@ -1556,40 +1581,6 @@
       }
     },
     {
-      "schema": "events/return-requested-v1.schema.json",
-      "valid": {
-        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
-        "status": "requested",
-        "currency": "RUB",
-        "version": 1
-      },
-      "invalid": {
-        "return_id": "bad",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
-        "status": "closed",
-        "currency": "rub",
-        "version": 0
-      }
-    },
-    {
-      "schema": "events/return-state-changed-v1.schema.json",
-      "valid": {
-        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
-        "from_status": "inspecting",
-        "status": "partially_accepted",
-        "version": 3
-      },
-      "invalid": {
-        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
-        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
-        "from_status": "closed",
-        "status": "requested",
-        "version": 0
-      }
-    },
-    {
       "schema": "events/privacy-request-created-v1.schema.json",
       "valid": {
         "request_id": "privacy_test_001",
@@ -1630,6 +1621,40 @@
         "entity_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0004",
         "version": 0,
         "change": "bypass"
+      }
+    },
+    {
+      "schema": "events/return-requested-v1.schema.json",
+      "valid": {
+        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "status": "requested",
+        "currency": "RUB",
+        "version": 1
+      },
+      "invalid": {
+        "return_id": "bad",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "status": "closed",
+        "currency": "rub",
+        "version": 0
+      }
+    },
+    {
+      "schema": "events/return-state-changed-v1.schema.json",
+      "valid": {
+        "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0712",
+        "from_status": "inspecting",
+        "status": "partially_accepted",
+        "version": 3
+      },
+      "invalid": {
+        "return_id": "018f0e8b-8a58-7f42-5c2f9b1a0711",
+        "order_id": "018f0e8b-8a58-7f42-5c2f9b1a0712",
+        "from_status": "closed",
+        "status": "requested",
+        "version": 0
       }
     },
     {
