@@ -353,10 +353,10 @@ test("public documentation follows current navigation, settings and sign-in beha
   const envExample = readRoot(".env.example");
   const navigationLabels = [...navigation.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   const settingsLabels = [...settings.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
-  assert.equal(navigationLabels.length, 18);
+  assert.equal(navigationLabels.length, 19);
   assert.equal(settingsLabels.length, 7);
   for (const label of [...navigationLabels, ...settingsLabels]) assert.ok(docs.includes(label), label);
-  for (const route of ["/catalog", "/orders", "/returns", "/inventory", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/audit", "/settings"]) {
+  for (const route of ["/catalog", "/publication-quality", "/orders", "/returns", "/inventory", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/audit", "/settings"]) {
     assert.ok(docs.includes(route), route);
   }
   assert.match(docs, /oidc\/silent-callback\.html/);

@@ -15,6 +15,7 @@ export interface NavigationItem {
 export const navigationItems: readonly NavigationItem[] = [
   {id: "dashboard", label: "Обзор", path: "/", risk: "READ", icon: "dashboard", shortcut: "G D"},
   {id: "catalog", label: "Каталог", path: "/catalog", capability: "products.read", risk: "READ", icon: "catalog", shortcut: "G C"},
+  {id: "publication-quality", label: "Качество публикации", path: "/publication-quality", capability: "products.read", risk: "READ", icon: "compliance", shortcut: "G Q"},
   {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G O"},
   {id: "returns", label: "Возвраты", path: "/returns", capability: "orders.returns.read", risk: "WRITE_SENSITIVE", icon: "orders"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},

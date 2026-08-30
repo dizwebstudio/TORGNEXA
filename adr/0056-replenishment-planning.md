@@ -16,7 +16,10 @@ Keep policy only in provider adapters or application handlers was rejected becau
 Additive provider-neutral contracts only; existing connector SDK and public API remain compatible.
 
 ## Migration and data impact
-Migration `000032_replenishment_planning.sql` is expand-only, tenant-scoped and preserves old readers/writers.
+The original planning contract is retained for compatibility. Task 165 adds
+the expand-only, tenant-scoped migration
+`000032_replenishment_forecast_planning.sql`; it preserves old readers/writers
+and does not replace the inventory ledger or procurement lifecycle.
 
 ## Security and privacy impact
 Tenant scope is mandatory; secrets and raw sensitive provider payloads are not part of these domain contracts.

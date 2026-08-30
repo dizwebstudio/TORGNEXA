@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
@@ -145,6 +146,60 @@ func TestCDEKRatesRejectDuplicateTariffs(t *testing.T) {
 	}
 }
 
+func TestCDEKTrackingReadsLatestStatusWithoutExposingCredentials(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected CDEK token method: %s", r.Method)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "tracking-token"})
+		case "/v2/orders":
+			if r.Method != http.MethodGet || r.URL.Query().Get("cdek_number") != "1100285492" || r.URL.Query().Get("uuid") != "" || r.Header.Get("Authorization") != "Bearer tracking-token" {
+				t.Fatalf("unexpected CDEK tracking request: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{
+				"uuid":        "72753031-1820-4f99-9240-aab139f05ca5",
+				"cdek_number": "1100285492",
+				"number":      "store-order-17",
+				"statuses": []any{
+					map[string]any{"code": "DELIVERED", "date_time": "2026-08-30T07:05:06Z"},
+					map[string]any{"code": "ACCEPTED", "date_time": "2026-08-30T06:00:00+0000"},
+				},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Track(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ShipmentStatusRequest{RemoteID: "1100285492"})
+	if err != nil {
+		t.Fatalf("CDEK tracking request failed: %v", err)
+	}
+	if result.RemoteID != "1100285492" || result.Status != "DELIVERED" || result.TrackingNumber != "1100285492" || result.ObservedAt.Format(time.RFC3339) != "2026-08-30T07:05:06Z" || result.Cost.Currency != "RUB" || result.Cost.MinorUnits != 0 {
+		t.Fatalf("unexpected normalized CDEK tracking result: %+v", result)
+	}
+}
+
+func TestCDEKTrackingUsesUUIDQueryAndRejectsInvalidStatusHistory(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "tracking-token"})
+			return
+		}
+		if r.URL.Path != "/v2/orders" || r.URL.Query().Get("uuid") != "72753031-1820-4f99-9240-aab139f05ca5" {
+			t.Fatalf("unexpected UUID tracking request: path=%s query=%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": "72753031-1820-4f99-9240-aab139f05ca5", "statuses": []any{map[string]any{"code": "", "date_time": "not-a-time"}}}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Track(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ShipmentStatusRequest{RemoteID: "72753031-1820-4f99-9240-aab139f05ca5"}); err == nil {
+		t.Fatal("invalid CDEK status history accepted")
+	}
+}
+
 func TestDellinCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v4/auth/login.json" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
@@ -254,6 +309,117 @@ func TestPekPickupPointsReadBranchDirectoryAndFilterOperations(t *testing.T) {
 	}
 }
 
+func TestPekRatesUseAuthenticatedWarehouseCalculatorAndExactMoney(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user-1" || password != "password-1" {
+			t.Fatalf("unexpected ПЭК basic credentials: user=%q password=%q ok=%v", user, password, ok)
+		}
+		switch r.URL.Path {
+		case "/api/v1/branches/all/":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {
+				t.Fatalf("unexpected ПЭК branch request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"branches": []any{
+				map[string]any{
+					"title": "Москва", "cities": []any{map[string]any{"title": "Москва", "divisions": []string{"moscow-division"}}},
+					"divisions": []any{map[string]any{"id": "moscow-division", "name": "Москва", "warehouses": []any{
+						map[string]any{"id": "warehouse-moscow", "name": "Москва", "address": "Москва, Тверская, 1", "kindsOfTransportation": []any{map[string]any{"operations": []string{"Выдача грузов"}}}},
+					}}},
+				},
+				map[string]any{
+					"title": "Санкт-Петербург", "cities": []any{map[string]any{"title": "Санкт-Петербург", "divisions": []string{"spb-division"}}},
+					"divisions": []any{map[string]any{"id": "spb-division", "name": "Санкт-Петербург", "warehouses": []any{
+						map[string]any{"id": "warehouse-spb", "name": "Санкт-Петербург", "address": "Санкт-Петербург, Невский, 1", "kindsOfTransportation": []any{map[string]any{"operations": []string{"Выдача грузов"}}}},
+					}}},
+				},
+			}})
+		case "/api/v1/calculator/calculateprice/":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {
+				t.Fatalf("unexpected ПЭК calculator request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			var payload map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode ПЭК calculator request: %v", err)
+			}
+			var types []int
+			var sender, receiver string
+			var cargos []map[string]json.RawMessage
+			if json.Unmarshal(payload["types"], &types) != nil || len(types) != 1 || types[0] != 3 ||
+				json.Unmarshal(payload["senderWarehouseId"], &sender) != nil || sender != "warehouse-moscow" ||
+				json.Unmarshal(payload["receiverWarehouseId"], &receiver) != nil || receiver != "warehouse-spb" ||
+				json.Unmarshal(payload["cargos"], &cargos) != nil || len(cargos) != 1 ||
+				string(cargos[0]["length"]) != "0.101" || string(cargos[0]["width"]) != "0.100" || string(cargos[0]["height"]) != "0.100" || string(cargos[0]["weight"]) != "1" {
+				t.Fatalf("unexpected ПЭК calculator payload: %v", payload)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"hasError": false, "transfers": []any{
+				map[string]any{"type": 3, "hasError": false, "costTotal": "1234.50", "estDeliveryTime": 3},
+				map[string]any{"type": 1, "hasError": true, "errorMessage": "unsupported", "costTotal": 0, "estDeliveryTime": 0},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 101, WidthMM: 100, HeightMM: 100}},
+	}
+	quotes, err := transport.Rates(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), request)
+	if err != nil {
+		t.Fatalf("ПЭК rate request failed: %v", err)
+	}
+	if len(quotes) != 1 || quotes[0].ServiceCode != "pek_type_3" || quotes[0].Cost.MinorUnits != 123450 || quotes[0].Cost.Currency != "RUB" {
+		t.Fatalf("unexpected normalized ПЭК quotes: %+v", quotes)
+	}
+}
+
+func TestPekTrackingUsesBasicStatusAndNormalizesRussianStatus(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/cargos/basicstatus/" || r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {
+			t.Fatalf("unexpected ПЭК tracking request: method=%s path=%s content-type=%q", r.Method, r.URL.Path, r.Header.Get("Content-Type"))
+		}
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user-1" || password != "password-1" {
+			t.Fatalf("unexpected ПЭК tracking credentials: user=%q password=%q ok=%v", user, password, ok)
+		}
+		var payload struct {
+			CargoCodes []string `json:"cargoCodes"`
+		}
+		if json.NewDecoder(r.Body).Decode(&payload) != nil || len(payload.CargoCodes) != 1 || payload.CargoCodes[0] != "780339690775" {
+			t.Fatalf("unexpected ПЭК tracking payload: %+v", payload)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"cargos": []any{
+			map[string]any{
+				"info":  map[string]any{"cargoStatus": "Выполняется адресная доставка"},
+				"cargo": map[string]any{"code": "780339690775"},
+			},
+		}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Track(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), sdk.ShipmentStatusRequest{RemoteID: "780339690775"})
+	if err != nil {
+		t.Fatalf("ПЭК tracking request failed: %v", err)
+	}
+	if result.RemoteID != "780339690775" || result.TrackingNumber != "780339690775" || result.Status != "on_delivery" || result.Cost.Currency != "RUB" || result.Cost.MinorUnits != 0 || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК tracking result: %+v", result)
+	}
+}
+
+func TestPekTrackingRejectsMalformedResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"cargos": []any{map[string]any{"info": map[string]any{"cargoStatus": "В пути"}}}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Track(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), sdk.ShipmentStatusRequest{RemoteID: "780339690775"}); err == nil {
+		t.Fatal("malformed ПЭК tracking response accepted")
+	}
+}
+
 func TestOzonDeliveryCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v2/warehouse/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {
@@ -325,6 +491,45 @@ func TestRussianPostPickupPointsReadDirectoryAndOfficeDetails(t *testing.T) {
 	}
 	if len(points) != 2 || points[0].RemoteID != "101000" || points[0].Address != "Москва, Чистопрудный бульвар, 1" || !points[0].Active || points[1].RemoteID != "101001" || points[1].Active {
 		t.Fatalf("unexpected normalized Почта России points: %+v", points)
+	}
+}
+
+func TestRussianPostRatesUsePostalCalculatorAndExactMoney(t *testing.T) {
+	badResponse := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v2/calculate/tariff/delivery" || r.Header.Get("Authorization") != "" ||
+			r.URL.Query().Get("format") != "json" || r.URL.Query().Get("errorcode") != "1" || r.URL.Query().Get("object") != "23030" ||
+			r.URL.Query().Get("weight") != "1000" || r.URL.Query().Get("from") != "101000" || r.URL.Query().Get("to") != "190000" {
+			t.Fatalf("unexpected Почта России calculator request: method=%s path=%s query=%v authorization=%q", r.Method, r.URL.Path, r.URL.Query(), r.Header.Get("Authorization"))
+		}
+		if badResponse {
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 23030, "errors": []any{map[string]any{"type": 1, "code": 42, "msg": "not available"}}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":       23030,
+			"items":    []any{map[string]any{"id": "delivery", "name": "Доставка"}},
+			"paynds":   123450,
+			"delivery": map[string]any{"min": 2, "max": 4},
+		})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	request := sdk.RateRequest{
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+	}
+	quotes, err := transport.Rates(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request)
+	if err != nil {
+		t.Fatalf("Почта России rate request failed: %v", err)
+	}
+	if len(quotes) != 1 || quotes[0].ServiceCode != "pochta_parcel_online" || quotes[0].Cost.MinorUnits != 123450 || quotes[0].Cost.Currency != "RUB" {
+		t.Fatalf("unexpected normalized Почта России quotes: %+v", quotes)
+	}
+	badResponse = true
+	if _, err := transport.Rates(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request); err == nil {
+		t.Fatal("Почта России calculator error response accepted")
 	}
 }
 

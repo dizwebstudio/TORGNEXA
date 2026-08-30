@@ -4,10 +4,12 @@ Storefront connector for self-hosted 1С-Битрикс («Управление 
 connector uses the official REST catalog methods through a Bitrix REST module
 webhook and is exposed in Settings → Integrations → Интернет-магазины.
 
-The current runtime admits only product catalog read/write and product
-inbound/outbound synchronization. Inventory, prices and orders remain SDK
-capabilities without an executable application route until their contracts are
-qualified end to end.
+The current runtime admits product, price, inventory and order reads, plus
+product/price/inventory writes and order-status writes. Product, price,
+inventory and order events are routed through the tenant-scoped commerce-sync
+worker; inventory writes require an explicit warehouse mapping and order
+status writes require the configured canonical status map. Live qualification
+still remains separate from repository/runtime admission.
 
 Official API references: [`catalog.product.list`](https://apidocs.bitrix24.ru/api-reference/catalog/product/catalog-product-list.html),
 [`catalog.product.get`](https://apidocs.bitrix24.ru/api-reference/catalog/product/catalog-product-get.html),

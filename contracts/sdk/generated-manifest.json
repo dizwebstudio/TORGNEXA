@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "f6106a9ca60adf351013289f09b9c54308672d870392ab4e05ad1e58b5d79859",
+    "sha256": "113a48504f2e6d97fe1d6f4649b5628f878994fe27957fc3c2cd8c9c809a98b5",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -395,6 +395,16 @@
       "path": "/products/{product_id}"
     },
     {
+      "operation_id": "getPublicationQualityReceipt",
+      "method": "GET",
+      "path": "/publication-quality/receipts/{receipt_id}"
+    },
+    {
+      "operation_id": "getPublicationQualityRun",
+      "method": "GET",
+      "path": "/publication-quality/runs/{run_id}"
+    },
+    {
       "operation_id": "getReportData",
       "method": "GET",
       "path": "/reports/{report_id}"
@@ -605,6 +615,11 @@
       "path": "/products"
     },
     {
+      "operation_id": "listPublicationQualityRuns",
+      "method": "GET",
+      "path": "/publication-quality/runs"
+    },
+    {
       "operation_id": "listReports",
       "method": "GET",
       "path": "/reports"
@@ -748,6 +763,11 @@
       "operation_id": "putWarehouseFailoverRoute",
       "method": "PUT",
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
+    },
+    {
+      "operation_id": "readLogisticsTracking",
+      "method": "GET",
+      "path": "/logistics/tracking"
     },
     {
       "operation_id": "recordReturnInspection",

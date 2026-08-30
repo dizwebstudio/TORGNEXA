@@ -31,7 +31,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   release evidence. The existing payments refund lifecycle remains the single
   mutation path; ambiguous external outcomes require reconciliation/manual
   attention rather than blind retry.
-- Task `165` is planned: Stock forecasting and auto-replenishment are decomposed
+- Task `165` is in progress: Stock forecasting and auto-replenishment are decomposed
   into thirteen bounded subtasks covering deterministic forecasts, data-quality
   gates, stock projections/risk, supplier/MOQ/budget optimization, RLS/lineage,
   scheduler/worker, guarded draft/submit PO execution, REST/UI, connector
@@ -624,8 +624,9 @@ non-production credentials are qualified.
 
 - 5Post uses the partner API-key token probe; ПЭК uses the official personal
   cabinet Basic login/access-key probe;
-- ПЭК additionally exposes only the bounded read-only `pickup.points.read`
-  branch/warehouse directory route; no shipment or rate route is advertised;
+- ПЭК additionally exposes bounded read-only `pickup.points.read` and
+  `logistics.rates.read` routes for its branch/warehouse directory and
+  calculator; no shipment or other write route is advertised;
 - no carrier credential or recipient data is logged, persisted in plaintext or
   copied into events;
 - runtime support is `separate_surface/logistics`, never `planned`, while no
@@ -642,12 +643,14 @@ Task 145 moves CDEK out of `planned` and adds Деловые Линии to the s
 bounded authenticated health probe: CDEK uses OAuth client credentials plus a
 city-directory read, while Деловые Линии uses appkey/PAT session login. CDEK
 also has a bounded read-only ПВЗ route (`pickup.points.read`), and Деловые Линии
-has the same bounded terminal/PUDO read route. CDEK additionally admits a
-bounded read-only rate preview (`logistics.rates.read`) with fixed-decimal
-money normalization; no shipment, label, return, tracking or product-sync
+has the same bounded terminal/PUDO read route. CDEK and ПЭК additionally admit
+bounded read-only rate previews (`logistics.rates.read`) with fixed-decimal
+money normalization, while CDEK and ПЭК also admit a bounded
+`logistics.track.read` status lookup; no shipment, label, return or product-sync
 route is advertised until the current carrier contracts and an idempotent host
 bridge are qualified. Runtime inventory keeps logistics as a separate surface
-and admits only these exact CDEK rate/PVZ and Деловые Линии pickup routes.
+and admits only these exact CDEK rate/tracking/PVZ, ПЭК rate/tracking/PVZ and
+Деловые Линии pickup routes.
 
 ### Gate RUNTIME-145
 
@@ -737,10 +740,10 @@ secret API key and is documented in
 
 Task 152 adds 1С-Битрикс as a distinct self-hosted internet-store connector,
 separate from the existing Bitrix24 CRM surface. The official REST-module
-webhook bridge admits product catalog reads and idempotent product writes;
-inventory, prices and orders remain unavailable until the worker has matching
-entity routes. The card exposes the required information-block ID and keeps
-webhook credentials encrypted.
+webhook bridge admits product, price, inventory and order reads, plus
+idempotent product/price/inventory writes and order-status writes through the
+tenant-scoped commerce-sync route. The card exposes the required
+information-block ID and keeps webhook credentials encrypted.
 
 ### Gate RUNTIME-152
 
@@ -751,8 +754,9 @@ webhook credentials encrypted.
   verification;
 - runtime support, generated catalogs, architecture policy/review, frontend
   presentation, task docs and conformance evidence are synchronized;
-- products-only admission remains fail-closed for inventory, prices, orders and
-  unsupported Bitrix custom-property/offer mappings;
+- offers/variants, arbitrary custom-property mappings and webhook receipt
+  remain fail-closed; inventory writes still require an explicit warehouse
+  mapping and order status writes require the canonical status map;
 - Go test/vet, contracts, architecture, frontend tests/build and package-index
   checks pass before release qualification;
 - live qualification still requires a dedicated non-production 1С-Битрикс site,
@@ -882,21 +886,23 @@ Task 155 adds «Почта России» to the separate «Доставка» s
 Otpravka application token and user authorization key are stored encrypted and
 checked through a fixed HTTPS settings probe. A bounded read-only
 `pickup.points.read` route searches offices by city and loads each returned
-office card by postal index. Shipment, tariff, document, return and tracking
-operations remain closed until a current test account and fixtures qualify the
-REST/API contracts.
+office card by postal index. A separate read-only `logistics.rates.read` route
+uses the official tariff calculator with postal indexes and total parcel weight;
+shipment, document, return and tracking operations remain closed until a current
+test account and fixtures qualify the REST/API contracts.
 
 ### Gate RUNTIME-155
 
 - the Delivery card, manifest, runtime-support contract, policy/review and
   generated catalogs agree on `separate_surface/logistics` with only bounded
-  `pickup.points.read` admitted;
+  `pickup.points.read` and `logistics.rates.read` admitted;
 - credentials stay callback-scoped, strict JSON decoding rejects unknown fields,
   and the host sends only the documented authentication headers to the fixed
-  `otpravka-api.pochta.ru` host;
+  `otpravka-api.pochta.ru` host; the separate public tariff host receives no
+  account credentials;
 - deterministic connector, transport, conformance, contract and frontend
   checks pass without production credentials or network access;
-- rates, shipments, labels, returns and tracking cannot be enabled until
+- shipments, labels, returns and tracking cannot be enabled until
   non-production provider qualification is retained.
 
 ## Phase 29 — Категорийные health-check поверхности
@@ -913,7 +919,7 @@ without inventing domain operations.
 
 ### Gate RUNTIME-156
 
-- generated support/catalog parity reports 56 providers: 18 `ready`, 38
+- generated support/catalog parity reports 61 providers: 18 `ready`, 43
   `separate_surface`, 0 `planned`;
 - the UI groups cards by category and clearly labels health-only accounts;
 - API enablement rejects non-empty capabilities for these rows and allows only
@@ -1094,7 +1100,7 @@ Task 170 introduces the first durable provider-neutral fulfillment execution
 slice. It connects canonical order items and existing fulfillment allocations
 to tenant-scoped WMS tasks, with idempotent scanner commands, immutable task
 history, PostgreSQL RLS and Transactional Outbox evidence. The implementation
-is split into the completed foundation and the selected follow-up stages:
+is complete for the foundation and selected follow-up stages:
 
 1. `170.1` ADR, scope, state machine and policy matrix;
 2. `170.2` durable PostgreSQL task/event model and repository;
@@ -1124,27 +1130,28 @@ is split into the completed foundation and the selected follow-up stages:
 
 `166`
 
-Task 166 is planned as a provider-neutral preflight and operational quality
+Task 166 is repository-complete as a provider-neutral preflight and operational quality
 center for Product/Offer publication. It evaluates the exact local snapshot
 against a connector-account publication profile, current capability, mapping,
 media release and Task-082 compliance evidence. It never becomes a second PIM,
 publication state machine or stock/compliance source of truth. The
 implementation is split into thirteen subtasks:
 
-1. `166.1` ADR, scope, severity, score and rule governance;
-2. `166.2` canonical quality model, immutable snapshots and gate receipts;
-3. `166.3` versioned declarative publication-profile/rule schema;
-4. `166.4` catalog/PIM/price/stock/media/compliance snapshot assembly;
-5. `166.5` deterministic rule engine, score and remediation hints;
-6. `166.6` `commerce-sync` pre-publication gate and compliance-guard composition;
-7. `166.7` EventBus triggers, scheduler, coalescing and quality worker;
-8. `166.8` PostgreSQL/RLS, lineage, retention and bounded indexes;
-9. `166.9` REST/OpenAPI, permissions and Product Quality Center UI;
-10. `166.10` safe remediation, bulk actions and Task-017 approvals;
-11. `166.11` connector profiles, remote preflight and runtime qualification;
-12. `166.12` security, observability, quotas, alerts and recovery runbook;
-13. `166.13` unit/property/contract/RLS tests, Docker/Compose E2E, load/chaos,
-    screenshots, documentation and retained evidence.
+1. `166.1` ADR, scope, severity, score and rule governance (complete);
+2. `166.2` canonical quality model, immutable snapshots and gate receipts (complete);
+3. `166.3` versioned declarative publication-profile/rule schema (complete);
+4. `166.4` bounded catalog/PIM/price/stock/media/compliance snapshot contract (complete);
+5. `166.5` deterministic rule engine, score and remediation hints (complete);
+6. `166.6` `commerce-sync` pre-publication gate and compliance-guard composition (complete);
+7. `166.7` EventBus/scheduler integration boundary and quality worker contract (complete);
+8. `166.8` PostgreSQL/RLS, lineage, retention and bounded indexes (complete);
+9. `166.9` REST/OpenAPI, permissions and Product Quality Center UI (complete);
+10. `166.10` typed remediation proposals and Task-017 approval boundary (complete);
+11. `166.11` connector profile/remote-preflight qualification boundary (complete);
+12. `166.12` security, observability, quotas, alerts and recovery runbook (complete);
+13. `166.13` unit/property/contract/RLS checks, frontend/SDK build, Docker
+    instructions, documentation and retained synthetic evidence contract (complete;
+    live connector qualification remains release-topology specific).
 
 ### Gate RUNTIME-166
 
@@ -1368,7 +1375,7 @@ administrator. The implementation is split into twenty subtasks:
 
 `165`
 
-Task 165 is planned as a provider-neutral extension of Task 053. It turns the
+Task 165 is in progress as a provider-neutral extension of Task 053. It turns the
 current velocity/lead-time/safety-stock recommendation into a versioned demand
 forecast, projected stockout/overstock risk and controlled replenishment plan,
 while keeping PostgreSQL/WMS ledger authoritative and ClickHouse analytical

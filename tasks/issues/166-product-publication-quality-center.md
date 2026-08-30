@@ -2,7 +2,12 @@
 
 ## Status
 
-`planned` — подробная декомпозиция подготовлена, реализация не начата.
+`repository-complete` — реализованы provider-neutral quality engine,
+immutable snapshot/receipt model, declarative profile schema and validation,
+PostgreSQL/RLS persistence, remediation proposals, read API, operator UI and
+fail-closed commerce-sync receipt gate. Production admission remains gated by
+the existing connector conformance/live evidence process; an SDK or health-only
+connector cannot become publishable from this module alone.
 
 ## Objective
 
@@ -413,13 +418,17 @@ promoted without current quality + connector evidence.
 ## Suggested delivery slices
 
 1. **Quality foundation:** 166.1–166.4 — ADR, model, profile schema and
-   canonical snapshot assembly.
+   bounded snapshot contract are complete; runtime assemblers must feed the
+   contract from canonical domains and never copy raw provider payloads.
 2. **Decision and runtime gate:** 166.5–166.8 — deterministic engine, score,
-   preflight gate, worker, persistence, RLS and lineage.
-3. **Operator workflow:** 166.9–166.12 — API/UI, remediation/approval,
-   connector qualification, observability and recovery.
-4. **Release qualification:** 166.13 — tests, Docker/Compose, load/chaos,
-   screenshots, docs and retained evidence.
+   exact receipt gate, worker composition, persistence, RLS and lineage are
+   complete.
+3. **Operator workflow:** 166.9–166.12 — tenant-scoped API/UI,
+   remediation/approval boundary, connector-safe qualification boundary,
+   observability, quotas and recovery runbook are complete.
+4. **Release qualification:** 166.13 — unit, contract, architecture,
+   migration, frontend and SDK gates are green; Docker/live connector evidence
+   remains an environment-specific release gate.
 
 ## Explicit exclusions
 
@@ -456,6 +465,7 @@ promoted without current quality + connector evidence.
 - `docs/46-sre-performance-slo.md`
 - `docs/56-product-compliance.md`
 - `docs/69-frontend-shell.md`
+- `contracts/publication-quality/profile.schema.json`
 - `adr/0009-transactional-outbox.md`
 - `adr/0018-slo-performance.md`
 - `adr/0024-product-compliance-policy.md`

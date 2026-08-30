@@ -94,13 +94,18 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
 			wantCapabilities := 1
-			if connectorID == "cdek" {
+			if connectorID == "cdek" || connectorID == "pek" {
+				wantCapabilities = 3
+			} else if connectorID == "pochta-russia" {
 				wantCapabilities = 2
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
 			}
-			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.rates.read") {
+			if (connectorID == "cdek" || connectorID == "pek") && !SupportsCapability(connectorID, "logistics.track.read") {
+				t.Fatalf("%s tracking support is inaccurate: %+v", connectorID, carrier)
+			}
+			if (connectorID == "cdek" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
@@ -233,8 +238,8 @@ func TestMagentoReturnReaderAdmissionIsExact(t *testing.T) {
 	if _, ok := reader.(sdk.ReturnReader); !ok {
 		t.Fatalf("unexpected Magento return reader type %T", reader)
 	}
-	if _, err := registry.ReturnReader(context.Background(), supportTestAccount(t, "woocommerce"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted WooCommerce return reader resolved: %v", err)
+	if _, err := registry.ReturnReader(context.Background(), supportTestAccount(t, "prestashop"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted PrestaShop return reader resolved: %v", err)
 	}
 }
 
@@ -307,6 +312,66 @@ func TestSaleorReturnReaderAdmissionIsExact(t *testing.T) {
 	}
 	if _, ok := reader.(sdk.ReturnReader); !ok {
 		t.Fatalf("unexpected Saleor return reader type %T", reader)
+	}
+}
+
+func TestWooCommerceReturnReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "woocommerce")
+	if !SupportsCapability("woocommerce", "returns.read") {
+		t.Fatal("WooCommerce return capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"USD"}`), nil
+	}
+	reader, err := registry.ReturnReader(context.Background(), account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("WooCommerce return reader unavailable: %v", err)
+	}
+	if _, ok := reader.(sdk.ReturnReader); !ok {
+		t.Fatalf("unexpected WooCommerce return reader type %T", reader)
+	}
+}
+
+func TestWooCommerceWebhookReceiverAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "woocommerce")
+	if !SupportsCapability("woocommerce", "notifications.receive") {
+		t.Fatal("WooCommerce webhook capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","store_currency":"USD"}`), nil
+	}
+	receiver, err := registry.CommerceWebhookReceiver(account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("WooCommerce webhook receiver unavailable: %v", err)
+	}
+	if _, ok := receiver.(sdk.CommerceWebhookReceiver); !ok {
+		t.Fatalf("unexpected WooCommerce webhook receiver type %T", receiver)
+	}
+	if _, err := registry.CommerceWebhookReceiver(supportTestAccount(t, "shopify"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted Shopify webhook receiver resolved: %v", err)
+	}
+}
+
+func TestYandexNotificationDecoderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "yandex-market")
+	if !SupportsCapability("yandex-market", "notifications.receive") {
+		t.Fatal("Yandex Market notification capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"business_id":1001,"campaign_id":2002,"inventory_mode":"DBS","price_mode":"API"}`), nil
+	}
+	decoder, err := registry.MarketplaceNotificationDecoder(account, load)
+	if err != nil {
+		t.Fatalf("Yandex Market notification decoder unavailable: %v", err)
+	}
+	if _, ok := decoder.(sdk.MarketplaceNotificationDecoder); !ok {
+		t.Fatalf("unexpected Yandex Market notification decoder type %T", decoder)
+	}
+	if _, err := registry.MarketplaceNotificationDecoder(supportTestAccount(t, "wildberries"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted Wildberries notification decoder resolved: %v", err)
 	}
 }
 

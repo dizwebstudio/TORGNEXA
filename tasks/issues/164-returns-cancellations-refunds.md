@@ -3,11 +3,14 @@
 ## Status
 
 `in_progress` — базовые доменные агрегаты, миграция PostgreSQL, outbox/audit,
-идемпотентный API и контрактные события реализованы. Live connector/WMS/
-fiscal/settlement qualification и production enablement остаются отдельным
+идемпотентный API, контрактные события, generated SDK и операторский экран
+возвратов реализованы. Live connector/WMS/fiscal/settlement qualification,
+durable worker orchestration и production enablement остаются отдельным
 завершающим gate.
 
-Репозиторная проверка: `go test ./internal/core/returns ./internal/platform/postgres/returnsrepo ./internal/app/api` и `scripts/check-contracts.sh` проходят в Go-контейнере. Полный production claim не делается до live Compose/conformance прогона.
+Репозиторная проверка: `go test ./...`, `go vet ./...`, contract/architecture/
+migration gates и frontend typecheck/build/logic/docs проходят. Полный production
+claim не делается до live Compose/conformance прогона.
 
 ## Objective
 

@@ -18,7 +18,12 @@
 тарифов, филиалов и грузов остаются внутри адаптера и не становятся полями
 Core.
 
-Runtime сейчас включает только `pickup.points.read`. Запрос выполняется через
-`POST https://kabinet.pecom.ru/api/v1/branches/all/`, ограничивается по размеру
-ответа и городу, а в результат попадают только склады с явной операцией
-«Выдача грузов». Остальные capability из манифеста остаются закрытыми.
+Runtime включает bounded read-only `pickup.points.read`,
+`logistics.rates.read` и `logistics.track.read`. Справочник выполняется через
+`POST https://kabinet.pecom.ru/api/v1/branches/all/`, расчёт — через
+`POST https://kabinet.pecom.ru/api/v1/calculator/calculateprice/`, а текущий
+статус — через `POST https://kabinet.pecom.ru/api/v1/cargos/basicstatus/`.
+Запрос статуса содержит один код груза, ответ ограничен 50 элементами и
+нормализуется в нейтральный статус. Расчёт принимает до 50 мест и возвращает
+не более 100 вариантов с точной денежной нормализацией. Заявка и остальные
+операции записи остаются закрыты.

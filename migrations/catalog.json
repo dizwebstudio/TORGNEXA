@@ -653,6 +653,46 @@
       },
       "backfill": null,
       "sha256": "18ca6b0a8279b8de87a2ca04ed3a41f49a6dcb5f7e9ef493d5d0bda597b9407e"
+    },
+    {
+      "version": 32,
+      "name": "replenishment_forecast_planning",
+      "file": "000032_replenishment_forecast_planning.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [31],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "d11bfa8a05ac3be651dc743a98e03befdb1a6bbdbd7c8eb1e48dd3dfa4637127"
+    },
+    {
+      "version": 33,
+      "name": "product_publication_quality",
+      "file": "000033_product_publication_quality.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [32],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "8f586e40aad503e946be13a6c25965730a4712044beba2c4c7ef615360e47ebf"
     }
   ]
 }

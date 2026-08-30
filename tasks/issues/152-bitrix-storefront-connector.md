@@ -14,11 +14,12 @@ runtime adapter for self-hosted 1С-Битрикс internet shops.
 - keep webhook credentials encrypted (`user_id` and `webhook_code`), with
   `store_host`, `base_path`, `catalog_iblock_id` and `store_currency` as
   non-secret runtime configuration;
-- admit product catalog read/write, outbound regular-price sync and outbound
-  integer inventory sync through warehouse documents;
-- implement SDK-level active warehouse and integer stock reads;
+- admit product catalog read/write, exact regular-price reads/writes and
+  integer inventory reads/writes through warehouse documents;
+- route inbound price/inventory reconciliation through mapped offers and
+  warehouses without narrowing values at the provider boundary;
 - implement SDK-level order reads and status writes with sale REST
-  reconciliation;
+  reconciliation and route order status events through the worker;
 - show a branded 1С-Битрикс card in Settings → Integrations → Интернет-магазины;
 - document the REST-module/webhook prerequisite and the explicit runtime gaps.
 
@@ -35,9 +36,9 @@ runtime adapter for self-hosted 1С-Битрикс internet shops.
 
 ## Explicit exclusions
 
-Inbound prices, offers/custom properties, browser automation and webhook
-receipt are not claimed as working application routes. Order runtime routing
-requires an explicit `order_statuses` map for all canonical lifecycle values.
-Inventory writes require an explicit `warehouse` entity mapping to the configured Bitrix warehouse. A real
-self-hosted site with the REST module enabled and a non-production webhook is
-still required for live qualification.
+Offers/variants and arbitrary custom-property mappings, browser automation and
+webhook receipt are not claimed as working application routes. Order runtime
+routing requires an explicit `order_statuses` map for all canonical lifecycle
+values. Inventory writes require an explicit `warehouse` entity mapping to the
+configured Bitrix warehouse. A real self-hosted site with the REST module
+enabled and a non-production webhook is still required for live qualification.

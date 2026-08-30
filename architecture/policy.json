@@ -91,6 +91,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/logistics",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/orders",
       "kind": "core_domain"
     },
@@ -423,6 +427,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/publicationqualityrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/reconciliationrepo",
       "kind": "infrastructure_adapter"
     },
@@ -504,6 +512,10 @@
     },
     {
       "path": "internal/platform/promotions",
+      "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/publicationquality",
       "kind": "platform_capability"
     },
     {

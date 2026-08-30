@@ -58,16 +58,19 @@ qualification-gated; the current runtime inventory is 12 generic integrations,
 
 Task 143 adds the ПЭК SDK adapter, official Basic credential probe and
 deterministic conformance candidate. ПЭК is available in the same Delivery
-surface for tenant account setup and health checks; shipment writes and product
-synchronization remain closed until a non-production API qualification.
+surface for tenant account setup, health checks and bounded read-only
+`pickup.points.read`, `logistics.rates.read` and `logistics.track.read` routes;
+shipment writes and product synchronization remain closed until a
+non-production API qualification.
 
 ## CDEK and Деловые Линии delivery verification
 
 Task 145 admits the existing CDEK SDK on the Delivery surface with an OAuth
 client-credentials probe and adds the Деловые Линии adapter with appkey/PAT
-session verification. Rates, shipment writes, labels and product
-synchronization remain closed until current provider fixtures and an
-idempotent host bridge are qualified. At that point the runtime inventory was
+session verification. CDEK and ПЭК expose bounded read-only rate previews, and
+CDEK also exposes a bounded tracking read; shipment writes, labels and product
+synchronization remain closed until current
+provider fixtures and an idempotent host bridge are qualified. At that point the runtime inventory was
 12 generic integrations, 18 separate-surface providers and 15 planned entries.
 
 ## Ozon Pay and Ozon Доставка runtime surfaces
@@ -188,7 +191,7 @@ See `tasks/issues/164-returns-cancellations-refunds.md`.
 
 ## Прогноз остатков и автопополнение
 
-Task 165 is the planned extension of Task 053 from a basic advisory formula to
+Task 165 is the in-progress extension of Task 053 from a basic advisory formula to
 an explainable forecast and guarded replenishment runtime. It adds forecast
 horizons/intervals, data-quality gates, projected stockout/overstock risk,
 supplier/MOQ/case-pack and budget/capacity policies, plus three explicit modes:
@@ -204,7 +207,7 @@ closed. See `tasks/issues/165-stock-forecast-auto-replenishment.md`.
 
 ## Центр качества публикации товаров
 
-Task 166 is the planned provider-neutral publication preflight and quality
+Task 166 is the repository-complete provider-neutral publication preflight and quality
 center. It adds target-specific readiness for Product/Offer against each
 connector account, deterministic score and rule evidence, hard blockers and
 warnings, compliance/capability/freshness checks, remediation and post-publish
@@ -217,6 +220,13 @@ security/observability/quotas; and tests, Compose, screenshots and docs. Task
 082's compliance guard remains mandatory, quality never edits Product truth, and
 unsupported/stale/unknown profiles fail closed. See
 `tasks/issues/166-product-publication-quality-center.md`.
+
+The completed repository slice includes the deterministic quality engine,
+declarative profile schema, tenant-scoped PostgreSQL evidence, typed
+remediation proposals, read-only operator API, operator UI and a fail-closed
+commerce-sync receipt gate. Connector live credentials, Docker/live evidence
+and runtime promotion remain release-topology gates and cannot be inferred from
+SDK or catalog presence.
 
 ## Юнит-экономика по каналам
 
@@ -486,8 +496,10 @@ are grouped into «Объявления и вертикали», «Социал�
 authenticated health check through the host-mediated catalog probe. They expose
 no product, publication, document, regulated-write or synchronization
 capability until a separate provider qualification adds the required domain
-bridge and worker route. Current inventory: **18 generic / 38 separate-surface /
-0 planned** across 56 providers.
+bridge and worker route. Current inventory at the completion of Task 156 was
+**18 generic / 38 separate-surface / 0 planned** across 56 providers; later
+Tasks 157–159 expand the current inventory to **18 generic / 43 separate-surface
+/ 0 planned** across 61 providers.
 
 ## Task 157 — М.Видео и Lamoda marketplace surfaces
 
@@ -524,10 +536,9 @@ separate-surface / 0 planned** across 61 providers.
 
 ## Task 170 — WMS operator workspace and marketplace fulfillment
 
-In progress: 170.1 → 170.4 connects canonical orders and durable fulfillment
-allocations to tenant-scoped WMS execution tasks. The selected continuation is
-170.5 task context/traceability, 170.6 standalone receiving and inventory
-execution, 170.7 bounded batches/local pack handoff, 170.9 operator UI and
-170.12 qualification/docs. Marketplace write APIs, labels, Честный знак,
-external shipment/status writes and automatic on-hand consumption remain
-separately scoped.
+Done for the repository slice: 170.1 → 170.7, 170.9 and 170.12 connect
+canonical orders and durable fulfillment allocations to tenant-scoped WMS
+execution tasks, standalone inventory work, bounded local pack handoff and the
+operator UI. Marketplace write APIs, labels, Честный знак, external
+shipment/status writes, automatic on-hand consumption and live production
+qualification remain separately scoped gates.

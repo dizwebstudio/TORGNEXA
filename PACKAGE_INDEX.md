@@ -65,6 +65,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 - planned decomposition for provider-neutral order cancellations, full/partial
   returns and payment refunds;
+- provider-neutral shipment lifecycle contract now separates canonical local
+  shipment identity from remote references and reserves idempotency before a
+  future carrier write;
 - twelve bounded subtasks covering policy/state machines, cross-domain
   orchestration, PostgreSQL/RLS/evidence, events/webhooks, cancellation and
   return workers, refund/fiscal/settlement reconciliation, REST/UI,

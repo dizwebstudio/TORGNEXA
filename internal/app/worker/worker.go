@@ -39,6 +39,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
@@ -369,6 +370,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if repoErr != nil {
 			return fail("worker_catalog_repository_startup_failed", repoErr)
 		}
+		publicationQualityRepository, repoErr := publicationqualityrepo.New(db)
+		if repoErr != nil {
+			return fail("worker_publication_quality_repository_startup_failed", repoErr)
+		}
 		orderRepository, repoErr := ordersrepo.New(db)
 		if repoErr != nil {
 			return fail("worker_orders_repository_startup_failed", repoErr)
@@ -404,7 +409,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		}})
 		commerceRoute, routeErr := newCommerceWriteRoute(syncRepository, accountRepository, mappingRepository, catalogRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
 			return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
-		})
+		}, postgresPublicationQualityGate{repository: publicationQualityRepository})
 		if routeErr != nil {
 			return fail("worker_commerce_sync_route_startup_failed", routeErr)
 		}

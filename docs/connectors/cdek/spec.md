@@ -13,7 +13,10 @@ enables `pickup.points.read`. A bounded rate preview is available through
 `POST /api/v1/logistics/rates` when `logistics.rates.read` is enabled. It
 accepts up to 50 parcels and returns up to 100 neutral options. Money is
 parsed as fixed decimal provider text into minor units; provider tariff ids
-are not returned by the application route. Shipment writes, labels,
-tracking, returns and webhooks remain qualification-gated.
+are not returned by the application route. A bounded tracking read is
+available through `GET /api/v1/logistics/tracking` when
+`logistics.track.read` is enabled. It selects the latest status from at most
+100 provider status records and returns no raw provider payload. Shipment
+writes, labels, returns and webhooks remain qualification-gated.
 
 Official documentation: https://apidoc.cdek.ru/

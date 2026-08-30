@@ -114,6 +114,15 @@ type ERPOrderReader = sdk.ERPOrderReader
 // own provider refund/credit-memo semantics.
 type ReturnReader = sdk.ReturnReader
 
+// CommerceWebhookReceiver resolves the signed storefront webhook boundary.
+// Replay claims stay host-owned through sdk.CommerceWebhookDeduplicator.
+type CommerceWebhookReceiver = sdk.CommerceWebhookReceiver
+
+// MarketplaceNotificationDecoder resolves provider-signed or provider-owned
+// notification decoding while keeping replay and durable acknowledgement in
+// the host application.
+type MarketplaceNotificationDecoder = sdk.MarketplaceNotificationDecoder
+
 // OrderReader is the provider-neutral order read surface admitted by the
 // production registry. The registry normalizes configured provider statuses
 // before handing the page to the worker.
@@ -168,8 +177,29 @@ func (r *Registry) LogisticsRates(ctx context.Context, account sdk.Account, runt
 	switch account.ConnectorID {
 	case "cdek":
 		return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
 	default:
 		return nil, ErrUnavailable
+	}
+}
+
+// LogisticsTracking reads one bounded provider shipment status through the
+// reviewed logistics composition. The operation is read-only; provider
+// status codes remain opaque values in the neutral result.
+func (r *Registry) LogisticsTracking(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.track.read") {
+		return sdk.ShipmentResult{}, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
+	default:
+		return sdk.ShipmentResult{}, ErrUnavailable
 	}
 }
 
@@ -522,6 +552,41 @@ func (r *Registry) ReturnReader(ctx context.Context, account sdk.Account, runtim
 		return shopware.New(shopwareHTTP{r.http}, shopwareConfigSource{load: load}, nil), nil
 	case "saleor":
 		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
+	case "woocommerce":
+		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// CommerceWebhookReceiver resolves an admitted storefront webhook receiver.
+func (r *Registry) CommerceWebhookReceiver(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (CommerceWebhookReceiver, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "notifications.receive") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	switch account.ConnectorID {
+	case "woocommerce":
+		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// MarketplaceNotificationDecoder resolves an admitted marketplace
+// notification decoder.
+func (r *Registry) MarketplaceNotificationDecoder(account sdk.Account, load ConfigLoader) (MarketplaceNotificationDecoder, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || !SupportsCapability(account.ConnectorID, "notifications.receive") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	switch account.ConnectorID {
+	case "yandex-market":
+		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}

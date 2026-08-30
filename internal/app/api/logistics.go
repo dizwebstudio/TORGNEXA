@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +23,10 @@ import (
 const (
 	logisticsPickupPointsPath = "/api/v1/logistics/pickup-points"
 	logisticsRatesPath        = "/api/v1/logistics/rates"
+	logisticsTrackingPath     = "/api/v1/logistics/tracking"
 )
+
+var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 
 // logisticsCapabilityStore is kept separate from the concrete PostgreSQL
 // repository so the operation remains testable without a database.
@@ -35,6 +39,7 @@ type logisticsRuntime interface {
 	SupportsCapability(string, string) bool
 	PickupPoints(context.Context, sdk.Account, sdk.Runtime, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
 	LogisticsRates(context.Context, sdk.Account, sdk.Runtime, sdk.RateRequest) ([]sdk.RateQuote, error)
+	LogisticsTracking(context.Context, sdk.Account, sdk.Runtime, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
 }
 
 type logisticsAPI struct {
@@ -81,11 +86,19 @@ type logisticsRateView struct {
 	ObservedAt    time.Time `json:"observed_at"`
 }
 
+type logisticsTrackingView struct {
+	RemoteID       string    `json:"remote_id"`
+	Status         string    `json:"status"`
+	TrackingNumber string    `json:"tracking_number,omitempty"`
+	ObservedAt     time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
+		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
 	}
 }
 
@@ -208,6 +221,50 @@ func (api logisticsAPI) calculateRates(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (api logisticsAPI) readTracking(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	remoteID := strings.TrimSpace(r.URL.Query().Get("remote_id"))
+	if accountID == "" || !logisticsRemoteIDPattern.MatchString(remoteID) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.track.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Tracking operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Tracking capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	result, err := api.runtime.LogisticsTracking(r.Context(), account, runtime, sdk.ShipmentStatusRequest{RemoteID: remoteID})
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if result.RemoteID == "" || len(result.RemoteID) > 192 || result.Status == "" || len(result.Status) > 64 || len(result.TrackingNumber) > 192 || result.ObservedAt.IsZero() {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, logisticsTrackingView{RemoteID: result.RemoteID, Status: result.Status, TrackingNumber: result.TrackingNumber, ObservedAt: result.ObservedAt})
 }
 
 func (input logisticsRatesInput) toSDK() sdk.RateRequest {

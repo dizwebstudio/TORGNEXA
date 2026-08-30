@@ -10,5 +10,6 @@ import (
 // Plaintext credentials are valid only for the duration of each callback.
 type Transport interface {
 	Ping(context.Context, []byte) error
+	Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error)
 	Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
 }

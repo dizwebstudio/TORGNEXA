@@ -24,6 +24,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
@@ -53,6 +54,7 @@ type productionRouteDependencies struct {
 	orders             orderStatusRepository
 	catalog            *catalogrepo.Repository
 	pricing            *pricingrepo.Repository
+	publicationQuality *publicationqualityrepo.Repository
 	pim                *pimrepo.Repository
 	images             *catalogimagerepo.Repository
 	inventory          *inventoryrepo.Repository
@@ -110,6 +112,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newSearchRoutes(deps.search, deps.auditService)...)
 	routes = append(routes, newOrderStatusRoutes(deps.orders)...)
 	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
+	routes = append(routes, newPublicationQualityRoutes(deps.publicationQuality)...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)

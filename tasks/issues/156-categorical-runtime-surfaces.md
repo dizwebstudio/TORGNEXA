@@ -33,7 +33,7 @@ Status: Repository implementation complete
 
 ## Acceptance criteria
 
-- generated runtime support содержит 56 коннекторов: 18 `ready`, 38
+- generated runtime support содержит 61 коннектор: 18 `ready`, 43
   `separate_surface`, 0 `planned`;
 - каждая из 14 карточек видна только в своей категорийной поверхности;
 - account creation, credentials и authenticated health check работают через

@@ -42,6 +42,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
@@ -205,6 +206,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pricingRepository, err := pricingrepo.New(db)
 	if err != nil {
 		return newRuntimeError("pricing_repository_startup_failed", err)
+	}
+	publicationQualityRepository, err := publicationqualityrepo.New(db)
+	if err != nil {
+		return newRuntimeError("publication_quality_repository_startup_failed", err)
 	}
 	pimRepository, err := pimrepo.New(db)
 	if err != nil {
@@ -388,7 +393,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	routeDeps := productionRouteDependencies{
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
-		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, pim: pimRepository,
+		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, publicationQuality: publicationQualityRepository, pim: pimRepository,
 		images: imageRepository, inventory: inventoryRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,

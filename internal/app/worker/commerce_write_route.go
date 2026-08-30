@@ -21,6 +21,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectormaprepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/publicationquality"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 )
@@ -67,14 +68,19 @@ type commerceWriteRoute struct {
 	receipts   *syncrepo.Repository
 	registry   commerceWriteRuntime
 	newRuntime commerceWriteRuntimeFactory
+	quality    commercePublicationQualityGate
 	now        func() time.Time
 }
 
-func newCommerceWriteRoute(policies *syncrepo.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, registry commerceWriteRuntime, newRuntime commerceWriteRuntimeFactory) (*commerceWriteRoute, error) {
+func newCommerceWriteRoute(policies *syncrepo.Repository, accounts *connectorrepo.Repository, mappings *connectormaprepo.Repository, catalogRepository *catalogrepo.Repository, registry commerceWriteRuntime, newRuntime commerceWriteRuntimeFactory, quality ...commercePublicationQualityGate) (*commerceWriteRoute, error) {
 	if policies == nil || accounts == nil || mappings == nil || catalogRepository == nil || registry == nil || newRuntime == nil {
 		return nil, errors.New("worker: commerce write route dependencies required")
 	}
-	return &commerceWriteRoute{policies: policies, accounts: accounts, mappings: mappings, catalog: catalogRepository, receipts: policies, registry: registry, newRuntime: newRuntime, now: func() time.Time { return time.Now().UTC() }}, nil
+	route := &commerceWriteRoute{policies: policies, accounts: accounts, mappings: mappings, catalog: catalogRepository, receipts: policies, registry: registry, newRuntime: newRuntime, now: func() time.Time { return time.Now().UTC() }}
+	if len(quality) > 0 {
+		route.quality = quality[0]
+	}
+	return route, nil
 }
 
 // Handle routes canonical product, price and inventory mutations to enabled
@@ -320,6 +326,16 @@ func (r *commerceWriteRoute) route(ctx context.Context, scope tenancy.Scope, eve
 		}
 		if !sdk.CapabilityEnabled(settings, writeCapability) {
 			continue
+		}
+		if entity == commerceProductsEntity && r.quality != nil {
+			if qualityErr := r.quality.CheckProduct(ctx, scope, account, mappingLocalID, localVersion, r.now().UTC()); qualityErr != nil {
+				if errors.Is(qualityErr, publicationquality.ErrGateDenied) || errors.Is(qualityErr, publicationquality.ErrReceiptStale) || errors.Is(qualityErr, publicationquality.ErrUnsupported) {
+					permanentErr = eventbus.Permanent("commerce_sync_quality_gate_denied")
+				} else {
+					retryableErr = eventbus.Retryable("commerce_sync_quality_gate_unavailable")
+				}
+				continue
+			}
 		}
 		mapping, err := r.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, mappingEntityType, mappingLocalID)
 		mappingMissing := false

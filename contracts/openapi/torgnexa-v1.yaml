@@ -5,6 +5,35 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /publication-quality/runs:
+    get:
+      operationId: listPublicationQualityRuns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: product_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Tenant-scoped publication quality decisions, content: {application/json: {schema: {$ref: '#/components/schemas/PublicationQualityRunPage'}}}}
+        '400': {description: Invalid quality query}
+        '403': {description: Caller lacks products.read}
+  /publication-quality/runs/{run_id}:
+    get:
+      operationId: getPublicationQualityRun
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Quality run with bounded issues, content: {application/json: {schema: {$ref: '#/components/schemas/PublicationQualityRun'}}}}
+        '404': {description: Quality run not found}
+  /publication-quality/receipts/{receipt_id}:
+    get:
+      operationId: getPublicationQualityReceipt
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: receipt_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Exact-match publication gate receipt, content: {application/json: {schema: {$ref: '#/components/schemas/PublicationQualityGateReceipt'}}}}
+        '404': {description: Quality receipt not found}
   /social/channels:
     get:
       operationId: listSocialChannels
@@ -79,6 +108,19 @@ paths:
       responses:
         '200': {description: Bounded neutral delivery-rate preview, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsRatePage'}}}}
         '400': {description: Invalid rate request}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
+  /logistics/tracking:
+    get:
+      operationId: readLogisticsTracking
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: remote_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Current neutral shipment status, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsTracking'}}}}
+        '400': {description: Invalid tracking query}
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
@@ -2260,6 +2302,104 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    PublicationQualityIssue:
+      type: object
+      additionalProperties: false
+      required: [code, category, severity, field_path, message, remediation]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,63}$'}
+        category: {type: string, enum: [identity_content, category_attributes, media, price_stock, compliance, mapping_capability, localization, channel_contract]}
+        severity: {type: string, enum: [block, approval_required, warn, info]}
+        field_path: {type: string, maxLength: 256}
+        message: {type: string, minLength: 1, maxLength: 240}
+        expected: {type: string, maxLength: 256}
+        observed: {type: string, maxLength: 256}
+        remediation: {type: string, minLength: 1, maxLength: 240}
+        source_ref: {type: string, maxLength: 192}
+    PublicationQualityRunSummary:
+      type: object
+      additionalProperties: false
+      required: [id, product_id, connector_account_id, connector_id, channel_family, decision, score_bps, evaluated_at, valid_until, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        connector_account_id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        channel_family: {type: string, maxLength: 192}
+        decision: {type: string, enum: [ready, ready_with_warnings, blocked, approval_required, stale, unsupported, not_configured, unknown]}
+        score_bps: {type: integer, minimum: 0, maximum: 10000}
+        evaluated_at: {type: string, format: date-time, pattern: 'Z$'}
+        valid_until: {type: string, format: date-time, pattern: 'Z$'}
+        version: {type: integer, minimum: 1}
+    PublicationQualityRunPage:
+      type: object
+      additionalProperties: false
+      required: [items, limit]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/PublicationQualityRunSummary'}}
+        limit: {type: integer, minimum: 1, maximum: 100}
+    PublicationQualityTarget:
+      type: object
+      additionalProperties: false
+      required: [organization_id, workspace_id, product_id, connector_account_id, connector_id, channel_family, locale, jurisdiction]
+      properties:
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        connector_account_id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        channel_family: {type: string, maxLength: 192}
+        locale: {type: string, pattern: '^[a-z]{2}(-[A-Z]{2})?$'}
+        jurisdiction: {type: string, pattern: '^[A-Z]{2}$'}
+    PublicationQualityRun:
+      type: object
+      additionalProperties: false
+      required: [id, target, product_version, offer_version, price_version, inventory_version, media_version, mapping_version, capability_version, snapshot_digest, profile_digest, compliance_fingerprint, evaluated_at, valid_until, status, decision, score_bps, category_scores_bps, issues, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        target: {$ref: '#/components/schemas/PublicationQualityTarget'}
+        product_version: {type: integer, minimum: 1}
+        offer_version: {type: integer, minimum: 0}
+        price_version: {type: integer, minimum: 0}
+        inventory_version: {type: integer, minimum: 0}
+        media_version: {type: integer, minimum: 0}
+        mapping_version: {type: integer, minimum: 0}
+        capability_version: {type: integer, minimum: 0}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        profile_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        compliance_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        evaluated_at: {type: string, format: date-time, pattern: 'Z$'}
+        valid_until: {type: string, format: date-time, pattern: 'Z$'}
+        status: {type: string, enum: [queued, running, completed, failed, cancelled]}
+        decision: {type: string, enum: [ready, ready_with_warnings, blocked, approval_required, stale, unsupported, not_configured, unknown]}
+        score_bps: {type: integer, minimum: 0, maximum: 10000}
+        category_scores_bps: {type: object, additionalProperties: {type: integer, minimum: 0, maximum: 10000}}
+        issues: {type: array, maxItems: 1024, items: {$ref: '#/components/schemas/PublicationQualityIssue'}}
+        version: {type: integer, minimum: 1}
+    PublicationQualityGateReceipt:
+      type: object
+      additionalProperties: false
+      required: [id, target, product_version, offer_version, price_version, inventory_version, media_version, mapping_version, capability_version, snapshot_digest, profile_digest, compliance_fingerprint, decision, issued_at, valid_until, run_id, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        target: {$ref: '#/components/schemas/PublicationQualityTarget'}
+        product_version: {type: integer, minimum: 1}
+        offer_version: {type: integer, minimum: 0}
+        price_version: {type: integer, minimum: 0}
+        inventory_version: {type: integer, minimum: 0}
+        media_version: {type: integer, minimum: 0}
+        mapping_version: {type: integer, minimum: 0}
+        capability_version: {type: integer, minimum: 0}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        profile_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        compliance_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        decision: {type: string, enum: [ready, ready_with_warnings]}
+        issued_at: {type: string, format: date-time, pattern: 'Z$'}
+        valid_until: {type: string, format: date-time, pattern: 'Z$'}
+        run_id: {type: string, maxLength: 192}
+        version: {type: integer, minimum: 1}
     SortableID:
       type: string
       pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'
@@ -2544,6 +2684,15 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsRateQuote'}}
+    LogisticsTracking:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        tracking_number: {type: string, maxLength: 192}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
     Quantity:
       type: object
       additionalProperties: false

@@ -45,8 +45,8 @@ capabilities.
 | Shopify | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | Shopware 6 | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | Wildberries | product/inventory read | products, inventory inbound | no |
-| WooCommerce | product/price/inventory/order reads; product/price/inventory writes; order status write ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound | required |
-| Yandex Market | product/price/inventory/order reads; price write | products, prices inbound; prices outbound; inventory and orders inbound | required |
+| WooCommerce | product/price/inventory/order/return reads; product/price/inventory writes; order status write and signed webhook receipt ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
+| Yandex Market | product/price/inventory/order reads; price write; notification decoder | products, prices inbound; prices outbound; inventory and orders inbound | required |
 | Magento (Adobe Commerce) | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | CS-Cart | product read/write | inbound + outbound | required |
 | Saleor | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
@@ -134,11 +134,13 @@ JSON с OAuth client credentials, для «Деловых Линий» — appke
 «Почты России» — токен приложения и ключ пользователя. Товарная синхронизация
 не заявляется; для CDEK, ПЭК, «Деловых Линий» и «Почты России» доступно
 bounded read-only чтение справочника ПВЗ/терминалов через `pickup.points.read`.
-Для CDEK также доступен bounded предпросмотр тарифов через
+Для CDEK, ПЭК и «Почты России» также доступен bounded предпросмотр тарифов через
 `POST /api/v1/logistics/rates` с capability `logistics.rates.read`; запрос
 ограничен 50 местами, ответ — 100 вариантами и не раскрывает код тарифа.
-Создание отправлений, статусы и этикетки остаются закрытыми до квалификации
-актуального API и тестового кабинета.
+Для СДЭК и ПЭК также доступно bounded read-only отслеживание одного отправления
+через `GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
+Создание отправлений и этикетки остаются закрытыми до квалификации актуального
+API и тестового кабинета.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
 использует пару `client_id`/`api_key` продавца Ozon и проверяет доступ к
@@ -172,10 +174,14 @@ capabilities.
 The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
 and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Линии» and «Почта России»
 expose a bounded, read-only `pickup.points.read` application route for their
-official ПВЗ/terminal directories; CDEK additionally exposes a bounded
-read-only rate preview. Shipment writes, tracking, labels and other carrier
+official ПВЗ/terminal directories; CDEK, ПЭК and «Почта России» additionally
+expose a bounded read-only rate preview, while CDEK and ПЭК also expose a bounded
+`logistics.track.read` status lookup. Shipment writes, labels and other carrier
 operations remain fail-closed until provider qualification. 5Post and Ozon
 Доставка expose only the separately reviewed credential-check surface.
+
+The exact write qualification boundary and next host-side steps are recorded in
+the [logistics write qualification matrix](connectors/logistics-write-qualification.md).
 
 Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
 карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded

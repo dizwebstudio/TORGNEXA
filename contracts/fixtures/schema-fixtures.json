@@ -4290,6 +4290,49 @@
       }
     },
     {
+      "schema": "publication-quality/profile.schema.json",
+      "valid": {
+        "id": "storefront-demo-v1",
+        "version": 1,
+        "connector_id": "storefront-demo",
+        "channel_family": "storefront",
+        "locale": "ru-RU",
+        "jurisdiction": "RU",
+        "freshness_ttl_seconds": 86400,
+        "rules": [
+          {"id": "brand_required", "category": "category_attributes", "field": "brand", "kind": "required", "severity": "block", "message": "brand is required", "remediation": "set brand"},
+          {"id": "price_min", "category": "price_stock", "field": "price_minor", "kind": "min_value", "severity": "warn", "min": "100", "message": "minimum price", "remediation": "review price"}
+        ],
+        "weights": {"identity_content": 2, "category_attributes": 1, "price_stock": 2},
+        "required_media": 1,
+        "allowed_media_formats": ["jpg", "png"],
+        "max_media_bytes": 10000000,
+        "require_price": true,
+        "require_stock": true,
+        "currency": "RUB",
+        "active": true
+      },
+      "invalid": {
+        "id": "storefront-demo-v1",
+        "version": 0,
+        "connector_id": "storefront-demo",
+        "channel_family": "storefront",
+        "locale": "ru-RU",
+        "jurisdiction": "RU",
+        "freshness_ttl_seconds": 86400,
+        "rules": [],
+        "weights": {},
+        "required_media": 0,
+        "allowed_media_formats": [],
+        "max_media_bytes": 10000000,
+        "require_price": true,
+        "require_stock": true,
+        "currency": "RUB",
+        "active": true,
+        "unsafe_expression": "fetch('https://example.invalid')"
+      }
+    },
+    {
       "schema": "reconciliation/action-v1.schema.json",
       "valid": {
         "id": "rca_test_014",

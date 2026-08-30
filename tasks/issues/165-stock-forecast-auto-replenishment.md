@@ -2,7 +2,10 @@
 
 ## Status
 
-`planned` — подробная декомпозиция подготовлена, реализация не начата.
+`in_progress` — foundation Task 165.1–165.2, deterministic baseline portions
+of 165.4–165.6 and part of 165.7 реализованы: provider-neutral model,
+tenant-scoped persistence and unit tests. Input adapters, durable worker,
+API/UI, procurement execution and production qualification остаются открытыми.
 
 ## Objective
 
@@ -76,6 +79,10 @@ SDK-метода поставщика. Если policy/ADR не допускае
 
 **Depends on:** none.
 
+**Статус:** выполнено для foundation. ADR 0118 фиксирует три режима,
+advisory default, fail-closed и границы WMS/procurement; полноценная policy
+matrix с live capability evidence остаётся частью runtime-квалификации.
+
 - Зафиксировать ADR, который расширяет ADR-0056, но сохраняет advisory default
   и правило «создание/отправка PO — отдельная approved write».
 - Утвердить planning grain: Offer/SKU × Warehouse × optional sales channel,
@@ -97,6 +104,11 @@ SDK-метода поставщика. Если policy/ADR не допускае
 ### 165.2 — Canonical planning model and invariants
 
 **Depends on:** 165.1.
+
+**Статус:** выполнено для базовых контрактов и exact arithmetic. Добавлены
+provider-neutral типы, digest/version lineage, quality gates, p50/p90,
+shortfall и MOQ/case-pack invariants; проверки существования/архивности
+канонических Offer/Warehouse/SupplierOffer будут в input/repository slice.
 
 - Ввести provider-neutral типы `DemandObservation`, `ForecastRun`,
   `ForecastPoint`, `StockProjection`, `ReorderPolicy`,
@@ -143,6 +155,9 @@ tenant не видит входы другого.
 
 **Depends on:** 165.2, 165.3.
 
+**Статус:** базовый deterministic latest-observation baseline выполнен.
+Backtest, сезонность, EWMA/интервалы и model registry ещё не подключены.
+
 - Реализовать deterministic baseline первой версии: seasonal-naive/EWMA или
   иной одобренный алгоритм с явным fallback для sparse/intermittent demand;
   алгоритм и параметры версионировать.
@@ -166,6 +181,9 @@ inventory/procurement факт.
 
 **Depends on:** 165.3, 165.4.
 
+**Статус:** базовая projection с inbound, no-negative clamp и явным shortfall
+выполнена; days-of-supply, stockout date, overstock и сценарии остаются.
+
 - Рассчитывать дневную/периодную проекцию: opening available + confirmed
   inbound − forecast demand − reservations/allocations с явными правилами
   lead-time uncertainty и receiving delay.
@@ -187,6 +205,10 @@ horizon и memory.
 
 **Depends on:** 165.1–165.5.
 
+**Статус:** базовая policy/recommendation и exact MOQ/case-pack/max-order
+проверки выполнены; supplier/legal-party, budget/capacity и open-PO
+оптимизация ещё не подключены.
+
 - Реализовать reorder point/target stock: demand during lead time + safety /
   service-level buffer с учётом projected available, inbound, review cadence и
   supplier lead-time uncertainty.
@@ -207,6 +229,10 @@ breaking; recommendation объясняет, почему quantity равна н
 ### 165.7 — Persistence, lineage and retention
 
 **Depends on:** 165.2–165.6.
+
+**Статус:** additive migration 000032 с RLS, indexes, run/input digests,
+append-only recommendation history и draft-plan metadata выполнена. Репозитории,
+retention jobs и outbox lineage ещё не подключены.
 
 - Additive migration расширяет `replenishment_snapshots` и
   `replenishment_recommendations` либо вводит связанные tables для forecast

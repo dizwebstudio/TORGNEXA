@@ -31,6 +31,7 @@ type logisticsRuntimeStub struct {
 	supported bool
 	points    []sdk.PickupPoint
 	rates     []sdk.RateQuote
+	tracking  sdk.ShipmentResult
 }
 
 func (stub logisticsRuntimeStub) SupportsCapability(string, string) bool { return stub.supported }
@@ -47,6 +48,13 @@ func (stub logisticsRuntimeStub) LogisticsRates(_ context.Context, _ sdk.Account
 		return nil, errors.New("runtime or request missing")
 	}
 	return stub.rates, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsTracking(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	if runtime == nil || query.RemoteID == "" {
+		return sdk.ShipmentResult{}, errors.New("runtime or tracking request missing")
+	}
+	return stub.tracking, nil
 }
 
 type logisticsSecretsStub struct{}
@@ -141,6 +149,47 @@ func TestLogisticsRatesRouteFailsClosedWithoutEnabledCapability(t *testing.T) {
 	}
 	body := strings.NewReader(`{"connector_account_id":"cdek-account","from":{"country":"RU","city":"Москва","line1":"Тверская, 1"},"to":{"country":"RU","city":"Москва","line1":"Тверская, 2"},"parcels":[{"weight_grams":1000,"length_mm":100,"width_mm":100,"height_mm":100}]}`)
 	request := httptest.NewRequest(http.MethodPost, logisticsRatesPath, body).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsTrackingRouteReturnsNeutralStatus(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.track.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, tracking: sdk.ShipmentResult{RemoteID: "1100285492", Status: "DELIVERED", TrackingNumber: "1100285492", ObservedAt: now}})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsTrackingPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("tracking route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsTrackingPath+"?connector_account_id=cdek-account&remote_id=1100285492")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"1100285492"`) || !strings.Contains(response.Body.String(), `"status":"DELIVERED"`) || !strings.Contains(response.Body.String(), `"tracking_number":"1100285492"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsTrackingRouteFailsClosedWithoutEnabledCapability(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsTrackingPath {
+			route = candidate
+		}
+	}
+	request := logisticsRequest(t, scope, logisticsTrackingPath+"?connector_account_id=cdek-account&remote_id=1100285492")
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusConflict {

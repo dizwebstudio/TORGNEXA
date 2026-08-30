@@ -3,7 +3,7 @@
   "id": "ARCH-145",
   "task": "145",
   "change_class": "new_provider",
-  "summary": "Move the existing CDEK reference from planned to the separate Delivery verification surface and add a Деловые Линии SDK adapter with appkey/PAT health checks; shipment operations remain qualification-gated.",
+  "summary": "Move the existing CDEK reference from planned to the separate Delivery verification surface and add a Деловые Линии SDK adapter with appkey/PAT health checks; CDEK also gains a bounded read-only tracking route while shipment operations remain qualification-gated.",
   "scopes": [
     "PACKAGE_INDEX.md",
     "README.md",
@@ -13,13 +13,15 @@
     "connectors/logistics/cdek/manifest.json",
     "connectors/logistics/dellin",
     "contracts/connectors/builtin-runtime-support-v1.json",
+    "contracts/openapi/torgnexa-v1.yaml",
     "docs/10-integrations-matrix.md",
     "docs/connectors/cdek",
     "docs/connectors/dellin",
     "frontend/public/connector-logos/dellin.svg",
     "frontend/src/features/settings/IntegrationCatalog.tsx",
     "frontend/src/generated/connector-catalog.ts",
-    "frontend/test/ui-experience.test.mjs",
+    "internal/app/api/logistics.go",
+    "internal/app/api/logistics_test.go",
     "internal/platform/builtinruntime/logistics_transport.go",
     "internal/platform/builtinruntime/logistics_transport_test.go",
     "internal/platform/builtinruntime/registry.go",
@@ -27,6 +29,10 @@
     "internal/platform/builtinruntime/support_test.go",
     "internal/platform/connectors/catalog_generated.go",
     "scripts/generate-frontend-connector-catalog.py",
+    "sdk/go/torgnexa/client.gen.go",
+    "sdk/python/torgnexa_sdk/client_gen.py",
+    "sdk/typescript/src/client.gen.d.mts",
+    "sdk/typescript/src/client.gen.mjs",
     "tasks/BACKLOG.md",
     "tasks/EXECUTION_PLAN.md",
     "tasks/issues/145-cdek-dellin-delivery-verification.md"
@@ -52,8 +58,8 @@
   },
   "impacts": [
     {"area":"tenancy","status":"affected","evidence":"Both providers bind credentials to one tenant-scoped connector account; no caller-supplied tenant override is accepted."},
-    {"area":"privacy_data_governance","status":"affected","evidence":"CDEK client secrets and the Деловые Линии PAT stay behind SecretProvider; access/session tokens and provider payloads are discarded after health checks."},
-    {"area":"api_compatibility","status":"not_affected","evidence":"No public endpoint is added; the existing connector-account create/enroll/check control plane is reused."},
+    {"area":"privacy_data_governance","status":"affected","evidence":"CDEK client secrets and the Деловые Линии PAT stay behind SecretProvider; access/session tokens and raw provider tracking payloads are discarded after each bounded read."},
+    {"area":"api_compatibility","status":"affected","evidence":"The additive GET /api/v1/logistics/tracking contract is generated into the public SDKs and remains capability-gated; no existing operation changes."},
     {"area":"event_compatibility","status":"not_affected","evidence":"No event or canonical envelope is added."},
     {"area":"plugin_sdk_compatibility","status":"affected","evidence":"The new adapter and CDEK host transport use the frozen Connector SDK v1 and existing additive logistics interfaces."},
     {"area":"database_migration","status":"not_affected","evidence":"Provider-neutral connector accounts and health history are reused; no provider-specific table is introduced."},
@@ -64,7 +70,7 @@
     {"area":"webhooks_egress","status":"affected","evidence":"Only fixed HTTPS health endpoints are called; no arbitrary callback or webhook ingress is introduced."},
     {"area":"slo_observability","status":"affected","evidence":"Manifest timeouts/retry metadata and normalized provider-unavailable health states bound both probes."},
     {"area":"operations_rollback","status":"affected","evidence":"Runtime support can disable either Delivery entry without a destructive migration or data rollback."},
-    {"area":"testing_conformance","status":"affected","evidence":"Deterministic CDEK and Деловые Линии connector tests plus the required conformance reports pass without production credentials or network access."}
+    {"area":"testing_conformance","status":"affected","evidence":"Deterministic CDEK tracking, CDEK directory/rate, and Деловые Линии connector tests plus the required conformance reports pass without production credentials or network access."}
   ],
   "provider": {
     "id": "dellin",

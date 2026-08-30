@@ -23,6 +23,7 @@ import (
 
 var errLogisticsOperationNotAdmitted = errors.New("logistics operation requires carrier qualification")
 var safeCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
+var pekDecimalPattern = regexp.MustCompile(`^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?$`)
 
 // fivepostHTTP is the reviewed host-side credential probe. The partner API
 // publishes the token endpoint, while shipment payload mappings remain behind
@@ -248,6 +249,24 @@ type cdekTariffListResponse struct {
 	TariffCodes []cdekTariffQuote `json:"tariff_codes"`
 }
 
+type cdekOrderStatus struct {
+	Code           string `json:"code"`
+	StatusCode     string `json:"status_code"`
+	DateTime       string `json:"date_time"`
+	StatusDateTime string `json:"status_date_time"`
+}
+
+type cdekOrderResponse struct {
+	UUID       string            `json:"uuid"`
+	CDEKNumber json.RawMessage   `json:"cdek_number"`
+	Number     json.RawMessage   `json:"number"`
+	Statuses   []cdekOrderStatus `json:"statuses"`
+}
+
+type cdekOrderEnvelope struct {
+	Entity cdekOrderResponse `json:"entity"`
+}
+
 const cdekTariffResponseLimit = 100
 
 func cdekAddress(value sdk.Address) cdekRateLocation {
@@ -402,10 +421,94 @@ func (transport cdekHTTP) Rates(ctx context.Context, secret []byte, request sdk.
 	}
 	return quotes, nil
 }
-func (cdekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+
+var cdekUUIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+var cdekRemotePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+
+func cdekStatusTime(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-0700", "2006-01-02T15:04:05.000-0700"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+	return time.Time{}, errors.New("СДЭК status timestamp is invalid")
 }
-func (cdekHTTP) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+
+func (transport cdekHTTP) Track(ctx context.Context, secret []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || remoteID == "" || !cdekRemotePattern.MatchString(remoteID) {
+		return sdk.ShipmentResult{}, errors.New("СДЭК tracking request is unavailable")
+	}
+	token, err := transport.accessToken(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	queryKey := "cdek_number"
+	if cdekUUIDPattern.MatchString(remoteID) {
+		queryKey = "uuid"
+	}
+	status, body, _, _, _, err := transport.h.do(ctx, http.MethodGet, "api.cdek.ru", "/v2/orders", url.Values{queryKey: []string{remoteID}}, nil, http.Header{"Authorization": []string{"Bearer " + token}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("СДЭК tracking request rejected with status %d", status)
+	}
+	var response cdekOrderEnvelope
+	if json.Unmarshal(body, &response) != nil || len(response.Entity.Statuses) == 0 || len(response.Entity.Statuses) > cdekTariffResponseLimit {
+		return sdk.ShipmentResult{}, errors.New("СДЭК tracking response rejected")
+	}
+	var statusCode string
+	var observedAt time.Time
+	for _, candidate := range response.Entity.Statuses {
+		candidateCode := strings.TrimSpace(candidate.Code)
+		if candidateCode == "" {
+			candidateCode = strings.TrimSpace(candidate.StatusCode)
+		}
+		if !safeCodePattern.MatchString(candidateCode) {
+			return sdk.ShipmentResult{}, errors.New("СДЭК tracking response has no valid status")
+		}
+		observedAtText := candidate.DateTime
+		if strings.TrimSpace(observedAtText) == "" {
+			observedAtText = candidate.StatusDateTime
+		}
+		candidateTime, parseErr := cdekStatusTime(observedAtText)
+		if parseErr != nil {
+			return sdk.ShipmentResult{}, parseErr
+		}
+		if observedAt.IsZero() || candidateTime.After(observedAt) {
+			statusCode = candidateCode
+			observedAt = candidateTime
+		}
+	}
+	canonicalRemoteID := cdekScalarText(response.Entity.CDEKNumber)
+	if canonicalRemoteID == "" {
+		canonicalRemoteID = strings.TrimSpace(response.Entity.UUID)
+	}
+	if canonicalRemoteID == "" {
+		canonicalRemoteID = remoteID
+	}
+	trackingNumber := cdekScalarText(response.Entity.CDEKNumber)
+	if trackingNumber == "" {
+		trackingNumber = cdekScalarText(response.Entity.Number)
+	}
+	if trackingNumber == "" {
+		trackingNumber = canonicalRemoteID
+	}
+	if !cdekRemotePattern.MatchString(canonicalRemoteID) || !cdekRemotePattern.MatchString(trackingNumber) {
+		return sdk.ShipmentResult{}, errors.New("СДЭК tracking response has an invalid identifier")
+	}
+	return sdk.ShipmentResult{
+		RemoteID:       canonicalRemoteID,
+		Status:         statusCode,
+		Cost:           sdk.LogisticsMoney{Currency: "RUB"},
+		TrackingNumber: trackingNumber,
+		ObservedAt:     observedAt,
+	}, nil
+}
+
+func (cdekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
 func (cdekHTTP) Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
@@ -424,8 +527,9 @@ func (cdekHTTP) Webhook(context.Context, []byte, []byte, []byte) (sdk.LogisticsW
 var _ cdek.Transport = cdekHTTP{}
 
 // pekHTTP probes and reads the official ПЭК personal-cabinet API with the
-// documented Basic login/access-key pair. Only the bounded branch/warehouse
-// directory is admitted; rate and shipment operations stay qualification-gated.
+// documented Basic login/access-key pair. Branch lookup and the bounded
+// calculator preview are read-only; shipment operations stay
+// qualification-gated.
 type pekHTTP struct{ h *httpTransport }
 
 type pekCredentials struct {
@@ -608,13 +712,248 @@ func (transport pekHTTP) Pickup(ctx context.Context, secret []byte, query sdk.Pi
 	return points, nil
 }
 
-func (pekHTTP) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error) {
-	return nil, errLogisticsOperationNotAdmitted
+type pekRateDecimal string
+
+func (value pekRateDecimal) MarshalJSON() ([]byte, error) {
+	if !pekDecimalPattern.MatchString(string(value)) {
+		return nil, errors.New("ПЭК calculator decimal is invalid")
+	}
+	return []byte(value), nil
 }
+
+type pekRateCargo struct {
+	Length pekRateDecimal `json:"length"`
+	Width  pekRateDecimal `json:"width"`
+	Height pekRateDecimal `json:"height"`
+	Weight pekRateDecimal `json:"weight"`
+}
+
+type pekRateRequest struct {
+	CurrencyCode        string         `json:"currencyCode"`
+	Types               []int          `json:"types"`
+	SenderWarehouseID   string         `json:"senderWarehouseId"`
+	ReceiverWarehouseID string         `json:"receiverWarehouseId"`
+	IsOpenCarSender     bool           `json:"isOpenCarSender"`
+	IsOpenCarReceiver   bool           `json:"isOpenCarReceiver"`
+	IsHyperMarket       bool           `json:"isHyperMarket"`
+	IsInsurance         bool           `json:"isInsurance"`
+	IsPickUp            bool           `json:"isPickUp"`
+	IsDelivery          bool           `json:"isDelivery"`
+	Cargos              []pekRateCargo `json:"cargos"`
+}
+
+type pekRateTransfer struct {
+	Type            int             `json:"type"`
+	HasError        bool            `json:"hasError"`
+	ErrorMessage    string          `json:"errorMessage"`
+	CostTotal       json.RawMessage `json:"costTotal"`
+	EstDeliveryTime int             `json:"estDeliveryTime"`
+}
+
+type pekRateResponse struct {
+	HasError     bool              `json:"hasError"`
+	ErrorMessage string            `json:"errorMessage"`
+	Transfers    []pekRateTransfer `json:"transfers"`
+}
+
+type pekBasicStatusCargo struct {
+	Info struct {
+		CargoStatus string `json:"cargoStatus"`
+	} `json:"info"`
+	Cargo struct {
+		Code string `json:"code"`
+	} `json:"cargo"`
+}
+
+type pekBasicStatusResponse struct {
+	Cargos []pekBasicStatusCargo `json:"cargos"`
+}
+
+const pekTrackingResponseLimit = 50
+
+func pekTrackingStatus(value string) string {
+	value = strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(value)), " "))
+	switch {
+	case strings.HasPrefix(value, "выдан"), strings.Contains(value, "доставлен получателю"):
+		return "delivered"
+	case strings.Contains(value, "возвращен отправителю"):
+		return "returned_to_sender"
+	case strings.Contains(value, "отправлен на возврат"):
+		return "returned"
+	case strings.Contains(value, "аннулирован"):
+		return "cancelled"
+	case strings.Contains(value, "утилизирован"):
+		return "scrap"
+	case strings.Contains(value, "изъят на таможне"):
+		return "needs_attention"
+	case strings.Contains(value, "адресная доставка"):
+		return "on_delivery"
+	case strings.Contains(value, "в пути"), strings.Contains(value, "принят к перевозке"), strings.Contains(value, "принят на пвз"), strings.Contains(value, "прибыл"), strings.Contains(value, "разгружается"):
+		return "in_transit"
+	case strings.Contains(value, "заявка на забор"), strings.Contains(value, "ожидается передача"), strings.Contains(value, "оформлен"):
+		return "pending"
+	default:
+		return "unknown"
+	}
+}
+
+func pekScaledDecimal(value, scale int64) pekRateDecimal {
+	whole := strconv.FormatInt(value/scale, 10)
+	remainder := value % scale
+	if remainder == 0 {
+		return pekRateDecimal(whole)
+	}
+	fraction := strconv.FormatInt(remainder, 10)
+	width := len(strconv.FormatInt(scale-1, 10))
+	if len(fraction) < width {
+		fraction = strings.Repeat("0", width-len(fraction)) + fraction
+	}
+	return pekRateDecimal(whole + "." + fraction)
+}
+
+func pekRateWarehouse(ctx context.Context, transport pekHTTP, secret []byte, city string) (string, error) {
+	points, err := transport.Pickup(ctx, secret, sdk.PickupPointQuery{Country: "RU", City: city, Limit: 50})
+	if err != nil {
+		return "", err
+	}
+	for _, point := range points {
+		if point.Active && point.RemoteID != "" {
+			return point.RemoteID, nil
+		}
+	}
+	return "", errors.New("ПЭК calculator city has no active warehouse")
+}
+
+func (transport pekHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if transport.h == nil || request.Validate() != nil || !strings.EqualFold(request.From.Country, "RU") || !strings.EqualFold(request.To.Country, "RU") {
+		return nil, errors.New("ПЭК tariff request is unavailable")
+	}
+	credentials, err := readPekCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	senderWarehouseID, err := pekRateWarehouse(ctx, transport, secret, request.From.City)
+	if err != nil {
+		return nil, err
+	}
+	receiverWarehouseID, err := pekRateWarehouse(ctx, transport, secret, request.To.City)
+	if err != nil {
+		return nil, err
+	}
+	cargos := make([]pekRateCargo, 0, len(request.Parcels))
+	for _, parcel := range request.Parcels {
+		cargos = append(cargos, pekRateCargo{
+			Length: pekScaledDecimal(parcel.LengthMM, 1000),
+			Width:  pekScaledDecimal(parcel.WidthMM, 1000),
+			Height: pekScaledDecimal(parcel.HeightMM, 1000),
+			Weight: pekScaledDecimal(parcel.WeightGrams, 1000),
+		})
+	}
+	body, err := json.Marshal(pekRateRequest{
+		CurrencyCode:        "643",
+		Types:               []int{3},
+		SenderWarehouseID:   senderWarehouseID,
+		ReceiverWarehouseID: receiverWarehouseID,
+		Cargos:              cargos,
+	})
+	if err != nil {
+		return nil, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json;charset=utf-8"}, "Accept": []string{"application/json"}}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "kabinet.pecom.ru", "/api/v1/calculator/calculateprice/", url.Values{}, body, headers, []byte(credentials.Username), []byte(credentials.Password))
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("ПЭК calculator request rejected with status %d", status)
+	}
+	var response pekRateResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Transfers) > 100 {
+		return nil, errors.New("ПЭК calculator response rejected")
+	}
+	now := time.Now().UTC()
+	quotes := make([]sdk.RateQuote, 0, len(response.Transfers))
+	seen := make(map[string]struct{}, len(response.Transfers))
+	for _, transfer := range response.Transfers {
+		if transfer.HasError {
+			continue
+		}
+		if transfer.Type < 1 || transfer.Type > 10000 || transfer.EstDeliveryTime < 0 || transfer.EstDeliveryTime > 3660 {
+			return nil, errors.New("ПЭК calculator response has invalid transfer")
+		}
+		serviceCode := "pek_type_" + strconv.Itoa(transfer.Type)
+		if !safeCodePattern.MatchString(serviceCode) {
+			return nil, errors.New("ПЭК calculator response has invalid transfer identifier")
+		}
+		if _, duplicate := seen[serviceCode]; duplicate {
+			return nil, errors.New("ПЭК calculator response has duplicate transfers")
+		}
+		seen[serviceCode] = struct{}{}
+		minorUnits, err := cdekMinorUnits(transfer.CostTotal)
+		if err != nil {
+			return nil, errors.New("ПЭК calculator response has invalid cost")
+		}
+		at := now.Add(time.Duration(transfer.EstDeliveryTime) * 24 * time.Hour)
+		quotes = append(quotes, sdk.RateQuote{ServiceCode: serviceCode, Cost: sdk.LogisticsMoney{MinorUnits: minorUnits, Currency: "RUB"}, MinDeliveryAt: at, MaxDeliveryAt: at, ObservedAt: now})
+	}
+	if len(quotes) == 0 {
+		return nil, errors.New("ПЭК calculator returned no applicable transfer")
+	}
+	return quotes, nil
+}
+
+func (transport pekHTTP) Track(ctx context.Context, secret []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || remoteID == "" || !cdekRemotePattern.MatchString(remoteID) {
+		return sdk.ShipmentResult{}, errors.New("ПЭК tracking request is unavailable")
+	}
+	credentials, err := readPekCredentials(secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	body, err := json.Marshal(struct {
+		CargoCodes []string `json:"cargoCodes"`
+	}{CargoCodes: []string{remoteID}})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json;charset=utf-8"}, "Accept": []string{"application/json"}}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "kabinet.pecom.ru", "/api/v1/cargos/basicstatus/", url.Values{}, body, headers, []byte(credentials.Username), []byte(credentials.Password))
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("ПЭК tracking request rejected with status %d", status)
+	}
+	var response pekBasicStatusResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Cargos) == 0 || len(response.Cargos) > pekTrackingResponseLimit {
+		return sdk.ShipmentResult{}, errors.New("ПЭК tracking response rejected")
+	}
+	var cargo pekBasicStatusCargo
+	for _, candidate := range response.Cargos {
+		if strings.TrimSpace(candidate.Cargo.Code) == remoteID {
+			cargo = candidate
+			break
+		}
+	}
+	if strings.TrimSpace(cargo.Cargo.Code) == "" {
+		return sdk.ShipmentResult{}, errors.New("ПЭК tracking response has no matching cargo")
+	}
+	statusCode := pekTrackingStatus(cargo.Info.CargoStatus)
+	canonicalRemoteID := strings.TrimSpace(cargo.Cargo.Code)
+	if !cdekRemotePattern.MatchString(canonicalRemoteID) {
+		return sdk.ShipmentResult{}, errors.New("ПЭК tracking response has invalid cargo identifier")
+	}
+	return sdk.ShipmentResult{
+		RemoteID:       canonicalRemoteID,
+		Status:         statusCode,
+		Cost:           sdk.LogisticsMoney{Currency: "RUB"},
+		TrackingNumber: canonicalRemoteID,
+		ObservedAt:     time.Now().UTC(),
+	}, nil
+}
+
 func (pekHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
-}
-func (pekHTTP) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
 
@@ -854,6 +1193,108 @@ func pochtarussiaPostalCode(raw json.RawMessage) (string, error) {
 		}
 	}
 	return value, nil
+}
+
+func pochtarussiaRequestPostalCode(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if len(value) != 6 {
+		return "", errors.New("Почта России rate request has invalid postal code")
+	}
+	for _, digit := range []byte(value) {
+		if digit < '0' || digit > '9' {
+			return "", errors.New("Почта России rate request has invalid postal code")
+		}
+	}
+	return value, nil
+}
+
+func pochtarussiaNonNegativeInt(raw json.RawMessage) (int64, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var number json.Number
+	if decoder.Decode(&number) != nil {
+		return 0, errors.New("Почта России rate response has invalid integer")
+	}
+	value, err := strconv.ParseInt(number.String(), 10, 64)
+	if err != nil || value < 0 {
+		return 0, errors.New("Почта России rate response has invalid integer")
+	}
+	return value, nil
+}
+
+type pochtarussiaRateDelivery struct {
+	Min json.RawMessage `json:"min"`
+	Max json.RawMessage `json:"max"`
+}
+
+type pochtarussiaRateResponse struct {
+	ID       int64                    `json:"id"`
+	Errors   []json.RawMessage        `json:"errors"`
+	Items    []json.RawMessage        `json:"items"`
+	PayNDS   json.RawMessage          `json:"paynds"`
+	Delivery pochtarussiaRateDelivery `json:"delivery"`
+}
+
+func (transport pochtarussiaHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if transport.h == nil || request.Validate() != nil || !strings.EqualFold(request.From.Country, "RU") || !strings.EqualFold(request.To.Country, "RU") {
+		return nil, errors.New("Почта России rate request rejected")
+	}
+	if _, err := readPochtaRussiaCredentials(secret); err != nil {
+		return nil, err
+	}
+	from, err := pochtarussiaRequestPostalCode(request.From.PostalCode)
+	if err != nil {
+		return nil, err
+	}
+	to, err := pochtarussiaRequestPostalCode(request.To.PostalCode)
+	if err != nil {
+		return nil, err
+	}
+	var weight int64
+	for _, parcel := range request.Parcels {
+		if parcel.WeightGrams > (int64(1<<63-1) - weight) {
+			return nil, errors.New("Почта России rate request weight is out of range")
+		}
+		weight += parcel.WeightGrams
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "tariff.pochta.ru", "/v2/calculate/tariff/delivery", url.Values{
+		"format":    []string{"json"},
+		"errorcode": []string{"1"},
+		"object":    []string{"23030"},
+		"weight":    []string{strconv.FormatInt(weight, 10)},
+		"from":      []string{from},
+		"to":        []string{to},
+	}, nil, http.Header{"Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Почта России rate request rejected with status %d", status)
+	}
+	var response pochtarussiaRateResponse
+	if json.Unmarshal(responseBody, &response) != nil || response.ID != 23030 || len(response.Errors) != 0 || len(response.Items) == 0 {
+		return nil, errors.New("Почта России rate response rejected")
+	}
+	cost, err := pochtarussiaNonNegativeInt(response.PayNDS)
+	if err != nil {
+		return nil, err
+	}
+	minDays, err := pochtarussiaNonNegativeInt(response.Delivery.Min)
+	if err != nil {
+		return nil, err
+	}
+	maxDays, err := pochtarussiaNonNegativeInt(response.Delivery.Max)
+	if err != nil || maxDays < minDays || maxDays > 3660 {
+		return nil, errors.New("Почта России rate response has invalid delivery period")
+	}
+	now := time.Now().UTC()
+	return []sdk.RateQuote{{
+		ServiceCode:   "pochta_parcel_online",
+		Cost:          sdk.LogisticsMoney{MinorUnits: cost, Currency: "RUB"},
+		MinDeliveryAt: now.Add(time.Duration(minDays) * 24 * time.Hour),
+		MaxDeliveryAt: now.Add(time.Duration(maxDays) * 24 * time.Hour),
+		ObservedAt:    now,
+	}}, nil
 }
 
 func (transport pochtarussiaHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
