@@ -62,7 +62,7 @@ function connectorDescription(entry:ConnectorCatalogEntry){
  if(entry.id==="dolyami")return "Проверьте merchant-доступ к API «Долями» по логину, паролю и mTLS-сертификату.";
  if(entry.runtime.healthOnly)return `Подключите ${surfaceLabels[entry.runtime.surface]??familyLabels[entry.family]??"сервис"} и проверьте доступ к официальному API. Операционные действия включаются отдельным квалифицированным маршрутом.`;
  if(entry.runtime.stage==="separate_surface"&&entry.runtime.surface==="logistics")return "Проверьте доступ перевозчика и подготовьте подключение к доставке.";
- if(entry.id==="cs-cart")return "Синхронизируйте каталог товаров CS-Cart через официальный REST API 2.0.";
+ if(entry.id==="cs-cart")return "Синхронизируйте каталог, цены, остатки и заказы CS-Cart через официальный REST API 2.0.";
  if(entry.id==="bitrix")return "Синхронизируйте каталог товаров 1С‑Битрикс через официальный REST-модуль и webhook.";
  if(entry.id==="opencart")return "Подключите OpenCart через bridge TORGNEXA: установите модуль extension/torgnexa/api/* в магазине.";
  if(entry.id==="ollama")return "Подключите локальные модели Ollama к управляемой AI-аналитике TORGNEXA.";

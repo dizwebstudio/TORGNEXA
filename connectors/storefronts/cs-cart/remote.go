@@ -11,6 +11,9 @@ type csCartProduct struct {
 	ProductID       json.RawMessage `json:"product_id"`
 	Product         string          `json:"product"`
 	ProductCode     string          `json:"product_code"`
+	Price           string          `json:"price"`
+	ListPrice       string          `json:"list_price"`
+	Amount          string          `json:"amount"`
 	Status          string          `json:"status"`
 	FullDescription string          `json:"full_description"`
 	UpdatedUnix     json.RawMessage `json:"updated_timestamp"`

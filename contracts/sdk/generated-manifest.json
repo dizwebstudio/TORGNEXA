@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "b401db72b226aa2438d97056b01550c55fe6d38c993a677dac132514a1b8651d",
+    "sha256": "02572098ea9f00d5dfe49fc8c0742be62c0199197c2ebe9dbe35ab59a578759b",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -25,6 +25,11 @@
       "path": "/settings/ai-providers:analyze"
     },
     {
+      "operation_id": "approveAssistantActionPreview",
+      "method": "POST",
+      "path": "/assistant/action-previews/{preview_id}:approve"
+    },
+    {
       "operation_id": "archiveWorkflow",
       "method": "POST",
       "path": "/workflow-commands/archive"
@@ -38,6 +43,11 @@
       "operation_id": "calculateLogisticsRates",
       "method": "POST",
       "path": "/logistics/rates"
+    },
+    {
+      "operation_id": "cancelAssistantRun",
+      "method": "POST",
+      "path": "/assistant/runs/{run_id}:cancel"
     },
     {
       "operation_id": "cancelLogisticsShipment",
@@ -103,6 +113,11 @@
       "operation_id": "createApprovalRequest",
       "method": "POST",
       "path": "/approvals/requests"
+    },
+    {
+      "operation_id": "createAssistantSession",
+      "method": "POST",
+      "path": "/assistant/sessions"
     },
     {
       "operation_id": "createCatalogCategory",
@@ -330,6 +345,16 @@
       "path": "/settings/ai-egress-policy"
     },
     {
+      "operation_id": "getAssistantRun",
+      "method": "GET",
+      "path": "/assistant/runs/{run_id}"
+    },
+    {
+      "operation_id": "getAssistantSession",
+      "method": "GET",
+      "path": "/assistant/sessions/{session_id}"
+    },
+    {
       "operation_id": "getCloudSubscription",
       "method": "GET",
       "path": "/cloud/subscription"
@@ -543,6 +568,11 @@
       "operation_id": "listApprovals",
       "method": "GET",
       "path": "/approvals"
+    },
+    {
+      "operation_id": "listAssistantSessions",
+      "method": "GET",
+      "path": "/assistant/sessions"
     },
     {
       "operation_id": "listAuditRecords",
@@ -800,6 +830,11 @@
       "path": "/logistics/tracking"
     },
     {
+      "operation_id": "recordAssistantFeedback",
+      "method": "POST",
+      "path": "/assistant/feedback"
+    },
+    {
       "operation_id": "recordMarkingScan",
       "method": "POST",
       "path": "/marking/scans"
@@ -893,6 +928,11 @@
       "operation_id": "searchLegalParties",
       "method": "GET",
       "path": "/counterparties/search"
+    },
+    {
+      "operation_id": "sendAssistantMessage",
+      "method": "POST",
+      "path": "/assistant/sessions/{session_id}/messages"
     },
     {
       "operation_id": "setMCPAgentKillSwitch",

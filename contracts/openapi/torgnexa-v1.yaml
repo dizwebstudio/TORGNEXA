@@ -1938,6 +1938,70 @@ paths:
           description: Tenant-scoped immutable settlement ledger page
           content: {application/json: {schema: {$ref: '#/components/schemas/SettlementEntryPage'}}}
         '400': {description: Invalid cursor or limit}
+  /assistant/sessions:
+    post:
+      operationId: createAssistantSession
+      security: [{bearerAuth: []}]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantSessionCreate'}}}}
+      responses:
+        '201': {description: Assistant session created, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantSession'}}}}
+        '400': {description: Invalid bounded session}
+    get:
+      operationId: listAssistantSessions
+      security: [{bearerAuth: []}]
+      parameters: [{name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}]
+      responses:
+        '200': {description: Actor-scoped sessions, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantSessionPage'}}}}
+  /assistant/sessions/{session_id}:
+    get:
+      operationId: getAssistantSession
+      security: [{bearerAuth: []}]
+      parameters: [{name: session_id, in: path, required: true, schema: {type: string, maxLength: 192}}]
+      responses: {'200': {description: Assistant session}, '404': {description: Session not found}}
+  /assistant/sessions/{session_id}/messages:
+    post:
+      operationId: sendAssistantMessage
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: session_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantMessage'}}}}
+      responses:
+        '201': {description: Durable assistant run, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantRun'}}}}
+        '400': {description: Invalid or unsafe question}
+        '409': {description: Idempotency conflict}
+  /assistant/runs/{run_id}:
+    get:
+      operationId: getAssistantRun
+      security: [{bearerAuth: []}]
+      parameters: [{name: run_id, in: path, required: true, schema: {type: string, maxLength: 192}}]
+      responses: {'200': {description: Run with grounded answer}, '404': {description: Run not found}}
+  /assistant/runs/{run_id}:cancel:
+    post:
+      operationId: cancelAssistantRun
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantCancel'}}}}
+      responses: {'200': {description: Run cancelled}, '409': {description: Version or lifecycle conflict}}
+  /assistant/action-previews/{preview_id}:approve:
+    post:
+      operationId: approveAssistantActionPreview
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: preview_id, in: path, required: true, schema: {type: string, pattern: '^ap:[0-9a-f]{26}$'}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '409': {description: Approval must be created through the governed approval API}
+  /assistant/feedback:
+    post:
+      operationId: recordAssistantFeedback
+      security: [{bearerAuth: []}]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantFeedback'}}}}
+      responses: {'202': {description: Feedback recorded}, '400': {description: Invalid feedback}}
   /reports:
     get:
       operationId: listReports
@@ -2416,6 +2480,90 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    AssistantSessionCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        title: {type: string, maxLength: 120}
+        locale: {type: string, minLength: 2, maxLength: 16, default: ru-RU}
+    AssistantSession:
+      type: object
+      additionalProperties: false
+      required: [id, actor_id, locale, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        actor_id: {type: string, maxLength: 192}
+        title: {type: string, maxLength: 120}
+        locale: {type: string, maxLength: 16}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    AssistantSessionPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/AssistantSession'}}
+    AssistantMessage:
+      type: object
+      additionalProperties: false
+      required: [question]
+      properties:
+        question: {type: string, minLength: 1, maxLength: 2000}
+        context_hint:
+          type: object
+          additionalProperties: false
+          properties:
+            kind: {type: string, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+            resource_id: {type: string, maxLength: 192}
+    AssistantCancel:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      properties:
+        expected_version: {type: integer, minimum: 1}
+    AssistantFeedback:
+      type: object
+      additionalProperties: false
+      required: [run_id, kind]
+      properties:
+        run_id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [useful, not_useful, incorrect]}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,95}$'}
+    AssistantRun:
+      type: object
+      additionalProperties: false
+      required: [id, session_id, state, intent, context_digest, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        session_id: {type: string, maxLength: 192}
+        state: {type: string, enum: [queued, retrieving_context, awaiting_model, streaming, awaiting_approval, action_queued, completed, partial, stale, blocked, provider_unavailable, cancelled, failed]}
+        intent: {type: string, enum: [integration, sync, product_quality, inventory_forecast, order_return, unit_economics, report_summary, notification, workflow_draft, unsupported]}
+        context_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        answer: {$ref: '#/components/schemas/AssistantAnswer'}
+        error_code: {type: string, maxLength: 96}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    AssistantAnswer:
+      type: object
+      additionalProperties: false
+      required: [summary, text, grounding_state, coverage_percent, facts, evidence, limitations, recommendations, action_previews, ai_generated, output_kind, answer_digest]
+      properties:
+        summary: {type: string, maxLength: 1200}
+        text: {type: string, maxLength: 16000}
+        grounding_state: {type: string, enum: [grounded, partially_grounded, insufficient_data, stale_data, source_unavailable, refused]}
+        coverage_percent: {type: integer, minimum: 0, maximum: 100}
+        facts: {type: array, maxItems: 100, items: {type: object, additionalProperties: false}}
+        evidence: {type: array, maxItems: 100, items: {type: object, additionalProperties: false}}
+        limitations: {type: array, maxItems: 16, items: {type: string, maxLength: 500}}
+        recommendations: {type: array, maxItems: 16, items: {type: object, additionalProperties: false}}
+        action_previews: {type: array, maxItems: 8, items: {type: object, additionalProperties: false}}
+        provider: {type: string, maxLength: 80}
+        model: {type: string, maxLength: 120}
+        ai_generated: {type: boolean}
+        output_kind: {type: string, enum: [source_facts, governance_workflow, ai_recommendation]}
+        answer_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
     MarkingBatch:
       type: object
       additionalProperties: false

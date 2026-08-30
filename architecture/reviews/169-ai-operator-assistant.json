@@ -1,0 +1,22 @@
+{
+  "task": "169",
+  "title": "AI-помощник оператора",
+  "status": "complete",
+  "decision": "approved",
+  "pillars": ["api", "data", "security", "events", "frontend", "operations"],
+  "changes": [
+    "provider-neutral core classifier/context/evidence/answer/action-preview policy",
+    "FORCE RLS PostgreSQL sessions/runs/previews/feedback metadata",
+    "protected REST/OpenAPI/SDK and Russian operator page",
+    "canonical AI operator-assistant event payload contracts",
+    "monotonic worker lifecycle and bounded retry/lease policy"
+  ],
+  "security": {
+    "raw_prompt_persisted": false,
+    "provider_payload_persisted": false,
+    "secrets_in_context": false,
+    "model_can_execute_actions": false,
+    "tenant_scope": "organization_id/workspace_id from authenticated context"
+  },
+  "follow_up": "Live provider/Compose screenshots are deployment evidence and must be retained on the target VPS."
+}

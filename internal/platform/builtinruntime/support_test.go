@@ -84,7 +84,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
-	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsSync("cs-cart", "products", "bidirectional") || SupportsCapability("cs-cart", "orders.read") {
+	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsCapability("cs-cart", "prices.read") || !SupportsCapability("cs-cart", "inventory.read") || !SupportsCapability("cs-cart", "orders.read") || !SupportsSync("cs-cart", "products", "bidirectional") || !SupportsSync("cs-cart", "prices", "inbound") || !SupportsSync("cs-cart", "inventory", "inbound") || !SupportsSync("cs-cart", "orders", "inbound") || SupportsCapability("cs-cart", "prices.write") || SupportsCapability("cs-cart", "inventory.write") {
 		t.Fatalf("CS-Cart storefront runtime support is inaccurate: %+v", csCart)
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
@@ -94,8 +94,8 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
 			wantCapabilities := 1
-				if connectorID == "cdek" {
-					wantCapabilities = 6
+			if connectorID == "cdek" {
+				wantCapabilities = 6
 			} else if connectorID == "dellin" {
 				wantCapabilities = 3
 			} else if connectorID == "pek" {
@@ -115,12 +115,12 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.cancel") {
 				t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
 			}
-				if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
-					t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
-				}
-				if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.label.read") {
-					t.Fatalf("%s label support is inaccurate: %+v", connectorID, carrier)
-				}
+			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.label.read") {
+				t.Fatalf("%s label support is inaccurate: %+v", connectorID, carrier)
+			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
 			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)
 		}
@@ -540,7 +540,7 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	for _, connectorID := range []string{"bitrix", "magnit-market", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+	for _, connectorID := range []string{"bitrix", "cs-cart", "magnit-market", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
 		if !SupportsCapability(connectorID, "prices.read") {
 			t.Fatalf("%s price reader capability is not admitted", connectorID)
@@ -549,7 +549,7 @@ func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 			t.Fatalf("%s price reader unavailable: %v", connectorID, err)
 		}
 	}
-	for _, connectorID := range []string{"bitrix", "wildberries", "ozon", "magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+	for _, connectorID := range []string{"bitrix", "cs-cart", "wildberries", "ozon", "magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
 		if !SupportsCapability(connectorID, "inventory.read") {
 			t.Fatalf("%s inventory reader capability is not admitted", connectorID)
@@ -558,7 +558,7 @@ func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 			t.Fatalf("%s inventory reader unavailable: %v", connectorID, err)
 		}
 	}
-	for _, connectorID := range []string{"magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+	for _, connectorID := range []string{"cs-cart", "magnit-market", "megamarket", "medusa", "magento", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
 		currentLoad := load
 		if connectorID == "prestashop" || connectorID == "opencart" {

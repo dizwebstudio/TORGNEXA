@@ -126,6 +126,14 @@ assert_status unauthorized 401
 request products GET 'products?page=1&items_per_page=1&pshort=Y&pfull=Y'
 assert_status products 200
 assert_json products products
+request prices GET 'products?page=1&items_per_page=1&pshort=Y&pfull=Y'
+assert_status prices 200
+assert_json prices products.0.price
+echo "PASS prices (base price projection present)"
+request orders GET 'orders?page=1&items_per_page=1&sort_by=date&sort_order=asc'
+assert_status orders 200
+assert_json orders orders
+echo "PASS orders (bounded order list projection present)"
 request create POST products "$create_body"
 actual="$(status_of create)"
 [[ "$actual" == "200" || "$actual" == "201" ]] || { echo "FAIL create: expected HTTP 200 or 201, got ${actual:-unknown}" >&2; exit 1; }
@@ -144,6 +152,7 @@ echo "PASS lookup (one product for SKU)"
 request product GET "products/$created_id"
 assert_status product 200
 assert_json product product_code
+assert_json product amount
 [[ "$(json_value product product_code)" == "$sku" ]] || { echo "FAIL product: product_code mismatch" >&2; exit 1; }
 echo "PASS product (product_code=$sku)"
 request update PUT "products/$created_id" "$update_body"

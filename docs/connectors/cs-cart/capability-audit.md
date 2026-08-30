@@ -2,10 +2,17 @@
 
 | Capability | Manifest | Runtime | Решение |
 |---|---:|---:|---|
+| `inventory.read` | да | да | admitted; one storefront location |
+| `orders.read` | да | да | admitted; list + detail projection |
+| `prices.read` | да | да | admitted; base product projection |
 | `products.read` | да | да | admitted |
 | `products.write` | да | да | admitted |
-| inventory / prices / orders | нет | нет | не заявляются |
+| `prices.write`, `inventory.write`, order writes | нет | нет | не заявляются |
 
-Синхронизируется только сущность `products`. Поля SKU, название, статус и
-описание ограничены SDK-проекцией; числовые идентификаторы CS-Cart сохраняются
-как remote IDs.
+Синхронизируются сущности `products` (inbound + outbound), `prices`,
+`inventory` и `orders` (inbound). Поля SKU, название, статус и описание ограничены SDK-проекцией;
+числовые идентификаторы CS-Cart сохраняются как remote IDs. Цена читается из
+`price`, а `list_price` — как необязательный `compare_at`; option combinations
+и запись цен остаются fail-closed. Остатки читаются из `amount` в единой
+локации `cs-cart-store`; multi-warehouse semantics не заявляются. Заказные
+строки с option combinations и неизвестные статусы остаются fail-closed.

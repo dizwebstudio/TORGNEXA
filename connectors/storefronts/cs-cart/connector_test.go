@@ -67,6 +67,106 @@ func TestManifestAndReadProducts(t *testing.T) {
 	}
 }
 
+func TestReadPricesProjectsProductProjection(t *testing.T) {
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		if request.Method != "GET" || request.Path != "/api/2.0/products" {
+			t.Fatalf("unexpected request: %+v", request)
+		}
+		return Response{StatusCode: 200, Body: []byte(`{"products":[{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"1999.90","list_price":"2499.00","status":"A","updated_timestamp":"1720000000"}],"params":{"total_items":"1"}}`)}, nil
+	}}
+	page, err := New(transport, testConfig{}, nil).ReadPrices(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].VariantRemoteID != "12" || page.Items[0].Value != "1999.90" || page.Items[0].CompareAt != "2499.00" || page.Items[0].Currency != "RUB" {
+		t.Fatalf("unexpected price page: %#v", page)
+	}
+}
+
+func TestReadPricesRejectsMissingPrice(t *testing.T) {
+	transport := scriptedTransport{fn: func(Request) (Response, error) {
+		return Response{StatusCode: 200, Body: []byte(`{"products":[{"product_id":"12","product":"100g Pants","product_code":"SKU-12","status":"A","updated_timestamp":"1720000000"}]}`)}, nil
+	}}
+	_, err := New(transport, testConfig{}, nil).ReadPrices(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != ErrInvalidResponse {
+		t.Fatalf("expected invalid response, got %v", err)
+	}
+}
+
+func TestReadInventoryUsesStorefrontLocation(t *testing.T) {
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		if request.Method != "GET" || request.Path != "/api/2.0/products/12" {
+			t.Fatalf("unexpected request: %+v", request)
+		}
+		return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"1999.90","amount":"18","status":"A","updated_timestamp":"1720000000"}`)}, nil
+	}}
+	connector := New(transport, testConfig{}, nil)
+	locations, err := connector.ListInventoryLocations(context.Background(), testAccount(), testRuntime{credentialJSON()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(locations) != 1 || locations[0].RemoteID != "cs-cart-store" {
+		t.Fatalf("unexpected locations: %#v", locations)
+	}
+	page, err := connector.ReadInventory(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.InventoryQuery{LocationRemoteID: "cs-cart-store", VariantRemoteIDs: []string{"12"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 1 || page[0].Quantity != 18 || page[0].VariantRemoteID != "12" {
+		t.Fatalf("unexpected inventory: %#v", page)
+	}
+}
+
+func TestReadInventoryRejectsFractionalAmount(t *testing.T) {
+	transport := scriptedTransport{fn: func(Request) (Response, error) {
+		return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","amount":"18.5","status":"A","updated_timestamp":"1720000000"}`)}, nil
+	}}
+	_, err := New(transport, testConfig{}, nil).ReadInventory(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.InventoryQuery{LocationRemoteID: "cs-cart-store", VariantRemoteIDs: []string{"12"}})
+	if err != ErrInvalidResponse {
+		t.Fatalf("expected invalid response, got %v", err)
+	}
+}
+
+func TestReadOrdersProjectsListAndDetails(t *testing.T) {
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		if request.Method != "GET" {
+			t.Fatalf("unexpected method: %+v", request)
+		}
+		switch request.Path {
+		case "/api/2.0/orders":
+			return Response{StatusCode: 200, Body: []byte(`{"orders":[{"order_id":"98","status":"O","timestamp":"1720000000"}],"params":{"total_items":"1"}}`)}, nil
+		case "/api/2.0/orders/98":
+			return Response{StatusCode: 200, Body: []byte(`{"order_id":"98","status":"O","timestamp":"1720000000","products":{"1":{"product_id":"12","amount":"2"}}}`)}, nil
+		default:
+			t.Fatalf("unexpected path: %s", request.Path)
+			return Response{}, nil
+		}
+	}}
+	page, err := New(transport, testConfig{}, nil).ReadOrders(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].RemoteID != "98" || page.Items[0].StatusRemoteID != "O" || len(page.Items[0].Items) != 1 || page.Items[0].Items[0].VariantRemoteID != "12" || page.Items[0].Items[0].Quantity != 2 {
+		t.Fatalf("unexpected order page: %#v", page)
+	}
+	if !page.Items[0].CreatedAt.Equal(time.Unix(1720000000, 0).UTC()) || !page.Items[0].UpdatedAt.Equal(page.Items[0].CreatedAt) {
+		t.Fatalf("unexpected timestamps: %#v", page.Items[0])
+	}
+}
+
+func TestReadOrdersRejectsOptionCombination(t *testing.T) {
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		if request.Path == "/api/2.0/orders" {
+			return Response{StatusCode: 200, Body: []byte(`{"orders":[{"order_id":"98"}]}`)}, nil
+		}
+		return Response{StatusCode: 200, Body: []byte(`{"order_id":"98","status":"O","timestamp":"1720000000","products":{"1":{"product_id":"12","amount":"1","product_options":{"2":"3"}}}}`)}, nil
+	}}
+	_, err := New(transport, testConfig{}, nil).ReadOrders(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PageRequest{Limit: 10})
+	if err != ErrInvalidResponse {
+		t.Fatalf("expected invalid response, got %v", err)
+	}
+}
+
 func TestUpsertProductReconcilesExisting(t *testing.T) {
 	calls := 0
 	transport := scriptedTransport{fn: func(request Request) (Response, error) {

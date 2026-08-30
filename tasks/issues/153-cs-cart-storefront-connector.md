@@ -1,7 +1,7 @@
 # Task 153 — CS-Cart storefront connector
 
 Добавить CS-Cart как отдельный storefront-коннектор с официальным REST API,
-реальным product read/write маршрутом, карточкой в каталоге интеграций и
+реальными product read/write, base price, inventory и order read маршрутами, карточкой в каталоге интеграций и
 документированными credential/runtime config.
 
 Acceptance criteria:
@@ -9,6 +9,12 @@ Acceptance criteria:
 - CS-Cart виден в «Интернет-магазины»;
 - Basic Auth и API 2.0 вызовы проходят через host transport;
 - каталог товаров поддерживает cursor pagination и read-after-write;
+- базовые цены читаются через bounded product projection и попадают в
+  inbound price reconciliation;
+- остаток читается из `amount` в одной локации `cs-cart-store` и попадает в
+  inbound inventory reconciliation;
+- заказы читаются списком и деталями с bounded строками и попадают в inbound
+  order reconciliation;
 - runtime support не заявляет неподдержанные сущности;
 - тесты, контракты, архитектурный review и документация обновлены;
 - `scripts/cscart-smoke.sh` предоставляет credentialed API 2.0 Basic Auth

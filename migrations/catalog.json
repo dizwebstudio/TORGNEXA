@@ -773,6 +773,26 @@
       },
       "backfill": null,
       "sha256": "8a0caf450256c55be52abf84e368d422d069b5100c3b2df6975d1d7f6e06705b"
+    },
+    {
+      "version": 38,
+      "name": "ai_operator_assistant",
+      "file": "000038_ai_operator_assistant.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [37],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "7ed2a3da8e881898706bb89cbb88f097827d7b3a8ae1304080f58dd6c43bf7ac"
     }
   ]
 }

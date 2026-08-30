@@ -34,12 +34,13 @@ for forbidden in ('raw_code', 'raw_codes', 'code_value', 'plaintext_code'):
         raise SystemExit(f'marking qualification: raw code column leaked into SQL: {forbidden}')
 
 sdk = (root / 'internal/platform/connectors/marking.go').read_text()
+capabilities = (root / 'internal/platform/connectors/capabilities.go').read_text()
 for capability in (
     'marking.codes.request', 'marking.codes.reserve',
     'marking.aggregation.write', 'marking.circulation.introduce',
     'marking.circulation.withdraw', 'marking.transfer.write',
 ):
-    if capability not in sdk:
+    if capability not in capabilities:
         raise SystemExit(f'marking qualification: missing typed capability {capability}')
 for required in ('DryRun', 'MarkingUnknown', 'IdempotencyKey', 'MarkingAggregationWriter', 'MarkingTransferWriter'):
     if required not in sdk:

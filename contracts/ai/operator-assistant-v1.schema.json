@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/ai/operator-assistant-v1.json",
+  "title": "TORGNEXA operator assistant v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "answer"],
+  "properties": {
+    "contract_version": {"const": "assistant.v1"},
+    "answer": {"$ref": "#/$defs/answer"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "code": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,95}$"},
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_kind", "source_ref", "observed_at", "checked_at", "freshness", "context_trust", "evidence_digest", "visibility", "age_seconds", "ttl_seconds"],
+      "properties": {
+        "source_kind": {"type": "string", "minLength": 1, "maxLength": 80}, "source_ref": {"$ref": "#/$defs/id"}, "source_version": {"type": "string", "maxLength": 192},
+        "observed_at": {"type": "string", "format": "date-time"}, "checked_at": {"type": "string", "format": "date-time"}, "watermark": {"type": "string", "maxLength": 192},
+        "freshness": {"enum": ["fresh", "stale", "missing", "redacted", "unavailable"]}, "context_trust": {"enum": ["trusted_system", "user_input", "untrusted_tool_data", "model_generated"]},
+        "evidence_digest": {"$ref": "#/$defs/digest"}, "visibility": {"type": "string", "minLength": 1, "maxLength": 32}, "deep_link": {"type": "string", "pattern": "^/[^?#\\r\\n]*$"},
+        "age_seconds": {"type": "integer", "minimum": 0}, "ttl_seconds": {"type": "integer", "minimum": 0}
+      }
+    },
+    "fact": {
+      "type": "object", "additionalProperties": false, "required": ["code", "label", "value", "source", "output_kind", "ai_generated"],
+      "properties": {"code": {"$ref": "#/$defs/code"}, "label": {"type": "string", "maxLength": 240}, "value": {"type": "string", "maxLength": 2000}, "source": {"$ref": "#/$defs/evidence"}, "output_kind": {"const": "source_facts"}, "ai_generated": {"const": false}}
+    },
+    "recommendation": {
+      "type": "object", "additionalProperties": false, "required": ["code", "title", "reason", "expected_effect", "output_kind", "ai_generated"],
+      "properties": {"code": {"$ref": "#/$defs/code"}, "title": {"type": "string", "maxLength": 240}, "reason": {"type": "string", "maxLength": 1000}, "expected_effect": {"type": "string", "maxLength": 1000}, "next_link": {"type": "string", "pattern": "^/[^?#\\r\\n]*$"}, "output_kind": {"const": "ai_recommendation"}, "ai_generated": {"const": true}}
+    },
+    "action_preview": {
+      "type": "object", "additionalProperties": false, "required": ["id", "action", "resource_type", "resource_id", "expected_version", "risk", "required_permission", "approval_required", "impact", "idempotency_key", "preview_digest", "expires_at", "status"],
+      "properties": {"id": {"type": "string", "pattern": "^ap:[0-9a-f]{26}$"}, "action": {"$ref": "#/$defs/code"}, "resource_type": {"$ref": "#/$defs/code"}, "resource_id": {"$ref": "#/$defs/id"}, "expected_version": {"type": "integer", "minimum": 1}, "risk": {"enum": ["read", "safe_write", "sensitive_write", "prohibited"]}, "required_permission": {"$ref": "#/$defs/code"}, "capability": {"type": "string", "maxLength": 192}, "runtime_stage": {"type": "string", "maxLength": 64}, "approval_required": {"type": "boolean"}, "impact": {"type": "string", "maxLength": 1200}, "idempotency_key": {"$ref": "#/$defs/id"}, "preview_digest": {"$ref": "#/$defs/digest"}, "expires_at": {"type": "string", "format": "date-time"}, "status": {"const": "pending"}, "evidence_digest": {"$ref": "#/$defs/digest"}}
+    },
+    "answer": {
+      "type": "object", "additionalProperties": false, "required": ["summary", "text", "grounding_state", "coverage_percent", "facts", "evidence", "limitations", "recommendations", "action_previews", "ai_generated", "output_kind", "answer_digest"],
+      "properties": {"summary": {"type": "string", "maxLength": 1200}, "text": {"type": "string", "maxLength": 16000}, "grounding_state": {"enum": ["grounded", "partially_grounded", "insufficient_data", "stale_data", "source_unavailable", "refused"]}, "coverage_percent": {"type": "integer", "minimum": 0, "maximum": 100}, "facts": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/fact"}}, "evidence": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/evidence"}}, "limitations": {"type": "array", "maxItems": 16, "items": {"type": "string", "maxLength": 500}}, "recommendations": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/recommendation"}}, "action_previews": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/action_preview"}}, "provider": {"type": "string", "maxLength": 80}, "model": {"type": "string", "maxLength": 120}, "ai_generated": {"type": "boolean"}, "output_kind": {"enum": ["source_facts", "governance_workflow", "ai_recommendation"]}, "answer_digest": {"$ref": "#/$defs/digest"}}
+    }
+  }
+}

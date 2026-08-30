@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ai-operator-assistant-run-failed-v1.json",
+  "title": "ai.operator_assistant.run_failed.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["run_id", "error_code", "retryable"],
+  "properties": {"run_id": {"type": "string", "maxLength": 192}, "error_code": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,95}$"}, "retryable": {"type": "boolean"}}
+}

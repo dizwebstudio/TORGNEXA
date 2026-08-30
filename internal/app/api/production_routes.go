@@ -22,6 +22,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
@@ -92,6 +93,7 @@ type productionRouteDependencies struct {
 	uploadContent      uploads.ReleaseReader
 	plugins            *pluginmarketplacerepo.Repository
 	aiAdvisory         *aiadvisoryrepo.Repository
+	assistant          *operatorassistantrepo.Repository
 	aiRegistry         *builtinruntime.Registry
 	integrationCenter  integrationCenterReader
 	workflows          *workflowrepo.Repository
@@ -136,6 +138,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newEntitlementRoutes(deps.entitlements, deps.quotas)...)
 	routes = append(routes, newWebhookRoutes(deps.webhooks)...)
 	routes = append(routes, newAIAdvisoryRoutes(deps.aiAdvisory, deps.secretProvider, deps.aiRegistry, deps.auditService, deps.trustControl)...)
+	routes = append(routes, newOperatorAssistantRoutes(deps.assistant, integrationAssistantSource{reader: deps.integrationCenter}, deps.auditService)...)
 	routes = append(routes, newMCPAccountRoutes(deps.mcpAccounts, deps.auditService)...)
 	routes = append(routes, newMCPAgentPolicyRoutes(deps.mcpAccounts, deps.agentGovernance, deps.agentGovernance, deps.auditService)...)
 	routes = append(routes, newTrustControlRoutes(deps.trustControl)...)

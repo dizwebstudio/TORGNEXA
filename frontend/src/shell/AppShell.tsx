@@ -27,6 +27,7 @@ const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({d
 const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
 const ReportsPage = lazy(() => import("../pages/ReportsPage").then(module => ({default: module.ReportsPage})));
+const OperatorAssistantPage = lazy(() => import("../pages/OperatorAssistantPage").then(module => ({default: module.OperatorAssistantPage})));
 const AuditPage = lazy(() => import("../pages/AuditPage").then(module => ({default: module.AuditPage})));
 const SyncPage = lazy(() => import("../pages/SyncPage").then(module => ({default: module.SyncPage})));
 const ApprovalsPage = lazy(() => import("../pages/ApprovalsPage").then(module => ({default: module.ApprovalsPage})));
@@ -61,6 +62,7 @@ function content(path: string) {
   if (path === "/integrations/status" || path.startsWith("/integrations/status/")) return <IntegrationStatusPage />;
   if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
+  if (path === "/assistant") return <OperatorAssistantPage />;
   if (path === "/audit") return <AuditPage />;
   if (path === "/settings") return <SettingsPage />;
   if (path === "/oauth/connectors/callback") return <ConnectorOAuthCallbackPage />;

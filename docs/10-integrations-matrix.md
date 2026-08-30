@@ -48,7 +48,7 @@ capabilities.
 | WooCommerce | product/price/inventory/order/return reads; product/price/inventory writes; order status write and signed webhook receipt ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | Yandex Market | product/price/inventory/order reads; price write; notification decoder | products, prices inbound; prices outbound; inventory and orders inbound | required |
 | Magento (Adobe Commerce) | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
-| CS-Cart | product read/write | inbound + outbound | required |
+| CS-Cart | product read/write; base price, inventory and order reads | products inbound + outbound; prices, inventory and orders inbound | required |
 | Saleor | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 
 The host registry contains SDK price, inventory and order readers for the qualified
@@ -181,7 +181,8 @@ expose a bounded, read-only `pickup.points.read` application route for their
 official ПВЗ/terminal directories; CDEK, ПЭК, «Деловые Линии» and «Почта России»
 additionally expose a bounded read-only rate preview, while CDEK, ПЭК, «Деловые Линии» and
 «Почта России» expose a bounded `logistics.track.read` status lookup. CDEK
-shipment creation also runs only through the approval-bound worker; labels and
+shipment creation also runs only through the approval-bound worker, while its
+transport-label read returns an opaque PDF artifact reference. Returns, webhooks and
 other carrier operations remain fail-closed until provider qualification. 5Post and Ozon
 Доставка expose only the separately reviewed credential-check surface.
 

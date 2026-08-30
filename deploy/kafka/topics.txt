@@ -1,5 +1,6 @@
 # Canonical base topics from internal/platform/config and contracts/events/event-catalog.json.
 # Retry and DLQ variants are created by bootstrap-topics.sh for every base topic.
+ai.operator_assistant.events.v1
 billing.subscription.events.v1
 commerce.catalog.events.v1
 commerce.claim.events.v1

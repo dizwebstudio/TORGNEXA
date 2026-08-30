@@ -51,7 +51,7 @@ func TestFormerlyReservedContractRoutesAreProductionAdapters(t *testing.T) {
 
 func TestProductionRoutesCoverOpenAPI(t *testing.T) {
 	operations, pathCount := readOpenAPIOperations(t, "../../../contracts/openapi/torgnexa-v1.yaml")
-	if pathCount != 168 || len(operations) != 198 {
+	if pathCount != 175 || len(operations) != 206 {
 		t.Fatalf("unexpected OpenAPI surface: got %d paths and %d operations", pathCount, len(operations))
 	}
 

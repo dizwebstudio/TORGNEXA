@@ -403,6 +403,11 @@ func (r *Registry) PriceReader(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
 	case "magnit-market":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -490,6 +495,11 @@ func (r *Registry) InventoryReader(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
 	case "prestashop":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -661,6 +671,9 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 		}
 		unknownStatusError = ErrConfigurationNeeded
 		value = bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil)
+	case "cs-cart":
+		value = cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil)
+		remoteToCanonical = csCartOrderStatuses
 	case "magnit-market":
 		value = magnitmarket.New(magnitHTTP{r.http}, magnitConfigSource{load: load}, nil)
 		remoteToCanonical = magnitOrderStatuses
@@ -765,6 +778,11 @@ var shopwareOrderStatuses = map[string]string{
 var woocommerceOrderStatuses = map[string]string{
 	"pending": "pending", "on-hold": "confirmed", "processing": "processing",
 	"completed": "fulfilled", "cancelled": "cancelled",
+}
+
+var csCartOrderStatuses = map[string]string{
+	"O": "pending", "Y": "pending", "P": "processing", "B": "processing",
+	"C": "fulfilled", "I": "cancelled", "F": "cancelled", "D": "cancelled",
 }
 
 // OrderStatusWriter resolves the provider-native order status writer for an

@@ -789,8 +789,9 @@ documented in `docs/connectors/magento/docker-live-qualification.md`.
 
 Task 153 adds CS-Cart as a distinct self-hosted internet-store connector. The
 official API 2.0 Basic Auth surface admits product catalog reads and
-idempotent creates/updates with SKU lookup and read-after-write reconciliation;
-unsupported inventory, prices, orders and webhooks remain unavailable.
+idempotent creates/updates with SKU lookup and read-after-write reconciliation,
+bounded base-price and single-storefront inventory reads, and bounded order
+list/detail reads; price/inventory/order writes and webhooks remain unavailable.
 
 ### Gate RUNTIME-153
 
@@ -800,8 +801,9 @@ unsupported inventory, prices, orders and webhooks remain unavailable.
   with bounded responses and cursor pagination;
 - runtime support, generated catalogs, architecture policy/review, frontend
   presentation, task docs and conformance evidence are synchronized;
-- products-only admission remains fail-closed for inventory, prices, orders and
-  webhooks;
+- price/inventory/order writes and webhook receipt remain fail-closed;
+- option-combination order lines and unknown remote status codes remain
+  fail-closed rather than being projected ambiguously;
 - Go tests/vet, contracts, frontend tests/build and package-index checks pass;
 - live qualification still requires a non-production CS-Cart store with API
   access enabled for the administrator. The credentialed API 2.0 smoke is
@@ -1338,7 +1340,7 @@ The implementation is split into eighteen subtasks:
 
 `169`
 
-Task 169 is planned as a provider-neutral, grounded operator copilot over the
+Task 169 is complete as a provider-neutral, grounded operator copilot over the
 canonical commerce and operations modules. It is intentionally separate from
 the legacy `/settings/ai-providers:analyze` completion call: the server owns
 intent, retrieval, data classes, evidence, risk and action limits. The first

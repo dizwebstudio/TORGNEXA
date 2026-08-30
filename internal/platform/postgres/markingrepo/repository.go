@@ -91,8 +91,26 @@ func (r *Repository) RecordScan(ctx context.Context, scope tenancy.Scope, scan m
 	}
 	var result = scan
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		// The API derives scan ID from the idempotency key. Replay the durable
+		// result before evaluating the current inventory state, so a retry after
+		// a committed transaction cannot become a second scan or an overflow.
+		var existing marking.Scan
+		var existingOccurredAt = existing.OccurredAt
+		err := tx.QueryRowContext(ctx, `SELECT scan_id,fingerprint,gtin,sku,wms_action,result,reason_code,actor_id,occurred_at FROM marking_scans WHERE organization_id=$1 AND workspace_id=$2 AND scan_id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scan.ID).Scan(&existing.ID, &existing.Fingerprint, &existing.GTIN, &existing.SKU, &existing.WMSAction, &existing.Result, &existing.ReasonCode, &existing.ActorID, &existingOccurredAt)
+		if err == nil {
+			if existing.Fingerprint != scan.Fingerprint || existing.GTIN != scan.GTIN || existing.SKU != scan.SKU || existing.WMSAction != scan.WMSAction || existing.ActorID != scan.ActorID {
+				return marking.ErrConflict
+			}
+			existing.OccurredAt = existingOccurredAt.UTC()
+			result = existing
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("marking repository: idempotency lookup: %w", err)
+		}
+
 		var codeGTIN, codeSKU, status string
-		err := tx.QueryRowContext(ctx, `SELECT gtin,sku,status FROM marking_codes WHERE organization_id=$1 AND workspace_id=$2 AND fingerprint=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scan.Fingerprint).Scan(&codeGTIN, &codeSKU, &status)
+		err = tx.QueryRowContext(ctx, `SELECT gtin,sku,status FROM marking_codes WHERE organization_id=$1 AND workspace_id=$2 AND fingerprint=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scan.Fingerprint).Scan(&codeGTIN, &codeSKU, &status)
 		if errors.Is(err, sql.ErrNoRows) {
 			result.Result, result.ReasonCode = marking.ScanRejected, "unknown_code"
 		} else if err != nil {

@@ -1,6 +1,6 @@
 # Package status — 2026-08-31
 
-**Tasks 001–168 are repository-implemented.** Task 159 adds Google Gemini and
+**Tasks 001–169 are repository-implemented.** Task 159 adds Google Gemini and
 Grok to the governed AI-provider surface. Midjourney remains intentionally
 unavailable because its official policy disallows third-party automation. Task
 158 adds «Долями» to the
@@ -15,14 +15,16 @@ and Open WebUI to the dedicated AI-provider surface through a private-address
 local transport. Task 147 adds separate Ozon Pay
 and Ozon Доставка surfaces with truthful Seller API health probes. Task 145 moves СДЭК out of
 `planned` and adds Деловые Линии to the separate Delivery verification
-surface; both remain qualification-gated for shipment operations. Connector
+surface; both remain qualification-gated for shipment operations. Task 169 adds
+the grounded operator assistant; live provider qualification remains deployment
+evidence. Connector
 packages are organized as `connectors/<category>/<provider>`, with provider
 IDs and generated catalog order unchanged. The catalog therefore contains 18
 generic product integrations and 43 separate-surface providers; there are no
 planned connectors. Architecture policy: **142 modules / 61 providers / 157
-reviews**. Active migrations are **36**, latest `000036`, with
+reviews**. Active migrations are **38**, latest `000038`, with
 the original **74-file / legacy head 000074** chain archived as immutable
-evidence. Public OpenAPI is **195 operations / 0.21.2**.
+evidence. Public OpenAPI is **206 operations / 0.21.2**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -32,13 +34,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 538
-- adrs: 121
-- tasks: 172
+- docs: 540
+- adrs: 123
+- tasks: 173
 - milestones: 14
-- contracts: 234
+- contracts: 240
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3072
+- total source files (excluding local secrets/build/dependency/cache trees): 3108
 
 
 ## Connector category layout
@@ -638,6 +640,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0119-product-publication-quality-center.md`
 - `adr/0120-channel-unit-economics.md`
 - `adr/0121-integration-state-center.md`
+- `adr/0122-marking-execution-and-edo.md`
+- `adr/0123-ai-operator-assistant.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -796,6 +800,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/166-product-publication-quality-center.json`
 - `architecture/reviews/167-channel-unit-economics.json`
 - `architecture/reviews/168-integration-state-center.json`
+- `architecture/reviews/169-ai-operator-assistant.json`
+- `architecture/reviews/171-marking-execution-and-upd.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1294,8 +1300,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/storefronts/cs-cart/connector.go`
 - `connectors/storefronts/cs-cart/connector_test.go`
 - `connectors/storefronts/cs-cart/cursor.go`
+- `connectors/storefronts/cs-cart/inventory.go`
 - `connectors/storefronts/cs-cart/manifest.json`
+- `connectors/storefronts/cs-cart/orders.go`
 - `connectors/storefronts/cs-cart/presentation.json`
+- `connectors/storefronts/cs-cart/prices.go`
 - `connectors/storefronts/cs-cart/products.go`
 - `connectors/storefronts/cs-cart/remote.go`
 - `connectors/storefronts/cs-cart/write.go`
@@ -1429,6 +1438,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/storefronts/woocommerce/write.go`
 - `contracts/ai/agent-policy-v1.schema.json`
 - `contracts/ai/agent-provenance-v1.schema.json`
+- `contracts/ai/operator-assistant-v1.schema.json`
 - `contracts/ai/prompt-injection-regressions-v1.json`
 - `contracts/ai/prompt-injection-regressions-v1.schema.json`
 - `contracts/ai/tool-risk-policy.yaml`
@@ -1472,6 +1482,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/entitlements/quota-policy-v1.schema.json`
 - `contracts/entitlements/quota-status-v1.schema.json`
 - `contracts/entitlements/rule-v1.schema.json`
+- `contracts/events/ai-operator-assistant-action-previewed-v1.schema.json`
+- `contracts/events/ai-operator-assistant-approval-requested-v1.schema.json`
+- `contracts/events/ai-operator-assistant-run-completed-v1.schema.json`
+- `contracts/events/ai-operator-assistant-run-failed-v1.schema.json`
+- `contracts/events/ai-operator-assistant-run-requested-v1.schema.json`
 - `contracts/events/approval-decided-v1.schema.json`
 - `contracts/events/approval-escalated-v1.schema.json`
 - `contracts/events/approval-policy-changed-v1.schema.json`
@@ -2223,6 +2238,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/operations/077-incident-management-runbooks.md`
 - `docs/operations/167-channel-unit-economics.md`
 - `docs/operations/168-integration-state-center.md`
+- `docs/operations/169-ai-operator-assistant.md`
+- `docs/operations/171-marking-execution.md`
 - `docs/operations/publication-quality.md`
 - `docs/payments/087-reference-acquiring-connector.md`
 - `docs/privacy/061-retention-subject-requests-tenant-deletion.md`
@@ -2517,7 +2534,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/IntegrationStatusPage.tsx`
 - `frontend/src/pages/IntegrationsPage.tsx`
 - `frontend/src/pages/InventoryPage.tsx`
+- `frontend/src/pages/MarkingPage.tsx`
 - `frontend/src/pages/NotificationsPage.tsx`
+- `frontend/src/pages/OperatorAssistantPage.tsx`
 - `frontend/src/pages/OrdersPage.tsx`
 - `frontend/src/pages/Page.tsx`
 - `frontend/src/pages/PlaceholderPage.tsx`
@@ -2602,6 +2621,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/lineage_test.go`
 - `internal/app/api/logistics.go`
 - `internal/app/api/logistics_test.go`
+- `internal/app/api/marking.go`
 - `internal/app/api/mcp_accounts.go`
 - `internal/app/api/mcp_agent_policies.go`
 - `internal/app/api/mcp_agent_policies_test.go`
@@ -2614,6 +2634,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/oidc_profile_test.go`
 - `internal/app/api/oidc_security.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
+- `internal/app/api/operator_assistant.go`
 - `internal/app/api/order_status.go`
 - `internal/app/api/order_status_test.go`
 - `internal/app/api/payment_webhooks.go`
@@ -2666,6 +2687,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/worker/logistics_cancel_route_test.go`
 - `internal/app/worker/logistics_create_route.go`
 - `internal/app/worker/logistics_create_route_test.go`
+- `internal/app/worker/operator_assistant.go`
+- `internal/app/worker/operator_assistant_test.go`
 - `internal/app/worker/payment_reconciliation.go`
 - `internal/app/worker/payment_reconciliation_test.go`
 - `internal/app/worker/publication_quality_gate.go`
@@ -2689,6 +2712,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/core/legalparty/legalparty_test.go`
 - `internal/core/logistics/logistics.go`
 - `internal/core/logistics/logistics_test.go`
+- `internal/core/marking/marking.go`
+- `internal/core/marking/marking_test.go`
+- `internal/core/marking/orchestration.go`
+- `internal/core/operatorassistant/assistant.go`
+- `internal/core/operatorassistant/assistant_test.go`
 - `internal/core/orders/orders.go`
 - `internal/core/orders/orders_test.go`
 - `internal/core/payments/payments.go`
@@ -2802,6 +2830,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/connectors/manager.go`
 - `internal/platform/connectors/mapping.go`
 - `internal/platform/connectors/mapping_test.go`
+- `internal/platform/connectors/marking.go`
+- `internal/platform/connectors/marking_test.go`
 - `internal/platform/connectors/payments.go`
 - `internal/platform/connectors/pickup.go`
 - `internal/platform/connectors/pickup_test.go`
@@ -2866,6 +2896,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/logging/logging_test.go`
 - `internal/platform/logistics/logistics.go`
 - `internal/platform/logistics/logistics_test.go`
+- `internal/platform/marking/ephemeral.go`
+- `internal/platform/marking/ephemeral_test.go`
 - `internal/platform/marking/marking.go`
 - `internal/platform/marking/marking_test.go`
 - `internal/platform/mcpaccounts/mcpaccounts.go`
@@ -2944,11 +2976,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/lineagerepo/repository.go`
 - `internal/platform/postgres/logisticsrepo/repository.go`
 - `internal/platform/postgres/logisticsrepo/repository_test.go`
+- `internal/platform/postgres/markingrepo/repository.go`
 - `internal/platform/postgres/mcpaccountsrepo/repository.go`
 - `internal/platform/postgres/mcpaccountsrepo/repository_test.go`
 - `internal/platform/postgres/notificationrepo/destinations.go`
 - `internal/platform/postgres/notificationrepo/migration_test.go`
 - `internal/platform/postgres/notificationrepo/repository.go`
+- `internal/platform/postgres/operatorassistantrepo/repository.go`
 - `internal/platform/postgres/ordersrepo/migration_test.go`
 - `internal/platform/postgres/ordersrepo/repository.go`
 - `internal/platform/postgres/ordersrepo/repository_test.go`
@@ -3124,6 +3158,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000034_channel_unit_economics.sql`
 - `migrations/000035_integration_state_center.sql`
 - `migrations/000036_logistics_shipment_payload_reference.sql`
+- `migrations/000037_marking_execution.sql`
+- `migrations/000038_ai_operator_assistant.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -3225,6 +3261,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-frontend-shell.sh`
 - `scripts/check-generated-sdks.sh`
 - `scripts/check-js-supply-chain.sh`
+- `scripts/check-marking-qualification.sh`
 - `scripts/check-migrations.sh`
 - `scripts/check-p3-release-qualification.sh`
 - `scripts/check-p4-go-live.sh`
@@ -3483,6 +3520,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/168-integration-state-center.md`
 - `tasks/issues/169-ai-operator-assistant.md`
 - `tasks/issues/170-wms-operator-workspace-marketplace-fulfillment.md`
+- `tasks/issues/171-marking-execution-and-upd.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

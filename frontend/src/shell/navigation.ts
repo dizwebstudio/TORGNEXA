@@ -32,6 +32,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "compliance", label: "Сертификаты и документы", path: "/compliance", capability: "compliance.read", risk: "WRITE_SENSITIVE", icon: "compliance", shortcut: "G L"},
   {id: "notifications", label: "Уведомления", path: "/notifications", capability: "notifications.read", risk: "READ", icon: "notifications", shortcut: "G N"},
   {id: "reports", label: "Отчёты", path: "/reports", capability: "reports.read", risk: "READ", icon: "reports", shortcut: "G R"},
+  {id: "operator-assistant", label: "AI-помощник", path: "/assistant", capability: "assistant.read", risk: "READ", icon: "reports"},
   {id: "audit", label: "Аудит", path: "/audit", capability: "audit.read", risk: "READ", icon: "audit", shortcut: "G U"},
   {id: "settings", label: "Настройки", path: "/settings", capability: "settings.read", risk: "WRITE_SAFE", icon: "settings", shortcut: "G T"}
 ] as const;

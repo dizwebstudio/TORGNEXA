@@ -39,6 +39,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
@@ -225,6 +226,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("ai_advisory_repository_startup_failed", err)
 	}
+	operatorAssistantRepository, err := operatorassistantrepo.New(db)
+	if err != nil {
+		return newRuntimeError("operator_assistant_repository_startup_failed", err)
+	}
 	mcpAccountsRepository, err := mcpaccountsrepo.New(db)
 	if err != nil {
 		return newRuntimeError("mcp_accounts_repository_startup_failed", err)
@@ -409,7 +414,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
-		aiAdvisory: aiAdvisoryRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository,
+		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository,
 		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()},
 	}
 	routes := newProductionRoutes(routeDeps)

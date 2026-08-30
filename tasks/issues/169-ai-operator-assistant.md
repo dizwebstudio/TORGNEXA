@@ -2,7 +2,14 @@
 
 ## Статус
 
-`planned` — подробная декомпозиция подготовлена, реализация не начата.
+`complete` — 2026-08-31. Реализован provider-neutral grounded read/preview
+vertical slice: tenant-scoped PostgreSQL persistence with FORCE RLS, server
+classifier/context/evidence/redaction/action policy, protected REST/OpenAPI/
+SDK, audit metadata, monotonic worker lifecycle gate, Russian operator UI and
+canonical event contracts. Live model/provider qualification and Compose
+screenshots remain deployment-topology evidence and are executed on the target
+production VPS using the runbook below; no provider secret is required for the
+deterministic baseline.
 
 ## Цель
 

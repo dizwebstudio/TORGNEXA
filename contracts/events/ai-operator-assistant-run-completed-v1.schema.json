@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ai-operator-assistant-run-completed-v1.json",
+  "title": "ai.operator_assistant.run_completed.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["run_id", "state", "grounding_state", "answer_digest", "context_digest"],
+  "properties": {"run_id": {"type": "string", "maxLength": 192}, "state": {"enum": ["completed", "partial", "stale", "blocked"]}, "grounding_state": {"type": "string", "maxLength": 32}, "answer_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "context_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

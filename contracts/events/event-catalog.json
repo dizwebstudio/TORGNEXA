@@ -2,6 +2,26 @@
   "version": 1,
   "events": [
     {
+      "event_type": "ai.operator_assistant.action_previewed.v1",
+      "payload_schema": "events/ai-operator-assistant-action-previewed-v1.schema.json"
+    },
+    {
+      "event_type": "ai.operator_assistant.approval_requested.v1",
+      "payload_schema": "events/ai-operator-assistant-approval-requested-v1.schema.json"
+    },
+    {
+      "event_type": "ai.operator_assistant.run_completed.v1",
+      "payload_schema": "events/ai-operator-assistant-run-completed-v1.schema.json"
+    },
+    {
+      "event_type": "ai.operator_assistant.run_failed.v1",
+      "payload_schema": "events/ai-operator-assistant-run-failed-v1.schema.json"
+    },
+    {
+      "event_type": "ai.operator_assistant.run_requested.v1",
+      "payload_schema": "events/ai-operator-assistant-run-requested-v1.schema.json"
+    },
+    {
       "event_type": "billing.subscription.state_changed.v1",
       "payload_schema": "events/billing-subscription-state-changed-v1.schema.json"
     },

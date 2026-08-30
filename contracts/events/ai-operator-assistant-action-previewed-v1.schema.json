@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ai-operator-assistant-action-previewed-v1.json",
+  "title": "ai.operator_assistant.action_previewed.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["preview_id", "run_id", "action", "risk", "approval_required", "preview_digest"],
+  "properties": {"preview_id": {"type": "string", "pattern": "^ap:[0-9a-f]{26}$"}, "run_id": {"type": "string", "maxLength": 192}, "action": {"type": "string", "maxLength": 96}, "risk": {"enum": ["read", "safe_write", "sensitive_write", "prohibited"]}, "approval_required": {"type": "boolean"}, "preview_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

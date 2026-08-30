@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ai-operator-assistant-run-requested-v1.json",
+  "title": "ai.operator_assistant.run_requested.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["run_id", "session_id", "intent", "context_digest"],
+  "properties": {"run_id": {"type": "string", "maxLength": 192}, "session_id": {"type": "string", "maxLength": 192}, "intent": {"type": "string", "maxLength": 64}, "context_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

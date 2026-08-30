@@ -53,7 +53,7 @@ scripts/cscart-smoke.sh
 ```
 
 Скрипт использует API 2.0 и Basic Auth (`email:API key`), проверяет `401` без
-credentials, bounded catalog read, создание синтетического товара, поиск по
+credentials, bounded catalog/price/inventory read, создание синтетического товара, поиск по
 `pcode`, чтение по ID, обновление и read-after-write. Созданный тестовый товар
 удаляется в `trap`; `CS_CART_KEEP_PRODUCT=1` оставляет его для ручного осмотра.
 Ключ и ответы магазина не выводятся и не сохраняются как evidence. При
@@ -71,4 +71,5 @@ CS-Cart REST API 2.0 live smoke: all checks passed
 ```
 
 До этого момента CS-Cart остаётся repository-qualified: SDK 13/13, products
-read/write в runtime; live/Docker-совместимость не заявляется.
+read/write, base price, inventory и order reads в runtime; live/Docker-
+совместимость не заявляется.
