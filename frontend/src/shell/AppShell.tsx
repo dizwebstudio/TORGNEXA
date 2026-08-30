@@ -32,6 +32,7 @@ const SyncPage = lazy(() => import("../pages/SyncPage").then(module => ({default
 const ApprovalsPage = lazy(() => import("../pages/ApprovalsPage").then(module => ({default: module.ApprovalsPage})));
 const WorkflowsPage = lazy(() => import("../pages/WorkflowsPage").then(module => ({default: module.WorkflowsPage})));
 const IntegrationsPage = lazy(() => import("../pages/IntegrationsPage").then(module => ({default: module.IntegrationsPage})));
+const IntegrationStatusPage = lazy(() => import("../pages/IntegrationStatusPage").then(module => ({default: module.IntegrationStatusPage})));
 const SocialPage = lazy(() => import("../pages/SocialPage").then(module => ({default: module.SocialPage})));
 const PlaceholderPage = lazy(() => import("../pages/PlaceholderPage").then(module => ({default: module.PlaceholderPage})));
 const IncidentCenterPage = lazy(() => import("../pages/IncidentCenterPage").then(module => ({default: module.IncidentCenterPage})));
@@ -55,6 +56,7 @@ function content(path: string) {
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/workflows") return <WorkflowsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
+  if (path === "/integrations/status" || path.startsWith("/integrations/status/")) return <IntegrationStatusPage />;
   if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
   if (path === "/audit") return <AuditPage />;

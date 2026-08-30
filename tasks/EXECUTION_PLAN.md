@@ -54,7 +54,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   worker/API/exports, operator UI, security/quotas and Compose qualification.
   Missing facts never become zero, payout never becomes revenue, and every
   cross-currency result requires Task-089b conversion evidence.
-- Task `168` is planned: the Unified Integration State Center is decomposed
+- Task `168` is repository-complete: the Unified Integration State Center is implemented
   into eighteen bounded subtasks covering multidimensional account/runtime/
   credential/config/capability/health/sync/reconciliation state, bulk adapters,
   deterministic reduction, derived snapshots/RLS/lineage, events/worker/SSE,
@@ -1248,7 +1248,7 @@ rebuildable projection. The implementation is delivered as the eighteen-subtask 
 
 `168`
 
-Task 168 is planned as a provider-neutral read model and operator triage center
+Task 168 is repository-complete as a provider-neutral read model and operator triage center
 for the complete integration lifecycle. It composes account lifecycle,
 credential/configuration class, truthful runtime stage, capability grants,
 health/freshness/rate limits, OAuth reauthorization, sync/retry/DLQ,

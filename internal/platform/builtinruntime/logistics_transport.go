@@ -1013,12 +1013,40 @@ type dellinCredentials struct {
 	PAT    string `json:"pat"`
 }
 
+type dellinLoginResponse struct {
+	Metadata struct {
+		Status int `json:"status"`
+	} `json:"metadata"`
+	Data struct {
+		SessionID string `json:"sessionID"`
+	} `json:"data"`
+}
+
 func readDellinCredentials(secret []byte) (dellinCredentials, error) {
 	var credentials dellinCredentials
 	if decodeStrict(secret, &credentials) != nil || strings.TrimSpace(credentials.AppKey) == "" || strings.TrimSpace(credentials.PAT) == "" {
 		return dellinCredentials{}, errors.New("Деловые Линии credentials must be JSON with appkey and pat")
 	}
 	return credentials, nil
+}
+
+func (transport dellinHTTP) login(ctx context.Context, credentials dellinCredentials) (string, error) {
+	body, err := json.Marshal(credentials)
+	if err != nil {
+		return "", err
+	}
+	status, response, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v4/auth/login.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("Деловые Линии credential probe rejected with status %d", status)
+	}
+	var result dellinLoginResponse
+	if json.Unmarshal(response, &result) != nil || (result.Metadata.Status != 0 && result.Metadata.Status != http.StatusOK) || strings.TrimSpace(result.Data.SessionID) == "" {
+		return "", errors.New("Деловые Линии credential probe returned no session")
+	}
+	return strings.TrimSpace(result.Data.SessionID), nil
 }
 
 func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
@@ -1029,30 +1057,8 @@ func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
 	if err != nil {
 		return err
 	}
-	body, err := json.Marshal(credentials)
-	if err != nil {
-		return err
-	}
-	headers := http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}
-	status, response, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v4/auth/login.json", url.Values{}, body, headers, nil, nil)
-	if err != nil {
-		return err
-	}
-	if status < http.StatusOK || status >= http.StatusMultipleChoices {
-		return fmt.Errorf("Деловые Линии credential probe rejected with status %d", status)
-	}
-	var result struct {
-		Metadata struct {
-			Status int `json:"status"`
-		} `json:"metadata"`
-		Data struct {
-			SessionID string `json:"sessionID"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(response, &result) != nil || (result.Metadata.Status != 0 && result.Metadata.Status != http.StatusOK) || strings.TrimSpace(result.Data.SessionID) == "" {
-		return errors.New("Деловые Линии credential probe returned no session")
-	}
-	return nil
+	_, err = transport.login(ctx, credentials)
+	return err
 }
 
 type dellinDirectoryCity struct {

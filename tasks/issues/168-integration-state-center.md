@@ -2,7 +2,10 @@
 
 ## Статус
 
-`planned` — подробная декомпозиция подготовлена, реализация не начата.
+`repository-complete` — реализованы типизированный reducer, tenant-scoped API,
+OpenAPI/SDK, derived PostgreSQL metadata/queue, canonical events, worker
+consumer и UI `/integrations/status`; release evidence и Compose smoke
+проверяются общими репозиторными gate-командами.
 
 ## Цель
 
@@ -646,4 +649,3 @@ response authorizes an operation by itself.
 - `tasks/issues/130-runtime-truthful-integration-catalog.md`
 - `tasks/issues/134-host-owned-oauth-refresh-runtime.md`
 - `tasks/issues/156-categorical-runtime-surfaces.md`
-

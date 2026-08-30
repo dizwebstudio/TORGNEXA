@@ -1,0 +1,52 @@
+import {useEffect,useMemo,useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {useApi} from "../api/ApiProvider";
+import {useLocationPath,navigate} from "../shell/useLocationPath";
+import {Page} from "./Page";
+import {DataTable} from "../components/DataTable";
+import {Drawer} from "../components/Drawer";
+import {StatusBadge} from "../components/StatusBadge";
+import {ErrorBlock,LoadingBlock} from "../components/ApiState";
+
+type CenterRow={account_id:string;connector_id:string;display_name?:string;family:string;surface:string;overall:string;version:number;generated_at:string;dimensions:Record<string,{status:string;evidence?:{checked_at?:string;age_seconds?:number;visibility?:string}}>;capabilities:Array<{name:string;status:string;direction:string;approval_required:boolean}>;issues:Array<{code:string;title:string;severity:string;reason_code:string}>;available_actions:Array<{id:string;label:string;href?:string;permission:string;expected_version:number}>;snapshot_digest:string};
+type CenterResponse={items?:CenterRow[];summary?:Record<string,number>;partial?:boolean;generated_at?:string;snapshot_digest?:string;next_cursor?:string;source_watermarks?:string[]};
+const overallLabels:Record<string,string>={healthy:"Работает",attention:"Требует внимания",degraded:"Нестабильно",syncing:"Синхронизация",blocked:"Заблокировано",setup_required:"Нужно настроить",reauthorization_required:"Нужна авторизация",stale:"Устарело",disabled:"Отключено",unsupported:"Не подключено",unknown:"Нет данных"};
+const surfaceLabels:Record<string,string>={integrations:"Основные интеграции",ai_providers:"ИИ-провайдеры",ai:"ИИ-провайдеры",finance:"Финансы",logistics:"Доставка",crm:"CRM",social:"Социальные сети",unknown:"Не определено"};
+const dimensionLabels:Record<string,string>={runtime:"Runtime",account:"Кабинет",credential:"Доступ",configuration:"Конфигурация",health:"Подключение",capability:"Операции",sync:"Синхронизация",reconciliation:"Сверка",webhook:"Webhook",rate_limit:"Лимит запросов"};
+
+function useSearchState(){
+ const [search,setSearch]=useState(()=>window.location.search);
+ useEffect(()=>{const onPop=()=>setSearch(window.location.search);window.addEventListener("popstate",onPop);return()=>window.removeEventListener("popstate",onPop)},[]);
+ const update=(key:string,value:string)=>{const url=new URL(window.location.href);if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);url.searchParams.delete("cursor");window.history.pushState({},"",url);setSearch(url.search)};
+ return {params:useMemo(()=>new URLSearchParams(search),[search]),update};
+}
+
+export function IntegrationStatusPage(){
+ const api=useApi() as any;const path=useLocationPath();const {params,update}=useSearchState();
+ const queryParams={limit:50,cursor:params.get("cursor")||undefined,family:params.get("family")||undefined,surface:params.get("surface")||undefined,overall:params.get("overall")||undefined,health:params.get("health")||undefined,sync:params.get("sync")||undefined,issue:params.get("issue")||undefined,stale:params.get("stale")==="true"?true:undefined};
+ const query=useQuery({queryKey:["integration-center",params.toString()],queryFn:async()=>((await api.getIntegrationCenter(queryParams)).body as CenterResponse),staleTime:10_000});
+ const selectedID=path.startsWith("/integrations/status/")?decodeURIComponent(path.slice("/integrations/status/".length)):undefined;
+ const detail=useQuery({queryKey:["integration-center","detail",selectedID],enabled:Boolean(selectedID),queryFn:async()=>((await api.getIntegrationCenterAccount({accountId:selectedID})).body as CenterRow)});
+ const items=query.data?.items??[];const summary=query.data?.summary??{};
+ const columns=[
+  {key:"connector",label:"Интеграция",value:(v:CenterRow)=>`${v.display_name||v.connector_id} ${v.connector_id}`,render:(v:CenterRow)=><span className="integration-center-name"><strong>{v.display_name||v.connector_id}</strong><small>{v.connector_id} · {surfaceLabels[v.surface]??v.surface}</small></span>},
+  {key:"overall",label:"Итог",value:(v:CenterRow)=>v.overall,render:(v:CenterRow)=><StatusBadge value={overallLabels[v.overall]??v.overall}/>},
+  {key:"runtime",label:"Runtime",value:(v:CenterRow)=>v.dimensions.runtime?.status??"unknown",render:(v:CenterRow)=><span>{v.dimensions.runtime?.status??"unknown"}</span>},
+  {key:"health",label:"Подключение",value:(v:CenterRow)=>v.dimensions.health?.status??"unknown",render:(v:CenterRow)=><StatusBadge value={v.dimensions.health?.status??"unknown"}/>},
+  {key:"capability",label:"Операции",value:(v:CenterRow)=>v.dimensions.capability?.status??"unknown",render:(v:CenterRow)=><span>{v.dimensions.capability?.status??"unknown"}</span>},
+  {key:"sync",label:"Синхронизация",value:(v:CenterRow)=>v.dimensions.sync?.status??"unknown",render:(v:CenterRow)=><span>{v.dimensions.sync?.status??"unknown"}</span>},
+  {key:"issue",label:"Причина",value:(v:CenterRow)=>v.issues?.[0]?.title??"",render:(v:CenterRow)=><span className="table-subline">{v.issues?.[0]?.title??"Проверка без замечаний"}</span>}
+ ];
+ return <Page eyebrow="Интеграции" title="Состояние интеграций" description="Единая фактическая картина кабинетов, доступных операций, подключения и обмена. Чтение не выполняет удалённые проверки.">
+  <section className="integration-center-summary" aria-label="Сводка состояния"><Metric label="Всего" value={summary.total??items.length}/><Metric label="Работают" value={summary.healthy??0}/><Metric label="Внимание" value={summary.attention??0}/><Metric label="Заблокированы" value={summary.blocked??0}/><Metric label="Устарели" value={summary.stale??0}/><Metric label="Синхронизация" value={summary.syncing??0}/></section>
+  {query.data?.partial?<div className="panel alert warning" role="status">Часть источников недоступна. Состояния с неполными данными не считаются зелёными.</div>:null}
+  <div className="integration-center-filters"><label className="field"><span>Состояние</span><select value={params.get("overall")??""} onChange={e=>update("overall",e.target.value)}><option value="">Все состояния</option>{Object.entries(overallLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><label className="field"><span>Рабочий контур</span><select value={params.get("surface")??""} onChange={e=>update("surface",e.target.value)}><option value="">Все контуры</option>{Object.entries(surfaceLabels).filter(([key])=>key!=="unknown").map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><label className="field"><span>Семейство</span><input value={params.get("family")??""} placeholder="storefront, logistics…" onChange={e=>update("family",e.target.value)}/></label><button type="button" className="button ghost" onClick={()=>{window.history.pushState({},"",window.location.pathname);window.dispatchEvent(new PopStateEvent("popstate"))}}>Сбросить фильтры</button></div>
+  {query.isPending?<LoadingBlock/>:query.isError?<ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить состояние интеграций.</ErrorBlock>:<DataTable rows={items} columns={columns} rowKey={v=>v.account_id} searchPlaceholder="Кабинет, коннектор, причина…" empty="Нет кабинетов по выбранным фильтрам" onOpen={v=>navigate(`/integrations/status/${encodeURIComponent(v.account_id)}`)}/>} 
+  {query.data?.next_cursor?<div className="button-row integration-center-pagination"><button type="button" className="button ghost" onClick={()=>update("cursor",query.data?.next_cursor??"")}>Загрузить следующую страницу</button></div>:null}
+  <p className="integration-center-footnote">Снимок: {query.data?.generated_at?new Date(query.data.generated_at).toLocaleString("ru-RU"):"—"} · digest <span className="mono">{query.data?.snapshot_digest?.slice(0,16)??"—"}</span></p>
+  <Drawer open={Boolean(selectedID)} title={detail.data?.display_name||detail.data?.connector_id||"Состояние интеграции"} subtitle={selectedID?`Кабинет · ${selectedID}`:undefined} onClose={()=>navigate("/integrations/status")}><IntegrationDetail query={detail}/></Drawer>
+ </Page>
+}
+
+function Metric({label,value}:{label:string;value:number}){return <article className="metric-card"><span>{label}</span><strong>{value}</strong></article>}
+function IntegrationDetail({query}:{query:any}){if(query.isPending)return <LoadingBlock/>;if(query.isError)return <ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить детали состояния.</ErrorBlock>;const row=query.data as CenterRow;return <div className="catalog-stack"><div className="drawer-kpis"><div><small>Итог</small><StatusBadge value={overallLabels[row.overall]??row.overall}/></div><div><small>Runtime</small><strong>{row.dimensions.runtime?.status}</strong></div><div><small>Версия кабинета</small><strong>{row.version}</strong></div></div><section className="drawer-section"><h3>Измерения</h3><dl className="detail-list">{Object.entries(row.dimensions).map(([key,value])=><div key={key}><dt>{dimensionLabels[key]??key}</dt><dd><StatusBadge value={value.status}/>{value.evidence?.visibility==="redacted"?<small> нет прав на раздел</small>:value.evidence?.checked_at?<small> · {new Date(value.evidence.checked_at).toLocaleString("ru-RU")}</small>:null}</dd></div>)}</dl></section><section className="drawer-section"><h3>Доступные операции</h3>{row.capabilities?.length?<ul className="integration-capability-list">{row.capabilities.map(cap=><li key={`${cap.name}:${cap.direction}`}><span>{cap.name}</span><StatusBadge value={cap.status}/>{cap.approval_required?<small> требуется согласование</small>:null}</li>)}</ul>:<p className="drawer-help">Операции не заявлены или не выданы. Сам факт подключения не даёт права на запись.</p>}</section>{row.issues?.length?<section className="drawer-section"><h3>Что требует внимания</h3>{row.issues.map(issue=><article className="integration-issue" key={issue.code}><StatusBadge value={issue.severity}/><span><strong>{issue.title}</strong><small>{issue.reason_code}</small></span></article>)}</section>:null}<section className="drawer-section"><h3>Следующее действие</h3>{row.available_actions?.length?row.available_actions.map(action=><button type="button" className="button ghost" key={action.id} onClick={()=>action.href?navigate(action.href):undefined}>{action.label}</button>):<p className="drawer-help">Действий нет: состояние фиксируется источниками системы.</p>}</section></div>}

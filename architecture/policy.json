@@ -83,6 +83,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/integrationcenter",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/inventory",
       "kind": "core_domain"
     },
@@ -380,6 +384,10 @@
     },
     {
       "path": "internal/platform/postgres/inboxrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/integrationcenterrepo",
       "kind": "infrastructure_adapter"
     },
     {

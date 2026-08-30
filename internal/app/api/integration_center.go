@@ -419,6 +419,9 @@ func integrationCenterDetail(w http.ResponseWriter, r *http.Request, reader inte
 
 func parseIntegrationCenterRequest(r *http.Request) (integrationCenterReadRequest, bool) {
 	q := r.URL.Query()
+	if q.Get("organization_id") != "" || q.Get("workspace_id") != "" || q.Get("tenant") != "" {
+		return integrationCenterReadRequest{}, false
+	}
 	limit := 50
 	if raw := q.Get("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)

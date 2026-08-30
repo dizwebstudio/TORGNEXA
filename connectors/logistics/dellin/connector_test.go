@@ -39,6 +39,17 @@ func TestPickupPointsUseCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestRatesUseCandidateTransport(t *testing.T) {
+	rates, err := New(candidateTransport{}, nil).ReadLogisticsRates(context.Background(), testAccount(), testRuntime{}, sdk.RateRequest{
+		From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"},
+		To: sdk.Address{Country: "RU", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+	})
+	if err != nil || len(rates) != 1 || rates[0].ServiceCode != "dellin_auto" {
+		t.Fatalf("rates=%+v err=%v", rates, err)
+	}
+}
+
 func TestTrackingUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).ReadLogisticsTracking(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentStatusRequest{RemoteID: "400267443"})
 	if err != nil || result.RemoteID != "400267443" || result.Status != "in_transit" || result.TrackingNumber != "400267443" {

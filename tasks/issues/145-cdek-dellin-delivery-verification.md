@@ -2,7 +2,7 @@
 
 ## Status
 
-`repository-complete` — 2026-08-28. CDEK is moved from `planned` to the
+`repository-complete` — 2026-08-30. CDEK is moved from `planned` to the
 separate Delivery surface and the Деловые Линии connector is added. Both
 providers expose encrypted account credentials and an authenticated health
 check. CDEK and Деловые Линии additionally expose the bounded read-only

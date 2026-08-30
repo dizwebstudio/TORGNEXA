@@ -57,3 +57,9 @@ allocation, publication-quality preflight, WMS execution tasks, the bounded
 workflow builder, channel unit economics and qualified logistics read
 operations. Runtime availability remains sourced from the generated connector
 catalog; SDK-declared capability alone is never presented as a live operation.
+## Единый центр состояния интеграций
+
+Маршрут `/integrations/status` отделён от marketplace-каталога `/integrations`.
+Он отображает server-side reducer, URL-фильтры и детализацию кабинета; UI не
+проверяет провайдера и не считает manifest capability доказательством операции.
+См. `docs/operations/168-integration-state-center.md`.

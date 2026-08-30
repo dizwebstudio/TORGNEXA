@@ -137,10 +137,11 @@ bounded read-only чтение справочника ПВЗ/терминало�
 Для CDEK, ПЭК и «Почты России» также доступен bounded предпросмотр тарифов через
 `POST /api/v1/logistics/rates` с capability `logistics.rates.read`; запрос
 ограничен 50 местами, ответ — 100 вариантами и не раскрывает код тарифа.
-Для СДЭК и ПЭК также доступно bounded read-only отслеживание одного отправления
-через `GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
-Создание отправлений и этикетки остаются закрытыми до квалификации актуального
-API и тестового кабинета.
+Для СДЭК, ПЭК, «Деловых Линий» и «Почты России» также доступно bounded
+read-only отслеживание одного отправления через
+`GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
+Создание отправлений и этикетки остаются закрытыми до qualification актуального
+API, provider fixtures и тестового кабинета.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
 использует пару `client_id`/`api_key` продавца Ozon и проверяет доступ к
@@ -175,9 +176,10 @@ The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Лини
 and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Линии» and «Почта России»
 expose a bounded, read-only `pickup.points.read` application route for their
 official ПВЗ/terminal directories; CDEK, ПЭК and «Почта России» additionally
-expose a bounded read-only rate preview, while CDEK and ПЭК also expose a bounded
-`logistics.track.read` status lookup. Shipment writes, labels and other carrier
-operations remain fail-closed until provider qualification. 5Post and Ozon
+expose a bounded read-only rate preview, while CDEK, ПЭК, «Деловые Линии» and
+«Почта России» expose a bounded `logistics.track.read` status lookup. Shipment
+writes, labels and other carrier operations remain fail-closed until provider
+qualification. 5Post and Ozon
 Доставка expose only the separately reviewed credential-check surface.
 
 The exact write qualification boundary and next host-side steps are recorded in

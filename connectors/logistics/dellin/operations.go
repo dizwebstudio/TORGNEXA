@@ -7,6 +7,29 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
+// ReadLogisticsRates calculates a bounded delivery-rate preview through the
+// official Деловые Линии calculator.
+func (c *Connector) ReadLogisticsRates(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var result []sdk.RateQuote
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		result, callErr = c.transport.Rates(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, quote := range result {
+		if quote.Validate() != nil {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+	}
+	return result, nil
+}
+
 // ReadPickupPoints reads a bounded Деловые Линии terminal/PUDO directory.
 // Provider identifiers stay remote references and never become Core warehouse
 // identifiers.
@@ -60,4 +83,5 @@ func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn
 }
 
 var _ sdk.PickupPointReader = (*Connector)(nil)
+var _ sdk.LogisticsRateReader = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
