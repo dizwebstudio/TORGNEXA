@@ -1,4 +1,4 @@
-# Package status — 2026-08-30
+# Package status — 2026-08-31
 
 **Tasks 001–168 are repository-implemented.** Task 159 adds Google Gemini and
 Grok to the governed AI-provider surface. Midjourney remains intentionally
@@ -19,10 +19,10 @@ surface; both remain qualification-gated for shipment operations. Connector
 packages are organized as `connectors/<category>/<provider>`, with provider
 IDs and generated catalog order unchanged. The catalog therefore contains 18
 generic product integrations and 43 separate-surface providers; there are no
-planned connectors. Architecture policy: **127 modules / 61 providers / 150
-reviews**. Active migrations are **22**, latest `000022`, with
+planned connectors. Architecture policy: **142 modules / 61 providers / 157
+reviews**. Active migrations are **36**, latest `000036`, with
 the original **74-file / legacy head 000074** chain archived as immutable
-evidence. Public OpenAPI is **194 operations / 0.21.2**.
+evidence. Public OpenAPI is **195 operations / 0.21.2**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 

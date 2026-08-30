@@ -54,7 +54,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   worker/API/exports, operator UI, security/quotas and Compose qualification.
   Missing facts never become zero, payout never becomes revenue, and every
   cross-currency result requires Task-089b conversion evidence.
-- Task `168` is repository-complete: the Unified Integration State Center is implemented
+- Task `168` is complete: the Unified Integration State Center is implemented
   into eighteen bounded subtasks covering multidimensional account/runtime/
   credential/config/capability/health/sync/reconciliation state, bulk adapters,
   deterministic reduction, derived snapshots/RLS/lineage, events/worker/SSE,

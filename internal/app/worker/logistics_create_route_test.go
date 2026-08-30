@@ -138,6 +138,6 @@ func logisticsCreateApproval(shipment logistics.Shipment) approval.Request {
 func logisticsCreateAccount(t *testing.T) sdk.Account {
 	account := logisticsCancelAccount(t)
 	account.ID = "cdek-account"
-	account.ConnectorID = "cdek"
+	account.ConnectorID = "test-logistics"
 	return account
 }
