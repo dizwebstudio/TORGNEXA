@@ -122,6 +122,10 @@ func (a wmsAPI) createFromOrder(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
+	if a.repository == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if key == "" {
 		writeProblem(w, http.StatusBadRequest, "Idempotency-Key Required")

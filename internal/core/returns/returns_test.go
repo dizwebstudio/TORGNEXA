@@ -52,3 +52,28 @@ func TestRefundAllocationRequiresExactPositiveMoney(t *testing.T) {
 		t.Fatalf("zero allocation error = %v", err)
 	}
 }
+
+func TestQuantityValidationRejectsMalformedUnits(t *testing.T) {
+	if _, err := NewQuantity(1, 0, "pcs"); err != ErrInvalidRecord {
+		t.Fatalf("lowercase unit error = %v", err)
+	}
+	if err := (Quantity{Coefficient: 1, Unit: "PCS!"}).Validate(); err != ErrInvalidRecord {
+		t.Fatalf("punctuated unit error = %v", err)
+	}
+}
+
+func TestInspectionRequiresQuantityForAcceptedOutcomes(t *testing.T) {
+	now := testUTC()
+	zero, _ := NewQuantity(0, 0, "PCS")
+	inspection := InspectionResult{
+		ID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0201", ReturnID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0202", ReturnItemID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0203",
+		Outcome: ReturnAccepted, ConditionCode: "sealed", Quantity: zero, Disposition: DispositionRestock, OccurredAt: now,
+	}
+	if err := inspection.Validate(); err != ErrInvalidRecord {
+		t.Fatalf("zero accepted inspection error = %v", err)
+	}
+	inspection.Outcome = ReturnRejected
+	if err := inspection.Validate(); err != nil {
+		t.Fatalf("zero rejected inspection: %v", err)
+	}
+}

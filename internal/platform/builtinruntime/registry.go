@@ -511,10 +511,30 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 	case "woocommerce":
 		value = woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil)
 		remoteToCanonical = woocommerceOrderStatuses
+	case "prestashop":
+		configuration, err := (prestaShopConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		canonical, err := configuration.OrderStatuses()
+		if err != nil {
+			return nil, ErrConfigurationNeeded
+		}
+		remoteToCanonical = reverseConfiguredOrderStatuses(canonical)
+		unknownStatusError = ErrConfigurationNeeded
+		value = prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil)
 	default:
 		return nil, ErrUnavailable
 	}
 	return mappedOrderReader{value: value, account: account, runtime: runtime, remoteToCanonical: remoteToCanonical, unknownStatusError: unknownStatusError}, nil
+}
+
+func reverseConfiguredOrderStatuses(canonicalToRemote map[string]string) map[string]string {
+	remoteToCanonical := make(map[string]string, len(canonicalToRemote))
+	for canonical, remote := range canonicalToRemote {
+		remoteToCanonical[remote] = canonical
+	}
+	return remoteToCanonical
 }
 
 var magnitOrderStatuses = map[string]string{
@@ -591,6 +611,18 @@ func (r *Registry) OrderStatusWriter(ctx context.Context, account sdk.Account, r
 		return configuredShopwareWriter(r, account, load)
 	case "woocommerce":
 		return configuredWooCommerceWriter(r, account, load)
+	case "prestashop":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		configuration, err := (prestaShopConfigSource{load: load}).Resolve(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := configuration.OrderStatuses(); err != nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return prestashop.New(prestaShopHTTP{r.http}, prestaShopConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -644,7 +676,7 @@ func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status 
 	if r == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
 		return "", false
 	}
-	if account.ConnectorID != "bitrix" {
+	if account.ConnectorID != "bitrix" && account.ConnectorID != "prestashop" {
 		value, ok := map[string]map[string]string{
 			"magento":     {"cancelled": "canceled"},
 			"medusa":      {"cancelled": "canceled"},
@@ -658,11 +690,21 @@ func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status 
 	if load == nil {
 		return "", false
 	}
-	configuration, err := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
-	if err != nil {
-		return "", false
+	var statuses map[string]string
+	var err error
+	if account.ConnectorID == "bitrix" {
+		configuration, resolveErr := (bitrixStoreConfigSource{load: load}).Resolve(ctx, account)
+		if resolveErr != nil {
+			return "", false
+		}
+		statuses, err = configuration.OrderStatuses()
+	} else {
+		configuration, resolveErr := (prestaShopConfigSource{load: load}).Resolve(ctx, account)
+		if resolveErr != nil {
+			return "", false
+		}
+		statuses, err = configuration.OrderStatuses()
 	}
-	statuses, err := configuration.OrderStatuses()
 	if err != nil {
 		return "", false
 	}

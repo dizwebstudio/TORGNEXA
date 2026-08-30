@@ -201,13 +201,8 @@ type Quantity struct {
 }
 
 func NewQuantity(coefficient int64, scale uint8, unit string) (Quantity, error) {
-	if scale > 9 || unit == "" || len(unit) > 16 || strings.ToUpper(unit) != unit {
+	if scale > 9 || !validUnit(unit) {
 		return Quantity{}, ErrInvalidRecord
-	}
-	for _, c := range unit {
-		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
-			return Quantity{}, ErrInvalidRecord
-		}
 	}
 	q := Quantity{Coefficient: coefficient, Scale: scale, Unit: unit}
 	return q.normalized(), nil
@@ -220,7 +215,7 @@ func (q Quantity) normalized() Quantity {
 	return q
 }
 func (q Quantity) Validate() error {
-	if q.Scale > 9 || q.Unit == "" || q.normalized() != q {
+	if q.Scale > 9 || !validUnit(q.Unit) || q.normalized() != q {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -391,6 +386,12 @@ func (i InspectionResult) Validate() error {
 	if !i.ID.Valid() || !i.ReturnID.Valid() || !i.ReturnItemID.Valid() || (i.Outcome != ReturnAccepted && i.Outcome != ReturnPartiallyAccepted && i.Outcome != ReturnRejected) || !reasonPattern.MatchString(i.ConditionCode) || (i.DiscrepancyCode != "" && !reasonPattern.MatchString(i.DiscrepancyCode)) || i.Quantity.Validate() != nil || !i.Disposition.Valid() || (i.ArtifactRef != "" && !refPattern.MatchString(i.ArtifactRef)) || !utc(i.OccurredAt) {
 		return ErrInvalidRecord
 	}
+	// An accepted or partially accepted inspection must account for a positive
+	// quantity. A rejected inspection may legitimately carry zero accepted
+	// quantity while still recording the condition/disposition evidence.
+	if i.Outcome != ReturnRejected && !i.Quantity.Positive() {
+		return ErrInvalidRecord
+	}
 	return nil
 }
 
@@ -448,6 +449,18 @@ func utc(t time.Time) bool { return !t.IsZero() && t.Location() == time.UTC }
 func hexDigest(value string) bool {
 	for _, c := range value {
 		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func validUnit(unit string) bool {
+	if unit == "" || len(unit) > 16 || strings.ToUpper(unit) != unit {
+		return false
+	}
+	for _, c := range unit {
+		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
 			return false
 		}
 	}

@@ -48,6 +48,9 @@ func (r *Repository) CreateCancellation(ctx context.Context, scope core.Scope, c
 	if err := r.validateMutation(ctx, scope, command.OrganizationID, command.WorkspaceID, mutation); err != nil || command.Validate() != nil {
 		return core.CancellationRequest{}, core.ErrInvalidRecord
 	}
+	if command.Status != core.CancellationRequested {
+		return core.CancellationRequest{}, core.ErrInvalidState
+	}
 	var result core.CancellationRequest
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
 		var exists bool
@@ -129,14 +132,20 @@ func (r *Repository) CreateReturn(ctx context.Context, scope core.Scope, command
 	if err := r.validateMutation(ctx, scope, command.OrganizationID, command.WorkspaceID, mutation); err != nil || command.Validate() != nil {
 		return core.ReturnRequest{}, core.ErrInvalidRecord
 	}
+	if command.Status != core.ReturnRequested {
+		return core.ReturnRequest{}, core.ErrInvalidState
+	}
 	var result core.ReturnRequest
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		var exists bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM orders WHERE organization_id=$1 AND workspace_id=$2 AND id=$3)`, scope.OrganizationID(), scope.WorkspaceID(), command.OrderID).Scan(&exists); err != nil {
+		var orderCurrency string
+		if err := tx.QueryRowContext(ctx, `SELECT currency FROM orders WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), command.OrderID).Scan(&orderCurrency); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return core.ErrNotFound
+			}
 			return err
 		}
-		if !exists {
-			return core.ErrNotFound
+		if orderCurrency != command.Currency.String() {
+			return core.ErrInvalidRecord
 		}
 		var inserted string
 		err := tx.QueryRowContext(ctx, `INSERT INTO commerce_returns(id,organization_id,workspace_id,order_id,status,reason_code,source,currency,requested_shipping_minor,requested_tax_minor,idempotency_key,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,1,$12,$12) ON CONFLICT (organization_id,workspace_id,idempotency_key) DO NOTHING RETURNING id`, command.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), command.OrderID, command.Status, command.ReasonCode, command.Source, command.Currency.String(), command.RequestedShippingMinor, command.RequestedTaxMinor, command.IdempotencyKey, mutation.OccurredAt).Scan(&inserted)
@@ -243,13 +252,12 @@ func (r *Repository) CreateReturnItem(ctx context.Context, scope core.Scope, ite
 	if err := r.validateMutation(ctx, scope, "", "", mutation); err != nil || item.Validate() != nil {
 		return core.ReturnItem{}, core.ErrInvalidRecord
 	}
+	if !item.Received.Zero() || !item.Accepted.Zero() {
+		return core.ReturnItem{}, core.ErrInvalidState
+	}
 	var result core.ReturnItem
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
 		inserted, err := tx.ExecContext(ctx, `INSERT INTO return_items(id,organization_id,workspace_id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,1,$14,$14) ON CONFLICT DO NOTHING`, item.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), item.ReturnID.String(), item.OrderItemID, item.Requested.Coefficient, item.Requested.Scale, item.Received.Coefficient, item.Received.Scale, item.Accepted.Coefficient, item.Accepted.Scale, item.Requested.Unit, item.Disposition, mutation.OccurredAt)
-		if err != nil {
-			return err
-		}
-		result, err = scanReturnItem(tx.QueryRowContext(ctx, `SELECT id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at FROM return_items WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), item.ID.String()))
 		if err != nil {
 			return err
 		}
@@ -258,6 +266,13 @@ func (r *Repository) CreateReturnItem(ctx context.Context, scope core.Scope, ite
 			return rowsErr
 		}
 		if rows == 0 {
+			result, err = scanReturnItem(tx.QueryRowContext(ctx, `SELECT id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at FROM return_items WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), item.ID.String()))
+			if errors.Is(err, core.ErrNotFound) {
+				result, err = scanReturnItem(tx.QueryRowContext(ctx, `SELECT id,return_id,order_item_id,requested_coefficient,requested_scale,received_coefficient,received_scale,accepted_coefficient,accepted_scale,unit,disposition,version,created_at,updated_at FROM return_items WHERE organization_id=$1 AND workspace_id=$2 AND return_id=$3 AND order_item_id=$4`, scope.OrganizationID(), scope.WorkspaceID(), item.ReturnID.String(), item.OrderItemID))
+			}
+			if err != nil {
+				return core.ErrConflict
+			}
 			if result.ReturnID != item.ReturnID || result.OrderItemID != item.OrderItemID || result.Requested != item.Requested || result.Disposition != item.Disposition {
 				return core.ErrConflict
 			}
@@ -279,6 +294,25 @@ func (r *Repository) RecordInspection(ctx context.Context, scope core.Scope, ins
 		}
 		n, _ := result.RowsAffected()
 		if n == 0 {
+			var existing core.InspectionResult
+			var outcome, condition, discrepancy, unit, disposition, artifact string
+			var coefficient int64
+			var scale int
+			if err := tx.QueryRowContext(ctx, `SELECT return_id,return_item_id,outcome,condition_code,COALESCE(discrepancy_code,''),quantity_coefficient,quantity_scale,unit,disposition,COALESCE(artifact_ref,''),occurred_at FROM return_inspections WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), inspection.ID.String()).Scan(&existing.ReturnID, &existing.ReturnItemID, &outcome, &condition, &discrepancy, &coefficient, &scale, &unit, &disposition, &artifact, &existing.OccurredAt); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return core.ErrConflict
+				}
+				return err
+			}
+			existing.Outcome, existing.ConditionCode, existing.DiscrepancyCode = core.ReturnStatus(outcome), condition, discrepancy
+			existing.Quantity, err = core.NewQuantity(coefficient, uint8(scale), unit)
+			if err != nil {
+				return err
+			}
+			existing.Disposition, existing.ArtifactRef = core.Disposition(disposition), artifact
+			if existing.ReturnID != inspection.ReturnID || existing.ReturnItemID != inspection.ReturnItemID || existing.Outcome != inspection.Outcome || existing.ConditionCode != inspection.ConditionCode || existing.DiscrepancyCode != inspection.DiscrepancyCode || existing.Quantity != inspection.Quantity || existing.Disposition != inspection.Disposition || existing.ArtifactRef != inspection.ArtifactRef {
+				return core.ErrConflict
+			}
 			return nil
 		}
 		return appendAudit(ctx, tx, scope, mutation, "returns.inspection.recorded", "return_inspection", inspection.ID.String(), audit.RiskWriteSensitive, audit.Summary{"return_id": inspection.ReturnID.String(), "return_item_id": inspection.ReturnItemID.String(), "outcome": string(inspection.Outcome), "disposition": string(inspection.Disposition)})
@@ -302,15 +336,15 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 		if paymentCurrency != allocation.Currency.String() {
 			return core.ErrInvalidRecord
 		}
-		var refundPaymentID, refundCurrency string
+		var refundPaymentID, refundCurrency, refundStatus string
 		var refundAmount int64
-		if err := tx.QueryRowContext(ctx, `SELECT payment_id,amount_minor_units,currency FROM payment_refunds WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), allocation.RefundID).Scan(&refundPaymentID, &refundAmount, &refundCurrency); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT payment_id,amount_minor_units,currency,status FROM payment_refunds WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), allocation.RefundID).Scan(&refundPaymentID, &refundAmount, &refundCurrency, &refundStatus); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return core.ErrNotFound
 			}
 			return err
 		}
-		if refundPaymentID != allocation.PaymentID || refundCurrency != allocation.Currency.String() {
+		if refundPaymentID != allocation.PaymentID || refundCurrency != allocation.Currency.String() || (refundStatus != "accepted" && refundStatus != "succeeded" && refundStatus != "unknown" && refundStatus != "manual_attention") {
 			return core.ErrConflict
 		}
 		if allocation.Amount.MinorUnits() > refundAmount {
