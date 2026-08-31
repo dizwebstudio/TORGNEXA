@@ -12,6 +12,7 @@ var ErrInvalidSocialWebhook = errors.New("connectors: invalid social webhook")
 
 var socialWebhookEventPattern = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
 var socialWebhookDeliveryPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+var hexFingerprintPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // SocialWebhookRequest is an ephemeral inbound-provider webhook envelope.
 // VerificationToken is provider-supplied verification material from the HTTP
@@ -53,11 +54,33 @@ func (result SocialWebhookResult) Validate() error {
 	return nil
 }
 
+// SocialWebhookClaim is the minimized verified delivery handed to the host's
+// durable replay boundary. CanonicalPayload is available only while the claim
+// is being processed; the host must not persist it when it contains untrusted
+// provider data.
+type SocialWebhookClaim struct {
+	DeliveryID          string
+	EventType           string
+	RemoteChannelID     string
+	RemoteObjectID      string
+	OccurredAt          time.Time
+	ProviderFingerprint string
+	CanonicalPayload    json.RawMessage
+}
+
+// Validate checks the bounded normalized fields of a verified webhook claim.
+func (claim SocialWebhookClaim) Validate() error {
+	if !socialWebhookDeliveryPattern.MatchString(claim.DeliveryID) || !socialWebhookEventPattern.MatchString(claim.EventType) || !validRemoteReadID(claim.RemoteChannelID) || (claim.RemoteObjectID != "" && !validRemoteReadID(claim.RemoteObjectID)) || claim.OccurredAt.IsZero() || claim.OccurredAt.Location() != time.UTC || !hexFingerprintPattern.MatchString(claim.ProviderFingerprint) || len(claim.CanonicalPayload) < 2 || len(claim.CanonicalPayload) > 2<<20 || !json.Valid(claim.CanonicalPayload) {
+		return ErrInvalidSocialWebhook
+	}
+	return nil
+}
+
 // SocialWebhookDeduplicator is the host-owned durable replay boundary. A
 // production implementation must be tenant-scoped and atomic (Task-009 inbox
 // is the intended persistence primitive). Duplicate=true is a successful no-op.
 type SocialWebhookDeduplicator interface {
-	ClaimSocialWebhook(context.Context, Account, string, string, time.Time) (duplicate bool, err error)
+	ClaimSocialWebhook(context.Context, Account, SocialWebhookClaim) (duplicate bool, err error)
 }
 
 // SocialWebhookReceiver is additive SDK-v1 surface for providers that support

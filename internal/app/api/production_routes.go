@@ -140,7 +140,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newEntitlementRoutes(deps.entitlements, deps.quotas)...)
 	routes = append(routes, newWebhookRoutes(deps.webhooks)...)
 	routes = append(routes, newAIAdvisoryRoutes(deps.aiAdvisory, deps.secretProvider, deps.aiRegistry, deps.auditService, deps.trustControl)...)
-	routes = append(routes, newOperatorAssistantRoutes(deps.assistant, integrationAssistantSource{reader: deps.integrationCenter}, deps.auditService)...)
+	routes = append(routes, newOperatorAssistantRoutesWithApproval(deps.assistant, operatorAssistantSources{integration: deps.integrationCenter, quality: deps.publicationQuality, inventory: deps.inventory, returns: deps.returns, sync: deps.syncPolicies, reconciliation: deps.reconciliations, reports: deps.reports}, deps.approvals, deps.auditService)...)
 	routes = append(routes, newMCPAccountRoutes(deps.mcpAccounts, deps.auditService)...)
 	routes = append(routes, newMCPAgentPolicyRoutes(deps.mcpAccounts, deps.agentGovernance, deps.agentGovernance, deps.auditService)...)
 	routes = append(routes, newTrustControlRoutes(deps.trustControl)...)
@@ -160,5 +160,6 @@ func newProductionWebhookRoutes(deps productionRouteDependencies) []PublicWebhoo
 	routes = append(routes, newLogisticsWebhookRoutes(deps.logistics, deps.accounts, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newPaymentWebhookRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newCommerceWebhookRoutes(deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry, deps.inboundWebhooks)...)
+	routes = append(routes, newSocialWebhookRoutes(deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry, deps.inboundWebhooks)...)
 	return routes
 }

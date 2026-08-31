@@ -116,7 +116,19 @@ func (connector *Connector) ReceiveSocialWebhook(ctx context.Context, account sd
 		digest := sha256.Sum256(canonical)
 		fingerprint := hex.EncodeToString(digest[:])
 		deliveryID := "sha256:" + fingerprint
-		duplicate, claimErr := dedup.ClaimSocialWebhook(ctx, account, deliveryID, fingerprint, request.ReceivedAt)
+		claim := sdk.SocialWebhookClaim{
+			DeliveryID:          deliveryID,
+			EventType:           "max." + update.UpdateType,
+			RemoteChannelID:     strconv.FormatInt(chatID, 10),
+			RemoteObjectID:      mid,
+			OccurredAt:          occurred,
+			ProviderFingerprint: fingerprint,
+			CanonicalPayload:    canonical,
+		}
+		if err := claim.Validate(); err != nil {
+			return err
+		}
+		duplicate, claimErr := dedup.ClaimSocialWebhook(ctx, account, claim)
 		if claimErr != nil {
 			return claimErr
 		}

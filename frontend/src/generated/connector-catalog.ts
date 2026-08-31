@@ -665,10 +665,10 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.media", "social.post.text", "social.post.video"],
+      operationalCapabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
       sync: [
       ],
-      runtimeConfigTemplate: {"chat_id":-70801090403050},
+      runtimeConfigTemplate: {"chat_id":-70801090403050,"webhook_secret_reference":""},
       socialTextMaxRunes: 4000,
     },
   },

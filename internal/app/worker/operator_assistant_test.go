@@ -14,6 +14,9 @@ func TestAssistantRunTransitionIsMonotonic(t *testing.T) {
 	if err := assistantRunTransition(operatorassistant.RunCompleted, operatorassistant.RunQueued); err == nil {
 		t.Fatal("terminal run moved backwards")
 	}
+	if err := assistantRunTransition(operatorassistant.RunQueued, operatorassistant.RunProviderUnavailable); err != nil {
+		t.Fatalf("queued run cannot be recovered without provider: %v", err)
+	}
 	if assistantRetryable("provider_timeout") != true || assistantRetryable("policy_denied") {
 		t.Fatal("retry policy is not bounded")
 	}

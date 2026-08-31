@@ -38,9 +38,11 @@
           "social.comments.reply",
           "social.post.delete",
           "social.post.edit",
+          "social.post.buttons",
           "social.post.media",
           "social.post.text",
-          "social.post.video"
+          "social.post.video",
+          "social.webhooks"
         ]
       }
     },

@@ -5,10 +5,13 @@ package operatorassistantrepo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +24,8 @@ var (
 	ErrNotFound = errors.New("operator assistant repository: not found")
 	ErrConflict = errors.New("operator assistant repository: conflict")
 )
+
+var assistantErrorCodePattern = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,95}$`)
 
 type Repository struct{ db *sql.DB }
 
@@ -194,6 +199,21 @@ func (r *Repository) GetRun(ctx context.Context, scope tenancy.Scope, actorID, i
 	return out, err
 }
 
+// GetRunForWorker is the worker-only read boundary. The dispatch lease has
+// already supplied tenant scope, so no actor selector is accepted here.
+func (r *Repository) GetRunForWorker(ctx context.Context, scope tenancy.Scope, id string) (operatorassistant.Run, error) {
+	if strings.TrimSpace(id) == "" {
+		return operatorassistant.Run{}, ErrInvalid
+	}
+	var out operatorassistant.Run
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		var err error
+		out, err = scanRun(tx.QueryRowContext(ctx, `SELECT `+runColumns+` FROM assistant_runs WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id))
+		return err
+	})
+	return out, err
+}
+
 func (r *Repository) SaveAnswer(ctx context.Context, scope tenancy.Scope, actorID, runID string, expectedVersion int64, state operatorassistant.RunState, answer operatorassistant.Answer, now time.Time) (operatorassistant.Run, error) {
 	if strings.TrimSpace(actorID) == "" || strings.TrimSpace(runID) == "" || expectedVersion < 1 || !state.Valid() || answer.Validate(now) != nil || !utc(now) {
 		return operatorassistant.Run{}, ErrInvalid
@@ -206,6 +226,27 @@ func (r *Repository) SaveAnswer(ctx context.Context, scope tenancy.Scope, actorI
 	err = r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
 		row := tx.QueryRowContext(ctx, `UPDATE assistant_runs SET state=$6,answer=$7::jsonb,answer_digest=$8,version=version+1,updated_at=$9 WHERE organization_id=$1 AND workspace_id=$2 AND actor_id=$3 AND id=$4 AND version=$5 AND state NOT IN ('cancelled','failed') RETURNING `+runColumns,
 			scope.OrganizationID().String(), scope.WorkspaceID().String(), actorID, runID, expectedVersion, string(state), raw, answer.AnswerDigest, now)
+		var scanErr error
+		out, scanErr = scanRun(row)
+		if errors.Is(scanErr, ErrNotFound) {
+			return ErrConflict
+		}
+		return scanErr
+	})
+	return out, err
+}
+
+// TransitionRun advances a queued run without fabricating an answer. It is
+// used by the durable worker when a provider is not configured or a lease is
+// recovered after a crash; a terminal provider_unavailable state remains
+// visible to the operator and can be retried explicitly.
+func (r *Repository) TransitionRun(ctx context.Context, scope tenancy.Scope, runID string, expectedVersion int64, state operatorassistant.RunState, errorCode string, now time.Time) (operatorassistant.Run, error) {
+	if strings.TrimSpace(runID) == "" || expectedVersion < 1 || !state.Valid() || state == operatorassistant.RunCompleted || state == operatorassistant.RunPartial || state == operatorassistant.RunStale || state == operatorassistant.RunBlocked || (errorCode != "" && !assistantErrorCodePattern.MatchString(errorCode)) || !utc(now) {
+		return operatorassistant.Run{}, ErrInvalid
+	}
+	var out operatorassistant.Run
+	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		row := tx.QueryRowContext(ctx, `UPDATE assistant_runs SET state=$4,error_code=$5,version=version+1,updated_at=$6 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$7 AND state NOT IN ('completed','partial','stale','blocked','cancelled','failed') RETURNING `+runColumns, scope.OrganizationID().String(), scope.WorkspaceID().String(), runID, string(state), errorCode, now, expectedVersion)
 		var scanErr error
 		out, scanErr = scanRun(row)
 		if errors.Is(scanErr, ErrNotFound) {
@@ -252,6 +293,84 @@ ON CONFLICT (organization_id,workspace_id,actor_id,run_id) DO UPDATE SET kind=EX
 		}
 		return nil
 	})
+}
+
+// CreateActionPreview persists the non-executing preview next to its run. The
+// table intentionally stores only normalized metadata and evidence digests;
+// impact text and capability details are recomputed/omitted at the API edge.
+func (r *Repository) CreateActionPreview(ctx context.Context, scope tenancy.Scope, runID, actorID string, preview operatorassistant.ActionPreview, now time.Time) error {
+	if strings.TrimSpace(runID) == "" || strings.TrimSpace(actorID) == "" || preview.Validate(now) != nil || !utc(now) {
+		return ErrInvalid
+	}
+	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		var existingDigest string
+		err := tx.QueryRowContext(ctx, `SELECT preview_digest FROM assistant_action_previews WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), preview.ID).Scan(&existingDigest)
+		if err == nil {
+			if existingDigest != preview.PreviewDigest {
+				return ErrConflict
+			}
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO assistant_action_previews(organization_id,workspace_id,id,run_id,actor_id,action,resource_type,resource_id,expected_version,risk,required_permission,preview_digest,evidence_digest,status,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14,$15)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), preview.ID, runID, actorID, preview.Action, preview.ResourceType, preview.ResourceID, preview.ExpectedVersion, string(preview.Risk), preview.RequiredPermission, preview.PreviewDigest, preview.EvidenceDigest, preview.ExpiresAt, now)
+		return err
+	})
+}
+
+// GetActionPreview loads a tenant/actor-scoped preview. It returns terminal
+// previews as well so the UI can explain an idempotent approval/rejection.
+func (r *Repository) GetActionPreview(ctx context.Context, scope tenancy.Scope, actorID, id string) (operatorassistant.ActionPreview, error) {
+	if strings.TrimSpace(actorID) == "" || strings.TrimSpace(id) == "" {
+		return operatorassistant.ActionPreview{}, ErrInvalid
+	}
+	var out operatorassistant.ActionPreview
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		var risk, status string
+		var expires, created time.Time
+		err := tx.QueryRowContext(ctx, `SELECT id,action,resource_type,resource_id,expected_version,risk,required_permission,preview_digest,evidence_digest,status,expires_at,created_at FROM assistant_action_previews WHERE organization_id=$1 AND workspace_id=$2 AND actor_id=$3 AND id=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), actorID, id).Scan(&out.ID, &out.Action, &out.ResourceType, &out.ResourceID, &out.ExpectedVersion, &risk, &out.RequiredPermission, &out.PreviewDigest, &out.EvidenceDigest, &status, &expires, &created)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		out.Risk, out.Status, out.ExpiresAt = operatorassistant.Risk(risk), status, expires.UTC()
+		out.IdempotencyKey = "assistant-preview-" + digestID(out.Action+"\x00"+out.ResourceType+"\x00"+out.ResourceID+"\x00"+out.EvidenceDigest)
+		out.Impact = "Проверка и выполнение остаются за владельцем домена."
+		out.ApprovalRequired = out.Risk == operatorassistant.RiskSensitiveWrite
+		if out.ExpiresAt.Before(created.UTC()) {
+			return ErrInvalid
+		}
+		return nil
+	})
+	return out, err
+}
+
+// MarkActionPreview advances a preview exactly once. It is deliberately
+// separate from approval creation so a domain owner can attach its own
+// approval request transaction and never execute the action here.
+func (r *Repository) MarkActionPreview(ctx context.Context, scope tenancy.Scope, actorID, id, status string, now time.Time) error {
+	if strings.TrimSpace(actorID) == "" || strings.TrimSpace(id) == "" || status != "approved" && status != "rejected" && status != "conflict" || !utc(now) {
+		return ErrInvalid
+	}
+	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE assistant_action_previews SET status=$5 WHERE organization_id=$1 AND workspace_id=$2 AND actor_id=$3 AND id=$4 AND status='pending' AND expires_at>$6`, scope.OrganizationID().String(), scope.WorkspaceID().String(), actorID, id, status, now)
+		if err != nil {
+			return err
+		}
+		n, _ := result.RowsAffected()
+		if n != 1 {
+			return ErrConflict
+		}
+		return nil
+	})
+}
+
+func digestID(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])[:26]
 }
 
 func utc(value time.Time) bool { return !value.IsZero() && value.Location() == time.UTC }

@@ -912,11 +912,15 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .nav-more-toggle { justify-content:flex-start; }
 .nav-more-toggle .nav-more-chevron { margin-left:auto; transition:transform .16s ease; }
 .nav-more.open .nav-more-chevron { transform:rotate(90deg); }
-.nav-more-panel { position:absolute; z-index:20; top:calc(100% + 8px); left:0; width:100%; min-width:228px; max-height:calc(100vh - 150px); overflow:auto; padding:8px; background:var(--surface-raised); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-md); }
-.nav-more-group { display:grid; gap:2px; }
-.nav-more-group + .nav-more-group { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
-.nav-more-group > p { margin:4px 8px 5px; color:var(--text-faint); font-size:10px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
-.nav-more-panel .nav-item { padding:8px 10px; font-size:12px; }
+.nav-more-panel { position:absolute; z-index:20; top:-8px; left:calc(100% + 10px); display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; width:min(520px,calc(100vw - 300px)); min-width:300px; max-height:calc(100vh - 32px); overflow:auto; padding:14px; background:var(--surface-raised); border:1px solid var(--border); border-radius:12px; box-shadow:0 18px 44px rgba(16,24,40,.16); }
+.nav-more-group { display:grid; gap:2px; min-width:0; align-content:start; }
+.nav-more-group:nth-child(n+3) { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+.nav-more-group > p { margin:2px 8px 6px; color:var(--text-faint); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.nav-more-panel .nav-item { padding:7px 8px; border-radius:7px; font-size:12px; }
+.nav-more-panel .nav-item:hover { background:var(--surface-soft); }
+.nav-more-panel .nav-item-secondary .nav-icon { width:18px; }
+.nav-more-panel .nav-item { justify-content:flex-start; }
+.nav-more-panel .nav-item .nav-label { display:block; }
 
 @media (max-width: 980px) {
   .nav-more-toggle .nav-label,.nav-more-toggle .nav-more-chevron { display:none; }
@@ -927,6 +931,11 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
   .nav-more { flex:0 0 auto; }
   .nav-more-toggle .nav-label { display:block!important; }
   .nav-more-panel { position:fixed; top:auto; left:8px; right:8px; bottom:80px; width:auto; min-width:0; max-height:calc(100vh - 100px); }
+}
+
+@media (max-width: 480px) {
+  .nav-more-panel { grid-template-columns:1fr; }
+  .nav-more-group:nth-child(n+2) { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
 }
 
 /* Task 120 — Enterprise Operations UX */

@@ -41,7 +41,7 @@ qualification evidence.
 | YooKassa | create, status, refund, reconcile, webhooks | — |
 | СБП | create, status, refund, reconcile, webhooks | live-квалификация эквайера |
 | Telegram | текстовая, фото/альбомная и MP4-видеопубликация через released-upload bridge, HTTPS-кнопки для одиночного сообщения | edit/delete, webhooks |
-| MAX | текстовая, фото/альбомная и видео-публикация через released-upload bridge | buttons, edit/delete, webhooks |
+| MAX | текстовая, фото/альбомная и видео-публикация через released-upload bridge, HTTPS-кнопки для публикаций, приём входящих webhooks через Inbox/outbox | edit/delete, управление подпиской webhook |
 | AI, объявления, ЭДО, маркировка, гос-системы | health-check/отдельная поверхность согласно runtime support | domain-операции из manifest до отдельной qualification |
 
 Источник истины для машинной проверки —

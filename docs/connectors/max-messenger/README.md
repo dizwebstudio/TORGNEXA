@@ -7,7 +7,9 @@ The admitted baseline publishes text, images/galleries, one video and HTTPS URL 
 Task 020 remains owner of Content, immutable ContentVariant, Publication state, scheduling, audit and outbox evidence. Task 009 remains the intended durable Inbox/dedup owner for webhook delivery claims. The provider owns only MAX protocol adaptation and bounded remote identifiers.
 
 Task 175 composes the production application subset for text, released
-image/gallery and video publication through the existing Social API, leased
-worker and append-only remote receipts. Buttons, destructive edits/deletes,
-status reads and webhook methods remain outside the connected application
-workflow.
+image/gallery, video and HTTPS URL button publication through the existing
+Social API, leased worker and append-only remote receipts. Task 183 also
+composes inbound MAX Webhook reception through the public social webhook
+route, tenant-scoped Inbox and transactional outbox. Destructive edits/deletes,
+status reads and subscription lifecycle management remain outside the connected
+application workflow.

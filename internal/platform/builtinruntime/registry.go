@@ -1188,6 +1188,24 @@ func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.
 	}
 }
 
+// SocialWebhookReceiver resolves an admitted inbound social webhook receiver.
+// Verification remains provider-owned while replay persistence stays in the
+// host-owned Inbox/outbox boundary.
+func (r *Registry) SocialWebhookReceiver(account sdk.Account, load ConfigLoader) (sdk.SocialWebhookReceiver, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || account.Family != sdk.FamilySocial || !SupportsCapability(account.ConnectorID, "social.webhooks") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	switch account.ConnectorID {
+	case "max-messenger":
+		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 // PaymentGateway resolves an admitted payment connector implementing every
 // payment capability its manifest advertises. Provider-specific
 // construction remains confined to this reviewed composition boundary.
@@ -1709,12 +1727,13 @@ func (source maxConfigSource) Resolve(ctx context.Context, account sdk.Account) 
 		return maxmessenger.Configuration{}, err
 	}
 	var value struct {
-		ChatID int64 `json:"chat_id"`
+		ChatID                 int64  `json:"chat_id"`
+		WebhookSecretReference string `json:"webhook_secret_reference"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return maxmessenger.Configuration{}, maxmessenger.ErrInvalidConfiguration
 	}
-	configuration := maxmessenger.Configuration{ChatID: value.ChatID}
+	configuration := maxmessenger.Configuration{ChatID: value.ChatID, WebhookSecretReference: sdk.SecretReference(value.WebhookSecretReference)}
 	if configuration.Validate() != nil {
 		return maxmessenger.Configuration{}, maxmessenger.ErrInvalidConfiguration
 	}

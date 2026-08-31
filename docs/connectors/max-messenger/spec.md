@@ -20,11 +20,18 @@ Admitted capabilities:
 - `social.webhooks` — verified/deduplicated `message_created`, `message_edited`, `message_removed`
 
 Task-175 production application admission connects `social.post.text`,
-`social.post.media` and `social.post.video` through API, worker and UI. The
+`social.post.media`, `social.post.video` and `social.post.buttons` through API,
+worker and UI. The
 exact official message endpoint is
 [`POST /messages`](https://dev.max.ru/docs-api/methods/POST/messages); account
 health uses [`GET /me`](https://dev.max.ru/docs-api/methods/GET/me) and the
 configured chat membership check.
+
+Task-183 also admits inbound MAX Webhook reception through the public social
+webhook route and the tenant-scoped Inbox/transactional outbox boundary. The
+route verifies the account capability and ephemeral
+`X-Max-Bot-Api-Secret` before publishing a minimized event; subscription and
+unsubscription lifecycle calls remain SDK-only.
 
 Not admitted: provider scheduling, Long Polling in production, edit/delete, comments, analytics, callback buttons, arbitrary files/audio, user messaging, or provider-native workflow state.
 

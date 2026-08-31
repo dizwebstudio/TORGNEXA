@@ -69,7 +69,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("Telegram social runtime support is inaccurate: %+v", telegram)
 	}
 	max, ok := SupportFor("max-messenger")
-	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || !SupportsCapability("max-messenger", "social.post.media") || !SupportsCapability("max-messenger", "social.post.video") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
+	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || !SupportsCapability("max-messenger", "social.post.media") || !SupportsCapability("max-messenger", "social.post.video") || !SupportsCapability("max-messenger", "social.post.buttons") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
 		t.Fatalf("MAX social runtime support is inaccurate: %+v", max)
 	}
 	if SocialTextLimit("avito") != 0 {
@@ -205,6 +205,23 @@ func TestSocialPublisherAdmissionIsExact(t *testing.T) {
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "avito"), load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted social publisher resolved: %v", err)
+	}
+}
+
+func TestSocialWebhookReceiverAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"chat_id":-70801090403050,"webhook_secret_reference":"sec:v1:1123456789abcdef0123456789abcdef"}`), nil
+	}
+	receiver, err := registry.SocialWebhookReceiver(supportTestAccount(t, "max-messenger"), load)
+	if err != nil {
+		t.Fatalf("MAX webhook receiver unavailable: %v", err)
+	}
+	if _, ok := receiver.(sdk.SocialWebhookReceiver); !ok {
+		t.Fatalf("MAX receiver has unexpected type %T", receiver)
+	}
+	if _, err := registry.SocialWebhookReceiver(supportTestAccount(t, "telegram"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted Telegram webhook receiver resolved: %v", err)
 	}
 }
 

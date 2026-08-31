@@ -1814,6 +1814,7 @@
         "connector_account_id": "telegram-main",
         "status": "active",
         "capabilities": [
+          "social.post.buttons",
           "social.post.media",
           "social.post.text"
         ],
@@ -1888,6 +1889,25 @@
         "media_count": 21,
         "version": 2,
         "change": "updated"
+      }
+    },
+    {
+      "schema": "events/social-webhook-received-v1.schema.json",
+      "valid": {
+        "connector_account_id": "max-main",
+        "delivery_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "event_type": "max.message_created",
+        "remote_channel_id": "-70801090403050",
+        "remote_object_id": "mid.ffff0001",
+        "provider_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "invalid": {
+        "connector_account_id": "max-main",
+        "delivery_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "event_type": "telegram.message_created",
+        "remote_channel_id": "-70801090403050",
+        "remote_object_id": "mid.ffff0001",
+        "provider_fingerprint": "not-a-fingerprint"
       }
     },
     {

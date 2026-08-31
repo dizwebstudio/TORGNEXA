@@ -15,6 +15,18 @@ TORGNEXA. Он возвращает факты, состояние подтве�
    policy.
 4. Откройте раздел **AI-помощник** или `/assistant`.
 
+Для повторяемой проверки API используйте synthetic smoke (требуются только
+`TORGNEXA_URL` и короткоживущий `ACCESS_TOKEN`):
+
+```bash
+TORGNEXA_URL=http://127.0.0.1:8080 ACCESS_TOKEN="$ACCESS_TOKEN" \
+  ./scripts/operator-assistant-smoke.sh
+```
+
+Скрипт создаёт одну actor-scoped сессию, задаёт пять вопросов первого среза,
+проверяет `state`/`grounding_state` и завершает ошибкой при credential-shaped
+строках. Тела ответов не печатаются и реальные данные в fixtures не нужны.
+
 ## API
 
 Все пути ниже имеют префикс `/api/v1`, требуют OIDC, tenant scope и permission.
@@ -28,7 +40,7 @@ TORGNEXA. Он возвращает факты, состояние подтве�
 | GET | `/assistant/runs/{run_id}` | получить нормализованный run |
 | POST | `/assistant/runs/{run_id}:cancel` | отменить незавершённый run с optimistic version |
 | POST | `/assistant/feedback` | записать bounded feedback по своему run |
-| POST | `/assistant/action-previews/{preview_id}:approve` | намеренно передаёт согласование в governed approval API; прямого исполнения нет |
+| POST | `/assistant/action-previews/{preview_id}:approve` | создаёт Task-017 approval request; прямого исполнения нет |
 
 Пример первого запроса:
 
@@ -73,6 +85,20 @@ UI скрывает раздел, а API возвращает 403. Повтор 
 создаёт второй run. Отмена использует `expected_version`; конфликт версии
 возвращает 409. Состояния worker монотонны и не возвращаются из terminal в
 queued.
+
+Очередь `operator_assistant` добавляется миграцией `000043_operator_assistant_runtime.sql`.
+Она использует тот же PostgreSQL lease/SKIP LOCKED boundary, что и остальные
+runtime jobs. При отсутствии provider queued-run переводится в
+`provider_unavailable` с кодом `provider_not_configured`; это честное состояние,
+а не сгенерированный ответ. Повторный запуск smoke после настройки provider
+не создаёт второй run благодаря `Idempotency-Key`.
+
+Action preview сначала сохраняется как pending. Для `sensitive_write` кнопка
+создаёт governed approval request (`approval.request` / `assistant_action_preview`),
+записывает audit и переводит preview в `approved`; доменная операция должна
+быть выполнена только владельцем домена после повторной проверки policy,
+capability и версии. Preview с истёкшим сроком или повторным кликом получает
+конфликт и не вызывает connector.
 
 ## Retention и production admission
 

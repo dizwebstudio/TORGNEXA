@@ -117,17 +117,17 @@ func (m *testMedia) OpenReleased(context.Context, sdk.Account, sdk.SocialMediaRe
 
 type memoryDedup struct{ seen map[string]string }
 
-func (d *memoryDedup) ClaimSocialWebhook(_ context.Context, _ sdk.Account, id, fingerprint string, _ time.Time) (bool, error) {
+func (d *memoryDedup) ClaimSocialWebhook(_ context.Context, _ sdk.Account, claim sdk.SocialWebhookClaim) (bool, error) {
 	if d.seen == nil {
 		d.seen = map[string]string{}
 	}
-	if prior, ok := d.seen[id]; ok {
-		if prior != fingerprint {
+	if prior, ok := d.seen[claim.DeliveryID]; ok {
+		if prior != claim.ProviderFingerprint {
 			return false, errors.New("collision")
 		}
 		return true, nil
 	}
-	d.seen[id] = fingerprint
+	d.seen[claim.DeliveryID] = claim.ProviderFingerprint
 	return false, nil
 }
 

@@ -122,6 +122,10 @@
       "payload_schema": "events/social-variant-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.social.webhook_received.v1",
+      "payload_schema": "events/social-webhook-received-v1.schema.json"
+    },
+    {
       "event_type": "commerce.storefront.webhook_received.v1",
       "payload_schema": "events/storefront-webhook-received-v1.schema.json"
     },

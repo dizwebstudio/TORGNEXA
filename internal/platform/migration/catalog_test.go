@@ -37,7 +37,8 @@ func TestRepositoryCatalogPasses(t *testing.T) {
 		"logistics_webhook_evidence",
 		"return_logistics_operations",
 		"return_logistics_tariff_code",
-		"social_publication_buttons",
+			"social_publication_buttons",
+			"operator_assistant_runtime",
 	}
 	if len(catalog.Migrations) != len(expected) {
 		t.Fatalf("catalog migration count = %d, want %d", len(catalog.Migrations), len(expected))

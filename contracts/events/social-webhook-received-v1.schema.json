@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/social-webhook-received-v1.json",
+  "title": "commerce.social.webhook_received.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "connector_account_id",
+    "delivery_id",
+    "event_type",
+    "remote_channel_id",
+    "provider_fingerprint"
+  ],
+  "properties": {
+    "connector_account_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "delivery_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^max\\.(message_created|message_edited|message_removed)$"
+    },
+    "remote_channel_id": {
+      "type": "string",
+      "pattern": "^-?[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "remote_object_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "provider_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

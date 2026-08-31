@@ -118,9 +118,11 @@ outside the application runtime subset.
 MAX uses the same dedicated Social surface and receipt-safe worker. Its account
 stores the bot token in SecretProvider and a non-zero numeric `chat_id` as
 non-secret runtime configuration. Production admission includes text, released
-image/gallery and video publication with the provider's 4000-code-point limit;
-buttons, destructive edits/deletes and webhooks remain outside the connected
-application workflow.
+image/gallery and video publication with the provider's 4000-code-point limit,
+plus HTTPS URL buttons. Inbound MAX Webhook reception is admitted through the
+public tenant-bound social webhook route and host-owned Inbox/transactional
+outbox; destructive edits/deletes and subscription lifecycle management remain
+outside the connected application workflow.
 
 Bitrix24 is available on the dedicated CRM surface. Its account uses the
 host-owned OAuth 2.0/refresh flow, keeps the lower-case `portal_host` in the

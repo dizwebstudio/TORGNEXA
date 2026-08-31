@@ -29,10 +29,11 @@ const (
 	KindPrivacy           Kind = "privacy"
 	KindWarehouseIncident Kind = "warehouse_incident"
 	KindSocialPublication Kind = "social_publication"
+	KindOperatorAssistant Kind = "operator_assistant"
 )
 
 func (k Kind) Valid() bool {
-	return k == KindReconciliation || k == KindUpload || k == KindPrivacy || k == KindWarehouseIncident || k == KindSocialPublication
+	return k == KindReconciliation || k == KindUpload || k == KindPrivacy || k == KindWarehouseIncident || k == KindSocialPublication || k == KindOperatorAssistant
 }
 
 type Job struct {
@@ -126,7 +127,7 @@ func (r *Repository) Claim(ctx context.Context, kind Kind, workerID string, batc
 	if err != nil {
 		normalized := normalizeSchemaError(err)
 		var state sqlStateError
-		if (kind == KindPrivacy || kind == KindWarehouseIncident || kind == KindSocialPublication) && errors.As(err, &state) && state.SQLState() == "22023" {
+		if (kind == KindPrivacy || kind == KindWarehouseIncident || kind == KindSocialPublication || kind == KindOperatorAssistant) && errors.As(err, &state) && state.SQLState() == "22023" {
 			normalized = ErrSchemaUnavailable // rolling upgrade: older function does not know this job kind
 		}
 		return nil, fmt.Errorf("worker repository: claim %s: %w", kind, normalized)

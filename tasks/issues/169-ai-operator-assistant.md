@@ -3,7 +3,9 @@
 ## Статус
 
 `complete` — 2026-08-31. Реализован provider-neutral grounded read/preview
-vertical slice: tenant-scoped PostgreSQL persistence with FORCE RLS, server
+vertical slice: tenant-scoped PostgreSQL persistence with FORCE RLS, bounded
+source adapters for integration/sync/quality/inventory/returns/reports,
+governed approval bridge, durable `operator_assistant` lease queue, server
 classifier/context/evidence/redaction/action policy, protected REST/OpenAPI/
 SDK, audit metadata, monotonic worker lifecycle gate, Russian operator UI and
 canonical event contracts. Live model/provider qualification and Compose

@@ -111,9 +111,28 @@ Task 175 is repository-complete: the existing MAX image/gallery and supported
 video adapter is now composed through the Social worker. The host admits the
 documented `/uploads?type=image|video` flow, restricts upload URLs to the exact
 official hosts and sends bounded multipart `data` bodies with the callback-
-scoped bot token. Buttons, webhooks, status reads, destructive mutations and
+scoped bot token. Webhooks, status reads, destructive mutations and
 arbitrary files remain outside the application runtime subset; credentialed
 live MAX qualification remains a separate release gate.
+
+## MAX HTTPS publication buttons
+
+Task 182 is repository-complete: the existing MAX `social.post.buttons` adapter
+capability is admitted by the built-in runtime-support contract and generated
+catalog. The existing Social API, leased worker, account/channel gates and UI
+now expose bounded HTTPS URL buttons for MAX; webhooks, status reads and
+destructive mutations remain outside the application runtime subset.
+
+## MAX inbound webhook reception
+
+Task 183 is repository-complete: inbound MAX Webhook updates are now admitted
+through the public tenant-bound social webhook route. The route checks the
+account and enabled capability, extracts the ephemeral provider secret,
+delegates canonical verification to MAX and commits a minimized
+`commerce.social.webhook_received.v1` event through the tenant-scoped Inbox and
+transactional outbox. Edit/delete and webhook subscription lifecycle calls
+remain fail-closed at the application boundary; live MAX credentials and
+provider delivery qualification remain release gates.
 
 ## Robokassa merchant refund runtime
 

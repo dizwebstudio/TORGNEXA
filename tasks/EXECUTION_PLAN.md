@@ -1597,3 +1597,30 @@ to eight link buttons and renders them in publication history. Callback-data
 buttons, edit/delete and inbound webhooks remain fail-closed because they need
 separate authorization, callback and reconciliation contracts. Credentialed
 live Telegram qualification remains a release gate.
+
+## Phase 51 — MAX HTTPS publication buttons
+
+`182`
+
+Task 182 is repository-complete. MAX `social.post.buttons` is now admitted in
+the built-in runtime-support contract and generated catalog. The existing
+provider-neutral Social API, account/channel capability gates, leased worker
+and `/social` UI expose bounded HTTPS URL buttons through the already tested
+MAX inline-keyboard adapter. Webhooks, status reads and destructive mutations
+remain outside the connected application runtime; credentialed live MAX
+qualification remains a separate release gate.
+
+## Phase 52 — MAX inbound webhook reception
+
+`183`
+
+Task 183 admits the already qualified MAX `social.webhooks` adapter through the
+public unauthenticated webhook boundary. The route resolves the tenant and
+connector account from the fixed URL, requires the account capability and
+passes the ephemeral `X-Max-Bot-Api-Secret` to the connector. The connector
+canonicalizes and validates the exact configured channel and update type; the
+host claims a minimized `commerce.social.webhook_received.v1` event in the
+tenant-scoped Task-009 Inbox and transactional outbox. Raw provider payloads
+and verification secrets do not enter durable event data. Subscription
+management, edit/delete and live MAX delivery qualification remain separate
+release gates.

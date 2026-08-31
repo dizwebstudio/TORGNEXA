@@ -27,17 +27,28 @@ Primary official surfaces reviewed:
 ## Task-175 application-runtime subset
 
 The manifest table above records the adapter's qualified SDK ceiling. The
-current application runtime grants text, released image/video uploads and the
-corresponding `POST /messages?chat_id=...` attachment path. Health may call
+current application runtime grants text, released image/video uploads, HTTPS
+URL buttons and the corresponding `POST /messages?chat_id=...` attachment path.
+Health may call
 only `GET /me`, `GET /chats/{chatId}` and
 `GET /chats/{chatId}/members/me`. Uploads are limited to the official image and
-video hosts, and all media is revalidated by the Task-088 bridge. URL buttons,
-webhooks and destructive remote mutations are not application operations. This
-subset is generated from
+video hosts, and all media is revalidated by the Task-088 bridge. Webhooks and
+destructive remote mutations are not application operations. This subset is
+generated from
 `contracts/connectors/builtin-runtime-support-v1.json` and is what the UI/API
 advertise. Official references: [message creation](https://dev.max.ru/docs-api/methods/POST/messages),
 [bot identity](https://dev.max.ru/docs-api/methods/GET/me), and
 [bot membership](https://dev.max.ru/docs-api/methods/GET/chats/-chatId-/members/me).
+
+## Task-183 application webhook admission
+
+The connected application now admits inbound MAX Webhook reception separately
+from publication. `POST /api/v1/webhooks/social/max-messenger/{organization_id}/{workspace_id}/{account_id}`
+resolves the account and enabled `social.webhooks` capability, extracts the
+ephemeral `X-Max-Bot-Api-Secret`, delegates verification to the MAX adapter and
+commits the minimized event through the tenant-scoped Task-009 Inbox and
+transactional outbox. Subscription and unsubscription calls remain connector
+SDK surfaces without a public application route.
 
 ## Retry decision
 

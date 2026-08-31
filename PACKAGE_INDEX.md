@@ -1,6 +1,11 @@
 # Package status — 2026-08-31
 
-**Tasks 001–180 are repository-implemented.** Task 180 admits the SBP payment
+**Tasks 001–183 are repository-implemented.** Task 183 admits MAX inbound
+Webhook reception through the public tenant-bound route and host-owned
+Inbox/outbox. Task 182 admits MAX HTTPS URL buttons through the existing Social
+API, leased worker and inline-keyboard adapter. Task 181 admits Telegram HTTPS
+URL buttons through the same
+provider-neutral social publication path. Task 180 admits the SBP payment
 webhook through the shared public receiver with mTLS status re-fetch and replay
 evidence. Task 179 adds the bounded Russian
 Post batch-directory route. Task 178 adds the PEK request
@@ -47,12 +52,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 132
-- tasks: 182
+- adrs: 135
+- tasks: 185
 - milestones: 14
-- contracts: 241
+- contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3172
+- total source files (excluding local secrets/build/dependency/cache trees): 3187
 
 
 ## Connector category layout
@@ -663,6 +668,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0130-pek-request-print-form-runtime.md`
 - `adr/0131-pochta-batch-directory-read-runtime.md`
 - `adr/0132-sbp-payment-webhook-runtime-admission.md`
+- `adr/0133-telegram-publication-buttons.md`
+- `adr/0134-max-publication-buttons.md`
+- `adr/0135-max-inbound-webhooks.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -832,6 +840,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/178-pek-request-print-form-runtime.json`
 - `architecture/reviews/179-pochta-batch-directory-read-runtime.json`
 - `architecture/reviews/180-sbp-payment-webhook-runtime-admission.json`
+- `architecture/reviews/181-telegram-publication-buttons.json`
+- `architecture/reviews/182-max-publication-buttons.json`
+- `architecture/reviews/183-max-inbound-webhooks.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1560,6 +1571,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/events/social-content-changed-v1.schema.json`
 - `contracts/events/social-publication-status-changed-v1.schema.json`
 - `contracts/events/social-variant-changed-v1.schema.json`
+- `contracts/events/social-webhook-received-v1.schema.json`
 - `contracts/events/stock-changed-v1.schema.json`
 - `contracts/events/storefront-webhook-received-v1.schema.json`
 - `contracts/events/unit-economics-snapshot-published-v1.schema.json`
@@ -2718,6 +2730,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/settings_security_test.go`
 - `internal/app/api/social.go`
 - `internal/app/api/social_test.go`
+- `internal/app/api/social_webhooks.go`
+- `internal/app/api/social_webhooks_test.go`
 - `internal/app/api/sync.go`
 - `internal/app/api/sync_test.go`
 - `internal/app/api/trust_control.go`
@@ -3227,6 +3241,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000039_logistics_webhook_evidence.sql`
 - `migrations/000040_return_logistics_operations.sql`
 - `migrations/000041_return_logistics_tariff_code.sql`
+- `migrations/000042_social_publication_buttons.sql`
+- `migrations/000043_operator_assistant_runtime.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -3364,6 +3380,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/medusa-docker/medusa-config.ts`
 - `scripts/medusa-smoke.sh`
 - `scripts/opencart-smoke.sh`
+- `scripts/operator-assistant-smoke.sh`
 - `scripts/p4_common.py`
 - `scripts/p4_hosting_rules.py`
 - `scripts/p4_live_connectors.py`
@@ -3597,6 +3614,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/178-pek-request-print-form-runtime.md`
 - `tasks/issues/179-pochta-batch-directory-read-runtime.md`
 - `tasks/issues/180-sbp-payment-webhook-runtime-admission.md`
+- `tasks/issues/181-telegram-publication-buttons.md`
+- `tasks/issues/182-max-publication-buttons.md`
+- `tasks/issues/183-max-inbound-webhooks.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

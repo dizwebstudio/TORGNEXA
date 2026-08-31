@@ -38,6 +38,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
@@ -217,6 +218,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	dispatchRepository, err := workerrepo.New(db)
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
+	}
+	operatorAssistantRepository, err := operatorassistantrepo.New(db)
+	if err != nil {
+		return fail("worker_operator_assistant_repository_startup_failed", err)
 	}
 	shipmentRepository, err := logisticsrepo.New(db)
 	if err != nil {
@@ -408,6 +413,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	}...)
 	components = append(components, component{name: "workflow-automation", run: func(componentCtx context.Context) error {
 		return runWorkflowAutomation(componentCtx, logger, dispatchRepository, workflowRepository, workflowEngine, workerID, cfg.Worker)
+	}})
+	components = append(components, component{name: "operator-assistant", run: func(componentCtx context.Context) error {
+		return runOperatorAssistant(componentCtx, logger, dispatchRepository, operatorAssistantRepository, workerID, cfg.Worker)
 	}})
 	components = append(components, component{name: "workflow-events", run: func(componentCtx context.Context) error {
 		return workflowConsumer.Run(componentCtx, func(eventCtx context.Context, delivery eventbus.Delivery) error {

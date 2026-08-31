@@ -10,10 +10,19 @@ import (
 	"strings"
 	"time"
 
+	coreinventory "github.com/torgnexa/torgnexa/internal/core/inventory"
 	"github.com/torgnexa/torgnexa/internal/core/operatorassistant"
+	corereturns "github.com/torgnexa/torgnexa/internal/core/returns"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 )
 
 const (
@@ -34,12 +43,22 @@ type operatorAssistantRepository interface {
 	RecordFeedback(context.Context, tenancy.Scope, string, operatorassistant.Feedback, time.Time) error
 }
 
+type operatorAssistantPreviewRepository interface {
+	CreateActionPreview(context.Context, tenancy.Scope, string, string, operatorassistant.ActionPreview, time.Time) error
+	GetActionPreview(context.Context, tenancy.Scope, string, string) (operatorassistant.ActionPreview, error)
+	MarkActionPreview(context.Context, tenancy.Scope, string, string, string, time.Time) error
+}
+
 type operatorAssistantSource interface {
 	Retrieve(context.Context, tenancy.Scope, operatorassistant.Intent, operatorassistant.ContextHint) (operatorassistant.ContextPack, error)
 }
 
 type operatorAssistantAudit interface {
 	Capture(context.Context, tenancy.Scope, audit.Entry) (audit.Record, error)
+}
+
+type operatorAssistantApproval interface {
+	CreateRequest(context.Context, tenancy.Scope, string, string, approval.RequestCommand) (approval.Request, error)
 }
 
 type integrationAssistantSource struct{ reader integrationCenterReader }
@@ -72,15 +91,23 @@ func (s integrationAssistantSource) Retrieve(ctx context.Context, scope tenancy.
 		if observed.IsZero() {
 			observed = now
 		}
+		observed = observed.UTC()
+		if observed.After(now) {
+			observed = now
+		}
 		sum := sha256.Sum256([]byte(row.SnapshotDigest + row.AccountID))
+		label := operatorassistant.SafeMarkdown(row.DisplayName)
+		if label == "" {
+			label = "Интеграция " + safeFactID(row.AccountID)
+		}
 		facts = append(facts, operatorassistant.Fact{
 			Code:  "integration." + safeFactID(row.AccountID),
-			Label: row.DisplayName,
+			Label: label,
 			Value: string(row.Overall),
 			Source: operatorassistant.EvidenceRef{
 				SourceKind: "integration_center", SourceRef: row.AccountID,
-				SourceVersion: strconv.FormatInt(row.Version, 10), ObservedAt: observed.UTC(),
-				CheckedAt: observed.UTC(), Watermark: row.SnapshotDigest,
+				SourceVersion: strconv.FormatInt(row.Version, 10), ObservedAt: observed,
+				CheckedAt: now, Watermark: row.SnapshotDigest,
 				Freshness: operatorassistant.Fresh, ContextTrust: operatorassistant.TrustedSystem,
 				EvidenceDigest: hex.EncodeToString(sum[:]), Visibility: "full",
 				DeepLink:   "/integrations/status/" + row.AccountID,
@@ -90,6 +117,249 @@ func (s integrationAssistantSource) Retrieve(ctx context.Context, scope tenancy.
 		})
 	}
 	return operatorassistant.BuildContext(intent, facts, result.SourceWatermarks, nil, result.Partial, now)
+}
+
+// operatorAssistantSources is the provider-neutral retrieval boundary for the
+// first assistant slice. Each adapter reads an existing tenant-scoped
+// projection; it never calls a connector or a secret provider. Missing
+// adapters deliberately return an explicit unavailable context instead of
+// turning an empty result into a healthy claim.
+type operatorAssistantSources struct {
+	integration    integrationCenterReader
+	quality        *publicationqualityrepo.Repository
+	inventory      *inventoryrepo.Repository
+	returns        *returnsrepo.Repository
+	sync           *syncrepo.Repository
+	reconciliation *reconciliationrepo.Repository
+	reports        reportReader
+}
+
+func (s operatorAssistantSources) Retrieve(ctx context.Context, scope tenancy.Scope, intent operatorassistant.Intent, hint operatorassistant.ContextHint) (operatorassistant.ContextPack, error) {
+	if hint.Validate() != nil || !scope.Valid() {
+		return operatorassistant.ContextPack{}, operatorassistant.ErrInvalid
+	}
+	if intent == operatorassistant.IntentIntegration {
+		return (integrationAssistantSource{reader: s.integration}).Retrieve(ctx, scope, intent, hint)
+	}
+	now := time.Now().UTC()
+	if s.integration == nil && s.quality == nil && s.inventory == nil && s.returns == nil && s.sync == nil && s.reconciliation == nil && s.reports == nil {
+		return assistantUnavailablePack(intent, "source_not_connected", now)
+	}
+	var facts []operatorassistant.Fact
+	var watermarks []string
+	var omissions []string
+	partial := false
+	var err error
+	switch intent {
+	case operatorassistant.IntentSync:
+		if s.sync == nil && s.reconciliation == nil {
+			return assistantUnavailablePack(intent, "sync_source_not_connected", now)
+		}
+		if s.sync != nil {
+			jobs, e := s.sync.ListSyncJobs(ctx, scope, 20)
+			if e != nil {
+				partial, omissions = true, append(omissions, "sync_jobs_unavailable")
+			} else {
+				for _, job := range jobs {
+					at := job.UpdatedAt.UTC()
+					if at.IsZero() {
+						at = now
+					}
+					fact, e := assistantFact("sync.job."+safeFactID(job.ID), "Синхронизация "+job.ID, string(job.Status), "sync_job:"+job.ID, strconv.FormatInt(int64(job.AttemptCount), 10), at, "/sync")
+					if e != nil {
+						partial, omissions = true, append(omissions, "sync_fact_redacted")
+						continue
+					}
+					facts = append(facts, fact)
+				}
+				watermarks = append(watermarks, "sync_jobs:"+strconv.Itoa(len(jobs)))
+			}
+		}
+		if s.reconciliation != nil {
+			drifts, e := s.reconciliation.ListRecentDrifts(ctx, scope, 20)
+			if e != nil {
+				partial, omissions = true, append(omissions, "reconciliation_unavailable")
+			} else {
+				for _, drift := range drifts {
+					at := drift.DetectedAt.UTC()
+					if at.IsZero() {
+						at = now
+					}
+					fact, e := assistantFact("reconciliation.drift."+safeFactID(drift.ID), "Расхождение "+drift.ID, string(drift.Status), "reconciliation_drift:"+drift.ID, strconv.FormatInt(drift.Version, 10), at, "/reconciliation")
+					if e != nil {
+						partial, omissions = true, append(omissions, "reconciliation_fact_redacted")
+						continue
+					}
+					facts = append(facts, fact)
+				}
+				watermarks = append(watermarks, "reconciliation_drifts:"+strconv.Itoa(len(drifts)))
+			}
+		}
+	case operatorassistant.IntentProductQuality:
+		if s.quality == nil {
+			return assistantUnavailablePack(intent, "quality_source_not_connected", now)
+		}
+		items, e := s.quality.ListRuns(ctx, scope, hint.ResourceID, 20)
+		if e != nil {
+			err = e
+			break
+		}
+		for _, item := range items {
+			at := item.EvaluatedAt.UTC()
+			if at.IsZero() {
+				at = now
+			}
+			fact, e := assistantFact("quality.run."+safeFactID(item.ID), "Качество товара "+item.ProductID, string(item.Decision)+" ("+strconv.FormatInt(item.ScoreBPS/100, 10)+"%)", "quality_run:"+item.ID, strconv.FormatInt(item.Version, 10), at, "/products/quality")
+			if e != nil {
+				partial, omissions = true, append(omissions, "quality_fact_redacted")
+				continue
+			}
+			facts = append(facts, fact)
+		}
+		watermarks = append(watermarks, "quality_runs:"+strconv.Itoa(len(items)))
+	case operatorassistant.IntentInventory:
+		if s.inventory == nil {
+			return assistantUnavailablePack(intent, "inventory_source_not_connected", now)
+		}
+		invScope, e := coreinventory.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+		if e != nil {
+			return operatorassistant.ContextPack{}, e
+		}
+		items, e := s.inventory.ListPositionViews(ctx, invScope, 20)
+		if e != nil {
+			err = e
+			break
+		}
+		for _, item := range items {
+			at, parseErr := time.Parse(time.RFC3339Nano, item.UpdatedAt)
+			if parseErr != nil {
+				at = now
+			} else {
+				at = at.UTC()
+			}
+			fact, e := assistantFact("inventory.position."+safeFactID(item.ID), item.SKU+" / "+item.WarehouseName, "доступно "+item.Available+" "+item.Unit+", резерв "+item.Reserved, "inventory_position:"+item.ID, strconv.FormatInt(item.Version, 10), at, "/inventory")
+			if e != nil {
+				partial, omissions = true, append(omissions, "inventory_fact_redacted")
+				continue
+			}
+			facts = append(facts, fact)
+		}
+		watermarks = append(watermarks, "inventory_positions:"+strconv.Itoa(len(items)))
+	case operatorassistant.IntentOrderReturn:
+		if s.returns == nil {
+			return assistantUnavailablePack(intent, "returns_source_not_connected", now)
+		}
+		returnScope, e := corereturns.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+		if e != nil {
+			return operatorassistant.ContextPack{}, e
+		}
+		items, e := s.returns.ListReturns(ctx, returnScope, 20)
+		if e != nil {
+			err = e
+			break
+		}
+		for _, item := range items {
+			at := item.UpdatedAt.UTC()
+			if at.IsZero() {
+				at = now
+			}
+			fact, e := assistantFact("returns.item."+safeFactID(item.ID.String()), "Возврат по заказу "+item.OrderID, string(item.Status)+", причина "+item.ReasonCode, "return:"+item.ID.String(), strconv.FormatInt(item.Version, 10), at, "/returns")
+			if e != nil {
+				partial, omissions = true, append(omissions, "return_fact_redacted")
+				continue
+			}
+			facts = append(facts, fact)
+		}
+		watermarks = append(watermarks, "returns:"+strconv.Itoa(len(items)))
+	case operatorassistant.IntentUnitEconomics, operatorassistant.IntentReportSummary:
+		if s.reports == nil {
+			return assistantUnavailablePack(intent, "report_source_not_connected", now)
+		}
+		reportID := "sales_daily"
+		if intent == operatorassistant.IntentUnitEconomics {
+			reportID = "unit_economics_by_channel"
+		}
+		data, e := s.reports.Report(ctx, scope, reportID, reportrepo.Filter{Limit: 20})
+		if e != nil {
+			err = e
+			break
+		}
+		for rowIndex, row := range data.Rows {
+			value := strings.Join(row, " · ")
+			at := data.GeneratedAt.UTC()
+			if at.IsZero() {
+				at = now
+			}
+			fact, e := assistantFact("report."+safeFactID(reportID)+"."+strconv.Itoa(rowIndex), data.ID, value, "report:"+reportID+":"+strconv.Itoa(rowIndex), data.Source, at, "/reports/"+reportID)
+			if e != nil {
+				partial, omissions = true, append(omissions, "report_fact_redacted")
+				continue
+			}
+			facts = append(facts, fact)
+		}
+		watermarks = append(watermarks, "report:"+reportID+":"+strconv.Itoa(len(data.Rows)))
+	case operatorassistant.IntentWorkflowDraft:
+		// A draft is grounded in the same operational evidence as the
+		// integration state center. It is still only a preview; execution is
+		// owned by Workflow/Approval and never by this adapter.
+		if s.integration == nil {
+			return assistantUnavailablePack(intent, "workflow_source_not_connected", now)
+		}
+		integrationPack, e := (integrationAssistantSource{reader: s.integration}).Retrieve(ctx, scope, operatorassistant.IntentIntegration, hint)
+		if e != nil {
+			return assistantUnavailablePack(intent, "workflow_source_unavailable", now)
+		}
+		facts, watermarks, partial = integrationPack.Facts, integrationPack.Watermarks, integrationPack.Partial
+		if partial {
+			omissions = append(omissions, "integration_context_partial")
+		}
+	default:
+		return assistantUnavailablePack(intent, "source_not_connected", now)
+	}
+	if err != nil {
+		return assistantUnavailablePack(intent, "source_unavailable", now)
+	}
+	if len(facts) == 0 {
+		omissions = append(omissions, "no_authoritative_facts")
+	}
+	pack, e := operatorassistant.BuildContext(intent, facts, watermarks, omissions, partial, now)
+	if e != nil {
+		return operatorassistant.ContextPack{}, e
+	}
+	if partial {
+		pack.Freshness = operatorassistant.Stale
+	}
+	return pack, nil
+}
+
+func assistantUnavailablePack(intent operatorassistant.Intent, omission string, now time.Time) (operatorassistant.ContextPack, error) {
+	pack, err := operatorassistant.BuildContext(intent, nil, nil, []string{omission}, true, now)
+	if err != nil {
+		return operatorassistant.ContextPack{}, err
+	}
+	pack.Freshness = operatorassistant.Unavailable
+	return pack, nil
+}
+
+func assistantFact(code, label, value, sourceRef, sourceVersion string, observed time.Time, deepLink string) (operatorassistant.Fact, error) {
+	now := time.Now().UTC()
+	if observed.IsZero() {
+		observed = now
+	}
+	observed = observed.UTC()
+	if observed.After(now) {
+		observed = now
+	}
+	if value == "" {
+		value = "нет значения"
+	}
+	sum := sha256.Sum256([]byte(strings.Join([]string{sourceRef, sourceVersion, label, value}, "\x00")))
+	ref := operatorassistant.EvidenceRef{SourceKind: "postgresql_projection", SourceRef: sourceRef, SourceVersion: sourceVersion, ObservedAt: observed, CheckedAt: now, Watermark: sourceVersion, Freshness: operatorassistant.Fresh, ContextTrust: operatorassistant.TrustedSystem, EvidenceDigest: hex.EncodeToString(sum[:]), Visibility: "tenant", DeepLink: deepLink, AgeSeconds: maxInt64(0, int64(now.Sub(observed).Seconds())), TTLSeconds: 3600}
+	fact := operatorassistant.Fact{Code: code, Label: label, Value: value, Source: ref, OutputKind: operatorassistant.SourceFacts}
+	if fact.Validate(now) != nil {
+		return operatorassistant.Fact{}, operatorassistant.ErrInvalid
+	}
+	return fact, nil
 }
 
 func safeFactID(value string) string {
@@ -115,16 +385,21 @@ func safeFactID(value string) string {
 type operatorAssistantAPI struct {
 	repository operatorAssistantRepository
 	source     operatorAssistantSource
+	approval   operatorAssistantApproval
 	audit      operatorAssistantAudit
 	now        func() time.Time
 }
 
 func newOperatorAssistantRoutes(repository operatorAssistantRepository, source operatorAssistantSource, auditors ...operatorAssistantAudit) []ProtectedRoute {
+	return newOperatorAssistantRoutesWithApproval(repository, source, nil, auditors...)
+}
+
+func newOperatorAssistantRoutesWithApproval(repository operatorAssistantRepository, source operatorAssistantSource, approvalRepository operatorAssistantApproval, auditors ...operatorAssistantAudit) []ProtectedRoute {
 	var auditService operatorAssistantAudit
 	if len(auditors) > 0 {
 		auditService = auditors[0]
 	}
-	api := &operatorAssistantAPI{repository: repository, source: source, audit: auditService, now: func() time.Time { return time.Now().UTC() }}
+	api := &operatorAssistantAPI{repository: repository, source: source, approval: approvalRepository, audit: auditService, now: func() time.Time { return time.Now().UTC() }}
 	return []ProtectedRoute{
 		{Method: http.MethodPost, Path: AssistantSessionsPath, Permission: "assistant.ask", Handler: http.HandlerFunc(api.createSession)},
 		{Method: http.MethodGet, Path: AssistantSessionsPath, Permission: "assistant.read", Handler: http.HandlerFunc(api.listSessions)},
@@ -416,11 +691,37 @@ func (api *operatorAssistantAPI) message(w http.ResponseWriter, r *http.Request)
 			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 			return
 		}
+		for _, preview := range assistantPreviews(intent, pack, api.now()) {
+			answer.ActionPreviews = append(answer.ActionPreviews, preview)
+		}
+		if len(answer.ActionPreviews) > 0 {
+			digest := answer.AnswerDigest
+			for _, preview := range answer.ActionPreviews {
+				digest += "\x00" + preview.PreviewDigest
+			}
+			sum := sha256.Sum256([]byte(digest))
+			answer.AnswerDigest = hex.EncodeToString(sum[:])
+		}
 		state := operatorassistant.RunCompleted
 		if answer.GroundingState != operatorassistant.Grounded {
 			state = operatorassistant.RunPartial
 		}
 		created, err = api.repository.SaveAnswer(r.Context(), scope, principal.SubjectRef, created.ID, created.Version, state, answer, api.now())
+		if err == nil {
+			previewRepository, hasPreviewRepository := api.repository.(operatorAssistantPreviewRepository)
+			if !hasPreviewRepository {
+				previewRepository = nil
+			}
+			for _, preview := range answer.ActionPreviews {
+				if previewRepository == nil {
+					break
+				}
+				if previewErr := previewRepository.CreateActionPreview(r.Context(), scope, created.ID, principal.SubjectRef, preview, api.now()); previewErr != nil {
+					err = previewErr
+					break
+				}
+			}
+		}
 	}
 	if err != nil {
 		writeProblem(w, http.StatusServiceUnavailable, "Assistant run could not be completed")
@@ -431,6 +732,53 @@ func (api *operatorAssistantAPI) message(w http.ResponseWriter, r *http.Request)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusCreated, runView(created))
+}
+
+func assistantPreviews(intent operatorassistant.Intent, pack operatorassistant.ContextPack, now time.Time) []operatorassistant.ActionPreview {
+	if len(pack.Facts) == 0 {
+		return nil
+	}
+	action, resourceType := "", ""
+	switch intent {
+	case operatorassistant.IntentIntegration:
+		action, resourceType = "health.check", "connector_account"
+	case operatorassistant.IntentSync:
+		action, resourceType = "sync.dry_run", "sync_job"
+	case operatorassistant.IntentProductQuality:
+		action, resourceType = "quality.preview", "quality_run"
+	case operatorassistant.IntentReportSummary, operatorassistant.IntentUnitEconomics:
+		action, resourceType = "open.evidence", "report"
+	case operatorassistant.IntentWorkflowDraft:
+		action, resourceType = "workflow.draft", "workflow"
+	default:
+		return nil
+	}
+	result := make([]operatorassistant.ActionPreview, 0, minInt(len(pack.Facts), operatorassistant.MaxActionPreviews))
+	for _, fact := range pack.Facts {
+		expected := int64(1)
+		if parsed, err := strconv.ParseInt(fact.Source.SourceVersion, 10, 64); err == nil && parsed > 0 {
+			expected = parsed
+		}
+		resourceID := fact.Source.SourceRef
+		if action == "open.evidence" {
+			resourceID = strings.TrimPrefix(resourceID, "report:")
+		}
+		preview, err := operatorassistant.CompileActionPreview(action, resourceType, resourceID, expected, fact.Source, now)
+		if err == nil {
+			result = append(result, preview)
+		}
+		if len(result) == operatorassistant.MaxActionPreviews {
+			break
+		}
+	}
+	return result
+}
+
+func minInt(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func refusalAnswer(pack operatorassistant.ContextPack, now time.Time) operatorassistant.Answer {
@@ -521,5 +869,56 @@ func (api *operatorAssistantAPI) feedback(w http.ResponseWriter, r *http.Request
 }
 
 func (api *operatorAssistantAPI) approve(w http.ResponseWriter, r *http.Request) {
-	writeProblem(w, http.StatusConflict, "Approval must be created through the governed approval API")
+	scope, ok := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, AssistantApprovePath), ":approve")
+	previewRepository, hasPreviewRepository := func() (operatorAssistantPreviewRepository, bool) {
+		if api == nil || api.repository == nil {
+			return nil, false
+		}
+		repository, ok := api.repository.(operatorAssistantPreviewRepository)
+		return repository, ok
+	}()
+	if !ok || !principalOK || api == nil || api.approval == nil || !hasPreviewRepository || id == "" || strings.Contains(id, "/") || !validIdempotencyKey(r.Header.Get("Idempotency-Key")) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	preview, err := previewRepository.GetActionPreview(r.Context(), scope, principal.SubjectRef, id)
+	if errors.Is(err, operatorassistantrepo.ErrNotFound) {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !preview.ApprovalRequired || preview.Risk != operatorassistant.RiskSensitiveWrite {
+		writeProblem(w, http.StatusConflict, "Approval is not required for this preview")
+		return
+	}
+	now := api.now()
+	if preview.Status != "pending" || !preview.ExpiresAt.After(now) {
+		writeProblem(w, http.StatusConflict, "Preview is stale or already handled")
+		return
+	}
+	request, err := api.approval.CreateRequest(r.Context(), scope, preview.Action, preview.ResourceType, approval.RequestCommand{
+		RequestID: "apr:" + digestID(preview.ID), ResourceID: preview.ResourceID, Risk: approval.RiskWriteSensitive,
+		Mutation: approval.Mutation{AuditID: newApprovalID(), EventID: newApprovalID(), ActorID: principal.SubjectRef, Source: "api.operator_assistant", CorrelationID: r.Header.Get("Idempotency-Key"), OccurredAt: now},
+	})
+	if err != nil {
+		writeProblem(w, http.StatusConflict, "Approval policy denied this preview")
+		return
+	}
+	if err := previewRepository.MarkActionPreview(r.Context(), scope, principal.SubjectRef, id, "approved", now); err != nil {
+		if errors.Is(err, operatorassistantrepo.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Preview is stale or already handled")
+		} else {
+			writeProblem(w, http.StatusServiceUnavailable, "Preview status could not be persisted")
+		}
+		return
+	}
+	if api.audit != nil {
+		_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api.operator_assistant", Action: "assistant.action_preview.approval_requested", ResourceType: "assistant_action_preview", ResourceID: preview.ID, CorrelationID: request.ID, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"approval_request_id": request.ID, "preview_digest": preview.PreviewDigest, "evidence_digest": preview.EvidenceDigest}})
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"status": "approval_requested", "preview_id": preview.ID, "approval_request_id": request.ID, "state": string(request.State), "expires_at": request.ExpiresAt})
 }

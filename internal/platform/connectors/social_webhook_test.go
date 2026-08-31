@@ -41,6 +41,21 @@ func TestSocialWebhookValidationFailsClosed(t *testing.T) {
 	if result.Validate() == nil {
 		t.Fatal("non-content-addressed delivery id accepted")
 	}
+	claim := SocialWebhookClaim{
+		DeliveryID:          "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		EventType:           "max.message_created",
+		RemoteChannelID:     "-1",
+		OccurredAt:          received,
+		ProviderFingerprint: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		CanonicalPayload:    json.RawMessage(`{"chat_id":-1}`),
+	}
+	if err := claim.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	claim.ProviderFingerprint = "not-a-fingerprint"
+	if claim.Validate() == nil {
+		t.Fatal("invalid provider fingerprint accepted")
+	}
 }
 
 func TestSocialWebhooksCapabilityIsSocialOnly(t *testing.T) {
