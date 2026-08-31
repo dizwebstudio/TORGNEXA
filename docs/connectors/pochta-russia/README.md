@@ -50,7 +50,12 @@ idempotency receipt; при неоднозначной сетевой ошибк
 `POST /1.0/batch/{batch-name}/checkin`, по флагу добавляет
 `useOnlineBalance=true` и принимает только подтверждение `f103-sent`. Результат
 нормализуется в статус партии, а повтор защищён тем же tenant-scoped
-idempotency receipt. Отдельное возвратное отправление остаётся закрытым.
+idempotency receipt. Отдельная возвратная отправка без исходного RPO
+выполняется через approval-bound `POST /api/v1/logistics/returns/separate` и
+официальный `PUT /1.0/returns/return-without-direct`. Запрос ограничен одним
+отправлением; наружу возвращаются только ШПИ, статус и время наблюдения после
+проверки `position=0`/`return-barcode`. Адреса и имена не попадают в durable
+receipt.
 Возвратная этикетка для существующего RPO
 доступна отдельным форматом `return_pdf` через
 `GET /1.0/forms/{rpo}/easy-return-pdf`. Принимается domestic/S10 RPO-barcode;

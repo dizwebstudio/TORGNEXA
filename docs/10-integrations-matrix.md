@@ -226,7 +226,10 @@ configuration; the provider acceptance remains asynchronous. Почта Росс
 returns the same neutral artifact reference after validating the official PDF
 response for both the regular and easy-return forms. Russian Post batch
 handoff is also available through the approval-bound check-in route and
-idempotent operation receipt; separate return shipments remain closed. Dellin additionally
+idempotent operation receipt. Separate return shipments are available through
+the approval-bound `POST /api/v1/logistics/returns/separate` route, which calls
+the official `PUT /1.0/returns/return-without-direct` endpoint for one item and
+stores only the normalized barcode result. Dellin additionally
 supports the bounded address-to-address shipment-create route with explicit
 counterparty runtime configuration. ПЭК также допускает аннулирование одной
 предварительной заявки через официальный `/order/cancellation/` с точным

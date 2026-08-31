@@ -20,5 +20,6 @@ type Transport interface {
 	Batches(context.Context, []byte, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)
 	CreateBatch(context.Context, []byte, sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error)
 	SubmitBatch(context.Context, []byte, sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error)
+	ArchiveBatch(context.Context, []byte, sdk.LogisticsBatchArchiveRequest) (sdk.LogisticsBatchArchive, error)
 	Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
 }

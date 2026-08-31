@@ -15,7 +15,8 @@
 отмены, возврата, этикетки, трекинга и пунктов выдачи. В runtime включены
 bounded `logistics.batches.create`, `logistics.batches.read`,
 `logistics.batches.submit`, `pickup.points.read`, `logistics.rates.read`,
-`logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`, `logistics.label.read`
+`logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`,
+`logistics.return.separate.create`, `logistics.label.read`
 и `logistics.track.read`.
 Создание одного заказа
 выполняется через официальный `PUT /1.0/user/backlog`; адаптер принимает
@@ -37,7 +38,14 @@ bounded `logistics.batches.create`, `logistics.batches.read`,
 `POST /1.0/batch/{batch-name}/checkin`; при необходимости передаётся
 `useOnlineBalance=true`, а ответ принимается только при `f103-sent`. Операция
 требует approval и idempotency receipt. Отдельное возвратное отправление
-остаётся fail-closed. Отдельная возвратная этикетка запрашивается форматом `return_pdf`
+создаётся через approval-bound `POST /api/v1/logistics/returns/separate`, который
+вызывает официальный `PUT /1.0/returns/return-without-direct` ровно для одного
+отправления. Адаптер передаёт адреса, вид отправления, объявленную ценность,
+имена и необязательные номер заказа/индекс ОПС; принимает только ответ с
+`position=0` и проверенным `return-barcode`. Сумма хранится в minor units и
+передаётся Почте в целых рублях. Адреса и имена не сохраняются в operation
+receipt, в receipt попадает только нормализованный ШПИ и статус. Отдельная
+возвратная этикетка запрашивается форматом `return_pdf`
 через `GET /1.0/forms/{rpo}/easy-return-pdf` с фиксированным
 `print-type=PAPER`; допускается только domestic/S10 RPO-barcode, а ответ
 принимается после проверки `application/pdf` и сигнатуры `%PDF-`.

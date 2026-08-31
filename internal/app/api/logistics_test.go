@@ -31,13 +31,14 @@ func (stub logisticsAccountStub) AccountCapabilities(context.Context, tenancy.Sc
 }
 
 type logisticsRuntimeStub struct {
-	supported bool
-	points    []sdk.PickupPoint
-	rates     []sdk.RateQuote
-	tracking  sdk.ShipmentResult
-	label     sdk.LabelResult
-	creator   sdk.LogisticsBatchCreator
-	submitter sdk.LogisticsBatchSubmitter
+	supported             bool
+	points                []sdk.PickupPoint
+	rates                 []sdk.RateQuote
+	tracking              sdk.ShipmentResult
+	label                 sdk.LabelResult
+	creator               sdk.LogisticsBatchCreator
+	submitter             sdk.LogisticsBatchSubmitter
+	archiver              sdk.LogisticsBatchArchiver
 	separateReturnCreator sdk.LogisticsSeparateReturnCreator
 }
 
@@ -129,6 +130,13 @@ func (stub logisticsRuntimeStub) LogisticsBatchSubmitter(_ context.Context, _ sd
 	return stub.submitter, nil
 }
 
+func (stub logisticsRuntimeStub) LogisticsBatchArchiver(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchArchiver, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.archiver, nil
+}
+
 func (stub logisticsRuntimeStub) LogisticsSeparateReturnCreator(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error) {
 	if runtime == nil {
 		return nil, errors.New("runtime missing")
@@ -146,12 +154,25 @@ type logisticsBatchSubmitterStub struct {
 	called     bool
 }
 
+type logisticsBatchArchiverStub struct {
+	archive sdk.LogisticsBatchArchive
+	called  bool
+}
+
 func (stub *logisticsBatchSubmitterStub) SubmitLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
 	stub.called = true
 	if stub.submission.RemoteID == "" {
 		stub.submission.RemoteID = request.BatchID
 	}
 	return stub.submission, nil
+}
+
+func (stub *logisticsBatchArchiverStub) ArchiveLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchArchiveRequest) (sdk.LogisticsBatchArchive, error) {
+	stub.called = true
+	if stub.archive.RemoteID == "" {
+		stub.archive.RemoteID = request.BatchID
+	}
+	return stub.archive, nil
 }
 
 func (stub *logisticsBatchCreatorStub) CreateLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
@@ -381,6 +402,44 @@ func TestLogisticsBatchSubmissionRouteRequiresApprovalAndStoresNormalizedResult(
 	}
 }
 
+func TestLogisticsBatchArchiveRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchArchiveInput{ConnectorAccountID: account.ID}
+	digest, err := logisticsBatchArchiveDigest(input, "batch-2026-003")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-archive-1"
+	archiver := &logisticsBatchArchiverStub{archive: sdk.LogisticsBatchArchive{Status: "ARCHIVED", Archived: true, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.archive", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, archiver: archiver}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.archive", ResourceType: "logistics_batch", ResourceID: logisticsBatchArchiveApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchArchivePath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("batch archive route not registered")
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchArchivePath+"batch-2026-003", strings.NewReader(`{"connector_account_id":"cdek-account"}`))
+	request.Header.Set("Idempotency-Key", "archive-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !archiver.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"archived":true`) {
+		t.Fatalf("status=%d body=%s archiver=%v operation=%+v", response.Code, response.Body.String(), archiver.called, operations)
+	}
+}
+
 type logisticsSeparateReturnCreatorStub struct {
 	result sdk.ShipmentResult
 	called bool
@@ -397,9 +456,9 @@ func TestLogisticsSeparateReturnRouteRequiresApprovalAndStoresNormalizedResult(t
 	account := logisticsTestAccount(t)
 	input := logisticsSeparateReturnInput{
 		ConnectorAccountID: account.ID,
-		From: logisticsAddressInput{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
-		To: &logisticsAddressInput{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
-		InsuredValueMinor: 129900, MailType: "ONLINE_PARCEL", OrderNumber: "return-001", PostOfficeCode: "101000", RecipientName: "Пётр Петров", SenderName: "Иван Иванов",
+		From:               logisticsAddressInput{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
+		To:                 &logisticsAddressInput{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		InsuredValueMinor:  129900, MailType: "ONLINE_PARCEL", OrderNumber: "return-001", PostOfficeCode: "101000", RecipientName: "Пётр Петров", SenderName: "Иван Иванов",
 	}
 	digest, err := logisticsSeparateReturnDigest(input)
 	if err != nil {
@@ -409,7 +468,7 @@ func TestLogisticsSeparateReturnRouteRequiresApprovalAndStoresNormalizedResult(t
 	creator := &logisticsSeparateReturnCreatorStub{result: sdk.ShipmentResult{RemoteID: "RA644000003RU", Status: "created", TrackingNumber: "RA644000003RU", Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
 	operations := &logisticsOperationStub{fresh: true}
 	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.return.separate.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, separateReturnCreator: creator}, logisticsRouteDependency{
-		approvals: logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.return.separate.create", ResourceType: "logistics_return", ResourceID: logisticsSeparateReturnApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.return.separate.create", ResourceType: "logistics_return", ResourceID: logisticsSeparateReturnApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
 		operations: operations,
 	})
 	var route ProtectedRoute

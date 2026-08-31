@@ -132,6 +132,7 @@ var capabilityDefinitions = map[Capability]CapabilityDefinition{
 	"logistics.batches.create":         writeSensitive("logistics.batches.create", families(FamilyLogistics)),
 	"logistics.batches.read":           readable("logistics.batches.read", families(FamilyLogistics)),
 	"logistics.batches.submit":         writeSensitive("logistics.batches.submit", families(FamilyLogistics)),
+	"logistics.batches.archive":        writeSensitive("logistics.batches.archive", families(FamilyLogistics)),
 	"logistics.rates.read":             readable("logistics.rates.read", families(FamilyLogistics)),
 	"logistics.shipment.create":        writeSensitive("logistics.shipment.create", families(FamilyLogistics)),
 	"logistics.shipment.cancel":        writeSensitive("logistics.shipment.cancel", families(FamilyLogistics)),

@@ -155,6 +155,18 @@ only a response confirming `f103-sent`. The tenant-scoped operation receipt
 prevents duplicate handoff and keeps ambiguous outcomes pending until
 reconciliation. Separate return shipments remain qualification-gated.
 
+## Почта России — отдельная возвратная отправка
+
+Task 186 is repository-complete: the qualified
+`logistics.return.separate.create` capability now calls the official
+`PUT /1.0/returns/return-without-direct` endpoint through an approval-bound
+`POST /api/v1/logistics/returns/separate` route. The adapter sends exactly one
+bounded item, accepts only `position=0` with a valid `return-barcode`, and
+stores only the normalized tracking result. Addresses and names stay
+request-scoped; the operation receipt prevents duplicate calls and blocks
+blind retry after an ambiguous result. Cancellation of already formed batches
+remains a separate qualification task.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official

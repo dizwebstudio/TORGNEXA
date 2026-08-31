@@ -216,6 +216,22 @@ type LogisticsBatchSubmitRequest struct {
 	IdempotencyKey   string `json:"idempotency_key"`
 }
 
+// LogisticsBatchArchiveRequest requests moving one formed provider batch to
+// the provider archive. The batch identifier remains a provider reference.
+type LogisticsBatchArchiveRequest struct {
+	BatchID        string `json:"batch_id"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// LogisticsBatchArchive is the normalized acknowledgement of a batch archive
+// operation.
+type LogisticsBatchArchive struct {
+	RemoteID   string
+	Status     string
+	Archived   bool
+	ObservedAt time.Time
+}
+
 // Validate checks the bounded batch formation request.
 func (request LogisticsBatchCreateRequest) Validate() error {
 	if len(request.OrderIDs) < 1 || len(request.OrderIDs) > 100 || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
@@ -245,6 +261,22 @@ func (request LogisticsBatchCreateRequest) Validate() error {
 // Validate checks the bounded batch hand-off request.
 func (request LogisticsBatchSubmitRequest) Validate() error {
 	if !logisticsRefPattern.MatchString(request.BatchID) || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the bounded batch archive request.
+func (request LogisticsBatchArchiveRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(request.BatchID) || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the normalized batch archive acknowledgement.
+func (archive LogisticsBatchArchive) Validate() error {
+	if !logisticsRefPattern.MatchString(archive.RemoteID) || archive.Status != "ARCHIVED" || !archive.Archived || archive.ObservedAt.IsZero() || archive.ObservedAt.Location() != time.UTC {
 		return ErrInvalidLogisticsRequest
 	}
 	return nil
@@ -341,6 +373,9 @@ type LogisticsBatchCreator interface {
 }
 type LogisticsBatchSubmitter interface {
 	SubmitLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchSubmitRequest) (LogisticsBatchSubmission, error)
+}
+type LogisticsBatchArchiver interface {
+	ArchiveLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchArchiveRequest) (LogisticsBatchArchive, error)
 }
 
 type LogisticsWebhook struct {

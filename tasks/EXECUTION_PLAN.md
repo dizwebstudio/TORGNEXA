@@ -1651,3 +1651,16 @@ The normalized submission result is stored in the tenant-scoped operation
 receipt; completed replays never call the provider again and ambiguous results
 remain pending for reconciliation. Separate return shipments remain outside
 this phase.
+
+## Phase 55 — Почта России — отдельная возвратная отправка
+
+`186`
+
+Task 186 admits the Russian Post standalone-return contract. The API requires
+an enabled `logistics.return.separate.create` capability, matching approval and
+an `Idempotency-Key`; the host sends one request item to
+`PUT /1.0/returns/return-without-direct` and accepts only `position=0` with a
+validated `return-barcode`. Names and addresses are request-scoped and are not
+stored in operation receipts; completed replays do not call the provider and
+ambiguous outcomes remain pending for reconciliation. Cancellation of an
+already formed batch remains outside this phase.

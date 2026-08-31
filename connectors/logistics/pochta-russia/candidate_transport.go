@@ -86,3 +86,7 @@ func (candidateTransport) CreateBatch(_ context.Context, _ []byte, request sdk.L
 func (candidateTransport) SubmitBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
 	return sdk.LogisticsBatchSubmission{RemoteID: request.BatchID, Status: "SUBMITTED", Accepted: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
 }
+
+func (candidateTransport) ArchiveBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchArchiveRequest) (sdk.LogisticsBatchArchive, error) {
+	return sdk.LogisticsBatchArchive{RemoteID: request.BatchID, Status: "ARCHIVED", Archived: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}

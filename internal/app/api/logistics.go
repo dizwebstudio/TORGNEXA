@@ -26,6 +26,7 @@ const (
 	logisticsPickupPointsPath   = "/api/v1/logistics/pickup-points"
 	logisticsBatchesPath        = "/api/v1/logistics/batches"
 	logisticsBatchSubmitPath    = "/api/v1/logistics/batches/"
+	logisticsBatchArchivePath   = "/api/v1/logistics/batches/archive/"
 	logisticsRatesPath          = "/api/v1/logistics/rates"
 	logisticsTrackingPath       = "/api/v1/logistics/tracking"
 	logisticsLabelsPath         = "/api/v1/logistics/labels"
@@ -70,6 +71,10 @@ type logisticsBatchCreateRuntime interface {
 
 type logisticsBatchSubmitRuntime interface {
 	LogisticsBatchSubmitter(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchSubmitter, error)
+}
+
+type logisticsBatchArchiveRuntime interface {
+	LogisticsBatchArchiver(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchArchiver, error)
 }
 
 type logisticsSeparateReturnRuntime interface {
@@ -180,6 +185,13 @@ type logisticsBatchSubmissionView struct {
 	ObservedAt time.Time `json:"observed_at"`
 }
 
+type logisticsBatchArchiveView struct {
+	RemoteID   string    `json:"remote_id"`
+	Status     string    `json:"status"`
+	Archived   bool      `json:"archived"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
 type logisticsBatchCreateInput struct {
 	ConnectorAccountID string   `json:"connector_account_id"`
 	OrderIDs           []string `json:"order_ids"`
@@ -190,6 +202,10 @@ type logisticsBatchCreateInput struct {
 type logisticsBatchSubmitInput struct {
 	ConnectorAccountID string `json:"connector_account_id"`
 	UseOnlineBalance   bool   `json:"use_online_balance"`
+}
+
+type logisticsBatchArchiveInput struct {
+	ConnectorAccountID string `json:"connector_account_id"`
 }
 
 type logisticsSeparateReturnInput struct {
@@ -228,6 +244,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentCreatePath, Permission: "logistics.shipment.create", Handler: http.HandlerFunc(api.createShipment)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchesPath, Permission: "logistics.batches.create", Handler: http.HandlerFunc(api.createBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchSubmitPath, PathPrefix: true, Permission: "logistics.batches.submit", Handler: http.HandlerFunc(api.submitBatch)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchArchivePath, PathPrefix: true, Permission: "logistics.batches.archive", Handler: http.HandlerFunc(api.archiveBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsSeparateReturnPath, Permission: "logistics.return.separate.create", Handler: http.HandlerFunc(api.createSeparateReturn)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
 	return routes
@@ -552,6 +569,132 @@ func (api logisticsAPI) submitBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := json.Marshal(view)
 	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.batch.submit", key, result) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func (api logisticsAPI) archiveBatch(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsBatchArchivePath), "/"), "/")
+	if len(parts) != 1 || !logisticsRemoteIDPattern.MatchString(parts[0]) {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	batchID := parts[0]
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsBatchArchiveInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(input.ConnectorAccountID)
+	input.ConnectorAccountID = accountID
+	request := input.toSDK(batchID, key)
+	if accountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.archive")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch archive is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch archive capability is not enabled")
+		return
+	}
+	digest, err := logisticsBatchArchiveDigest(input, batchID)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.batch.archive" || requested.ResourceType != "logistics_batch" || requested.ResourceID != logisticsBatchArchiveApprovalResourceID(digest) || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	archiverRuntime, runtimeOK := api.runtime.(logisticsBatchArchiveRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch archive is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	archiver, err := archiverRuntime.LogisticsBatchArchiver(r.Context(), account, runtime)
+	if err != nil || archiver == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.batch.archive", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsBatchArchiveView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsBatchArchiveViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	archive, err := archiver.ArchiveLogisticsBatch(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsBatchArchiveView{RemoteID: archive.RemoteID, Status: archive.Status, Archived: archive.Archived, ObservedAt: archive.ObservedAt}
+	if archive.Validate() != nil || archive.RemoteID != batchID || !logisticsBatchArchiveViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	result, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.batch.archive", key, result) != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -1076,6 +1219,10 @@ func (input logisticsBatchSubmitInput) toSDK(batchID, idempotencyKey string) sdk
 	return sdk.LogisticsBatchSubmitRequest{BatchID: strings.TrimSpace(batchID), UseOnlineBalance: input.UseOnlineBalance, IdempotencyKey: idempotencyKey}
 }
 
+func (input logisticsBatchArchiveInput) toSDK(batchID, idempotencyKey string) sdk.LogisticsBatchArchiveRequest {
+	return sdk.LogisticsBatchArchiveRequest{BatchID: strings.TrimSpace(batchID), IdempotencyKey: idempotencyKey}
+}
+
 func (input logisticsSeparateReturnInput) toSDK(idempotencyKey string) sdk.LogisticsSeparateReturnRequest {
 	address := func(value logisticsAddressInput) sdk.Address {
 		return sdk.Address{Country: strings.ToUpper(strings.TrimSpace(value.Country)), PostalCode: strings.TrimSpace(value.PostalCode), City: strings.TrimSpace(value.City), Line1: strings.TrimSpace(value.Line1)}
@@ -1131,6 +1278,22 @@ func logisticsBatchSubmitApprovalResourceID(digest [32]byte) string {
 	return "batch-submit:" + hex.EncodeToString(digest[:])
 }
 
+func logisticsBatchArchiveDigest(input logisticsBatchArchiveInput, batchID string) ([32]byte, error) {
+	canonical := struct {
+		ConnectorAccountID string `json:"connector_account_id"`
+		BatchID            string `json:"batch_id"`
+	}{ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), BatchID: strings.TrimSpace(batchID)}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsBatchArchiveApprovalResourceID(digest [32]byte) string {
+	return "batch-archive:" + hex.EncodeToString(digest[:])
+}
+
 func logisticsSeparateReturnDigest(input logisticsSeparateReturnInput) ([32]byte, error) {
 	canonical := struct {
 		ConnectorAccountID string                 `json:"connector_account_id"`
@@ -1164,6 +1327,10 @@ func logisticsBatchViewValid(view logisticsBatchView) bool {
 
 func logisticsBatchSubmissionViewValid(view logisticsBatchSubmissionView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.Accepted && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func logisticsBatchArchiveViewValid(view logisticsBatchArchiveView) bool {
+	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && view.Status == "ARCHIVED" && view.Archived && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
 
 func logisticsSeparateReturnViewValid(view logisticsSeparateReturnView) bool {

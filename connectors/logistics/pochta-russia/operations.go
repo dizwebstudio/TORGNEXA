@@ -250,6 +250,27 @@ func (c *Connector) SubmitLogisticsBatch(ctx context.Context, account sdk.Accoun
 	return out, nil
 }
 
+// ArchiveLogisticsBatch moves one formed Russian Post batch to the provider
+// archive. Archiving is reversible through a separate provider operation.
+func (c *Connector) ArchiveLogisticsBatch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchArchiveRequest) (sdk.LogisticsBatchArchive, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatchArchive{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatchArchive
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.ArchiveBatch(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchArchive{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.BatchID {
+		return sdk.LogisticsBatchArchive{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -268,3 +289,4 @@ var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchCreator = (*Connector)(nil)
 var _ sdk.LogisticsBatchSubmitter = (*Connector)(nil)
+var _ sdk.LogisticsBatchArchiver = (*Connector)(nil)

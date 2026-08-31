@@ -101,7 +101,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "pek" {
 				wantCapabilities = 6
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 10
+				wantCapabilities = 12
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -733,6 +733,19 @@ func TestLogisticsBatchSubmitterAdmissionIsExact(t *testing.T) {
 	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
 		if _, err := registry.LogisticsBatchSubmitter(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified batch submitter resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsBatchArchiverAdmissionIsExact(t *testing.T) {
+	registry := New()
+	archiver, err := registry.LogisticsBatchArchiver(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || archiver == nil {
+		t.Fatalf("Russian Post batch archiver unavailable: archiver=%T err=%v", archiver, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsBatchArchiver(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified batch archiver resolved: %v", connectorID, err)
 		}
 	}
 }

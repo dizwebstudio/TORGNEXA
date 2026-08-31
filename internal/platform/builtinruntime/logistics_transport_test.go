@@ -1591,6 +1591,36 @@ func TestRussianPostBatchSubmissionUsesCheckinEndpoint(t *testing.T) {
 	}
 }
 
+func TestRussianPostBatchArchiveUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/1.0/archive" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch archive request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		var payload []int64
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || len(payload) != 1 || payload[0] != 25 {
+			t.Fatalf("unexpected batch archive payload: %#v err=%v", payload, err)
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"batch-name": 25}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.ArchiveBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchArchiveRequest{BatchID: "25", IdempotencyKey: "archive-25"})
+	if err != nil {
+		t.Fatalf("Почта России batch archive failed: %v", err)
+	}
+	if result.RemoteID != "25" || result.Status != "ARCHIVED" || !result.Archived || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России batch archive: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"batch-name": 25, "error-code": "NOT_FOUND"}})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).ArchiveBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchArchiveRequest{BatchID: "25", IdempotencyKey: "archive-25"}); err == nil {
+		t.Fatal("batch archive error response accepted")
+	}
+}
+
 func TestRussianPostSeparateReturnUsesOfficialEndpoint(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut || r.URL.Path != "/1.0/returns/return-without-direct" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {

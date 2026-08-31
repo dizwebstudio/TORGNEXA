@@ -4,10 +4,11 @@
   "family": "logistics",
   "version": "1.0.0",
   "sdk_version": 1,
-  "capabilities": [
+	"capabilities": [
 	"logistics.batches.create",
 	"logistics.batches.read",
 	"logistics.batches.submit",
+	"logistics.batches.archive",
 	"logistics.label.read",
     "logistics.rates.read",
 	"logistics.return.create",

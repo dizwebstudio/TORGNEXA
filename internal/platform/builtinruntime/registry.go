@@ -203,6 +203,19 @@ func (r *Registry) LogisticsBatchSubmitter(ctx context.Context, account sdk.Acco
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 }
 
+// LogisticsBatchArchiver resolves the qualified Russian Post batch-archive
+// surface. The provider's archive operation is reversible through its
+// separate archive-revert endpoint.
+func (r *Registry) LogisticsBatchArchiver(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchArchiver, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.archive") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 // LogisticsRates calculates bounded provider rates through the reviewed
 // logistics composition. Provider service identifiers remain inside the
 // adapter; the application exposes only its neutral rate preview.

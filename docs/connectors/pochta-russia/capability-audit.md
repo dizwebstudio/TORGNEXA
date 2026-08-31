@@ -52,7 +52,13 @@ host проверяет PDF и возвращает только content-address
 `POST /api/v1/logistics/batches/{batch_id}/submit`, который вызывает официальный
 `POST /1.0/batch/{batch-name}/checkin` и принимает только ответ с `f103-sent`.
 
-Отдельные возвратные отправления, прочие документы и возвраты, не покрытые
+`logistics.return.separate.create` теперь допускает standalone-возврат через
+approval-bound `POST /api/v1/logistics/returns/separate`. Runtime вызывает
+официальный `PUT /1.0/returns/return-without-direct` с одной записью и
+принимает только ответ с `position=0` и валидным `return-barcode`; сырые
+адреса, имена и ответ провайдера не сохраняются.
+
+Прочие документы и возвраты, не покрытые
 существующим RPO,
 требуют актуальных
 обезличенных fixtures, маппинга почтовых сервисов и доказанной идемпотентности
