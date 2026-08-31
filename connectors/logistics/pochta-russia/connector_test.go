@@ -3,6 +3,7 @@ package pochtarussia
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -171,6 +172,13 @@ func TestReturnCreationUsesCandidateTransport(t *testing.T) {
 func TestLabelUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "310115153", Format: "pdf"})
 	if err != nil || result.ArtifactRef != "pochta-russia:form:backlog:310115153" || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestBatchF103LabelUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "28", Format: "batch_f103_pdf"})
+	if err != nil || !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:batch-f103:28") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }

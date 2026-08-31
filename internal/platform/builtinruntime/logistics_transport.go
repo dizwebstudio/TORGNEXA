@@ -1587,13 +1587,15 @@ func (transport pekHTTP) Return(ctx context.Context, secret []byte, request sdk.
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
 }
 
-// Label requests the official single-cargo PDF label. The ПЭК endpoint
-// returns base64 JSON; only an opaque content-addressed reference leaves the
-// host transport, never the PDF body or provider credentials.
+// Label requests an official ПЭК PDF document. The endpoint returns base64
+// JSON; only an opaque content-addressed reference leaves the host transport,
+// never the PDF body or provider credentials. The explicit formats map to
+// type=simple (one cargo), type=big (application form) and type=multiple (all
+// cargo labels in the application).
 func (transport pekHTTP) Label(ctx context.Context, secret []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
 	format := strings.ToLower(strings.TrimSpace(request.Format))
-	if transport.h == nil || !pekRuntimeCargoCodePattern.MatchString(remoteID) || (format != "pdf" && format != "request_pdf") {
+	if transport.h == nil || !pekRuntimeCargoCodePattern.MatchString(remoteID) || (format != "pdf" && format != "request_pdf" && format != "multiple_pdf") {
 		return sdk.LabelResult{}, errors.New("ПЭК label request is unavailable")
 	}
 	credentials, err := readPekCredentials(secret)
@@ -1603,7 +1605,7 @@ func (transport pekHTTP) Label(ctx context.Context, secret []byte, request sdk.L
 	body, err := json.Marshal(struct {
 		CargoIndex string `json:"cargoIndex"`
 		Type       string `json:"type"`
-	}{CargoIndex: remoteID, Type: map[string]string{"pdf": "simple", "request_pdf": "big"}[format]})
+	}{CargoIndex: remoteID, Type: map[string]string{"pdf": "simple", "request_pdf": "big", "multiple_pdf": "multiple"}[format]})
 	if err != nil {
 		return sdk.LabelResult{}, err
 	}
@@ -1627,7 +1629,7 @@ func (transport pekHTTP) Label(ctx context.Context, secret []byte, request sdk.L
 		return sdk.LabelResult{}, errors.New("ПЭК label response is not a PDF")
 	}
 	digest := sha256.Sum256(pdf)
-	printType := map[string]string{"pdf": "simple", "request_pdf": "big"}[format]
+	printType := map[string]string{"pdf": "simple", "request_pdf": "big", "multiple_pdf": "multiple"}[format]
 	return sdk.LabelResult{ArtifactRef: "pek:print:" + printType + ":" + remoteID + ":" + hex.EncodeToString(digest[:]), MediaType: "application/pdf", ObservedAt: time.Now().UTC()}, nil
 }
 
@@ -3233,7 +3235,8 @@ func (transport pochtarussiaHTTP) Track(ctx context.Context, secret []byte, requ
 // PDF is represented by a content-addressed opaque reference after validating
 // its media type and signature. Credentials and the PDF body never leave host
 // transport. Format "pdf" requests the pre-batch order form; format
-// "return_pdf" requests the one-page easy-return label for an RPO barcode.
+// "return_pdf" requests the one-page easy-return label for an RPO barcode;
+// "batch_f103_pdf" requests the F103 document for one numeric batch.
 func (transport pochtarussiaHTTP) Label(ctx context.Context, secret []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
 	format := strings.ToLower(strings.TrimSpace(request.Format))
@@ -3263,6 +3266,12 @@ func (transport pochtarussiaHTTP) Label(ctx context.Context, secret []byte, requ
 		path = "/1.0/forms/" + url.PathEscape(remoteID) + "/easy-return-pdf"
 		query.Set("print-type", "PAPER")
 		prefix = "pochta-russia:form:return:" + remoteID + ":"
+	case "batch_f103_pdf":
+		if !pochtarussiaOrderIDPattern.MatchString(remoteID) {
+			return sdk.LabelResult{}, errors.New("Почта России batch number is invalid")
+		}
+		path = "/1.0/forms/" + url.PathEscape(remoteID) + "/f103pdf"
+		prefix = "pochta-russia:form:batch-f103:" + remoteID + ":"
 	default:
 		return sdk.LabelResult{}, errors.New("Почта России label format is unsupported")
 	}

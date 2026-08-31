@@ -158,7 +158,8 @@ read-only отслеживание одного отправления чере�
 для Почты России обычная форма использует официальный
 `GET /1.0/forms/backlog/{order-id}/forms`, а возвратная этикетка —
 `GET /1.0/forms/{rpo}/easy-return-pdf` с `print-type=PAPER`; наружу возвращается
-только проверенная content-addressed PDF-ссылка. Почта
+только проверенная content-addressed PDF-ссылка. Форма Ф103 партии доступна
+через `GET /1.0/forms/{batch-name}/f103pdf` с явным `batch_f103_pdf`; Почта
 России также принимает одиночный заказ через `PUT /1.0/user/backlog` с
 ограниченным маппингом адреса, ФИО и габаритов; bounded чтение справочника
 партий доступно через `GET /api/v1/logistics/batches`, а формирование партии
@@ -176,9 +177,10 @@ bounded создание одной заявки самовывозом чере
 проверяются, но асинхронное принятие не считается сверкой. Также для ПЭК
 доступно аннулирование одного предварительного оформления через официальный
 `POST /api/v1/order/cancellation/` с проверкой точного кода в ответе. Одиночная
-PDF-этикетка ПЭК доступна через официальный `/order/print/` с `type=simple`, а
-полная печатная форма заявки — через тот же маршрут с `type=big`; оба ответа
-проверяются как PDF и наружу возвращаются только digest-ссылки. Возврат одного
+PDF-этикетка ПЭК доступна через официальный `/order/print/` с `type=simple`,
+полная печатная форма заявки — через тот же маршрут с `type=big`, а все
+этикетки заявки — с `type=multiple`; все ответы проверяются как PDF и наружу
+возвращаются только digest-ссылки. Возврат одного
 принятого груза отправителю ПЭК доступен через официальный
 `POST /api/v1/cargos/cancelandreturncargo/`: передаётся один `code`, а
 `success=true` нормализуется существующим worker-контуром как созданный
@@ -230,7 +232,8 @@ additionally expose a bounded read-only rate preview, while CDEK, ПЭК, «Де
 «Почта России» expose a bounded `logistics.track.read` status lookup and a
 bounded `logistics.batches.read` directory projection. CDEK
 shipment creation also runs only through the approval-bound worker, while its
-transport-label read returns an opaque PDF artifact reference. ПЭК additionally
+transport-label read returns an opaque PDF artifact reference for a single cargo,
+an application form or all labels in one application. ПЭК additionally
 admits one bounded self-delivery preregistration with explicit sender-warehouse
 configuration; the provider acceptance remains asynchronous. Почта России
 returns the same neutral artifact reference after validating the official PDF

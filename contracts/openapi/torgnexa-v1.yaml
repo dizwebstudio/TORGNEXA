@@ -349,7 +349,7 @@ paths:
       parameters:
         - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
         - {name: remote_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
-        - {name: format, in: query, required: false, schema: {type: string, enum: [pdf, a4, a5, a6], default: pdf}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [pdf, request_pdf, multiple_pdf, return_pdf, batch_f103_pdf, a4, a5, a6], default: pdf}}
       responses:
         '200': {description: Remote transport-label artifact reference, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsLabel'}}}}
         '400': {description: Invalid label query}

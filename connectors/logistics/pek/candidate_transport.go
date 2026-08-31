@@ -42,7 +42,8 @@ func (candidateTransport) Return(_ context.Context, _ []byte, request sdk.Return
 }
 
 func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
-	return sdk.LabelResult{ArtifactRef: "pek:print:" + request.RemoteID + ":fixture", MediaType: "application/pdf", ObservedAt: candidateTime}, nil
+	printType := map[string]string{"pdf": "simple", "request_pdf": "big", "multiple_pdf": "multiple"}[request.Format]
+	return sdk.LabelResult{ArtifactRef: "pek:print:" + printType + ":" + request.RemoteID + ":fixture", MediaType: "application/pdf", ObservedAt: candidateTime}, nil
 }
 
 func (candidateTransport) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {

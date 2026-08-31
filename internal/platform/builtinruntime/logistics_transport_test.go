@@ -1300,6 +1300,28 @@ func TestRussianPostReturnLabelRequestsEasyReturnPDF(t *testing.T) {
 	}
 }
 
+func TestRussianPostBatchF103RequestsOfficialPDF(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/forms/28/f103pdf" || r.URL.RawQuery != "" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России F103 request: method=%s path=%s query=%q authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7\nsynthetic F103\n%%EOF"))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "28", Format: "batch_f103_pdf"})
+	if err != nil {
+		t.Fatalf("Почта России F103 request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:batch-f103:28:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России F103: %+v", result)
+	}
+	if _, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "not-a-batch", Format: "batch_f103_pdf"}); err == nil {
+		t.Fatal("invalid Почта России batch accepted")
+	}
+}
+
 func TestRussianPostShipmentCreationUsesBacklogAndNormalizesOrderID(t *testing.T) {
 	reject := false
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1528,6 +1550,36 @@ func TestPEKLabelRequestsFullOrderPDF(t *testing.T) {
 	}
 	if !strings.HasPrefix(result.ArtifactRef, "pek:print:big:780339690775:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
 		t.Fatalf("unexpected normalized ПЭК order form: %+v", result)
+	}
+}
+
+func TestPEKLabelRequestsMultipleCargoPDF(t *testing.T) {
+	pdf := []byte("%PDF-1.7\nmultiple cargo labels\n%%EOF")
+	encoded := base64.StdEncoding.EncodeToString(pdf)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/order/print/" || r.Header.Get("Content-Type") != "application/json;charset=utf-8" {
+			t.Fatalf("unexpected ПЭК multiple-label request: method=%s path=%s content-type=%s", r.Method, r.URL.Path, r.Header.Get("Content-Type"))
+		}
+		var request struct {
+			CargoIndex string `json:"cargoIndex"`
+			Type       string `json:"type"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil || request.CargoIndex != "780339690775" || request.Type != "multiple" {
+			t.Fatalf("unexpected ПЭК multiple-label body: %+v", request)
+		}
+		if username, password, ok := r.BasicAuth(); !ok || username != "synthetic-user" || password != "synthetic-key" {
+			t.Fatalf("unexpected ПЭК credentials: username=%q ok=%t", username, ok)
+		}
+		_ = json.NewEncoder(w).Encode(encoded)
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), sdk.LabelRequest{RemoteID: "780339690775", Format: "multiple_pdf"})
+	if err != nil {
+		t.Fatalf("ПЭК multiple-label request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pek:print:multiple:780339690775:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК multiple labels: %+v", result)
 	}
 }
 

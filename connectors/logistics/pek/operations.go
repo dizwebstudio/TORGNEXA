@@ -121,16 +121,17 @@ func (c *Connector) CreateLogisticsReturn(ctx context.Context, account sdk.Accou
 	return validateShipment(result)
 }
 
-// ReadLogisticsLabel requests one PDF label for one ПЭК cargo code. The
-// provider also supports batch and application forms, but those are not
-// exposed through this single-label neutral contract.
+// ReadLogisticsLabel requests a bounded ПЭК PDF document for one cargo code.
+// The explicit multiple_pdf format prints all cargo labels for the cargo's
+// application through the provider's type=multiple operation.
 func (c *Connector) ReadLogisticsLabel(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
-	if c == nil || c.transport == nil || !pekCargoCodePattern.MatchString(remoteID) || strings.ToLower(strings.TrimSpace(request.Format)) != "pdf" {
+	format := strings.ToLower(strings.TrimSpace(request.Format))
+	if c == nil || c.transport == nil || !pekCargoCodePattern.MatchString(remoteID) || (format != "pdf" && format != "request_pdf" && format != "multiple_pdf") {
 		return sdk.LabelResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	request.RemoteID = remoteID
-	request.Format = "pdf"
+	request.Format = format
 	var result sdk.LabelResult
 	err := useSecret(ctx, runtime, account, func(secret []byte) error {
 		var callErr error

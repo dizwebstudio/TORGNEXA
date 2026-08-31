@@ -20,6 +20,12 @@ type/signature, content-addressed artifact reference и отказ на
 не-PDF/невалидный RPO. Live qualification должна также проверить наличие формы
 для реального тестового RPO.
 
+Для формата `batch_f103_pdf` fixture должен проверить `GET
+/1.0/forms/{batch-name}/f103pdf`, числовой номер партии, заголовки авторизации,
+`application/pdf`, сигнатуру `%PDF-`, opaque artifact reference и отказ на
+нечисловой номер или не-PDF. Live qualification должна использовать партию из
+тестового кабинета.
+
 Для `logistics.batches.read` fixture должен вернуть две партии через
 `GET /1.0/batch`, проверить заголовки авторизации, `mailType`/`mailCategory`,
 `size` и `page`, а также нормализацию `batch-name`, `batch-status` и

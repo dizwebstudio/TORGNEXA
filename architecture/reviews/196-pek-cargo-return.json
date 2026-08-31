@@ -2,16 +2,16 @@
   "schema_version": 1,
   "id": "ARCH-196",
   "task": "196",
-  "change_class": "pillar_change",
+  "change_class": "mixed",
   "summary": "Admit one bounded, approval-bound PЭК return-to-sender operation for an accepted cargo.",
   "scopes": [
     "adr/0148-pek-cargo-return.md",
     "architecture/reviews/196-pek-cargo-return.json",
     "connectors/logistics/pek/candidate_transport.go",
+    "connectors/logistics/pek/conformance-plan.md",
     "connectors/logistics/pek/connector_test.go",
     "connectors/logistics/pek/manifest.json",
     "connectors/logistics/pek/operations.go",
-    "connectors/logistics/pek/conformance-plan.md",
     "connectors/logistics/pek/reconciliation.md",
     "contracts/connectors/builtin-runtime-support-v1.json",
     "docs/10-integrations-matrix.md",
@@ -19,12 +19,12 @@
     "docs/connectors/pek/README.md",
     "docs/connectors/pek/capability-audit.md",
     "docs/connectors/pek/spec.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
     "internal/platform/builtinruntime/logistics_transport.go",
     "internal/platform/builtinruntime/logistics_transport_test.go",
     "internal/platform/builtinruntime/registry.go",
     "internal/platform/builtinruntime/support_generated.go",
     "internal/platform/builtinruntime/support_test.go",
-    "frontend/src/features/settings/IntegrationCatalog.tsx",
     "tasks/BACKLOG.md",
     "tasks/EXECUTION_PLAN.md",
     "tasks/issues/196-pek-cargo-return.md"
@@ -32,8 +32,8 @@
   "frozen_pillars": [
     "connector-plugin-runtime-capabilities",
     "event-platform-outbox-inbox",
-    "privacy-secrets-security-governance",
-    "workflow-approval-audit-lineage"
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
   ],
   "adr": "adr/0148-pek-cargo-return.md",
   "existing_adrs": [
@@ -42,8 +42,8 @@
     "adr/0039-connector-conformance-admission-gate.md",
     "adr/0090-built-in-provider-runtime-composition-boundary.md",
     "adr/0100-runtime-truthful-integration-catalog.md",
-    "adr/0143-pek-logistics-connector.md",
-    "adr/0170-wms-operator-workspace.md"
+    "adr/0117-wms-operator-workspace-and-marketplace-fulfillment.md",
+    "adr/0125-pek-bounded-shipment-create.md"
   ],
   "gap_audit": {
     "performed": true,
@@ -66,6 +66,13 @@
     {"area":"operations_rollback", "status":"affected", "evidence":"Capability removal closes admission; a provider return is not silently reversed by the host."},
     {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic adapter, host transport, runtime admission and existing worker tests cover success, rejection and scope boundaries."}
   ],
-  "provider": "pek",
-  "follow_up_tasks": ["Live qualification with a disposable accepted cargo and queued-result reconciliation"]
+  "provider": {
+    "id": "pek",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/pek/manifest.json",
+    "connector_spec": "docs/connectors/pek/spec.md",
+    "capability_audit": "docs/connectors/pek/capability-audit.md",
+    "conformance_plan": "docs/connectors/pek/conformance-plan.md"
+  },
+  "follow_up_tasks": []
 }

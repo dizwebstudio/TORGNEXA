@@ -91,7 +91,10 @@ reference. Для `logistics.label.read` обычный
 `GET /1.0/forms/backlog/{order-id}/forms` с бумажным форматом и текущей датой.
 PDF проверяется по `Content-Type` и сигнатуре `%PDF-`, а наружу передаётся
 только content-addressed opaque reference; бинарное тело не выходит из
-host-side transport. Для
+host-side transport. Форма Ф103 партии доступна явным форматом
+`batch_f103_pdf` через `GET /1.0/forms/{batch-name}/f103pdf`; номер партии
+проверяется как числовой, а PDF проходит ту же проверку и digest-нормализацию.
+Для
 `logistics.track.read` выполняется один SOAP 1.2 вызов
 `POST https://tracking.russianpost.ru/rtm34` с методом
 `getOperationHistory`, `MessageType=0` и `Language=RUS`; ответ ограничен 100

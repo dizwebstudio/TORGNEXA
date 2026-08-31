@@ -1796,3 +1796,24 @@ one cargo code and accepts only `success=true`; a confirmed provider rejection
 is permanent and a network-ambiguous result remains unknown for reconciliation.
 Pre-registration cancellation, formed-cargo cancellation, address delivery,
 batch printing and webhooks remain outside this qualification.
+
+## Phase 66 — ПЭК — пакетная печать этикеток заявки
+
+`197`
+
+Task 197 admits the bounded PEK `type=multiple` print operation through the
+existing `logistics.label.read` route and explicit `format=multiple_pdf`. The
+host sends one numeric cargo code, validates the bounded base64 response as a
+PDF and returns only an opaque digest reference. Single-cargo labels and the
+request form remain compatible; formed-cargo cancellation and other
+unqualified writes remain fail-closed.
+
+## Phase 67 — Почта России — форма Ф103 партии
+
+`198`
+
+Task 198 admits the bounded Russian Post F103 document through the existing
+`logistics.label.read` route and explicit `format=batch_f103_pdf`. The host
+calls `GET /1.0/forms/{batch-name}/f103pdf` for one numeric batch, validates
+the PDF response and returns only an opaque digest reference. Other
+unqualified documents remain fail-closed.

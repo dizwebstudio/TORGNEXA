@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 148
-- tasks: 198
+- adrs: 149
+- tasks: 199
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3229
+- total source files (excluding local secrets/build/dependency/cache trees): 3232
 
 
 ## Connector category layout
@@ -698,6 +698,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0146-telegram-inbound-webhook-runtime.md`
 - `adr/0147-telegram-webhook-subscription-lifecycle.md`
 - `adr/0148-pek-cargo-return.md`
+- `adr/0149-pek-multiple-label-print.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -883,6 +884,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/194-telegram-inbound-webhook-runtime.json`
 - `architecture/reviews/195-telegram-webhook-subscription-lifecycle.json`
 - `architecture/reviews/196-pek-cargo-return.json`
+- `architecture/reviews/197-pek-multiple-label-print-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -3673,6 +3675,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/194-telegram-inbound-webhook-runtime.md`
 - `tasks/issues/195-telegram-webhook-subscription-lifecycle.md`
 - `tasks/issues/196-pek-cargo-return.md`
+- `tasks/issues/197-pek-multiple-label-print-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

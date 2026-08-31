@@ -73,6 +73,10 @@ approval-bound `POST /api/v1/logistics/returns/separate/{return_id}` и
 через `GET /1.0/forms/{rpo}/easy-return-pdf` с фиксированным
 `print-type=PAPER`; допускается только domestic/S10 RPO-barcode, а ответ
 принимается после проверки `application/pdf` и сигнатуры `%PDF-`.
+Форма Ф103 одной партии запрашивается форматом `batch_f103_pdf` через
+`GET /1.0/forms/{batch-name}/f103pdf`; номер партии должен быть числовым,
+а ответ также проверяется как PDF и возвращается только как opaque digest-
+ссылка.
 PDF-печатная форма заказа
 запрашивается через официальный `GET /1.0/forms/backlog/{order-id}/forms` с
 бумажным форматом и текущей датой, а наружу возвращается только

@@ -68,7 +68,11 @@ func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.Shipmen
 }
 
 func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
-	return sdk.LabelResult{ArtifactRef: "pochta-russia:form:backlog:310115153", MediaType: "application/pdf", ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}, nil
+	artifactRef := "pochta-russia:form:backlog:" + request.RemoteID
+	if request.Format == "batch_f103_pdf" {
+		artifactRef = "pochta-russia:form:batch-f103:" + request.RemoteID
+	}
+	return sdk.LabelResult{ArtifactRef: artifactRef, MediaType: "application/pdf", ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}, nil
 }
 
 func (candidateTransport) Pickup(_ context.Context, _ []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {

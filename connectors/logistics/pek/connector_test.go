@@ -2,6 +2,7 @@ package pek
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,6 +94,16 @@ func TestShipmentLabelUsesCandidateTransport(t *testing.T) {
 	}
 	if label.MediaType != "application/pdf" || label.ArtifactRef == "" || label.ObservedAt.IsZero() {
 		t.Fatalf("unexpected label result: %+v", label)
+	}
+}
+
+func TestShipmentMultipleLabelUsesCandidateTransport(t *testing.T) {
+	label, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "780339690775", Format: "multiple_pdf"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(label.ArtifactRef, "pek:print:multiple:") || label.MediaType != "application/pdf" || label.ObservedAt.IsZero() {
+		t.Fatalf("unexpected multiple label result: %+v", label)
 	}
 }
 
