@@ -156,12 +156,12 @@ func TestManifestMatchesAndDeclaresExactScope(t *testing.T) {
 	if !reflect.DeepEqual(got.Canonical(), Manifest().Canonical()) {
 		t.Fatal("manifest drift")
 	}
-	for _, c := range []sdk.Capability{"social.post.text", "social.post.media", "social.post.video", "social.post.buttons", "social.webhooks"} {
+	for _, c := range []sdk.Capability{"social.post.text", "social.post.media", "social.post.video", "social.post.buttons", "social.post.edit", "social.post.delete", "social.webhooks"} {
 		if !Manifest().Supports(c) {
 			t.Fatalf("missing %s", c)
 		}
 	}
-	if Manifest().Supports("social.post.delete") || Manifest().Supports("social.analytics.read") {
+	if Manifest().Supports("social.analytics.read") {
 		t.Fatal("undeclared capability")
 	}
 }

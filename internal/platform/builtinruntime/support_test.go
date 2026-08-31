@@ -219,8 +219,8 @@ func TestSocialEditorAdmissionIsExact(t *testing.T) {
 	if editor, err := registry.SocialEditor(supportTestAccount(t, "telegram"), load); err != nil || editor == nil {
 		t.Fatalf("Telegram editor unavailable: editor=%T err=%v", editor, err)
 	}
-	if _, err := registry.SocialEditor(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted MAX social editor resolved: %v", err)
+	if editor, err := registry.SocialEditor(supportTestAccount(t, "max-messenger"), load); err != nil || editor == nil {
+		t.Fatalf("MAX social editor unavailable: editor=%T err=%v", editor, err)
 	}
 }
 
@@ -232,8 +232,8 @@ func TestSocialDeleterAdmissionIsExact(t *testing.T) {
 	if deleter, err := registry.SocialDeleter(supportTestAccount(t, "telegram"), load); err != nil || deleter == nil {
 		t.Fatalf("Telegram deleter unavailable: deleter=%T err=%v", deleter, err)
 	}
-	if _, err := registry.SocialDeleter(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted MAX social deleter resolved: %v", err)
+	if deleter, err := registry.SocialDeleter(supportTestAccount(t, "max-messenger"), load); err != nil || deleter == nil {
+		t.Fatalf("MAX social deleter unavailable: deleter=%T err=%v", deleter, err)
 	}
 }
 

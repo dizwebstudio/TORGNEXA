@@ -237,7 +237,9 @@ an application form or all labels in one application. ПЭК additionally
 admits one bounded self-delivery preregistration with explicit sender-warehouse
 configuration; the provider acceptance remains asynchronous. Почта России
 returns the same neutral artifact reference after validating the official PDF
-response for both the regular and easy-return forms. Russian Post batch
+response for regular, formed-order and easy-return forms. The regular form
+uses the backlog route before batch formation, while the formed-order form
+uses the post-formation route. Russian Post batch
 handoff is also available through the approval-bound check-in route and
 idempotent operation receipt; active and archived batch directories are
 available through bounded read routes; formed batches can also be moved to the provider

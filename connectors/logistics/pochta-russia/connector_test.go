@@ -182,3 +182,10 @@ func TestBatchF103LabelUsesCandidateTransport(t *testing.T) {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
+
+func TestFormedOrderLabelUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "310115153", Format: "formed_order_pdf"})
+	if err != nil || !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:formed-order:310115153") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}

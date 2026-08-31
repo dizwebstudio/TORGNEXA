@@ -26,6 +26,12 @@ type/signature, content-addressed artifact reference и отказ на
 нечисловой номер или не-PDF. Live qualification должна использовать партию из
 тестового кабинета.
 
+Для `formed_order_pdf` fixture должен проверить `GET
+/1.0/forms/{order-id}/forms`, один числовой order ID, `sending-date`,
+`print-type=PAPER`, заголовки авторизации, `application/pdf`, сигнатуру `%PDF-`,
+opaque artifact reference и отказ на нечисловой ID или не-PDF. Live
+qualification должна использовать заказ, уже включённый в тестовую партию.
+
 Для `logistics.batches.read` fixture должен вернуть две партии через
 `GET /1.0/batch`, проверить заголовки авторизации, `mailType`/`mailCategory`,
 `size` и `page`, а также нормализацию `batch-name`, `batch-status` и

@@ -69,6 +69,9 @@ func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.Shipmen
 
 func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	artifactRef := "pochta-russia:form:backlog:" + request.RemoteID
+	if request.Format == "formed_order_pdf" {
+		artifactRef = "pochta-russia:form:formed-order:" + request.RemoteID
+	}
 	if request.Format == "batch_f103_pdf" {
 		artifactRef = "pochta-russia:form:batch-f103:" + request.RemoteID
 	}

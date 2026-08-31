@@ -1322,6 +1322,28 @@ func TestRussianPostBatchF103RequestsOfficialPDF(t *testing.T) {
 	}
 }
 
+func TestRussianPostFormedOrderRequestsOfficialPDF(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/forms/310115153/forms" || r.URL.Query().Get("print-type") != "PAPER" || r.URL.Query().Get("sending-date") == "" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России formed-order request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if _, err := time.Parse("2006-01-02", r.URL.Query().Get("sending-date")); err != nil {
+			t.Fatalf("invalid sending date: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7\nsynthetic formed order\n%%EOF"))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "310115153", Format: "formed_order_pdf"})
+	if err != nil {
+		t.Fatalf("Почта России formed-order request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:formed-order:310115153:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России formed order: %+v", result)
+	}
+}
+
 func TestRussianPostShipmentCreationUsesBacklogAndNormalizesOrderID(t *testing.T) {
 	reject := false
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

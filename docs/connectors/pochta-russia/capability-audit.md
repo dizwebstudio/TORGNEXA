@@ -96,6 +96,11 @@ Runtime вызывает официальный `POST /1.0/returns/{barcode}`, �
 `batch_f103_pdf` и официальный `GET /1.0/forms/{batch-name}/f103pdf`.
 Host принимает только числовой номер партии, проверяет `application/pdf` и
 сигнатуру `%PDF-`, после чего возвращает content-addressed opaque reference.
+Форма уже сформированного заказа доступна через явный формат
+`formed_order_pdf` и официальный `GET /1.0/forms/{order-id}/forms`; host
+ограничивает order ID одним числовым значением, передаёт бумажный формат и
+текущую дату, проверяет PDF и возвращает только content-addressed opaque
+reference.
 
 Прочие документы и возвраты, не покрытые
 существующим RPO,

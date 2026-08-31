@@ -858,3 +858,11 @@ Task 198 is repository-complete: существующий `logistics.label.read`
 проверяет `application/pdf` и сигнатуру `%PDF-`, а наружу выдаёт только opaque
 digest reference; UI добавляет пункт «Форма Ф103 партии». Прочие документы,
 не покрытые этим маршрутом, остаются fail-closed.
+
+Task 199 is repository-complete: существующий `logistics.label.read` теперь
+принимает явный формат `formed_order_pdf` и вызывает официальный
+`GET /1.0/forms/{order-id}/forms` для одного числового заказа после
+формирования партии. Host передаёт `print-type=PAPER` и текущую дату,
+проверяет `application/pdf` и сигнатуру `%PDF-`, а наружу выдаёт только
+opaque digest reference; UI добавляет пункт «Форма сформированного заказа».
+Прочие документы, не покрытые этими маршрутами, остаются fail-closed.

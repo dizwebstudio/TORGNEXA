@@ -91,7 +91,10 @@ reference. Для `logistics.label.read` обычный
 `GET /1.0/forms/backlog/{order-id}/forms` с бумажным форматом и текущей датой.
 PDF проверяется по `Content-Type` и сигнатуре `%PDF-`, а наружу передаётся
 только content-addressed opaque reference; бинарное тело не выходит из
-host-side transport. Форма Ф103 партии доступна явным форматом
+host-side transport. Форма уже сформированного заказа доступна явным форматом
+`formed_order_pdf` через `GET /1.0/forms/{order-id}/forms`; runtime передаёт
+бумажный формат и текущую дату, а результат проходит ту же PDF-проверку и
+digest-нормализацию. Форма Ф103 партии доступна явным форматом
 `batch_f103_pdf` через `GET /1.0/forms/{batch-name}/f103pdf`; номер партии
 проверяется как числовой, а PDF проходит ту же проверку и digest-нормализацию.
 Для

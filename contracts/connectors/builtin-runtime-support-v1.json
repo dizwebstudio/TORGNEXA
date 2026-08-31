@@ -36,7 +36,7 @@
       "runtime_config_template":{"shop_id":1,"stock_type":"FBS","order_window_days":30}
     },
     {
-      "connector_id":"max-messenger","stage":"separate_surface","surface":"social","operational_capabilities":["social.post.buttons","social.post.media","social.post.text","social.post.video","social.webhooks"],"sync":[],
+      "connector_id":"max-messenger","stage":"separate_surface","surface":"social","operational_capabilities":["social.post.buttons","social.post.delete","social.post.edit","social.post.media","social.post.text","social.post.video","social.webhooks"],"sync":[],
       "social_text_max_runes":4000,
       "runtime_config_template":{"chat_id":-70801090403050,"webhook_secret_reference":""}
     },

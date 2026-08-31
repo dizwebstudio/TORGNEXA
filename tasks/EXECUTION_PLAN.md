@@ -1817,3 +1817,14 @@ Task 198 admits the bounded Russian Post F103 document through the existing
 calls `GET /1.0/forms/{batch-name}/f103pdf` for one numeric batch, validates
 the PDF response and returns only an opaque digest reference. Other
 unqualified documents remain fail-closed.
+
+## Phase 68 — Почта России — форма сформированного заказа
+
+`199`
+
+Task 199 admits the bounded Russian Post formed-order document through the
+existing `logistics.label.read` route and explicit `format=formed_order_pdf`.
+The host calls `GET /1.0/forms/{order-id}/forms` for one numeric order after
+batch formation, sends `print-type=PAPER` and the current date, validates the
+PDF response and returns only an opaque digest reference. Other unqualified
+documents remain fail-closed.

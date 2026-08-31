@@ -1287,24 +1287,38 @@ func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.
 	}
 }
 
-// SocialEditor resolves the qualified remote-message edit surface. Telegram
-// is admitted here only after the host has checked the publication receipt,
-// account capability and approval boundary.
+// SocialEditor resolves the qualified remote-message edit surface. The host
+// checks the publication receipt, account capability and approval boundary
+// before invoking the provider-neutral editor.
 func (r *Registry) SocialEditor(account sdk.Account, load ConfigLoader) (sdk.SocialEditor, error) {
-	if r == nil || r.http == nil || account.Validate() != nil || load == nil || account.ConnectorID != "telegram" || !SupportsCapability(account.ConnectorID, "social.post.edit") {
+	if r == nil || r.http == nil || account.Validate() != nil || load == nil || !SupportsCapability(account.ConnectorID, "social.post.edit") {
 		return nil, ErrUnavailable
 	}
-	return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	switch account.ConnectorID {
+	case "telegram":
+		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	case "max-messenger":
+		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
 }
 
 // SocialDeleter resolves the qualified remote-message deletion surface.
-// Telegram is admitted here only after the host has checked the publication
-// receipt, account capability and approval boundary.
+// The host checks the publication receipt, account capability and approval
+// boundary before invoking the provider-neutral deleter.
 func (r *Registry) SocialDeleter(account sdk.Account, load ConfigLoader) (sdk.SocialDeleter, error) {
-	if r == nil || r.http == nil || account.Validate() != nil || load == nil || account.ConnectorID != "telegram" || !SupportsCapability(account.ConnectorID, "social.post.delete") {
+	if r == nil || r.http == nil || account.Validate() != nil || load == nil || !SupportsCapability(account.ConnectorID, "social.post.delete") {
 		return nil, ErrUnavailable
 	}
-	return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	switch account.ConnectorID {
+	case "telegram":
+		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	case "max-messenger":
+		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
 }
 
 // SocialWebhookReceiver resolves an admitted inbound social webhook receiver.

@@ -3236,7 +3236,8 @@ func (transport pochtarussiaHTTP) Track(ctx context.Context, secret []byte, requ
 // its media type and signature. Credentials and the PDF body never leave host
 // transport. Format "pdf" requests the pre-batch order form; format
 // "return_pdf" requests the one-page easy-return label for an RPO barcode;
-// "batch_f103_pdf" requests the F103 document for one numeric batch.
+// "batch_f103_pdf" requests the F103 document for one numeric batch;
+// "formed_order_pdf" requests the form for one order after batch formation.
 func (transport pochtarussiaHTTP) Label(ctx context.Context, secret []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
 	format := strings.ToLower(strings.TrimSpace(request.Format))
@@ -3259,6 +3260,14 @@ func (transport pochtarussiaHTTP) Label(ctx context.Context, secret []byte, requ
 		query.Set("sending-date", time.Now().UTC().Format("2006-01-02"))
 		query.Set("print-type", "PAPER")
 		prefix = "pochta-russia:form:backlog:" + remoteID + ":"
+	case "formed_order_pdf":
+		if !pochtarussiaOrderIDPattern.MatchString(remoteID) {
+			return sdk.LabelResult{}, errors.New("Почта России formed order id is invalid")
+		}
+		path = "/1.0/forms/" + remoteID + "/forms"
+		query.Set("sending-date", time.Now().UTC().Format("2006-01-02"))
+		query.Set("print-type", "PAPER")
+		prefix = "pochta-russia:form:formed-order:" + remoteID + ":"
 	case "return_pdf":
 		if !pochtarussiaTrackingBarcode(remoteID) {
 			return sdk.LabelResult{}, errors.New("Почта России return label RPO is invalid")
