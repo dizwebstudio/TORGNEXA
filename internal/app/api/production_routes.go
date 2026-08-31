@@ -29,6 +29,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/procurementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
@@ -105,6 +106,7 @@ type productionRouteDependencies struct {
 	returns                *returnsrepo.Repository
 	marking                *markingrepo.Repository
 	marketplacePublication *marketplacepublicationrepo.Repository
+	procurement            *procurementrepo.Repository
 	mcpAccounts            *mcpaccountsrepo.Repository
 	agentGovernance        *agentgovernancerepo.Repository
 	runtimePosture         *runtimeposture.Inspector
@@ -131,6 +133,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
+	routes = append(routes, newProcurementRoutes(deps.procurement, deps.approvals, deps.uploadAccess, deps.uploadContent)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry, socialRouteDependency{secrets: deps.secretProvider, configs: deps.connectorConfigs, receipts: deps.socialReceipts, approvals: deps.approvals, operations: deps.logistics, webhookControllerRuntime: deps.aiRegistry, audit: deps.auditService, uploadAccess: deps.uploadAccess, uploadContent: deps.uploadContent})...)

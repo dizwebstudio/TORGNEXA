@@ -467,6 +467,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/procurementrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/publicationqualityrepo",
       "kind": "infrastructure_adapter"
     },

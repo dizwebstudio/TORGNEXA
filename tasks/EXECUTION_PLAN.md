@@ -2191,3 +2191,31 @@ an individual terminal shipment or creating a manual return.
 - OpenAPI, generated SDKs, runtime support, frontend/catalog, deterministic
   transport/connector/API tests, architecture review and qualification docs stay
   synchronized.
+
+## Phase 86 — Supplier & Procurement Operations
+
+`218`
+
+Task 218 closes the user-facing Epic 173 because repository task key 173 is
+already occupied by the PЭК shipment task. The implementation adds a
+tenant-scoped procurement workbench around the existing PurchaseOrder lifecycle:
+canonical LegalParty-linked suppliers, versioned offers, released CSV/XLSX
+price-list preview/commit, recommendation snapshot checks, approval-bound
+send/unknown/retry, WMS receiving evidence and reconciliation.
+
+### Gate RUNTIME-218
+
+- every supplier, offer, preview, PO and finding query is tenant-scoped with
+  forced RLS; mutation metadata is audited and published through transactional
+  outbox;
+- raw uploads are read only from released objects and verified by digest; raw
+  file content, credentials and unnecessary PII never enter ordinary API,
+  events or evidence;
+- matching uses GTIN, supplier SKU and explicit manual mapping, while invalid
+  and ambiguous rows stay outside offer mutation;
+- existing PO lifecycle is preserved, approval is bound to the same PO, retry
+  is idempotent and timeout is represented as `unknown`;
+- receiving produces a WMS-consumable fact and never mutates stock directly;
+- OpenAPI, generated SDKs, frontend workbench, migration catalog, tests and
+  architecture review stay synchronized. External EDO/marking/marketplace
+  writes remain denied until separate qualification.

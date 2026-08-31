@@ -24,6 +24,7 @@ const ReturnsPage = lazy(() => import("../pages/ReturnsPage").then(module => ({d
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
 const InventoryPage = lazy(() => import("../pages/InventoryPage").then(module => ({default: module.InventoryPage})));
 const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then(module => ({default: module.CounterpartiesPage})));
+const ProcurementPage = lazy(() => import("../pages/ProcurementPage").then(module => ({default: module.ProcurementPage})));
 const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
 const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
@@ -58,6 +59,7 @@ function content(path: string) {
   if (path === "/notifications") return <NotificationsPage />;
   if (path === "/sync") return <SyncPage />;
   if (path === "/counterparties") return <CounterpartiesPage />;
+  if (path === "/procurement") return <ProcurementPage />;
   if (path === "/finance") return <FinancePage />;
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/workflows") return <WorkflowsPage />;

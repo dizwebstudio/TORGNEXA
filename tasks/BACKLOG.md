@@ -1028,3 +1028,15 @@ accepted/processing/published/rejected/unknown результатами, API pre
 коннекторы, а также неподключённые media/attribute bridges, остаются явно
 denied/deferred до отдельной официальной qualification и не маскируются под
 успешную публикацию.
+
+## Epic 173 — Supplier & Procurement Operations
+
+Task 218 is repository-complete: supplier profiles use canonical LegalParty,
+offers keep versioned price evidence, released CSV/XLSX files go through
+preview/commit and deterministic GTIN/SKU/manual matching, and the existing
+PurchaseOrder lifecycle now has recommendation snapshot checks, approval-bound
+send, idempotent unknown/retry outcomes, WMS receiving facts and redacted
+reconciliation findings. The frontend procurement workbench and generated SDKs
+are included. Chestny ZNAK, Diadoc, Saby EDO, KKT/OFD and marketplace order
+connectors remain explicitly deferred until separate official API
+qualification.

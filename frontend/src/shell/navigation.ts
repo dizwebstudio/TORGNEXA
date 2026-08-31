@@ -27,7 +27,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 export const navigationSections = [
   {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "returns", "incidents", "marking"]},
   {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "social"]},
-  {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "finance", "approvals", "compliance", "reports", "audit"]},
+  {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
 ] as const;
 
@@ -46,6 +46,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "social", label: "Публикации", path: "/social", capability: "connectors.read", risk: "WRITE_SAFE", icon: "notifications", shortcut: "G M"},
   {id: "sync", label: "Синхронизация", path: "/sync", capability: "sync.read", risk: "READ", icon: "sync", shortcut: "G S"},
   {id: "counterparties", label: "Контрагенты", path: "/counterparties", capability: "counterparties.read", risk: "READ", icon: "counterparties", shortcut: "G P"},
+  {id: "procurement", label: "Закупки", path: "/procurement", capability: "procurement.suppliers.read", risk: "WRITE_SENSITIVE", icon: "inventory"},
   {id: "finance", label: "Финансы", path: "/finance", capability: "settlements.read", risk: "READ", icon: "finance", shortcut: "G F"},
   {id: "approvals", label: "Согласования", path: "/approvals", capability: "approvals.read", risk: "WRITE_SENSITIVE", icon: "approvals", shortcut: "G A"},
   {id: "workflows", label: "Автоматизации", path: "/workflows", capability: "workflows.read", risk: "WRITE_SAFE", icon: "sync", shortcut: "G W"},

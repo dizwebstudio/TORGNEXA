@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "d06f975f180a61185907b6c32bd4102e88e30650cf214e3cc9caadf4eb62adf0",
+    "sha256": "c570f1fa0bde049ab2ef42eed4a5f53ba7f7f8ea48e13d99b751202987c699a4",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -28,6 +28,11 @@
       "operation_id": "approveAssistantActionPreview",
       "method": "POST",
       "path": "/assistant/action-previews/{preview_id}:approve"
+    },
+    {
+      "operation_id": "approveProcurementPurchaseOrder",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/approve"
     },
     {
       "operation_id": "archiveLogisticsBatch",
@@ -65,6 +70,11 @@
       "path": "/logistics/shipments/{shipment_id}/cancel"
     },
     {
+      "operation_id": "cancelProcurementPurchaseOrder",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/cancel"
+    },
+    {
       "operation_id": "cancelWarehouseTask",
       "method": "POST",
       "path": "/warehouse-tasks/{task_id}/cancel"
@@ -98,6 +108,11 @@
       "operation_id": "claimWarehouseTask",
       "method": "POST",
       "path": "/warehouse-tasks/{task_id}/claim"
+    },
+    {
+      "operation_id": "commitProcurementPriceList",
+      "method": "POST",
+      "path": "/procurement/price-lists/commit"
     },
     {
       "operation_id": "completeConnectorOAuth",
@@ -198,6 +213,26 @@
       "operation_id": "createPrivacyRequest",
       "method": "POST",
       "path": "/privacy/requests"
+    },
+    {
+      "operation_id": "createProcurementOffer",
+      "method": "POST",
+      "path": "/procurement/offers"
+    },
+    {
+      "operation_id": "createProcurementPurchaseOrder",
+      "method": "POST",
+      "path": "/procurement/purchase-orders"
+    },
+    {
+      "operation_id": "createProcurementPurchaseOrderFromRecommendations",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/from-recommendations"
+    },
+    {
+      "operation_id": "createProcurementSupplier",
+      "method": "POST",
+      "path": "/procurement/suppliers"
     },
     {
       "operation_id": "createProduct",
@@ -505,6 +540,16 @@
       "path": "/payments/{payment_id}"
     },
     {
+      "operation_id": "getProcurementPurchaseOrder",
+      "method": "GET",
+      "path": "/procurement/purchase-orders/{purchase_order_id}"
+    },
+    {
+      "operation_id": "getProcurementSupplier",
+      "method": "GET",
+      "path": "/procurement/suppliers/{supplier_id}"
+    },
+    {
       "operation_id": "getProduct",
       "method": "GET",
       "path": "/products/{product_id}"
@@ -760,6 +805,26 @@
       "path": "/plugins"
     },
     {
+      "operation_id": "listProcurementOffers",
+      "method": "GET",
+      "path": "/procurement/offers"
+    },
+    {
+      "operation_id": "listProcurementPurchaseOrders",
+      "method": "GET",
+      "path": "/procurement/purchase-orders"
+    },
+    {
+      "operation_id": "listProcurementReconciliationFindings",
+      "method": "GET",
+      "path": "/procurement/reconciliation"
+    },
+    {
+      "operation_id": "listProcurementSuppliers",
+      "method": "GET",
+      "path": "/procurement/suppliers"
+    },
+    {
       "operation_id": "listProducts",
       "method": "GET",
       "path": "/products"
@@ -870,6 +935,11 @@
       "path": "/notifications/{notification_id}/read"
     },
     {
+      "operation_id": "markProcurementPurchaseOrderSendUnknown",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/send-timeout"
+    },
+    {
       "operation_id": "pauseWorkflow",
       "method": "POST",
       "path": "/workflow-commands/pause"
@@ -888,6 +958,11 @@
       "operation_id": "previewConnectorBootstrap",
       "method": "POST",
       "path": "/connector-accounts:bootstrap-preview"
+    },
+    {
+      "operation_id": "previewProcurementPriceList",
+      "method": "POST",
+      "path": "/procurement/price-lists/preview"
     },
     {
       "operation_id": "publishWorkflow",
@@ -933,6 +1008,11 @@
       "operation_id": "receiveCommerceWebhook",
       "method": "POST",
       "path": "/webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
+    },
+    {
+      "operation_id": "receiveProcurementPurchaseOrder",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/receive"
     },
     {
       "operation_id": "receiveSocialWebhook",
@@ -993,6 +1073,11 @@
       "operation_id": "retryMarketplacePublication",
       "method": "POST",
       "path": "/marketplace-publications/{operation_id}/retry"
+    },
+    {
+      "operation_id": "retryProcurementPurchaseOrderSend",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/retry"
     },
     {
       "operation_id": "retryWorkflowRun",
@@ -1058,6 +1143,11 @@
       "operation_id": "sendAssistantMessage",
       "method": "POST",
       "path": "/assistant/sessions/{session_id}/messages"
+    },
+    {
+      "operation_id": "sendProcurementPurchaseOrder",
+      "method": "POST",
+      "path": "/procurement/purchase-orders/{purchase_order_id}/send"
     },
     {
       "operation_id": "setMCPAgentKillSwitch",
@@ -1128,6 +1218,11 @@
       "operation_id": "updateOfferPrice",
       "method": "PATCH",
       "path": "/products/{product_id}/prices/{offer_or_price_id}"
+    },
+    {
+      "operation_id": "updateProcurementSupplier",
+      "method": "PATCH",
+      "path": "/procurement/suppliers/{supplier_id}"
     },
     {
       "operation_id": "updateProduct",

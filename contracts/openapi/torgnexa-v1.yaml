@@ -2725,6 +2725,178 @@ paths:
           description: Tenant-scoped canonical counterparty role page
           content: {application/json: {schema: {$ref: '#/components/schemas/CounterpartyPage'}}}
         '400': {description: Invalid limit}
+  /procurement/suppliers:
+    get:
+      operationId: listProcurementSuppliers
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Tenant-scoped supplier directory, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplierPage'}}}}
+    post:
+      operationId: createProcurementSupplier
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplierWrite'}}}}
+      responses:
+        '201': {description: Supplier profile created, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplier'}}}}
+        '400': {description: Invalid supplier profile or canonical legal party}
+        '409': {description: Supplier or idempotency conflict}
+  /procurement/suppliers/{supplier_id}:
+    get:
+      operationId: getProcurementSupplier
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: supplier_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Supplier profile, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplier'}}}}
+        '404': {description: Supplier not found in tenant scope}
+    patch:
+      operationId: updateProcurementSupplier
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: supplier_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplierWrite'}}}}
+      responses:
+        '200': {description: Updated supplier profile, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSupplier'}}}}
+        '409': {description: Optimistic version conflict}
+  /procurement/offers:
+    get:
+      operationId: listProcurementOffers
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: supplier_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+      responses:
+        '200': {description: Current supplier offers, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementOfferPage'}}}}
+    post:
+      operationId: createProcurementOffer
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementOfferWrite'}}}}
+      responses:
+        '201': {description: Versioned supplier offer created, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementOffer'}}}}
+        '400': {description: Invalid offer}
+        '409': {description: Supplier or offer conflict}
+  /procurement/price-lists/preview:
+    post:
+      operationId: previewProcurementPriceList
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPriceListPreviewWrite'}}}}
+      responses:
+        '201': {description: Price-list preview with matching evidence, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPriceListPreview'}}}}
+        '422': {description: Released upload integrity or security check failed}
+  /procurement/price-lists/commit:
+    post:
+      operationId: commitProcurementPriceList
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPriceListCommit'}}}}
+      responses:
+        '200': {description: Applied price-list version, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPriceListPreview'}}}}
+        '422': {description: Preview has unresolved or invalid rows}
+  /procurement/purchase-orders:
+    get:
+      operationId: listProcurementPurchaseOrders
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [draft, approved, sent, partially_received, received, cancelled]}}
+        - {name: supplier_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+      responses:
+        '200': {description: Purchase-order work queue, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrderPage'}}}}
+    post:
+      operationId: createProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrderWrite'}}}}
+      responses:
+        '201': {description: Draft purchase order, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Idempotency or supplier conflict}
+  /procurement/purchase-orders/from-recommendations:
+    post:
+      operationId: createProcurementPurchaseOrderFromRecommendations
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrderWrite'}}}}
+      responses:
+        '201': {description: Draft PO linked to immutable recommendation snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Stale recommendation or open-PO conflict}
+  /procurement/purchase-orders/{purchase_order_id}:
+    get:
+      operationId: getProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Purchase order with lines and current state, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '404': {description: Purchase order not found in tenant scope}
+  /procurement/purchase-orders/{purchase_order_id}/approve:
+    post:
+      operationId: approveProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, maxLength: 192}}
+      responses:
+        '202': {description: Purchase order approved, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Matching approval or optimistic version is missing}
+  /procurement/purchase-orders/{purchase_order_id}/send:
+    post:
+      operationId: sendProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, maxLength: 192}}
+      responses:
+        '202': {description: Export queued with explicit send state, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Matching approval or lifecycle transition is missing}
+  /procurement/purchase-orders/{purchase_order_id}/retry:
+    post:
+      operationId: retryProcurementPurchaseOrderSend
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {description: Ambiguous send returned for an idempotent retry, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: PO is not in an unknown send state}
+  /procurement/purchase-orders/{purchase_order_id}/send-timeout:
+    post:
+      operationId: markProcurementPurchaseOrderSendUnknown
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {description: Send marked unknown for reconciliation, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+  /procurement/purchase-orders/{purchase_order_id}/cancel:
+    post:
+      operationId: cancelProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {description: Purchase order cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Lifecycle transition is not allowed}
+  /procurement/purchase-orders/{purchase_order_id}/receive:
+    post:
+      operationId: receiveProcurementPurchaseOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: purchase_order_id, in: path, required: true, schema: {type: string, maxLength: 192}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementReceivingWrite'}}}}
+      responses:
+        '200': {description: Receipt recorded and PO status updated, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}}}
+        '409': {description: Quantity or lifecycle conflict}
+  /procurement/reconciliation:
+    get:
+      operationId: listProcurementReconciliationFindings
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Redacted procurement reconciliation findings, content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementFindingPage'}}}}
   /compliance/documents:
     get:
       operationId: listComplianceDocuments
@@ -2954,6 +3126,199 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    ProcurementSupplier:
+      type: object
+      additionalProperties: false
+      required: [id, legal_party_id, name, status, currency, lead_time_days, minimum_order_minor, minimum_order_currency, contacts, contracts, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        legal_party_id: {type: string, maxLength: 192}
+        name: {type: string, minLength: 1, maxLength: 200}
+        status: {type: string, enum: [active, blocked, archived]}
+        payment_terms: {type: string, maxLength: 500}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        lead_time_days: {type: integer, minimum: 0, maximum: 3650}
+        minimum_order_minor: {type: integer, minimum: 0}
+        minimum_order_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        contacts: {type: array, maxItems: 32, items: {type: object, additionalProperties: false}}
+        contracts: {type: array, maxItems: 32, items: {type: object, additionalProperties: false}}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ProcurementSupplierWrite:
+      type: object
+      additionalProperties: false
+      required: [legal_party_id, name]
+      properties:
+        id: {type: string, maxLength: 192}
+        legal_party_id: {type: string, maxLength: 192}
+        name: {type: string, minLength: 1, maxLength: 200}
+        status: {type: string, enum: [active, blocked, archived], default: active}
+        payment_terms: {type: string, maxLength: 500}
+        currency: {type: string, pattern: '^[A-Z]{3}$', default: RUB}
+        lead_time_days: {type: integer, minimum: 0, maximum: 3650}
+        minimum_order_minor: {type: integer, minimum: 0}
+        minimum_order_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        contacts: {type: array, maxItems: 32, items: {type: object, additionalProperties: false}}
+        contracts: {type: array, maxItems: 32, items: {type: object, additionalProperties: false}}
+        expected_version: {type: integer, minimum: 1}
+    ProcurementSupplierPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ProcurementSupplier'}}
+    ProcurementOffer:
+      type: object
+      additionalProperties: false
+      required: [id, supplier_id, sku, unit, unit_price_minor, currency, moq, case_pack, lead_time_days, priority, valid_from, valid_until, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        supplier_id: {type: string, maxLength: 192}
+        canonical_offer_id: {type: string, maxLength: 192}
+        supplier_sku: {type: string, maxLength: 200}
+        gtin: {type: string, pattern: '^[0-9]{8,14}$'}
+        sku: {type: string, maxLength: 200}
+        unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+        unit_price_minor: {type: integer, minimum: 0}
+        minimum_order_minor: {type: integer, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        minimum_order_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        moq: {$ref: '#/components/schemas/Quantity'}
+        case_pack: {$ref: '#/components/schemas/Quantity'}
+        lead_time_days: {type: integer, minimum: 0, maximum: 3650}
+        priority: {type: integer, minimum: 0}
+        valid_from: {type: string, format: date-time}
+        valid_until: {type: string, format: date-time}
+        version: {type: integer, minimum: 1}
+    ProcurementOfferWrite:
+      type: object
+      additionalProperties: false
+      required: [id, supplier_id, sku, unit_price_minor, currency]
+      properties:
+        id: {type: string, maxLength: 192}
+        supplier_id: {type: string, maxLength: 192}
+        canonical_offer_id: {type: string, maxLength: 192}
+        supplier_sku: {type: string, maxLength: 200}
+        gtin: {type: string, pattern: '^[0-9]{8,14}$'}
+        sku: {type: string, maxLength: 200}
+        unit: {type: string, default: PCS}
+        unit_price_minor: {type: integer, minimum: 0}
+        minimum_order_minor: {type: integer, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        minimum_order_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        moq: {type: string, default: '1'}
+        case_pack: {type: string, default: '1'}
+        lead_time_days: {type: integer, minimum: 0, maximum: 3650}
+        priority: {type: integer, minimum: 0}
+        valid_from: {type: string, format: date-time}
+        valid_until: {type: string, format: date-time}
+    ProcurementOfferPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/ProcurementOffer'}}
+    ProcurementPriceListPreviewWrite:
+      type: object
+      additionalProperties: false
+      required: [supplier_id, upload_id, format, mapping]
+      properties:
+        supplier_id: {type: string, maxLength: 192}
+        upload_id: {type: string, pattern: '^upl_[0-9a-f]{32}$'}
+        format: {type: string, enum: [csv, xlsx]}
+        mapping: {$ref: '#/components/schemas/ProcurementPriceListMapping'}
+        canonical_mappings: {type: object, additionalProperties: {type: string, maxLength: 192}}
+    ProcurementPriceListCommit:
+      type: object
+      additionalProperties: false
+      required: [preview_id]
+      properties:
+        preview_id: {type: string, maxLength: 192}
+        allow_partial: {type: boolean, default: false}
+    ProcurementPriceListMapping:
+      type: object
+      additionalProperties: false
+      required: [fields]
+      properties:
+        fields: {type: object, minProperties: 2, maxProperties: 16, additionalProperties: {type: string, minLength: 1, maxLength: 128}}
+    ProcurementPriceListPreview:
+      type: object
+      additionalProperties: false
+      required: [id, supplier_id, upload_id, source_sha256, mapping_fingerprint, status, total_rows, valid_rows, invalid_rows, unresolved_rows, errors, rows, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        supplier_id: {type: string, maxLength: 192}
+        upload_id: {type: string, maxLength: 192}
+        source_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        mapping_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, enum: [preview, ready, committed, rejected]}
+        total_rows: {type: integer, minimum: 0}
+        valid_rows: {type: integer, minimum: 0}
+        invalid_rows: {type: integer, minimum: 0}
+        unresolved_rows: {type: integer, minimum: 0}
+        errors: {type: array, maxItems: 100, items: {type: object, additionalProperties: false}}
+        rows: {type: array, maxItems: 10000, items: {type: object, additionalProperties: false}}
+        version: {type: integer, minimum: 1}
+    ProcurementPurchaseOrderWrite:
+      type: object
+      additionalProperties: false
+      required: [id, supplier_id, warehouse_id, currency, lines]
+      properties:
+        id: {type: string, maxLength: 192}
+        supplier_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        recommendation_id: {type: string, maxLength: 192}
+        recommendation_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        expected_receipt_at: {type: string, format: date-time}
+        lines: {type: array, minItems: 1, maxItems: 500, items: {type: object, additionalProperties: false}}
+    ProcurementPurchaseOrder:
+      type: object
+      additionalProperties: false
+      required: [id, supplier_id, status, currency, version, lines, warehouse_id, send_state]
+      properties:
+        id: {type: string, maxLength: 192}
+        supplier_id: {type: string, maxLength: 192}
+        status: {type: string, enum: [draft, approved, sent, partially_received, received, cancelled]}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        version: {type: integer, minimum: 1}
+        lines: {type: array, maxItems: 500, items: {type: object, additionalProperties: false}}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        recommendation_id: {type: string, maxLength: 192}
+        recommendation_digest: {type: string, maxLength: 64}
+        approval_request_id: {type: string, maxLength: 192}
+        send_state: {type: string, enum: [not_sent, queued, sent, unknown, failed]}
+        error_code: {type: string, maxLength: 96}
+        expected_receipt_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ProcurementPurchaseOrderPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ProcurementPurchaseOrder'}}
+    ProcurementReceivingWrite:
+      type: object
+      additionalProperties: false
+      required: [warehouse_id, line_id, quantity, unit]
+      properties:
+        warehouse_id: {type: string, maxLength: 192}
+        line_id: {type: string, maxLength: 192}
+        quantity: {type: string, pattern: '^[0-9]+(?:\.[0-9]+)?$'}
+        unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+        status: {type: string, enum: [accepted, partial, discrepancy, rejected], default: accepted}
+        discrepancy_code: {type: string, maxLength: 96}
+        note: {type: string, maxLength: 500}
+    ProcurementFindingPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {type: object, additionalProperties: false}}
     AssistantSessionCreate:
       type: object
       additionalProperties: false

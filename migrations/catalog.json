@@ -913,6 +913,26 @@
       },
       "backfill": null,
     "sha256": "78804b419ddfeec13af06e7cfb7ce70f0a2375ef39981cdca5d4a746da9fe092"
+    },
+    {
+      "version": 45,
+      "name": "supplier_procurement_operations",
+      "file": "000045_supplier_procurement_operations.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [31, 32, 44],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "6c87140c6a935ec8b838521dc4ad1fab07fb4ac807ec4d42d7e48538770f3d4c"
     }
   ]
 }

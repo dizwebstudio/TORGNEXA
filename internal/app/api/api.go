@@ -47,6 +47,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/procurementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo"
@@ -224,6 +225,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	marketplacePublicationRepository, err := marketplacepublicationrepo.New(db)
 	if err != nil {
 		return newRuntimeError("marketplace_publication_repository_startup_failed", err)
+	}
+	procurementRepository, err := procurementrepo.New(db)
+	if err != nil {
+		return newRuntimeError("procurement_repository_startup_failed", err)
 	}
 	pimRepository, err := pimrepo.New(db)
 	if err != nil {
@@ -429,7 +434,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
-		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository,
+		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository, procurement: procurementRepository,
 		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()},
 	}
 	routes := newProductionRoutes(routeDeps)
