@@ -78,8 +78,8 @@ type socialRouteDependency struct {
 	operations               socialOperationStore
 	webhookControllerRuntime socialWebhookControllerRuntime
 	audit                    auditCapturer
-	uploadAccess              uploadReleaseGate
-	uploadContent             uploads.ReleaseReader
+	uploadAccess             uploadReleaseGate
+	uploadContent            uploads.ReleaseReader
 }
 
 type socialAPI struct {

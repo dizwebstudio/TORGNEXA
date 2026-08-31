@@ -30,8 +30,8 @@ configured chat membership check.
 Task-183 also admits inbound MAX Webhook reception through the public social
 webhook route and the tenant-scoped Inbox/transactional outbox boundary. The
 route verifies the account capability and ephemeral
-`X-Max-Bot-Api-Secret` before publishing a minimized event; subscription and
-unsubscription lifecycle calls remain SDK-only.
+`X-Max-Bot-Api-Secret` before publishing a minimized event. Task-201 admits
+the authenticated subscription lifecycle through the same host boundary.
 
 Not admitted: provider scheduling, Long Polling in production, comments, analytics, callback buttons, arbitrary files/audio, user messaging, or provider-native workflow state.
 
@@ -65,7 +65,13 @@ The qualified send surface exposes no caller-supplied idempotency key. Therefore
 
 ## Webhook lifecycle
 
-Production updates use `POST /subscriptions`. The connector subscribes only to `message_created`, `message_edited` and `message_removed`, always supplies a separate verification secret, and permits only HTTPS endpoints with implicit port 443.
+Production updates use the official [`POST /subscriptions`](https://dev.max.ru/docs-api/methods/POST/subscriptions) and
+[`DELETE /subscriptions`](https://dev.max.ru/docs-api/methods/DELETE/subscriptions)
+methods. The connector subscribes only to `message_created`,
+`message_edited` and `message_removed`, always supplies a separate verification
+secret, and permits only HTTPS endpoints with implicit port 443. The
+authenticated host route wraps both calls in the existing tenant-scoped
+operation receipt and audit boundary; ambiguous writes are not retried.
 
 `ReceiveSocialWebhook`:
 

@@ -128,8 +128,9 @@ image/gallery and video publication with the provider's 4000-code-point limit,
 plus HTTPS URL buttons and approval-bound single-message edit/delete through
 the immutable remote receipt. Inbound MAX Webhook reception is admitted through
 the public tenant-bound social webhook route and host-owned Inbox/transactional
-outbox; subscription lifecycle management remains outside the connected
-application workflow.
+outbox. Task 201 also admits subscription lifecycle management through the
+authenticated host route, with provider update types and verification secret
+fixed by the adapter.
 
 Bitrix24 is available on the dedicated CRM surface. Its account uses the
 host-owned OAuth 2.0/refresh flow, keeps the lower-case `portal_host` in the

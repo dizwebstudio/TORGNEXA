@@ -18,6 +18,7 @@ immutable remote receipt и fail-closed обработку неоднознач�
 - повторно валидировать text/media/buttons и released uploads перед edit;
 - принимать только явный `success=true` и отклонять чужой канал;
 - подключить MAX к reviewed registry и общему Social UI;
+- передать edit-маршруту API безопасный released-upload media bridge;
 - добавить deterministic adapter, runtime admission, ADR, architecture review,
   capability audit, conformance plan и обновить матрицы.
 

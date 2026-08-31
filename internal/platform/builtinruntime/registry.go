@@ -1355,8 +1355,11 @@ func (r *Registry) SocialWebhookController(account sdk.Account, load ConfigLoade
 	if load == nil {
 		return nil, ErrConfigurationNeeded
 	}
-	if account.ConnectorID == "telegram" {
+	switch account.ConnectorID {
+	case "telegram":
 		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	case "max-messenger":
+		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
 	}
 	return nil, ErrUnavailable
 }

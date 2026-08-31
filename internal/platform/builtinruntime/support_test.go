@@ -265,8 +265,12 @@ func TestSocialWebhookControllerAdmissionIsExact(t *testing.T) {
 	if _, ok := controller.(sdk.SocialWebhookController); !ok {
 		t.Fatalf("telegram controller has unexpected type %T", controller)
 	}
-	if _, err := registry.SocialWebhookController(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("MAX webhook controller was admitted: %v", err)
+	maxController, err := registry.SocialWebhookController(supportTestAccount(t, "max-messenger"), load)
+	if err != nil {
+		t.Fatalf("MAX webhook controller unavailable: %v", err)
+	}
+	if _, ok := maxController.(sdk.SocialWebhookController); !ok {
+		t.Fatalf("MAX controller has unexpected type %T", maxController)
 	}
 	if _, err := registry.SocialWebhookController(supportTestAccount(t, "vk"), load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted social webhook controller resolved: %v", err)

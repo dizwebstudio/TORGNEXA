@@ -13,5 +13,6 @@ composes inbound MAX Webhook reception through the public social webhook
 route, tenant-scoped Inbox and transactional outbox. Approval-bound edits and
 deletes use the exact configured channel and provider message ID; text, released
 media and HTTPS buttons are revalidated before an edit, while deletion accepts
-only an explicit provider success. Subscription lifecycle management remains
-outside the connected application workflow.
+only an explicit provider success. Task 201 also connects subscription
+lifecycle management to the authenticated host route with tenant-scoped
+idempotency and audit evidence.

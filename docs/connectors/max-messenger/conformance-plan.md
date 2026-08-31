@@ -16,6 +16,9 @@ Provider-specific deterministic evidence additionally covers:
 - approval-bound single-message edit/delete with exact `message_id`, strict
   `success=true` response handling, released-upload revalidation and foreign
   channel rejection;
+- authenticated webhook subscription/unsubscription with exact update types,
+  separate verification secret, HTTPS endpoint validation and idempotent host
+  operation receipt;
 - non-retryable ambiguous write outcomes;
 - production webhook endpoint validation, subscription/unsubscription and fixed update allowlist;
 - constant-time webhook-secret verification;

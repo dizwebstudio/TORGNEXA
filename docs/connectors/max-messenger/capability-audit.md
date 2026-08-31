@@ -49,8 +49,9 @@ from publication. `POST /api/v1/webhooks/social/max-messenger/{organization_id}/
 resolves the account and enabled `social.webhooks` capability, extracts the
 ephemeral `X-Max-Bot-Api-Secret`, delegates verification to the MAX adapter and
 commits the minimized event through the tenant-scoped Task-009 Inbox and
-transactional outbox. Subscription and unsubscription calls remain connector
-SDK surfaces without a public application route.
+transactional outbox. Task 201 also admits subscription and unsubscription
+through `PUT/DELETE /api/v1/social/webhooks/subscription`, backed by the
+existing idempotent operation receipt and audit boundary.
 
 ## Retry decision
 

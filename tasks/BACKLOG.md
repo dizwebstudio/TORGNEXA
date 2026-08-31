@@ -876,3 +876,10 @@ Task 200 is repository-complete: MAX теперь допускает approval-bo
 operation receipt не допускает повторный внешний вызов при неизвестном исходе.
 Комментарии, callback actions и управление подпиской webhook остаются
 fail-closed.
+
+## MAX — жизненный цикл подписки webhook
+
+Task 201 is repository-complete: существующие MAX `POST/DELETE /subscriptions`
+теперь допущены через reviewed runtime и authenticated host route. Адаптер
+фиксирует три квалифицированных update-типа, отдельный verification secret и
+HTTPS endpoint; host сохраняет tenant-scoped idempotency и audit evidence.

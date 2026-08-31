@@ -1839,3 +1839,13 @@ receipt. The host calls `PUT/DELETE /messages?message_id=...` on the fixed
 official host, revalidates released media and HTTPS buttons, accepts only
 `success=true` and never retries an ambiguous write. Comments, callback
 actions and webhook subscription lifecycle remain fail-closed.
+
+## Phase 70 — MAX — жизненный цикл подписки webhook
+
+`201`
+
+Task 201 admits MAX Webhook subscription and unsubscription through the
+existing authenticated host route and tenant-scoped operation receipt. The
+adapter calls the official `POST/DELETE /subscriptions`, fixes the accepted
+update types and verification secret boundary, validates HTTPS endpoints and
+does not retry ambiguous writes.

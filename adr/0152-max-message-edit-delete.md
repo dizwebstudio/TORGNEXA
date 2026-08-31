@@ -19,9 +19,10 @@ Status: Accepted
 настроенным каналом.
 
 Редактирование повторно проверяет provider-neutral text/media/buttons. Для
-media host непосредственно перед запросом использует уже released upload и
-передаёт только opaque attachment token. Ответ принимается только при
-явном `success=true`. Удаление также требует явного `success=true`.
+media authenticated API и worker непосредственно перед запросом используют
+released-upload bridge, который заново проверяет release и передаёт только
+opaque attachment token. Ответ принимается только при явном `success=true`.
+Удаление также требует явного `success=true`.
 API/Core/worker используют существующий approval-bound, tenant-scoped
 operation receipt и audit flow; новая база или новый публичный endpoint не
 требуются.
