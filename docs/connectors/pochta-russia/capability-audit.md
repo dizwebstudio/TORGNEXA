@@ -111,3 +111,52 @@ reference.
 валидный PDF, наружу возвращает только SHA-256-based opaque reference. До
 отдельной квалификации остальные перечисленные операции остаются
 fail-closed.
+
+`logistics.orders.restore` возвращает выбранные заказы из сформированной
+партии в список «Новые» через approval-bound `POST
+/api/v1/logistics/orders/restore` и официальный `POST /1.0/user/backlog`.
+Host требует 1–100 числовых ID, отвергает provider errors, частичное или
+несовпадающее подтверждение и сохраняет только нормализованный статус
+`restored`. Операция отдельна от отмены заказа.
+
+`logistics.batches.orders.read` допускается как bounded read-only проекция
+заказов через `GET /1.0/batch/{batch-name}/shipment`. Qualification evidence
+должно подтвердить числовой batch ID, query `size`/`page`/`sort=ask`, оба
+заголовка авторизации, exact batch match, duplicate rejection и отсутствие
+PII в проекции. В SDK разрешены только provider order ID, batch ID, barcode,
+нормализованный lowercase status и UTC observation time; сырой ответ и поля
+получателя не сохраняются.
+
+`logistics.orders.read` квалифицируется как bounded read-only lookup одного
+заказа через `GET /1.0/shipment/{id}`. Evidence должно подтвердить числовой
+order ID, отсутствие query/body, оба заголовка авторизации, exact ID match,
+одну нормализованную строку результата и отсутствие PII. Object и single-item
+array допускаются только при ровно одной записи; другой ID, отсутствующий
+batch ID и malformed fields должны оставаться provider failure.
+
+Проверка `logistics.batches.read` теперь также включает точечный lookup партии
+через `GET /1.0/batch/{batch-name}`. Evidence должна подтвердить числовой
+batch ID, отсутствие query/body, exact name match, ровно одну проекцию и
+отсутствие строк заказов/raw payload. Ответ с другим именем, несколькими
+объектами, невалидным status/count или provider error остаётся fail-closed.
+
+Для `logistics.orders.search` fixture должен проверить официальный
+`GET /1.0/backlog/search?query=...`, оба заголовка авторизации и bounded
+лимит не более 100 строк. Harness должен принять только результаты с точным
+номером магазина, нормализовать статус в lowercase и отклонить дубликаты,
+невалидные ID/status, номер, отличный от query, и ответ сверх лимита. Поля
+получателя, адреса и raw provider payload из fixture не должны попасть в
+безопасную проекцию. Live qualification выполняется read-only на тестовом
+заказе и не требует approval или operation receipt.
+
+Для `logistics.batches.sending_date.write` fixture должен проверить
+`POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD` с числовым batch ID, датой в
+трёх path-сегментах, отсутствием query и тела и обоими заголовками
+авторизации. Успешным считается `2xx` с пустым телом или JSON без
+`error-code`; любой error code, malformed response, нечисловая партия или
+другая дата должны оставаться provider failure. Host projection ограничена
+точным batch ID, ISO-даты, `UPDATED`/`updated=true` и UTC observation time.
+Live qualification выполняется на disposable сформированной партии с
+проверкой approval, tenant-scoped idempotency receipt и поведения после
+timeout/неоднозначного ответа. Контракт подтверждён [официальной
+спецификацией API «Отправка»](https://otpravka.pochta.ru/specification).

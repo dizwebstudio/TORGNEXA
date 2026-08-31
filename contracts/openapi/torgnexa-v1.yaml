@@ -183,6 +183,61 @@ paths:
         '403': {description: Caller lacks logistics.batches.create}
         '409': {description: 'Batch capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
+  /logistics/batches/orders:
+    get:
+      operationId: listLogisticsBatchOrders
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: batch_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: page, in: query, required: false, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+      responses:
+        '200': {description: Bounded order projections for one Russian Post batch, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchOrderPage'}}}}
+        '400': {description: Invalid batch-order query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
+  /logistics/batches/{batch_id}:
+    get:
+      operationId: getLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200': {description: Safe projection for one Russian Post batch, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatch'}}}}
+        '400': {description: Invalid provider batch query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
+  /logistics/orders/{order_id}:
+    get:
+      operationId: getLogisticsOrder
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        '200': {description: Safe projection for one Russian Post order, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchOrder'}}}}
+        '400': {description: Invalid provider order query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
+  /logistics/orders/search:
+    get:
+      operationId: searchLogisticsOrders
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: external_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Safe projections for Russian Post backlog orders, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsOrderSummaryPage'}}}}
+        '400': {description: Invalid merchant order search query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
   /logistics/batches/{batch_id}/submit:
     post:
       operationId: submitLogisticsBatch
@@ -255,6 +310,65 @@ paths:
         '400': {description: Invalid batch or idempotency key}
         '403': {description: Caller lacks logistics.batches.unarchive}
         '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
+  /logistics/batches/cancel/{batch_id}:
+    post:
+      operationId: cancelLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchCancelRequest'}
+      responses:
+        '201': {description: Provider Pre-Alert batch cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchCancellation'}}}}
+        '202': {description: Batch cancellation outcome is pending and must not be retried automatically}
+        '400': {description: Invalid batch or idempotency key}
+        '403': {description: Caller lacks logistics.batches.cancel}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
+  /logistics/batches/sending-date/{batch_id}:
+    post:
+      operationId: updateLogisticsBatchSendingDate
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchSendingDateRequest'}
+      responses:
+        '201': {description: Batch sending date changed, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchSendingDateUpdate'}}}}
+        '202': {description: Batch sending date update is pending and must not be retried automatically}
+        '400': {description: 'Invalid batch, date or idempotency key'}
+        '403': {description: Caller lacks logistics.batches.sending_date.write}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
+  /logistics/orders/restore:
+    post:
+      operationId: restoreLogisticsOrders
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsOrderRestoreRequest'}
+      responses:
+        '201': {description: Orders returned to the provider backlog, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsOrderRestore'}}}}
+        '202': {description: Order restore outcome is pending and must not be retried automatically}
+        '400': {description: Invalid order restore request or idempotency key}
+        '403': {description: Caller lacks logistics.orders.restore}
+        '409': {description: 'Order restore capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
   /logistics/returns/separate:
     post:
@@ -382,6 +496,11 @@ paths:
         - {name: shipment_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
         - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsShipmentCancelRequest'}
       responses:
         '202': {description: Shipment cancellation accepted for asynchronous carrier processing, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsShipmentCancellation'}}}}
         '400': {description: Invalid shipment or idempotency key}
@@ -3290,6 +3409,39 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsBatch'}}
+    LogisticsBatchOrder:
+      type: object
+      additionalProperties: false
+      required: [remote_id, batch_id, status, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        batch_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        tracking_number: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsBatchOrderPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsBatchOrder'}}
+    LogisticsOrderSummary:
+      type: object
+      additionalProperties: false
+      required: [remote_id, external_id, status, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        external_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        batch_id: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        tracking_number: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsOrderSummaryPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsOrderSummary'}}
     LogisticsBatchCreateRequest:
       type: object
       additionalProperties: false
@@ -3336,6 +3488,21 @@ components:
       required: [connector_account_id]
       properties:
         connector_account_id: {type: string, minLength: 1, maxLength: 128}
+    LogisticsBatchCancelRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+    LogisticsBatchCancellation:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, cancelled, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: CANCELLED}
+        cancelled: {const: true}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsBatchUnarchive:
       type: object
       additionalProperties: false
@@ -3344,6 +3511,38 @@ components:
         remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         status: {type: string, const: RESTORED}
         archived: {type: boolean, const: false}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsBatchSendingDateRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, sending_date]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        sending_date: {type: string, format: date, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+    LogisticsBatchSendingDateUpdate:
+      type: object
+      additionalProperties: false
+      required: [remote_id, sending_date, status, updated, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        sending_date: {type: string, format: date, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+        status: {type: string, const: UPDATED}
+        updated: {type: boolean, const: true}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsOrderRestoreRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, order_ids]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        order_ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+    LogisticsOrderRestore:
+      type: object
+      additionalProperties: false
+      required: [order_ids, status, observed_at]
+      properties:
+        order_ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        status: {type: string, const: restored}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsSeparateReturnRequest:
       type: object
@@ -3424,6 +3623,17 @@ components:
         length_mm: {type: integer, minimum: 1}
         width_mm: {type: integer, minimum: 1}
         height_mm: {type: integer, minimum: 1}
+    LogisticsShipmentItem:
+      type: object
+      additionalProperties: false
+      required: [name, quantity, unit_price, vat_percent]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 512}
+        quantity: {type: integer, minimum: 1}
+        unit_price: {$ref: '#/components/schemas/Money'}
+        vat_percent: {type: integer, enum: [-1, 0, 5, 7, 10, 22]}
+        sku: {type: string, maxLength: 128}
+        barcode: {type: string, maxLength: 128}
     LogisticsRateRequest:
       type: object
       additionalProperties: false
@@ -3433,6 +3643,11 @@ components:
         from: {$ref: '#/components/schemas/LogisticsAddress'}
         to: {$ref: '#/components/schemas/LogisticsAddress'}
         parcels: {type: array, minItems: 1, maxItems: 50, items: {$ref: '#/components/schemas/LogisticsParcel'}}
+        from_point_ref: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$', description: Provider pickup-point reference when the carrier requires an explicit point UUID}
+        to_point_ref: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$', description: Provider delivery-point reference when the carrier requires an explicit point UUID}
+        calculate_date: {type: string, format: date, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+        declared_value: {$ref: '#/components/schemas/Money'}
+        payment_value: {$ref: '#/components/schemas/Money'}
     LogisticsContact:
       type: object
       additionalProperties: false
@@ -3456,6 +3671,10 @@ components:
         pickup_point_ref: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         sender: {$ref: '#/components/schemas/LogisticsContact'}
         recipient: {$ref: '#/components/schemas/LogisticsContact'}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsShipmentItem'}}
+        declared_value: {$ref: '#/components/schemas/Money'}
+        delivery_cost: {$ref: '#/components/schemas/Money'}
+        payment_value: {$ref: '#/components/schemas/Money'}
     LogisticsRateQuote:
       type: object
       additionalProperties: false
@@ -3499,6 +3718,11 @@ components:
         version: {type: integer, minimum: 1}
         accepted: {const: true}
         fresh: {type: boolean}
+    LogisticsShipmentCancelRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        variant: {type: string, enum: [delivery, pickup], default: delivery}
     LogisticsShipmentCreation:
       type: object
       additionalProperties: false

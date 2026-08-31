@@ -181,6 +181,50 @@ func (r *Registry) LogisticsBatches(ctx context.Context, account sdk.Account, ru
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatches(ctx, account, runtime, query)
 }
 
+// LogisticsBatchByName resolves one bounded Russian Post batch lookup.
+func (r *Registry) LogisticsBatchByName(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.read") {
+		return sdk.LogisticsBatch{}, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return sdk.LogisticsBatch{}, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatchByName(ctx, account, runtime, query)
+}
+
+// LogisticsBatchOrders resolves the bounded Russian Post batch-order reader.
+func (r *Registry) LogisticsBatchOrders(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.orders.read") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatchOrders(ctx, account, runtime, query)
+}
+
+// LogisticsOrder resolves one bounded Russian Post order lookup.
+func (r *Registry) LogisticsOrder(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.orders.read") {
+		return sdk.LogisticsBatchOrder{}, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return sdk.LogisticsBatchOrder{}, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsOrder(ctx, account, runtime, query)
+}
+
+// LogisticsOrderSearch resolves a bounded Russian Post merchant-order search.
+func (r *Registry) LogisticsOrderSearch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.orders.search") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).SearchLogisticsOrders(ctx, account, runtime, query)
+}
+
 // LogisticsArchivedBatches resolves the bounded Russian Post archive reader.
 func (r *Registry) LogisticsArchivedBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.archive.read") {
@@ -242,6 +286,42 @@ func (r *Registry) LogisticsBatchUnarchiver(ctx context.Context, account sdk.Acc
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 }
 
+// LogisticsBatchCanceler resolves the qualified Деловые Линии Pre-Alert
+// batch-cancellation operation.
+func (r *Registry) LogisticsBatchCanceler(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCanceler, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.cancel") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "dellin" {
+		return nil, ErrUnavailable
+	}
+	return dellin.New(dellinHTTP{r.http}, nil), nil
+}
+
+// LogisticsBatchSendingDateUpdater resolves the qualified Russian Post
+// operation that changes a formed batch hand-off date.
+func (r *Registry) LogisticsBatchSendingDateUpdater(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchSendingDateUpdater, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.sending_date.write") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
+// LogisticsOrderRestorer resolves the qualified Russian Post operation that
+// returns formed-batch orders to the provider backlog.
+func (r *Registry) LogisticsOrderRestorer(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsOrderRestorer, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.orders.restore") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 // LogisticsRates calculates bounded provider rates through the reviewed
 // logistics composition. Provider service identifiers remain inside the
 // adapter; the application exposes only its neutral rate preview.
@@ -258,6 +338,8 @@ func (r *Registry) LogisticsRates(ctx context.Context, account sdk.Account, runt
 		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
 	case "pochta-russia":
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil).ReadLogisticsRates(ctx, account, runtime, request)
 	default:
 		return nil, ErrUnavailable
 	}
@@ -349,10 +431,10 @@ func (r *Registry) LogisticsCanceler(ctx context.Context, account sdk.Account, r
 	}
 }
 
-// LogisticsCreator resolves the qualified CDEK or bounded Деловые Линии
-// shipment-creation surface. The host must still enforce tenant scope,
-// capability settings, policy/approval and operation idempotency before
-// invoking it.
+// LogisticsCreator resolves qualified shipment-creation surfaces for CDEK,
+// Деловые Линии, ПЭК, Почты России and bounded 5Post. The host must still
+// enforce tenant scope, capability settings, policy/approval and operation
+// idempotency before invoking it.
 func (r *Registry) LogisticsCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.LogisticsShipmentCreator, error) {
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.shipment.create") {
 		return nil, ErrUnavailable
@@ -372,6 +454,11 @@ func (r *Registry) LogisticsCreator(ctx context.Context, account sdk.Account, ru
 		return pek.NewWithConfiguration(pekHTTP{r.http}, pekConfigSource{load: load}, nil), nil
 	case "pochta-russia":
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+	case "fivepost":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return fivepost.NewWithConfiguration(fivepostHTTP{r.http}, fivepostConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -2099,6 +2186,23 @@ type dellinConfigSource struct{ load ConfigLoader }
 
 type pekConfigSource struct{ load ConfigLoader }
 
+type fivepostConfigSource struct{ load ConfigLoader }
+
+func (source fivepostConfigSource) Resolve(ctx context.Context, account sdk.Account) (fivepost.Configuration, error) {
+	if source.load == nil {
+		return fivepost.Configuration{}, fivepost.ErrConfigurationMissing
+	}
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return fivepost.Configuration{}, fivepost.ErrConfigurationMissing
+	}
+	var value fivepost.Configuration
+	if decodeStrict(raw, &value) != nil || value.Validate() != nil {
+		return fivepost.Configuration{}, fivepost.ErrInvalidConfiguration
+	}
+	return value, nil
+}
+
 func (source pekConfigSource) Resolve(ctx context.Context, account sdk.Account) (pek.Configuration, error) {
 	if source.load == nil {
 		return pek.Configuration{}, pek.ErrConfigurationMissing
@@ -2126,6 +2230,7 @@ func (source dellinConfigSource) Resolve(ctx context.Context, account sdk.Accoun
 		RequesterUID         string `json:"requester_uid"`
 		SenderCounteragentID int64  `json:"sender_counteragent_id"`
 		FreightUID           string `json:"freight_uid"`
+		SenderTerminalID     string `json:"sender_terminal_id"`
 		ProduceDate          string `json:"produce_date"`
 		DerivalWorktimeStart string `json:"derival_worktime_start"`
 		DerivalWorktimeEnd   string `json:"derival_worktime_end"`
@@ -2136,7 +2241,7 @@ func (source dellinConfigSource) Resolve(ctx context.Context, account sdk.Accoun
 	}
 	configuration := dellin.Configuration{
 		RequesterUID: value.RequesterUID, SenderCounteragentID: value.SenderCounteragentID,
-		FreightUID: value.FreightUID, ProduceDate: value.ProduceDate,
+		FreightUID: value.FreightUID, SenderTerminalID: value.SenderTerminalID, ProduceDate: value.ProduceDate,
 		DerivalWorktimeStart: value.DerivalWorktimeStart, DerivalWorktimeEnd: value.DerivalWorktimeEnd,
 		PaymentType: value.PaymentType,
 	}

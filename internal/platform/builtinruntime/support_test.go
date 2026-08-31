@@ -89,7 +89,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		carrier, ok := SupportFor(connectorID)
-		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && connectorID != "dellin" && connectorID != "pek" && connectorID != "pochta-russia" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
+		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && connectorID != "dellin" && connectorID != "fivepost" && connectorID != "pek" && connectorID != "pochta-russia" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia" {
@@ -97,13 +97,13 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if connectorID == "cdek" {
 				wantCapabilities = 8
 			} else if connectorID == "dellin" {
-				wantCapabilities = 6
+				wantCapabilities = 7
 			} else if connectorID == "fivepost" {
-				wantCapabilities = 4
+				wantCapabilities = 6
 			} else if connectorID == "pek" {
 				wantCapabilities = 7
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 16
+				wantCapabilities = 21
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -111,7 +111,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.track.read") {
 				t.Fatalf("%s tracking support is inaccurate: %+v", connectorID, carrier)
 			}
-			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {
+			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia" {
@@ -132,6 +132,9 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "pochta-russia" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "fivepost" && !SupportsCapability(connectorID, "logistics.shipment.create") {
 				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
 			}
 			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.label.read") {
@@ -752,7 +755,7 @@ func TestLogisticsHealthRegistryAdmissionIsExact(t *testing.T) {
 func TestLogisticsCreatorAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	for _, connectorID := range []string{"cdek", "dellin", "pek", "pochta-russia"} {
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "pek", "pochta-russia"} {
 		creator, err := registry.LogisticsCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}, load)
 		if err != nil || creator == nil {
 			t.Fatalf("%s shipment creator unavailable: creator=%T err=%v", connectorID, creator, err)
@@ -814,6 +817,114 @@ func TestLogisticsBatchUnarchiverAdmissionIsExact(t *testing.T) {
 		if _, err := registry.LogisticsBatchUnarchiver(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified batch unarchiver resolved: %v", connectorID, err)
 		}
+	}
+}
+
+func TestLogisticsOrderRestorerAdmissionIsExact(t *testing.T) {
+	registry := New()
+	restorer, err := registry.LogisticsOrderRestorer(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || restorer == nil {
+		t.Fatalf("Russian Post order restorer unavailable: restorer=%T err=%v", restorer, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsOrderRestorer(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified order restorer resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsBatchOrderReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.batches.orders.read") {
+		t.Fatal("Russian Post batch order reader capability is not admitted")
+	}
+	reader, ok := any(registry).(interface {
+		LogisticsBatchOrders(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose batch order reader")
+	}
+	if _, err := reader.LogisticsBatchOrders(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}, sdk.LogisticsBatchOrdersQuery{BatchID: "24", Limit: 10}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified batch order reader returned err=%v", err)
+	}
+	if _, err := reader.LogisticsBatchOrders(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{}, sdk.LogisticsBatchOrdersQuery{BatchID: "24", Limit: 10}); errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Russian Post batch order reader unavailable: %v", err)
+	}
+}
+
+func TestLogisticsBatchLookupReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.batches.read") {
+		t.Fatal("Russian Post batch lookup capability is not admitted")
+	}
+	reader, ok := any(registry).(interface {
+		LogisticsBatchByName(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose batch lookup reader")
+	}
+	if _, err := reader.LogisticsBatchByName(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}, sdk.LogisticsBatchLookupQuery{BatchID: "24"}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified batch lookup returned err=%v", err)
+	}
+	if _, err := reader.LogisticsBatchByName(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{}, sdk.LogisticsBatchLookupQuery{BatchID: "24"}); errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Russian Post batch lookup unavailable: %v", err)
+	}
+}
+
+func TestLogisticsOrderReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.orders.read") {
+		t.Fatal("Russian Post order reader capability is not admitted")
+	}
+	reader, ok := any(registry).(interface {
+		LogisticsOrder(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose order reader")
+	}
+	if _, err := reader.LogisticsOrder(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}, sdk.LogisticsOrderQuery{RemoteID: "57565818"}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified order reader returned err=%v", err)
+	}
+	if _, err := reader.LogisticsOrder(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{}, sdk.LogisticsOrderQuery{RemoteID: "57565818"}); errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Russian Post order reader unavailable: %v", err)
+	}
+}
+
+func TestLogisticsOrderSearcherAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.orders.search") {
+		t.Fatal("Russian Post order search capability is not admitted")
+	}
+	reader, ok := any(registry).(interface {
+		LogisticsOrderSearch(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose order search")
+	}
+	if _, err := reader.LogisticsOrderSearch(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}, sdk.LogisticsOrderSearchQuery{ExternalID: "shop-order-1", Limit: 10}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified order search returned err=%v", err)
+	}
+	if _, err := reader.LogisticsOrderSearch(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{}, sdk.LogisticsOrderSearchQuery{ExternalID: "shop-order-1", Limit: 10}); errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Russian Post order search unavailable: %v", err)
+	}
+}
+
+func TestLogisticsBatchSendingDateUpdaterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.batches.sending_date.write") {
+		t.Fatal("Russian Post batch sending date capability is not admitted")
+	}
+	updater, ok := any(registry).(interface {
+		LogisticsBatchSendingDateUpdater(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchSendingDateUpdater, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose batch sending date updater")
+	}
+	if _, err := updater.LogisticsBatchSendingDateUpdater(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified batch sending date updater resolved: %v", err)
+	}
+	if _, err := updater.LogisticsBatchSendingDateUpdater(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{}); errors.Is(err, ErrUnavailable) {
+		t.Fatalf("Russian Post batch sending date updater unavailable: %v", err)
 	}
 }
 

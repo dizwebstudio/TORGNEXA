@@ -29,7 +29,7 @@ func testAccount() sdk.Account {
 }
 
 func TestShipmentTrackingLabelPickupAndCancel(t *testing.T) {
-	connector := New(candidateTransport{}, nil)
+	connector := NewWithConfiguration(candidateTransport{}, candidateConfigurationSource{}, nil)
 	address := sdk.Address{Country: "RU", PostalCode: "101000", City: "Moscow", Line1: "Street 5"}
 	parcel := sdk.Parcel{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}
 	shipment, err := connector.CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCreateRequest{
@@ -56,5 +56,17 @@ func TestHealthRejectsMissingCredentials(t *testing.T) {
 	connector := New(candidateTransport{}, nil)
 	if _, err := connector.Health(context.Background(), testAccount(), nil); err == nil {
 		t.Fatal("expected missing runtime to be rejected")
+	}
+}
+
+func TestLogisticsRatesRequiresAndNormalizesPointReferences(t *testing.T) {
+	connector := New(candidateTransport{}, nil)
+	address := sdk.Address{Country: "RU", PostalCode: "101000", City: "Moscow", Line1: "Street 5"}
+	quotes, err := connector.ReadLogisticsRates(context.Background(), testAccount(), testRuntime{}, sdk.RateRequest{
+		From: address, To: address, FromPointRef: "13e9d62d-1799-4e14-a27b-d218f33de7f6", ToPointRef: "23e9d62d-1799-4e14-a27b-d218f33de7f6",
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+	})
+	if err != nil || len(quotes) != 1 || quotes[0].ServiceCode != "fivepost_c2c" {
+		t.Fatalf("unexpected 5Post rates: quotes=%+v err=%v", quotes, err)
 	}
 }

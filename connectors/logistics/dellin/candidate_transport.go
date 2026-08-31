@@ -31,6 +31,10 @@ func (candidateTransport) Cancel(_ context.Context, _ []byte, request sdk.Shipme
 	}, nil
 }
 
+func (candidateTransport) CancelBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchCancelRequest) (sdk.LogisticsBatchCancellation, error) {
+	return sdk.LogisticsBatchCancellation{RemoteID: request.BatchID, Status: "CANCELLED", Cancelled: true, ObservedAt: time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC)}, nil
+}
+
 func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{
 		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,

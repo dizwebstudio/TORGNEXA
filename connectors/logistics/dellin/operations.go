@@ -7,11 +7,12 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
-// CreateLogisticsShipment places a bounded address-to-address request through
-// the official Деловые Линии API. Account configuration supplies provider
-// identifiers that cannot be inferred from the neutral SDK request.
+// CreateLogisticsShipment places a bounded address-to-address or
+// terminal-to-terminal request through the official Деловые Линии API.
+// Account configuration supplies provider identifiers that cannot be inferred
+// from the neutral SDK request.
 func (c *Connector) CreateLogisticsShipment(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil || request.PickupPointRef != "" {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
 	}
 	configuration, err := c.configuration(ctx, account)
@@ -20,6 +21,9 @@ func (c *Connector) CreateLogisticsShipment(ctx context.Context, account sdk.Acc
 	}
 	if configuration.Validate() != nil {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "configuration_rejected")
+	}
+	if request.PickupPointRef != "" && (!IsValidTerminalReference(request.PickupPointRef) || configuration.SenderTerminalID == "") {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "terminal_references_rejected")
 	}
 	var result sdk.ShipmentResult
 	err = useSecret(ctx, runtime, account, func(secret []byte) error {
@@ -55,6 +59,27 @@ func (c *Connector) CancelLogisticsShipment(ctx context.Context, account sdk.Acc
 	}
 	if result.RemoteID != strings.TrimSpace(request.RemoteID) || result.Status != "cancellation_pending" || result.Cost.Validate() != nil || result.ObservedAt.IsZero() {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return result, nil
+}
+
+// CancelLogisticsBatch dissolves one provider-side Pre-Alert batch through
+// the official asynchronous batch cancellation method.
+func (c *Connector) CancelLogisticsBatch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchCancelRequest) (sdk.LogisticsBatchCancellation, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatchCancellation{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var result sdk.LogisticsBatchCancellation
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		result, callErr = c.transport.CancelBatch(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchCancellation{}, err
+	}
+	if result.RemoteID != strings.TrimSpace(request.BatchID) || result.Validate() != nil {
+		return sdk.LogisticsBatchCancellation{}, remote(sdk.ErrorInternal, "invalid_remote_response")
 	}
 	return result, nil
 }
@@ -159,6 +184,7 @@ func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn
 var _ sdk.PickupPointReader = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
+var _ sdk.LogisticsBatchCanceler = (*Connector)(nil)
 var _ sdk.LogisticsRateReader = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)

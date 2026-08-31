@@ -13,6 +13,10 @@ var candidateTime = time.Date(2026, 8, 12, 3, 0, 0, 0, time.UTC)
 
 func (candidateTransport) Ping(context.Context, []byte) error { return nil }
 
+func (candidateTransport) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error) {
+	return []sdk.RateQuote{{ServiceCode: "fivepost_c2c", Cost: sdk.LogisticsMoney{MinorUnits: 33120, Currency: "RUB"}, MinDeliveryAt: candidateTime.Add(24 * time.Hour), MaxDeliveryAt: candidateTime.Add(48 * time.Hour), ObservedAt: candidateTime}}, nil
+}
+
 func candidateShipment(status string) sdk.ShipmentResult {
 	return sdk.ShipmentResult{
 		RemoteID:       "5post-order:1",
@@ -23,8 +27,14 @@ func candidateShipment(status string) sdk.ShipmentResult {
 	}
 }
 
-func (candidateTransport) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
+func (candidateTransport) Create(context.Context, []byte, sdk.ShipmentCreateRequest, Configuration) (sdk.ShipmentResult, error) {
 	return candidateShipment("created"), nil
+}
+
+type candidateConfigurationSource struct{}
+
+func (candidateConfigurationSource) Resolve(context.Context, sdk.Account) (Configuration, error) {
+	return Configuration{SenderLocation: "synthetic-warehouse", UndeliverableOption: "RETURN", BarcodeEnrichment: "ENABLED"}, nil
 }
 
 func (candidateTransport) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {

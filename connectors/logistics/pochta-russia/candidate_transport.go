@@ -94,6 +94,39 @@ func (candidateTransport) Batches(_ context.Context, _ []byte, query sdk.Logisti
 	return []sdk.LogisticsBatch{{RemoteID: "batch-conformance-001", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}}, nil
 }
 
+func (candidateTransport) BatchByName(_ context.Context, _ []byte, query sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error) {
+	if err := query.Validate(); err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	return sdk.LogisticsBatch{RemoteID: query.BatchID, Status: "CREATED", ShipmentCount: 2, ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}, nil
+}
+
+func (candidateTransport) BatchOrders(_ context.Context, _ []byte, query sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error) {
+	if err := query.Validate(100); err != nil {
+		return nil, err
+	}
+	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
+	return []sdk.LogisticsBatchOrder{
+		{RemoteID: "57565818", BatchID: query.BatchID, TrackingNumber: "80084740397510", Status: "created", ObservedAt: now},
+		{RemoteID: "57565819", BatchID: query.BatchID, TrackingNumber: "80084740397527", Status: "created", ObservedAt: now},
+	}, nil
+}
+
+func (candidateTransport) OrderInBatch(_ context.Context, _ []byte, query sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error) {
+	if err := query.Validate(); err != nil {
+		return sdk.LogisticsBatchOrder{}, err
+	}
+	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
+	return sdk.LogisticsBatchOrder{RemoteID: query.RemoteID, BatchID: "24", TrackingNumber: "80084740397510", Status: "created", ObservedAt: now}, nil
+}
+
+func (candidateTransport) SearchOrders(_ context.Context, _ []byte, query sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error) {
+	if err := query.Validate(100); err != nil {
+		return nil, err
+	}
+	return []sdk.LogisticsOrderSummary{{RemoteID: "57565818", ExternalID: query.ExternalID, BatchID: "24", TrackingNumber: "80084740397510", Status: "created", ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}}, nil
+}
+
 func (candidateTransport) ArchivedBatches(_ context.Context, _ []byte, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
 	if err := query.Validate(100); err != nil {
 		return nil, err
@@ -116,4 +149,12 @@ func (candidateTransport) ArchiveBatch(_ context.Context, _ []byte, request sdk.
 
 func (candidateTransport) UnarchiveBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchUnarchiveRequest) (sdk.LogisticsBatchUnarchive, error) {
 	return sdk.LogisticsBatchUnarchive{RemoteID: request.BatchID, Status: "RESTORED", Archived: false, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}
+
+func (candidateTransport) UpdateBatchSendingDate(_ context.Context, _ []byte, request sdk.LogisticsBatchSendingDateRequest) (sdk.LogisticsBatchSendingDateUpdate, error) {
+	return sdk.LogisticsBatchSendingDateUpdate{RemoteID: request.BatchID, SendingDate: request.SendingDate, Status: "UPDATED", Updated: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}
+
+func (candidateTransport) RestoreOrders(_ context.Context, _ []byte, request sdk.LogisticsOrderRestoreRequest) (sdk.LogisticsOrderRestore, error) {
+	return sdk.LogisticsOrderRestore{OrderIDs: append([]string(nil), request.OrderIDs...), Status: "restored", ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
 }

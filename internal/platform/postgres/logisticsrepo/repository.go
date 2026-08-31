@@ -333,7 +333,7 @@ func (repository *Repository) BeginCancel(ctx context.Context, scope tenancy.Sco
 		if result.RemoteID == "" {
 			return logistics.ErrInvalidState
 		}
-		digest := cancelDigest(id, result.RemoteID)
+		digest := cancelDigest(id, result.RemoteID, mutation.CancelVariant)
 		resourceID, claimed, err := claimReceipt(ctx, tx, scope, cancelOperation, idempotencyKey, digest)
 		if err != nil {
 			return err
@@ -671,7 +671,8 @@ func enqueueShipmentEvent(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, 
 		Version           int64            `json:"version"`
 		Operation         string           `json:"operation"`
 		ApprovalRequestID string           `json:"approval_request_id,omitempty"`
-	}{shipment.ID.String(), shipment.Status, shipment.Version, operation, mutationApprovalRequestID(mutation, operation)})
+		CancelVariant     string           `json:"cancel_variant,omitempty"`
+	}{shipment.ID.String(), shipment.Status, shipment.Version, operation, mutationApprovalRequestID(mutation, operation), mutationCancelVariant(mutation, operation)})
 	if err != nil {
 		return err
 	}
@@ -701,6 +702,13 @@ func mutationApprovalRequestID(mutation logistics.Mutation, operation string) st
 	return ""
 }
 
+func mutationCancelVariant(mutation logistics.Mutation, operation string) string {
+	if operation == "cancel_requested" {
+		return mutation.CancelVariant
+	}
+	return ""
+}
+
 func shipmentSummary(shipment logistics.Shipment, operation string) audit.Summary {
 	return audit.Summary{"shipment_id": shipment.ID.String(), "provider_account_id": shipment.AccountID, "external_id": shipment.ExternalID, "remote_id": shipment.RemoteID, "status": string(shipment.Status), "version": shipment.Version, "operation": operation}
 }
@@ -709,8 +717,14 @@ func createDigest(command logistics.CreateCommand) [32]byte {
 	return sha256.Sum256([]byte(command.ID.String() + "\x00" + command.AccountID + "\x00" + command.ExternalID + "\x00" + command.ServiceCode + "\x00" + command.PayloadDigest))
 }
 
-func cancelDigest(id logistics.ShipmentID, remoteID string) [32]byte {
-	return sha256.Sum256([]byte(id.String() + "\x00" + remoteID))
+func cancelDigest(id logistics.ShipmentID, remoteID, variant string) [32]byte {
+	// Keep the legacy delivery digest stable: before the optional variant was
+	// introduced, the request identity was id + remoteID. Only the new pickup
+	// mode needs an extra discriminator.
+	if variant != "pickup" {
+		return sha256.Sum256([]byte(id.String() + "\x00" + remoteID))
+	}
+	return sha256.Sum256([]byte(id.String() + "\x00" + remoteID + "\x00" + variant))
 }
 
 func validReference(value string) bool {

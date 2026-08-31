@@ -25,10 +25,17 @@ import (
 const (
 	logisticsPickupPointsPath         = "/api/v1/logistics/pickup-points"
 	logisticsBatchesPath              = "/api/v1/logistics/batches"
+	logisticsBatchLookupPath          = "/api/v1/logistics/batches/"
+	logisticsBatchOrdersPath          = "/api/v1/logistics/batches/orders"
+	logisticsOrderLookupPath          = "/api/v1/logistics/orders/"
+	logisticsOrderSearchPath          = "/api/v1/logistics/orders/search"
 	logisticsArchivedBatchesPath      = "/api/v1/logistics/batches/archive"
 	logisticsBatchSubmitPath          = "/api/v1/logistics/batches/"
 	logisticsBatchArchivePath         = "/api/v1/logistics/batches/archive/"
 	logisticsBatchUnarchivePath       = "/api/v1/logistics/batches/archive/revert/"
+	logisticsBatchCancelPath          = "/api/v1/logistics/batches/cancel/"
+	logisticsBatchSendingDatePath     = "/api/v1/logistics/batches/sending-date/"
+	logisticsOrderRestorePath         = "/api/v1/logistics/orders/restore"
 	logisticsRatesPath                = "/api/v1/logistics/rates"
 	logisticsTrackingPath             = "/api/v1/logistics/tracking"
 	logisticsLabelsPath               = "/api/v1/logistics/labels"
@@ -40,6 +47,7 @@ const (
 )
 
 var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+var logisticsISODatePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 
 // logisticsCapabilityStore is kept separate from the concrete PostgreSQL
 // repository so the operation remains testable without a database.
@@ -69,6 +77,22 @@ type logisticsBatchRuntime interface {
 	LogisticsBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)
 }
 
+type logisticsBatchLookupRuntime interface {
+	LogisticsBatchByName(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error)
+}
+
+type logisticsBatchOrdersRuntime interface {
+	LogisticsBatchOrders(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error)
+}
+
+type logisticsOrderRuntime interface {
+	LogisticsOrder(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error)
+}
+
+type logisticsOrderSearchRuntime interface {
+	LogisticsOrderSearch(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error)
+}
+
 type logisticsArchivedBatchRuntime interface {
 	LogisticsArchivedBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error)
 }
@@ -87,6 +111,18 @@ type logisticsBatchArchiveRuntime interface {
 
 type logisticsBatchUnarchiveRuntime interface {
 	LogisticsBatchUnarchiver(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchUnarchiver, error)
+}
+
+type logisticsBatchCancelRuntime interface {
+	LogisticsBatchCanceler(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchCanceler, error)
+}
+
+type logisticsBatchSendingDateRuntime interface {
+	LogisticsBatchSendingDateUpdater(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchSendingDateUpdater, error)
+}
+
+type logisticsOrderRestoreRuntime interface {
+	LogisticsOrderRestorer(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsOrderRestorer, error)
 }
 
 type logisticsSeparateReturnRuntime interface {
@@ -144,11 +180,30 @@ type logisticsParcelInput struct {
 	HeightMM    int64 `json:"height_mm"`
 }
 
+type logisticsMoneyInput struct {
+	MinorUnits int64  `json:"minor_units"`
+	Currency   string `json:"currency"`
+}
+
+type logisticsShipmentItemInput struct {
+	Name       string              `json:"name"`
+	Quantity   int64               `json:"quantity"`
+	UnitPrice  logisticsMoneyInput `json:"unit_price"`
+	VATPercent int                 `json:"vat_percent"`
+	SKU        string              `json:"sku"`
+	Barcode    string              `json:"barcode"`
+}
+
 type logisticsRatesInput struct {
 	ConnectorAccountID string                 `json:"connector_account_id"`
 	From               logisticsAddressInput  `json:"from"`
 	To                 logisticsAddressInput  `json:"to"`
 	Parcels            []logisticsParcelInput `json:"parcels"`
+	FromPointRef       string                 `json:"from_point_ref"`
+	ToPointRef         string                 `json:"to_point_ref"`
+	CalculateDate      string                 `json:"calculate_date"`
+	DeclaredValue      logisticsMoneyInput    `json:"declared_value"`
+	PaymentValue       logisticsMoneyInput    `json:"payment_value"`
 }
 
 type logisticsContactInput struct {
@@ -158,16 +213,24 @@ type logisticsContactInput struct {
 }
 
 type logisticsShipmentCreateInput struct {
-	ShipmentID         string                 `json:"shipment_id"`
-	ConnectorAccountID string                 `json:"connector_account_id"`
-	ExternalID         string                 `json:"external_id"`
-	ServiceCode        string                 `json:"service_code"`
-	From               logisticsAddressInput  `json:"from"`
-	To                 logisticsAddressInput  `json:"to"`
-	Parcels            []logisticsParcelInput `json:"parcels"`
-	PickupPointRef     string                 `json:"pickup_point_ref"`
-	Sender             logisticsContactInput  `json:"sender"`
-	Recipient          logisticsContactInput  `json:"recipient"`
+	ShipmentID         string                       `json:"shipment_id"`
+	ConnectorAccountID string                       `json:"connector_account_id"`
+	ExternalID         string                       `json:"external_id"`
+	ServiceCode        string                       `json:"service_code"`
+	From               logisticsAddressInput        `json:"from"`
+	To                 logisticsAddressInput        `json:"to"`
+	Parcels            []logisticsParcelInput       `json:"parcels"`
+	PickupPointRef     string                       `json:"pickup_point_ref"`
+	Sender             logisticsContactInput        `json:"sender"`
+	Recipient          logisticsContactInput        `json:"recipient"`
+	Items              []logisticsShipmentItemInput `json:"items"`
+	DeclaredValue      logisticsMoneyInput          `json:"declared_value"`
+	DeliveryCost       logisticsMoneyInput          `json:"delivery_cost"`
+	PaymentValue       logisticsMoneyInput          `json:"payment_value"`
+}
+
+type logisticsShipmentCancelInput struct {
+	Variant string `json:"variant"`
 }
 
 type logisticsRateView struct {
@@ -198,6 +261,23 @@ type logisticsBatchView struct {
 	ObservedAt    time.Time `json:"observed_at"`
 }
 
+type logisticsBatchOrderView struct {
+	RemoteID       string    `json:"remote_id"`
+	BatchID        string    `json:"batch_id"`
+	TrackingNumber string    `json:"tracking_number,omitempty"`
+	Status         string    `json:"status"`
+	ObservedAt     time.Time `json:"observed_at"`
+}
+
+type logisticsOrderSummaryView struct {
+	RemoteID       string    `json:"remote_id"`
+	ExternalID     string    `json:"external_id"`
+	BatchID        string    `json:"batch_id,omitempty"`
+	TrackingNumber string    `json:"tracking_number,omitempty"`
+	Status         string    `json:"status"`
+	ObservedAt     time.Time `json:"observed_at"`
+}
+
 type logisticsBatchSubmissionView struct {
 	RemoteID   string    `json:"remote_id"`
 	Status     string    `json:"status"`
@@ -219,6 +299,27 @@ type logisticsBatchUnarchiveView struct {
 	ObservedAt time.Time `json:"observed_at"`
 }
 
+type logisticsBatchCancellationView struct {
+	RemoteID   string    `json:"remote_id"`
+	Status     string    `json:"status"`
+	Cancelled  bool      `json:"cancelled"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
+type logisticsBatchSendingDateView struct {
+	RemoteID    string    `json:"remote_id"`
+	SendingDate string    `json:"sending_date"`
+	Status      string    `json:"status"`
+	Updated     bool      `json:"updated"`
+	ObservedAt  time.Time `json:"observed_at"`
+}
+
+type logisticsOrderRestoreView struct {
+	OrderIDs   []string  `json:"order_ids"`
+	Status     string    `json:"status"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
 type logisticsBatchCreateInput struct {
 	ConnectorAccountID string   `json:"connector_account_id"`
 	OrderIDs           []string `json:"order_ids"`
@@ -237,6 +338,20 @@ type logisticsBatchArchiveInput struct {
 
 type logisticsBatchUnarchiveInput struct {
 	ConnectorAccountID string `json:"connector_account_id"`
+}
+
+type logisticsBatchCancelInput struct {
+	ConnectorAccountID string `json:"connector_account_id"`
+}
+
+type logisticsBatchSendingDateInput struct {
+	ConnectorAccountID string `json:"connector_account_id"`
+	SendingDate        string `json:"sending_date"`
+}
+
+type logisticsOrderRestoreInput struct {
+	ConnectorAccountID string   `json:"connector_account_id"`
+	OrderIDs           []string `json:"order_ids"`
 }
 
 type logisticsSeparateReturnInput struct {
@@ -298,6 +413,10 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodGet, Path: logisticsBatchesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listBatches)},
+		{Method: http.MethodGet, Path: logisticsBatchOrdersPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listBatchOrders)},
+		{Method: http.MethodGet, Path: logisticsBatchLookupPath, PathPrefix: true, Permission: "connectors.read", Handler: http.HandlerFunc(api.readBatchByName)},
+		{Method: http.MethodGet, Path: logisticsOrderLookupPath, PathPrefix: true, Permission: "connectors.read", Handler: http.HandlerFunc(api.readOrder)},
+		{Method: http.MethodGet, Path: logisticsOrderSearchPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.searchOrders)},
 		{Method: http.MethodGet, Path: logisticsArchivedBatchesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listArchivedBatches)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
@@ -308,6 +427,9 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchSubmitPath, PathPrefix: true, Permission: "logistics.batches.submit", Handler: http.HandlerFunc(api.submitBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchArchivePath, PathPrefix: true, Permission: "logistics.batches.archive", Handler: http.HandlerFunc(api.archiveBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchUnarchivePath, PathPrefix: true, Permission: "logistics.batches.unarchive", Handler: http.HandlerFunc(api.unarchiveBatch)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchCancelPath, PathPrefix: true, Permission: "logistics.batches.cancel", Handler: http.HandlerFunc(api.cancelBatch)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchSendingDatePath, PathPrefix: true, Permission: "logistics.batches.sending_date.write", Handler: http.HandlerFunc(api.updateBatchSendingDate)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsOrderRestorePath, Permission: "logistics.orders.restore", Handler: http.HandlerFunc(api.restoreOrders)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsSeparateReturnPath, Permission: "logistics.return.separate.create", Handler: http.HandlerFunc(api.createSeparateReturn)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsSeparateReturnEditPath, PathPrefix: true, Permission: "logistics.return.separate.edit", Handler: http.HandlerFunc(api.editSeparateReturn)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodDelete, Path: logisticsSeparateReturnDeletePath, PathPrefix: true, Permission: "logistics.return.separate.delete", Handler: http.HandlerFunc(api.deleteSeparateReturn)})
@@ -381,6 +503,272 @@ func (api logisticsAPI) listBatches(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		views = append(views, logisticsBatchView{RemoteID: batch.RemoteID, Status: batch.Status, ShipmentCount: batch.ShipmentCount, ObservedAt: batch.ObservedAt})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (api logisticsAPI) listBatchOrders(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	ordersRuntime, runtimeOK := api.runtime.(logisticsBatchOrdersRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch order operation is unavailable")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	batchID := strings.TrimSpace(r.URL.Query().Get("batch_id"))
+	limit, page := 50, 0
+	for name, target := range map[string]*int{"limit": &limit, "page": &page} {
+		if raw := strings.TrimSpace(r.URL.Query().Get(name)); raw != "" {
+			value, err := strconv.Atoi(raw)
+			if err != nil {
+				writeProblem(w, http.StatusBadRequest, "Bad Request")
+				return
+			}
+			*target = value
+		}
+	}
+	query := sdk.LogisticsBatchOrdersQuery{BatchID: batchID, Limit: limit, Page: page}
+	if accountID == "" || query.Validate(100) != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.orders.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch order operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch order capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	orders, err := ordersRuntime.LogisticsBatchOrders(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if len(orders) > query.Limit {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	views := make([]logisticsBatchOrderView, 0, len(orders))
+	seen := make(map[string]struct{}, len(orders))
+	for _, order := range orders {
+		if order.Validate() != nil || order.BatchID != query.BatchID {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		if _, duplicate := seen[order.RemoteID]; duplicate {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		seen[order.RemoteID] = struct{}{}
+		views = append(views, logisticsBatchOrderView{RemoteID: order.RemoteID, BatchID: order.BatchID, TrackingNumber: order.TrackingNumber, Status: order.Status, ObservedAt: order.ObservedAt})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (api logisticsAPI) readBatchByName(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	batchRuntime, runtimeOK := api.runtime.(logisticsBatchLookupRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch lookup is unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsBatchLookupPath), "/"), "/")
+	if len(parts) != 1 || strings.TrimSpace(parts[0]) == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	query := sdk.LogisticsBatchLookupQuery{BatchID: parts[0]}
+	if query.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	if accountID == "" {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch lookup is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	batch, err := batchRuntime.LogisticsBatchByName(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsBatchView{RemoteID: batch.RemoteID, Status: batch.Status, ShipmentCount: batch.ShipmentCount, ObservedAt: batch.ObservedAt}
+	if batch.Validate() != nil || batch.RemoteID != query.BatchID || view.ObservedAt.Location() != time.UTC {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+func (api logisticsAPI) readOrder(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	ordersRuntime, runtimeOK := api.runtime.(logisticsOrderRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Order operation is unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsOrderLookupPath), "/"), "/")
+	if len(parts) != 1 || strings.TrimSpace(parts[0]) == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	query := sdk.LogisticsOrderQuery{RemoteID: parts[0]}
+	if query.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	if accountID == "" {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.orders.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Order operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Order capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	order, err := ordersRuntime.LogisticsOrder(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsBatchOrderView{RemoteID: order.RemoteID, BatchID: order.BatchID, TrackingNumber: order.TrackingNumber, Status: order.Status, ObservedAt: order.ObservedAt}
+	if order.Validate() != nil || order.RemoteID != query.RemoteID || view.ObservedAt.Location() != time.UTC {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+func (api logisticsAPI) searchOrders(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	ordersRuntime, runtimeOK := api.runtime.(logisticsOrderSearchRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Order search is unavailable")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	externalID := strings.TrimSpace(r.URL.Query().Get("external_id"))
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		limit = value
+	}
+	query := sdk.LogisticsOrderSearchQuery{ExternalID: externalID, Limit: limit}
+	if accountID == "" || query.Validate(100) != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.orders.search")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Order search is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Order search capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	orders, err := ordersRuntime.LogisticsOrderSearch(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if len(orders) > query.Limit {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	views := make([]logisticsOrderSummaryView, 0, len(orders))
+	seen := make(map[string]struct{}, len(orders))
+	for _, order := range orders {
+		if order.Validate() != nil || order.ExternalID != query.ExternalID {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		if _, duplicate := seen[order.RemoteID]; duplicate {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		seen[order.RemoteID] = struct{}{}
+		views = append(views, logisticsOrderSummaryView{RemoteID: order.RemoteID, ExternalID: order.ExternalID, BatchID: order.BatchID, TrackingNumber: order.TrackingNumber, Status: order.Status, ObservedAt: order.ObservedAt})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": views})
 }
@@ -958,6 +1346,378 @@ func (api logisticsAPI) unarchiveBatch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, view)
 }
 
+func (api logisticsAPI) updateBatchSendingDate(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsBatchSendingDatePath), "/"), "/")
+	if len(parts) != 1 || !logisticsRemoteIDPattern.MatchString(parts[0]) {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	batchID := parts[0]
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsBatchSendingDateInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	input.ConnectorAccountID = strings.TrimSpace(input.ConnectorAccountID)
+	input.SendingDate = strings.TrimSpace(input.SendingDate)
+	request := input.toSDK(batchID, key)
+	if input.ConnectorAccountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), input.ConnectorAccountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.sending_date.write")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch sending date update is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch sending date capability is not enabled")
+		return
+	}
+	digest, err := logisticsBatchSendingDateDigest(input, batchID)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.batch.sending_date.update" || requested.ResourceType != "logistics_batch" || requested.ResourceID != logisticsBatchSendingDateApprovalResourceID(digest) || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	updaterRuntime, runtimeOK := api.runtime.(logisticsBatchSendingDateRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch sending date update is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	updater, err := updaterRuntime.LogisticsBatchSendingDateUpdater(r.Context(), account, runtime)
+	if err != nil || updater == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.batch.sending_date.update", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsBatchSendingDateView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsBatchSendingDateViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	update, err := updater.UpdateLogisticsBatchSendingDate(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsBatchSendingDateView{RemoteID: update.RemoteID, SendingDate: update.SendingDate, Status: update.Status, Updated: update.Updated, ObservedAt: update.ObservedAt}
+	if update.Validate() != nil || update.RemoteID != batchID || update.SendingDate != input.SendingDate || !logisticsBatchSendingDateViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	result, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.batch.sending_date.update", key, result) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func (api logisticsAPI) cancelBatch(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsBatchCancelPath), "/"), "/")
+	if len(parts) != 1 || !logisticsRemoteIDPattern.MatchString(parts[0]) {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	batchID := parts[0]
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsBatchCancelInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	input.ConnectorAccountID = strings.TrimSpace(input.ConnectorAccountID)
+	request := input.toSDK(batchID, key)
+	if input.ConnectorAccountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), input.ConnectorAccountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.cancel")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch cancellation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch cancellation capability is not enabled")
+		return
+	}
+	digest, err := logisticsBatchCancelDigest(input, batchID)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.batch.cancel" || requested.ResourceType != "logistics_batch" || requested.ResourceID != logisticsBatchCancelApprovalResourceID(digest) || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	cancelerRuntime, runtimeOK := api.runtime.(logisticsBatchCancelRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch cancellation is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	canceler, err := cancelerRuntime.LogisticsBatchCanceler(r.Context(), account, runtime)
+	if err != nil || canceler == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.batch.cancel", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsBatchCancellationView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsBatchCancellationViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	cancellation, err := canceler.CancelLogisticsBatch(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsBatchCancellationView{RemoteID: cancellation.RemoteID, Status: cancellation.Status, Cancelled: cancellation.Cancelled, ObservedAt: cancellation.ObservedAt}
+	if cancellation.Validate() != nil || view.RemoteID != batchID || !logisticsBatchCancellationViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	result, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.batch.cancel", key, result) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func (api logisticsAPI) restoreOrders(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsOrderRestoreInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(input.ConnectorAccountID)
+	input.ConnectorAccountID = accountID
+	request := input.toSDK(key)
+	if accountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.orders.restore")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Order restore is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Order restore capability is not enabled")
+		return
+	}
+	digest, err := logisticsOrderRestoreDigest(input)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	approvalResourceID := logisticsOrderRestoreApprovalResourceID(digest)
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.orders.restore" || requested.ResourceType != "logistics_orders" || requested.ResourceID != approvalResourceID || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	restorerRuntime, runtimeOK := api.runtime.(logisticsOrderRestoreRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Order restore is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	restorer, err := restorerRuntime.LogisticsOrderRestorer(r.Context(), account, runtime)
+	if err != nil || restorer == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.orders.restore", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsOrderRestoreView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsOrderRestoreViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	restore, err := restorer.RestoreLogisticsOrders(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsOrderRestoreView{OrderIDs: append([]string(nil), restore.OrderIDs...), Status: restore.Status, ObservedAt: restore.ObservedAt}
+	if restore.Validate() != nil || !logisticsOrderRestoreViewValid(view) || !sameLogisticsOrderIDSet(view.OrderIDs, request.OrderIDs) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	result, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.orders.restore", key, result) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
 func (api logisticsAPI) createSeparateReturn(w http.ResponseWriter, r *http.Request) {
 	scope, scopeOK := ScopeFromContext(r.Context())
 	principal, principalOK := PrincipalFromContext(r.Context())
@@ -1445,6 +2205,29 @@ func (api logisticsAPI) cancelShipment(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Approval-Request-ID Required")
 		return
 	}
+	var input logisticsShipmentCancelInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	decoder.DisallowUnknownFields()
+	decodeErr := decoder.Decode(&input)
+	if decodeErr != nil && !errors.Is(decodeErr, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	if decodeErr == nil {
+		var trailing struct{}
+		if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+	}
+	input.Variant = strings.TrimSpace(input.Variant)
+	if input.Variant == "" {
+		input.Variant = "delivery"
+	}
+	if input.Variant != "delivery" && input.Variant != "pickup" {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
 	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsShipmentsPath), "/"), "/")
 	if len(parts) != 2 || parts[1] != "cancel" || parts[0] == "" {
 		writeProblem(w, http.StatusNotFound, "Not Found")
@@ -1460,7 +2243,7 @@ func (api logisticsAPI) cancelShipment(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Approved matching request required")
 		return
 	}
-	shipment, fresh, err := api.shipments.BeginCancel(r.Context(), scope, shipmentID, key, logistics.Mutation{EventID: newApprovalID(), AuditID: newApprovalID(), ActorID: principal.Subject, Source: "api.logistics", CorrelationID: key, ApprovalRequestID: approvalID, OccurredAt: time.Now().UTC()})
+	shipment, fresh, err := api.shipments.BeginCancel(r.Context(), scope, shipmentID, key, logistics.Mutation{EventID: newApprovalID(), AuditID: newApprovalID(), ActorID: principal.Subject, Source: "api.logistics", CorrelationID: key, ApprovalRequestID: approvalID, CancelVariant: input.Variant, OccurredAt: time.Now().UTC()})
 	if err != nil {
 		switch {
 		case errors.Is(err, logistics.ErrNotFound):
@@ -1699,7 +2482,10 @@ func (input logisticsRatesInput) toSDK() sdk.RateRequest {
 	for _, parcel := range input.Parcels {
 		parcels = append(parcels, sdk.Parcel{WeightGrams: parcel.WeightGrams, LengthMM: parcel.LengthMM, WidthMM: parcel.WidthMM, HeightMM: parcel.HeightMM})
 	}
-	return sdk.RateRequest{From: address(input.From), To: address(input.To), Parcels: parcels}
+	money := func(value logisticsMoneyInput) sdk.LogisticsMoney {
+		return sdk.LogisticsMoney{MinorUnits: value.MinorUnits, Currency: strings.ToUpper(strings.TrimSpace(value.Currency))}
+	}
+	return sdk.RateRequest{From: address(input.From), To: address(input.To), Parcels: parcels, FromPointRef: strings.TrimSpace(input.FromPointRef), ToPointRef: strings.TrimSpace(input.ToPointRef), CalculateDate: strings.TrimSpace(input.CalculateDate), DeclaredValue: money(input.DeclaredValue), PaymentValue: money(input.PaymentValue)}
 }
 
 func (input logisticsShipmentCreateInput) toSDK(idempotencyKey string) sdk.ShipmentCreateRequest {
@@ -1713,7 +2499,14 @@ func (input logisticsShipmentCreateInput) toSDK(idempotencyKey string) sdk.Shipm
 	contact := func(value logisticsContactInput) sdk.LogisticsContact {
 		return sdk.LogisticsContact{Name: strings.TrimSpace(value.Name), Phone: strings.TrimSpace(value.Phone), Email: strings.TrimSpace(value.Email)}
 	}
-	return sdk.ShipmentCreateRequest{ExternalID: strings.TrimSpace(input.ExternalID), ServiceCode: strings.TrimSpace(input.ServiceCode), IdempotencyKey: idempotencyKey, From: address(input.From), To: address(input.To), Parcels: parcels, PickupPointRef: strings.TrimSpace(input.PickupPointRef), Sender: contact(input.Sender), Recipient: contact(input.Recipient)}
+	items := make([]sdk.ShipmentItem, 0, len(input.Items))
+	for _, item := range input.Items {
+		items = append(items, sdk.ShipmentItem{Name: strings.TrimSpace(item.Name), Quantity: item.Quantity, UnitPrice: sdk.LogisticsMoney{MinorUnits: item.UnitPrice.MinorUnits, Currency: strings.ToUpper(strings.TrimSpace(item.UnitPrice.Currency))}, VATPercent: item.VATPercent, SKU: strings.TrimSpace(item.SKU), Barcode: strings.TrimSpace(item.Barcode)})
+	}
+	money := func(value logisticsMoneyInput) sdk.LogisticsMoney {
+		return sdk.LogisticsMoney{MinorUnits: value.MinorUnits, Currency: strings.ToUpper(strings.TrimSpace(value.Currency))}
+	}
+	return sdk.ShipmentCreateRequest{ExternalID: strings.TrimSpace(input.ExternalID), ServiceCode: strings.TrimSpace(input.ServiceCode), IdempotencyKey: idempotencyKey, From: address(input.From), To: address(input.To), Parcels: parcels, PickupPointRef: strings.TrimSpace(input.PickupPointRef), Sender: contact(input.Sender), Recipient: contact(input.Recipient), Items: items, DeclaredValue: money(input.DeclaredValue), DeliveryCost: money(input.DeliveryCost), PaymentValue: money(input.PaymentValue)}
 }
 
 func (input logisticsBatchCreateInput) toSDK(idempotencyKey string) sdk.LogisticsBatchCreateRequest {
@@ -1734,6 +2527,22 @@ func (input logisticsBatchArchiveInput) toSDK(batchID, idempotencyKey string) sd
 
 func (input logisticsBatchUnarchiveInput) toSDK(batchID, idempotencyKey string) sdk.LogisticsBatchUnarchiveRequest {
 	return sdk.LogisticsBatchUnarchiveRequest{BatchID: strings.TrimSpace(batchID), IdempotencyKey: idempotencyKey}
+}
+
+func (input logisticsBatchCancelInput) toSDK(batchID, idempotencyKey string) sdk.LogisticsBatchCancelRequest {
+	return sdk.LogisticsBatchCancelRequest{BatchID: strings.TrimSpace(batchID), IdempotencyKey: idempotencyKey}
+}
+
+func (input logisticsBatchSendingDateInput) toSDK(batchID, idempotencyKey string) sdk.LogisticsBatchSendingDateRequest {
+	return sdk.LogisticsBatchSendingDateRequest{BatchID: strings.TrimSpace(batchID), SendingDate: strings.TrimSpace(input.SendingDate), IdempotencyKey: idempotencyKey}
+}
+
+func (input logisticsOrderRestoreInput) toSDK(idempotencyKey string) sdk.LogisticsOrderRestoreRequest {
+	orderIDs := make([]string, len(input.OrderIDs))
+	for index, orderID := range input.OrderIDs {
+		orderIDs[index] = strings.TrimSpace(orderID)
+	}
+	return sdk.LogisticsOrderRestoreRequest{OrderIDs: orderIDs, IdempotencyKey: idempotencyKey}
 }
 
 func (input logisticsSeparateReturnInput) toSDK(idempotencyKey string) sdk.LogisticsSeparateReturnRequest {
@@ -1843,6 +2652,59 @@ func logisticsBatchUnarchiveApprovalResourceID(digest [32]byte) string {
 	return "batch-unarchive:" + hex.EncodeToString(digest[:])
 }
 
+func logisticsBatchCancelDigest(input logisticsBatchCancelInput, batchID string) ([32]byte, error) {
+	canonical := struct {
+		ConnectorAccountID string `json:"connector_account_id"`
+		BatchID            string `json:"batch_id"`
+	}{ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), BatchID: strings.TrimSpace(batchID)}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsBatchCancelApprovalResourceID(digest [32]byte) string {
+	return "batch-cancel:" + hex.EncodeToString(digest[:])
+}
+
+func logisticsBatchSendingDateDigest(input logisticsBatchSendingDateInput, batchID string) ([32]byte, error) {
+	canonical := struct {
+		ConnectorAccountID string `json:"connector_account_id"`
+		BatchID            string `json:"batch_id"`
+		SendingDate        string `json:"sending_date"`
+	}{ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), BatchID: strings.TrimSpace(batchID), SendingDate: strings.TrimSpace(input.SendingDate)}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsBatchSendingDateApprovalResourceID(digest [32]byte) string {
+	return "batch-sending-date:" + hex.EncodeToString(digest[:])
+}
+
+func logisticsOrderRestoreDigest(input logisticsOrderRestoreInput) ([32]byte, error) {
+	orderIDs := make([]string, len(input.OrderIDs))
+	for index, orderID := range input.OrderIDs {
+		orderIDs[index] = strings.TrimSpace(orderID)
+	}
+	canonical := struct {
+		ConnectorAccountID string   `json:"connector_account_id"`
+		OrderIDs           []string `json:"order_ids"`
+	}{ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), OrderIDs: orderIDs}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsOrderRestoreApprovalResourceID(digest [32]byte) string {
+	return "orders-restore:" + hex.EncodeToString(digest[:])
+}
+
 func logisticsSeparateReturnDigest(input logisticsSeparateReturnInput) ([32]byte, error) {
 	canonical := struct {
 		ConnectorAccountID string                 `json:"connector_account_id"`
@@ -1928,6 +2790,56 @@ func logisticsBatchArchiveViewValid(view logisticsBatchArchiveView) bool {
 
 func logisticsBatchUnarchiveViewValid(view logisticsBatchUnarchiveView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && view.Status == "RESTORED" && !view.Archived && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func logisticsBatchCancellationViewValid(view logisticsBatchCancellationView) bool {
+	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && view.Status == "CANCELLED" && view.Cancelled && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func logisticsBatchSendingDateViewValid(view logisticsBatchSendingDateView) bool {
+	if !logisticsRemoteIDPattern.MatchString(view.RemoteID) || view.Status != "UPDATED" || !view.Updated || !logisticsISODatePattern.MatchString(view.SendingDate) || view.ObservedAt.IsZero() || view.ObservedAt.Location() != time.UTC {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", view.SendingDate)
+	return err == nil
+}
+
+func logisticsOrderRestoreViewValid(view logisticsOrderRestoreView) bool {
+	if view.Status != "restored" || view.ObservedAt.IsZero() || view.ObservedAt.Location() != time.UTC || len(view.OrderIDs) < 1 || len(view.OrderIDs) > 100 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(view.OrderIDs))
+	for _, orderID := range view.OrderIDs {
+		orderID = strings.TrimSpace(orderID)
+		if !logisticsRemoteIDPattern.MatchString(orderID) {
+			return false
+		}
+		if _, exists := seen[orderID]; exists {
+			return false
+		}
+		seen[orderID] = struct{}{}
+	}
+	return true
+}
+
+func sameLogisticsOrderIDSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]struct{}, len(left))
+	for _, orderID := range left {
+		orderID = strings.TrimSpace(orderID)
+		if _, exists := seen[orderID]; exists {
+			return false
+		}
+		seen[orderID] = struct{}{}
+	}
+	for _, orderID := range right {
+		if _, exists := seen[strings.TrimSpace(orderID)]; !exists {
+			return false
+		}
+	}
+	return true
 }
 
 func logisticsSeparateReturnViewValid(view logisticsSeparateReturnView) bool {

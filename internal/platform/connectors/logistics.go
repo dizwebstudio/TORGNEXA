@@ -17,8 +17,8 @@ var logisticsProviderCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:
 var logisticsBatchDatePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 
 type LogisticsMoney struct {
-	MinorUnits int64
-	Currency   string
+	MinorUnits int64  `json:"minor_units"`
+	Currency   string `json:"currency"`
 }
 
 func (m LogisticsMoney) Validate() error {
@@ -62,6 +62,36 @@ func (p Parcel) Validate() error {
 	return nil
 }
 
+// ShipmentItem is one declared product line in a shipment. It is optional in
+// the neutral request because most carriers accept package-only data; a
+// carrier that requires customs/payment product lines must explicitly require
+// and validate it in its adapter.
+type ShipmentItem struct {
+	Name       string         `json:"name"`
+	Quantity   int64          `json:"quantity"`
+	UnitPrice  LogisticsMoney `json:"unit_price"`
+	VATPercent int            `json:"vat_percent"`
+	SKU        string         `json:"sku,omitempty"`
+	Barcode    string         `json:"barcode,omitempty"`
+}
+
+// Validate checks the provider-neutral product-line bounds. Provider adapters
+// may impose stricter catalog, tax or identifier rules.
+func (item ShipmentItem) Validate() error {
+	if !validLogisticsText(item.Name, 512) || item.Quantity <= 0 || item.UnitPrice.MinorUnits <= 0 || item.UnitPrice.Validate() != nil {
+		return ErrInvalidLogisticsRequest
+	}
+	switch item.VATPercent {
+	case -1, 0, 5, 7, 10, 22:
+	default:
+		return ErrInvalidLogisticsRequest
+	}
+	if !validLogisticsOptionalText(item.SKU, 128) || !validLogisticsOptionalText(item.Barcode, 128) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 // LogisticsContact carries the minimum recipient/sender contact details
 // needed by a carrier shipment request. It is request-scoped and is never
 // part of the canonical shipment projection.
@@ -72,9 +102,14 @@ type LogisticsContact struct {
 }
 
 type RateRequest struct {
-	From    Address  `json:"from"`
-	To      Address  `json:"to"`
-	Parcels []Parcel `json:"parcels"`
+	From          Address        `json:"from"`
+	To            Address        `json:"to"`
+	Parcels       []Parcel       `json:"parcels"`
+	FromPointRef  string         `json:"from_point_ref,omitempty"`
+	ToPointRef    string         `json:"to_point_ref,omitempty"`
+	CalculateDate string         `json:"calculate_date,omitempty"`
+	DeclaredValue LogisticsMoney `json:"declared_value,omitempty"`
+	PaymentValue  LogisticsMoney `json:"payment_value,omitempty"`
 }
 type RateQuote struct {
 	ServiceCode                              string
@@ -84,6 +119,23 @@ type RateQuote struct {
 
 func (r RateRequest) Validate() error {
 	if r.From.Validate() != nil || r.To.Validate() != nil || len(r.Parcels) < 1 || len(r.Parcels) > 50 {
+		return ErrInvalidLogisticsRequest
+	}
+	if !validLogisticsOptionalText(r.FromPointRef, 192) || !validLogisticsOptionalText(r.ToPointRef, 192) || !validLogisticsOptionalText(r.CalculateDate, 10) {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.CalculateDate != "" && !logisticsBatchDatePattern.MatchString(r.CalculateDate) {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.CalculateDate != "" {
+		if _, err := time.Parse("2006-01-02", r.CalculateDate); err != nil {
+			return ErrInvalidLogisticsRequest
+		}
+	}
+	if (r.DeclaredValue.Currency == "" && r.DeclaredValue.MinorUnits != 0) || (r.DeclaredValue.Currency != "" && r.DeclaredValue.Validate() != nil) {
+		return ErrInvalidLogisticsRequest
+	}
+	if (r.PaymentValue.Currency == "" && r.PaymentValue.MinorUnits != 0) || (r.PaymentValue.Currency != "" && r.PaymentValue.Validate() != nil) {
 		return ErrInvalidLogisticsRequest
 	}
 	for _, p := range r.Parcels {
@@ -110,6 +162,10 @@ type ShipmentCreateRequest struct {
 	PickupPointRef string           `json:"pickup_point_ref,omitempty"`
 	Sender         LogisticsContact `json:"sender"`
 	Recipient      LogisticsContact `json:"recipient"`
+	Items          []ShipmentItem   `json:"items,omitempty"`
+	DeclaredValue  LogisticsMoney   `json:"declared_value,omitempty"`
+	DeliveryCost   LogisticsMoney   `json:"delivery_cost,omitempty"`
+	PaymentValue   LogisticsMoney   `json:"payment_value,omitempty"`
 }
 type ShipmentResult struct {
 	RemoteID, Status string
@@ -118,7 +174,13 @@ type ShipmentResult struct {
 	ObservedAt       time.Time
 }
 type ShipmentStatusRequest struct{ RemoteID string }
-type ShipmentCancelRequest struct{ RemoteID, IdempotencyKey string }
+
+// ShipmentCancelRequest selects the bounded neutral cancellation variant.
+// Empty Variant means delivery-to-address for backward compatibility.
+type ShipmentCancelRequest struct {
+	RemoteID, IdempotencyKey string
+	Variant                  string
+}
 type ReturnCreateRequest struct {
 	OriginalRemoteID string `json:"original_remote_id"`
 	ExternalID       string `json:"external_id"`
@@ -201,6 +263,85 @@ type LogisticsBatchQuery struct {
 	Page         int
 }
 
+// LogisticsBatchLookupQuery bounds a provider batch lookup by its remote
+// name. The name remains a provider reference and is not a Core identifier.
+type LogisticsBatchLookupQuery struct {
+	BatchID string
+}
+
+// Validate checks the provider batch reference.
+func (query LogisticsBatchLookupQuery) Validate() error {
+	if !logisticsRefPattern.MatchString(query.BatchID) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsBatchOrdersQuery bounds a provider batch-order read. The batch
+// identifier remains a provider reference and the host projects only safe
+// order identity/status fields.
+type LogisticsBatchOrdersQuery struct {
+	BatchID string
+	Limit   int
+	Page    int
+}
+
+// LogisticsOrderQuery bounds a read of one provider order by its remote ID.
+// The provider reference remains opaque to Core and is validated again by the
+// host adapter when a connector has a stricter identifier contract.
+type LogisticsOrderQuery struct {
+	RemoteID string
+}
+
+// Validate checks the provider order reference.
+func (query LogisticsOrderQuery) Validate() error {
+	if !logisticsRefPattern.MatchString(query.RemoteID) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsOrderSearchQuery bounds a provider order search by the merchant's
+// assigned order number.
+type LogisticsOrderSearchQuery struct {
+	ExternalID string
+	Limit      int
+}
+
+// Validate checks the bounded merchant-order search.
+func (query LogisticsOrderSearchQuery) Validate(maxLimit int) error {
+	if maxLimit < 1 || query.Limit < 1 || query.Limit > maxLimit || !logisticsRefPattern.MatchString(query.ExternalID) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsOrderSummary is the safe projection of one provider order search
+// result. Batch and tracking references are optional because backlog orders
+// may not have entered a provider batch yet.
+type LogisticsOrderSummary struct {
+	RemoteID       string
+	ExternalID     string
+	BatchID        string
+	TrackingNumber string
+	Status         string
+	ObservedAt     time.Time
+}
+
+// Validate checks the normalized order search projection.
+func (order LogisticsOrderSummary) Validate() error {
+	if !logisticsRefPattern.MatchString(order.RemoteID) || !logisticsRefPattern.MatchString(order.ExternalID) || !safeCodePattern.MatchString(order.Status) || order.ObservedAt.IsZero() || order.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	if order.BatchID != "" && !logisticsRefPattern.MatchString(order.BatchID) {
+		return ErrInvalidLogisticsRequest
+	}
+	if order.TrackingNumber != "" && !logisticsRefPattern.MatchString(order.TrackingNumber) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 // LogisticsArchiveBatchQuery bounds a read of the provider archive. The
 // archive endpoint has no client-side page parameter, so the host bounds the
 // returned collection after the fixed HTTPS request.
@@ -227,6 +368,14 @@ func (query LogisticsBatchQuery) Validate(maxLimit int) error {
 	return nil
 }
 
+// Validate checks the bounded order-list query for one provider batch.
+func (query LogisticsBatchOrdersQuery) Validate(maxLimit int) error {
+	if maxLimit < 1 || query.Limit < 1 || query.Limit > maxLimit || query.Page < 0 || query.Page > 100000 || !logisticsRefPattern.MatchString(query.BatchID) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 // LogisticsBatch is the bounded neutral projection of one provider batch.
 // RemoteID and Status remain provider references/codes; no raw provider
 // payload or order list crosses the connector boundary.
@@ -235,6 +384,28 @@ type LogisticsBatch struct {
 	Status        string
 	ShipmentCount int
 	ObservedAt    time.Time
+}
+
+// LogisticsBatchOrder is the safe neutral projection of one provider order
+// row inside a batch. Recipient and address fields never cross the connector
+// boundary.
+type LogisticsBatchOrder struct {
+	RemoteID       string
+	BatchID        string
+	TrackingNumber string
+	Status         string
+	ObservedAt     time.Time
+}
+
+// Validate checks the normalized provider order projection.
+func (order LogisticsBatchOrder) Validate() error {
+	if !logisticsRefPattern.MatchString(order.RemoteID) || !logisticsRefPattern.MatchString(order.BatchID) || !safeCodePattern.MatchString(order.Status) || order.ObservedAt.IsZero() || order.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	if order.TrackingNumber != "" && !logisticsRefPattern.MatchString(order.TrackingNumber) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
 }
 
 // LogisticsBatchSubmission is the normalized acknowledgement of a provider
@@ -305,6 +476,80 @@ type LogisticsBatchUnarchive struct {
 	ObservedAt time.Time
 }
 
+// LogisticsBatchCancelRequest requests cancellation of one provider-side
+// pre-alert batch. The batch identifier remains a provider reference.
+type LogisticsBatchCancelRequest struct {
+	BatchID        string `json:"batch_id"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// LogisticsBatchCancellation is the normalized acknowledgement of a
+// provider-side pre-alert batch cancellation.
+type LogisticsBatchCancellation struct {
+	RemoteID   string
+	Status     string
+	Cancelled  bool
+	ObservedAt time.Time
+}
+
+// LogisticsBatchSendingDateRequest requests changing the provider hand-off
+// date for one formed batch. The provider batch reference remains opaque to
+// Core and the operation is approval- and idempotency-gated by the host.
+type LogisticsBatchSendingDateRequest struct {
+	BatchID        string `json:"batch_id"`
+	SendingDate    string `json:"sending_date"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// Validate checks the provider batch reference, ISO date and idempotency key.
+func (request LogisticsBatchSendingDateRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(request.BatchID) || !logisticsRefPattern.MatchString(request.IdempotencyKey) || !logisticsBatchDatePattern.MatchString(request.SendingDate) {
+		return ErrInvalidLogisticsRequest
+	}
+	if _, err := time.Parse("2006-01-02", request.SendingDate); err != nil {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsBatchSendingDateUpdate is the normalized acknowledgement of a
+// provider batch sending-date update.
+type LogisticsBatchSendingDateUpdate struct {
+	RemoteID    string
+	SendingDate string
+	Status      string
+	Updated     bool
+	ObservedAt  time.Time
+}
+
+// Validate checks the normalized batch sending-date acknowledgement.
+func (update LogisticsBatchSendingDateUpdate) Validate() error {
+	if !logisticsRefPattern.MatchString(update.RemoteID) || update.Status != "UPDATED" || !update.Updated || !logisticsBatchDatePattern.MatchString(update.SendingDate) || update.ObservedAt.IsZero() || update.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	if _, err := time.Parse("2006-01-02", update.SendingDate); err != nil {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsOrderRestoreRequest requests moving provider orders from a formed
+// batch back to the provider backlog. Order identifiers remain provider
+// references and the operation is independently approval- and
+// idempotency-gated.
+type LogisticsOrderRestoreRequest struct {
+	OrderIDs       []string `json:"order_ids"`
+	IdempotencyKey string   `json:"idempotency_key"`
+}
+
+// LogisticsOrderRestore is the normalized acknowledgement that every
+// requested provider order was returned to the backlog.
+type LogisticsOrderRestore struct {
+	OrderIDs   []string
+	Status     string
+	ObservedAt time.Time
+}
+
 // Validate checks the bounded batch formation request.
 func (request LogisticsBatchCreateRequest) Validate() error {
 	if len(request.OrderIDs) < 1 || len(request.OrderIDs) > 100 || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
@@ -371,6 +616,59 @@ func (restore LogisticsBatchUnarchive) Validate() error {
 	return nil
 }
 
+// Validate checks the bounded provider batch cancellation request.
+func (request LogisticsBatchCancelRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(request.BatchID) || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the normalized provider batch cancellation acknowledgement.
+func (cancellation LogisticsBatchCancellation) Validate() error {
+	if !logisticsRefPattern.MatchString(cancellation.RemoteID) || cancellation.Status != "CANCELLED" || !cancellation.Cancelled || cancellation.ObservedAt.IsZero() || cancellation.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the bounded provider order references and acknowledgement.
+func (request LogisticsOrderRestoreRequest) Validate() error {
+	if len(request.OrderIDs) < 1 || len(request.OrderIDs) > 100 || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	seen := make(map[string]struct{}, len(request.OrderIDs))
+	for _, orderID := range request.OrderIDs {
+		if !logisticsRefPattern.MatchString(orderID) {
+			return ErrInvalidLogisticsRequest
+		}
+		if _, duplicate := seen[orderID]; duplicate {
+			return ErrInvalidLogisticsRequest
+		}
+		seen[orderID] = struct{}{}
+	}
+	return nil
+}
+
+// Validate checks that a restore acknowledgement contains a bounded set of
+// provider order references and no provider-specific payload.
+func (restore LogisticsOrderRestore) Validate() error {
+	if len(restore.OrderIDs) < 1 || len(restore.OrderIDs) > 100 || restore.Status != "restored" || restore.ObservedAt.IsZero() || restore.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	seen := make(map[string]struct{}, len(restore.OrderIDs))
+	for _, orderID := range restore.OrderIDs {
+		if !logisticsRefPattern.MatchString(orderID) {
+			return ErrInvalidLogisticsRequest
+		}
+		if _, duplicate := seen[orderID]; duplicate {
+			return ErrInvalidLogisticsRequest
+		}
+		seen[orderID] = struct{}{}
+	}
+	return nil
+}
+
 // Validate checks the normalized batch projection.
 func (batch LogisticsBatch) Validate() error {
 	if !logisticsRefPattern.MatchString(batch.RemoteID) || !logisticsRefPattern.MatchString(batch.Status) || batch.ShipmentCount < 0 || batch.ShipmentCount > 1000000 || batch.ObservedAt.IsZero() || batch.ObservedAt.Location() != time.UTC {
@@ -391,6 +689,23 @@ func (r LabelRequest) Validate() error {
 
 func (r ShipmentCreateRequest) Validate() error {
 	if !logisticsRefPattern.MatchString(r.ExternalID) || !safeCodePattern.MatchString(r.ServiceCode) || !logisticsRefPattern.MatchString(r.IdempotencyKey) || r.From.Validate() != nil || r.To.Validate() != nil || len(r.Parcels) < 1 {
+		return ErrInvalidLogisticsRequest
+	}
+	if len(r.Items) > 100 {
+		return ErrInvalidLogisticsRequest
+	}
+	for _, item := range r.Items {
+		if item.Validate() != nil {
+			return ErrInvalidLogisticsRequest
+		}
+	}
+	if r.DeclaredValue.Currency != "" && r.DeclaredValue.Validate() != nil {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.DeliveryCost.Currency != "" && r.DeliveryCost.Validate() != nil {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.PaymentValue.Currency != "" && r.PaymentValue.Validate() != nil {
 		return ErrInvalidLogisticsRequest
 	}
 	return nil
@@ -469,6 +784,10 @@ func validLogisticsText(value string, maxRunes int) bool {
 	return true
 }
 
+func validLogisticsOptionalText(value string, maxRunes int) bool {
+	return value == "" || validLogisticsText(value, maxRunes)
+}
+
 type LogisticsRateReader interface {
 	ReadLogisticsRates(context.Context, Account, Runtime, RateRequest) ([]RateQuote, error)
 }
@@ -499,6 +818,18 @@ type LogisticsLabelReader interface {
 type LogisticsBatchReader interface {
 	ReadLogisticsBatches(context.Context, Account, Runtime, LogisticsBatchQuery) ([]LogisticsBatch, error)
 }
+type LogisticsBatchLookupReader interface {
+	ReadLogisticsBatchByName(context.Context, Account, Runtime, LogisticsBatchLookupQuery) (LogisticsBatch, error)
+}
+type LogisticsBatchOrderReader interface {
+	ReadLogisticsBatchOrders(context.Context, Account, Runtime, LogisticsBatchOrdersQuery) ([]LogisticsBatchOrder, error)
+}
+type LogisticsOrderReader interface {
+	ReadLogisticsOrder(context.Context, Account, Runtime, LogisticsOrderQuery) (LogisticsBatchOrder, error)
+}
+type LogisticsOrderSearcher interface {
+	SearchLogisticsOrders(context.Context, Account, Runtime, LogisticsOrderSearchQuery) ([]LogisticsOrderSummary, error)
+}
 type LogisticsArchivedBatchReader interface {
 	ReadArchivedLogisticsBatches(context.Context, Account, Runtime, LogisticsArchiveBatchQuery) ([]LogisticsBatch, error)
 }
@@ -513,6 +844,15 @@ type LogisticsBatchArchiver interface {
 }
 type LogisticsBatchUnarchiver interface {
 	UnarchiveLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchUnarchiveRequest) (LogisticsBatchUnarchive, error)
+}
+type LogisticsBatchCanceler interface {
+	CancelLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchCancelRequest) (LogisticsBatchCancellation, error)
+}
+type LogisticsBatchSendingDateUpdater interface {
+	UpdateLogisticsBatchSendingDate(context.Context, Account, Runtime, LogisticsBatchSendingDateRequest) (LogisticsBatchSendingDateUpdate, error)
+}
+type LogisticsOrderRestorer interface {
+	RestoreLogisticsOrders(context.Context, Account, Runtime, LogisticsOrderRestoreRequest) (LogisticsOrderRestore, error)
 }
 
 type LogisticsWebhook struct {

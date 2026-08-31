@@ -10,16 +10,27 @@ import (
 // Connector adapts the partner 5Post API to the provider-neutral logistics SDK.
 // Network access is supplied by the host through Transport.
 type Connector struct {
-	transport Transport
-	now       func() time.Time
+	transport     Transport
+	configuration ConfigurationSource
+	now           func() time.Time
 }
 
 // New constructs a 5Post connector with a host-owned transport.
 func New(transport Transport, now func() time.Time) *Connector {
+	return newConnector(transport, nil, now)
+}
+
+// NewWithConfiguration constructs a 5Post connector with tenant-scoped
+// non-secret settings required for universal order creation.
+func NewWithConfiguration(transport Transport, configuration ConfigurationSource, now func() time.Time) *Connector {
+	return newConnector(transport, configuration, now)
+}
+
+func newConnector(transport Transport, configuration ConfigurationSource, now func() time.Time) *Connector {
 	if now == nil {
 		now = time.Now
 	}
-	return &Connector{transport: transport, now: now}
+	return &Connector{transport: transport, configuration: configuration, now: now}
 }
 
 // Manifest returns the canonical 5Post connector manifest.

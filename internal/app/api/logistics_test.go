@@ -36,10 +36,16 @@ type logisticsRuntimeStub struct {
 	rates                 []sdk.RateQuote
 	tracking              sdk.ShipmentResult
 	label                 sdk.LabelResult
+	batchOrders           []sdk.LogisticsBatchOrder
+	order                 sdk.LogisticsBatchOrder
+	orderSearch           []sdk.LogisticsOrderSummary
 	creator               sdk.LogisticsBatchCreator
 	submitter             sdk.LogisticsBatchSubmitter
 	archiver              sdk.LogisticsBatchArchiver
 	unarchiver            sdk.LogisticsBatchUnarchiver
+	batchCanceler         sdk.LogisticsBatchCanceler
+	sendingDateUpdater    sdk.LogisticsBatchSendingDateUpdater
+	restorer              sdk.LogisticsOrderRestorer
 	separateReturnCreator sdk.LogisticsSeparateReturnCreator
 	separateReturnDeleter sdk.LogisticsSeparateReturnDeleter
 	separateReturnEditor  sdk.LogisticsSeparateReturnEditor
@@ -120,6 +126,37 @@ func (stub logisticsBatchRuntimeStub) LogisticsBatches(_ context.Context, _ sdk.
 	return stub.batches, nil
 }
 
+func (stub logisticsBatchRuntimeStub) LogisticsBatchByName(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error) {
+	if runtime == nil || query.Validate() != nil {
+		return sdk.LogisticsBatch{}, errors.New("runtime or batch lookup query missing")
+	}
+	if len(stub.batches) == 0 {
+		return sdk.LogisticsBatch{}, nil
+	}
+	return stub.batches[0], nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsBatchOrders(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error) {
+	if runtime == nil || query.Validate(100) != nil {
+		return nil, errors.New("runtime or batch order query missing")
+	}
+	return stub.batchOrders, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsOrder(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error) {
+	if runtime == nil || query.Validate() != nil {
+		return sdk.LogisticsBatchOrder{}, errors.New("runtime or order query missing")
+	}
+	return stub.order, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsOrderSearch(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error) {
+	if runtime == nil || query.Validate(100) != nil {
+		return nil, errors.New("runtime or order search query missing")
+	}
+	return stub.orderSearch, nil
+}
+
 func (stub logisticsBatchRuntimeStub) LogisticsArchivedBatches(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
 	if runtime == nil || query.Validate(100) != nil {
 		return nil, errors.New("runtime or archived batch query missing")
@@ -153,6 +190,27 @@ func (stub logisticsRuntimeStub) LogisticsBatchUnarchiver(_ context.Context, _ s
 		return nil, errors.New("runtime missing")
 	}
 	return stub.unarchiver, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsBatchCanceler(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCanceler, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.batchCanceler, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsBatchSendingDateUpdater(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchSendingDateUpdater, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.sendingDateUpdater, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsOrderRestorer(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsOrderRestorer, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.restorer, nil
 }
 
 func (stub logisticsRuntimeStub) LogisticsSeparateReturnCreator(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error) {
@@ -196,6 +254,21 @@ type logisticsBatchUnarchiverStub struct {
 	called  bool
 }
 
+type logisticsBatchCancelerStub struct {
+	cancellation sdk.LogisticsBatchCancellation
+	called       bool
+}
+
+type logisticsBatchSendingDateUpdaterStub struct {
+	update sdk.LogisticsBatchSendingDateUpdate
+	called bool
+}
+
+type logisticsOrderRestorerStub struct {
+	restore sdk.LogisticsOrderRestore
+	called  bool
+}
+
 func (stub *logisticsBatchSubmitterStub) SubmitLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
 	stub.called = true
 	if stub.submission.RemoteID == "" {
@@ -216,6 +289,33 @@ func (stub *logisticsBatchUnarchiverStub) UnarchiveLogisticsBatch(_ context.Cont
 	stub.called = true
 	if stub.restore.RemoteID == "" {
 		stub.restore.RemoteID = request.BatchID
+	}
+	return stub.restore, nil
+}
+
+func (stub *logisticsBatchCancelerStub) CancelLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchCancelRequest) (sdk.LogisticsBatchCancellation, error) {
+	stub.called = true
+	if stub.cancellation.RemoteID == "" {
+		stub.cancellation.RemoteID = request.BatchID
+	}
+	return stub.cancellation, nil
+}
+
+func (stub *logisticsBatchSendingDateUpdaterStub) UpdateLogisticsBatchSendingDate(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchSendingDateRequest) (sdk.LogisticsBatchSendingDateUpdate, error) {
+	stub.called = true
+	if stub.update.RemoteID == "" {
+		stub.update.RemoteID = request.BatchID
+	}
+	if stub.update.SendingDate == "" {
+		stub.update.SendingDate = request.SendingDate
+	}
+	return stub.update, nil
+}
+
+func (stub *logisticsOrderRestorerStub) RestoreLogisticsOrders(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsOrderRestoreRequest) (sdk.LogisticsOrderRestore, error) {
+	stub.called = true
+	if len(stub.restore.OrderIDs) == 0 {
+		stub.restore.OrderIDs = append([]string(nil), request.OrderIDs...)
 	}
 	return stub.restore, nil
 }
@@ -330,6 +430,110 @@ func TestLogisticsBatchesRouteReturnsBoundedPage(t *testing.T) {
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"batch-1"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsBatchLookupRouteReturnsExactBatch(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsBatchRuntimeStub{
+		logisticsRuntimeStub: logisticsRuntimeStub{supported: true},
+		batches:              []sdk.LogisticsBatch{{RemoteID: "24", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsBatchLookupPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("batch lookup route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsBatchLookupPath+"24?connector_account_id=cdek-account")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"24"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsBatchOrdersRouteReturnsSafeProjection(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.orders.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{
+		supported:   true,
+		batchOrders: []sdk.LogisticsBatchOrder{{RemoteID: "57565818", BatchID: "24", TrackingNumber: "80084740397510", Status: "created", ObservedAt: now}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsBatchOrdersPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("batch orders route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsBatchOrdersPath+"?connector_account_id=cdek-account&batch_id=24&limit=10&page=2")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"57565818"`) || !strings.Contains(response.Body.String(), `"tracking_number":"80084740397510"`) || !strings.Contains(response.Body.String(), `"batch_id":"24"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsOrderRouteReturnsSafeProjection(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.orders.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{
+		supported: true,
+		order:     sdk.LogisticsBatchOrder{RemoteID: "57565818", BatchID: "24", TrackingNumber: "80084740397510", Status: "created", ObservedAt: now},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsOrderLookupPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("order lookup route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsOrderLookupPath+"57565818?connector_account_id=cdek-account")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"57565818"`) || !strings.Contains(response.Body.String(), `"batch_id":"24"`) || !strings.Contains(response.Body.String(), `"tracking_number":"80084740397510"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsOrderSearchRouteReturnsSafeProjection(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.orders.search", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsRuntimeStub{
+		supported:   true,
+		orderSearch: []sdk.LogisticsOrderSummary{{RemoteID: "57565818", ExternalID: "shop-order-1", BatchID: "24", TrackingNumber: "80084740397510", Status: "created", ObservedAt: now}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsOrderSearchPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("order search route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsOrderSearchPath+"?connector_account_id=cdek-account&external_id=shop-order-1&limit=10")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"57565818"`) || !strings.Contains(response.Body.String(), `"external_id":"shop-order-1"`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
@@ -546,6 +750,120 @@ func TestLogisticsBatchUnarchiveRouteRequiresApprovalAndStoresNormalizedResult(t
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusCreated || !unarchiver.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"status":"RESTORED"`) {
 		t.Fatalf("status=%d body=%s unarchiver=%v operation=%+v", response.Code, response.Body.String(), unarchiver.called, operations)
+	}
+}
+
+func TestLogisticsBatchCancellationRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchCancelInput{ConnectorAccountID: account.ID}
+	digest, err := logisticsBatchCancelDigest(input, "24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-cancel-batch-1"
+	canceler := &logisticsBatchCancelerStub{cancellation: sdk.LogisticsBatchCancellation{Status: "CANCELLED", Cancelled: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.cancel", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, batchCanceler: canceler}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.cancel", ResourceType: "logistics_batch", ResourceID: logisticsBatchCancelApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchCancelPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("batch cancellation route not registered")
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchCancelPath+"24", strings.NewReader(`{"connector_account_id":"cdek-account"}`))
+	request.Header.Set("Idempotency-Key", "cancel-batch-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !canceler.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"24"`) || !strings.Contains(response.Body.String(), `"status":"CANCELLED"`) || !strings.Contains(response.Body.String(), `"cancelled":true`) {
+		t.Fatalf("status=%d body=%s canceler=%v operation=%+v", response.Code, response.Body.String(), canceler.called, operations)
+	}
+}
+
+func TestLogisticsBatchSendingDateRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchSendingDateInput{ConnectorAccountID: account.ID, SendingDate: "2026-09-05"}
+	digest, err := logisticsBatchSendingDateDigest(input, "24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-sending-date-1"
+	updater := &logisticsBatchSendingDateUpdaterStub{update: sdk.LogisticsBatchSendingDateUpdate{Status: "UPDATED", Updated: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.sending_date.write", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, sendingDateUpdater: updater}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.sending_date.update", ResourceType: "logistics_batch", ResourceID: logisticsBatchSendingDateApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchSendingDatePath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("batch sending date route not registered")
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchSendingDatePath+"24", strings.NewReader(`{"connector_account_id":"cdek-account","sending_date":"2026-09-05"}`))
+	request.Header.Set("Idempotency-Key", "sending-date-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !updater.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"24"`) || !strings.Contains(response.Body.String(), `"sending_date":"2026-09-05"`) || !strings.Contains(response.Body.String(), `"updated":true`) {
+		t.Fatalf("status=%d body=%s updater=%v operation=%+v", response.Code, response.Body.String(), updater.called, operations)
+	}
+}
+
+func TestLogisticsOrderRestoreRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsOrderRestoreInput{ConnectorAccountID: account.ID, OrderIDs: []string{"57565818", "57565819"}}
+	digest, err := logisticsOrderRestoreDigest(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-orders-restore-1"
+	restorer := &logisticsOrderRestorerStub{restore: sdk.LogisticsOrderRestore{Status: "restored", ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.orders.restore", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, restorer: restorer}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.orders.restore", ResourceType: "logistics_orders", ResourceID: logisticsOrderRestoreApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsOrderRestorePath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("order restore route not registered")
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsOrderRestorePath, strings.NewReader(`{"connector_account_id":"cdek-account","order_ids":["57565818","57565819"]}`))
+	request.Header.Set("Idempotency-Key", "restore-orders-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !restorer.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"order_ids":["57565818","57565819"]`) || !strings.Contains(response.Body.String(), `"status":"restored"`) {
+		t.Fatalf("status=%d body=%s restorer=%v operation=%+v", response.Code, response.Body.String(), restorer.called, operations)
 	}
 }
 

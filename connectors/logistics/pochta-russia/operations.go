@@ -250,6 +250,111 @@ func (c *Connector) ReadLogisticsBatches(ctx context.Context, account sdk.Accoun
 	return out, nil
 }
 
+// ReadLogisticsBatchByName reads one Russian Post batch by its provider name.
+func (c *Connector) ReadLogisticsBatchByName(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate() != nil {
+		return sdk.LogisticsBatch{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatch
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.BatchByName(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != query.BatchID {
+		return sdk.LogisticsBatch{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// ReadLogisticsBatchOrders reads a bounded page of safe order projections
+// from one Russian Post batch. Recipient and address data remain provider
+// private and are intentionally not returned.
+func (c *Connector) ReadLogisticsBatchOrders(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate(100) != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out []sdk.LogisticsBatchOrder
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.BatchOrders(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > query.Limit {
+		return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	seen := make(map[string]struct{}, len(out))
+	for _, order := range out {
+		if order.Validate() != nil || order.BatchID != query.BatchID {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+		if _, duplicate := seen[order.RemoteID]; duplicate {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+		seen[order.RemoteID] = struct{}{}
+	}
+	return out, nil
+}
+
+// ReadLogisticsOrder reads one order that is already inside a Russian Post
+// batch. The provider payload is reduced to the same safe projection used by
+// the bounded batch list operation.
+func (c *Connector) ReadLogisticsOrder(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate() != nil {
+		return sdk.LogisticsBatchOrder{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatchOrder
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.OrderInBatch(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchOrder{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != query.RemoteID {
+		return sdk.LogisticsBatchOrder{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// SearchLogisticsOrders finds bounded Russian Post backlog orders by the
+// merchant-assigned order number.
+func (c *Connector) SearchLogisticsOrders(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate(100) != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out []sdk.LogisticsOrderSummary
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.SearchOrders(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > query.Limit {
+		return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	seen := make(map[string]struct{}, len(out))
+	for _, order := range out {
+		if order.Validate() != nil || order.ExternalID != query.ExternalID {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+		if _, duplicate := seen[order.RemoteID]; duplicate {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+		seen[order.RemoteID] = struct{}{}
+	}
+	return out, nil
+}
+
 // ReadArchivedLogisticsBatches reads a bounded page of Russian Post archived
 // batches without projecting the provider's individual order rows.
 func (c *Connector) ReadArchivedLogisticsBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
@@ -361,6 +466,68 @@ func (c *Connector) UnarchiveLogisticsBatch(ctx context.Context, account sdk.Acc
 	return out, nil
 }
 
+// UpdateLogisticsBatchSendingDate changes the provider hand-off date for one
+// formed Russian Post batch. The host owns approval and idempotency policy.
+func (c *Connector) UpdateLogisticsBatchSendingDate(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchSendingDateRequest) (sdk.LogisticsBatchSendingDateUpdate, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatchSendingDateUpdate
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.UpdateBatchSendingDate(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.BatchID || out.SendingDate != request.SendingDate {
+		return sdk.LogisticsBatchSendingDateUpdate{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// RestoreLogisticsOrders moves existing Russian Post batch orders back to the
+// provider's "New" backlog. This is distinct from cancellation: the orders
+// remain available for later batch formation.
+func (c *Connector) RestoreLogisticsOrders(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsOrderRestoreRequest) (sdk.LogisticsOrderRestore, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsOrderRestore{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsOrderRestore
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.RestoreOrders(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsOrderRestore{}, err
+	}
+	if out.Validate() != nil || !sameStringSet(out.OrderIDs, request.OrderIDs) {
+		return sdk.LogisticsOrderRestore{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+func sameStringSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]struct{}, len(left))
+	for _, value := range left {
+		if _, exists := seen[value]; exists {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	for _, value := range right {
+		if _, exists := seen[value]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -379,8 +546,14 @@ var _ sdk.LogisticsSeparateReturnEditor = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)
+var _ sdk.LogisticsBatchLookupReader = (*Connector)(nil)
+var _ sdk.LogisticsBatchOrderReader = (*Connector)(nil)
+var _ sdk.LogisticsOrderReader = (*Connector)(nil)
+var _ sdk.LogisticsOrderSearcher = (*Connector)(nil)
 var _ sdk.LogisticsArchivedBatchReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchCreator = (*Connector)(nil)
 var _ sdk.LogisticsBatchSubmitter = (*Connector)(nil)
 var _ sdk.LogisticsBatchArchiver = (*Connector)(nil)
 var _ sdk.LogisticsBatchUnarchiver = (*Connector)(nil)
+var _ sdk.LogisticsBatchSendingDateUpdater = (*Connector)(nil)
+var _ sdk.LogisticsOrderRestorer = (*Connector)(nil)

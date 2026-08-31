@@ -146,11 +146,13 @@ outside the v1 runtime claim.
 SecretProvider и запустить проверку официального API. Для СДЭК используется
 JSON с OAuth client credentials, для «Деловых Линий» — appkey и PAT, для
 «Почты России» — токен приложения и ключ пользователя. Товарная синхронизация
-не заявляется; для CDEK, ПЭК, «Деловых Линий» и «Почты России» доступно
+не заявляется; для CDEK, 5Post, ПЭК, «Деловых Линий» и «Почты России» доступно
 bounded read-only чтение справочника ПВЗ/терминалов через `pickup.points.read`.
-Для CDEK, ПЭК, «Деловых Линий» и «Почты России» также доступен bounded предпросмотр тарифов через
+Для CDEK, 5Post, ПЭК, «Деловых Линий» и «Почты России» также доступен bounded предпросмотр тарифов через
 `POST /api/v1/logistics/rates` с capability `logistics.rates.read`; запрос
-ограничен 50 местами, ответ — 100 вариантами и не раскрывает код тарифа.
+ограничен 50 местами, ответ — 100 вариантами и не раскрывает код тарифа. Для
+5Post расчёт C2C дополнительно требует UUID точки размещения и UUID точки
+выдачи; адресный текст сам по себе не подменяет эти ссылки.
 Для СДЭК, ПЭК, «Деловых Линий» и «Почты России» также доступно bounded
 read-only отслеживание одного отправления через
 `GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
@@ -194,8 +196,10 @@ PDF-этикетка ПЭК доступна через официальный `
 остальных перевозчиков остаются
 закрытыми до qualification актуального API,
 provider fixtures и тестового кабинета. Для Деловых Линий создание ограничено
-address-to-address LTL-заявкой с явными runtime-параметрами контрагента,
-характера груза, даты и окна передачи.
+address-to-address или bounded terminal-to-terminal LTL-заявкой: для адресного
+маршрута используются адреса, а для терминального — явные
+`sender_terminal_id` и `pickup_point_ref`; в обоих случаях runtime-параметры
+контрагента, характера груза, даты и окна передачи задаются явно.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
 использует пару `client_id`/`api_key` продавца Ozon и проверяет доступ к
@@ -260,22 +264,52 @@ stores only the normalized deletion acknowledgement. Редактировани�
 через approval-bound `POST /api/v1/logistics/returns/separate/{return_id}` и
 официальный `POST /1.0/returns/{barcode}`; runtime принимает только
 подтверждение того же ШПИ и сохраняет нормализованный `UPDATED` результат.
-Dellin additionally
-supports the bounded address-to-address shipment-create route with explicit
-counterparty runtime configuration. ПЭК также допускает аннулирование одной
+Dellin additionally supports the bounded address-to-address and
+terminal-to-terminal shipment-create routes with explicit counterparty and
+terminal runtime configuration, plus the bounded delivery/pickup cancellation
+variants for address services. Для Pre-Alert доступно approval-bound
+расформирование пакетной заявки через `logistics.batches.cancel` и официальный
+`POST /v2/batch_request/cancel.json`; это не отмена отдельной терминальной
+перевозки. ПЭК также допускает аннулирование одной
 предварительной заявки через официальный `/order/cancellation/` с точным
 подтверждением кода. CDEK `ORDER_STATUS` webhooks are verified
 by an OAuth re-fetch and stored as append-only evidence; client-return creation
 with an explicit tariff is admitted, while other carrier operations remain
 fail-closed until provider qualification. 5Post additionally exposes the
-bounded official pickup-point directory read and single-order status lookup;
-Ozon Доставка remains limited to the separately reviewed credential-check
-surface.
+bounded official pickup-point directory read, single-order status lookup,
+cancellation, C2C rate preview, PDF label read and one-parcel universal order create; Ozon
+Доставка remains limited to the separately reviewed credential-check surface.
 
 The exact write qualification boundary and next host-side steps are recorded in
 the [logistics write qualification matrix](connectors/logistics-write-qualification.md).
 The full manifest-versus-runtime boundary is tracked in the
 [fail-closed operation matrix](connectors/fail-closed-operation-matrix.md).
+
+Почта России также поддерживает approval-bound возврат заказов из
+сформированной партии в список «Новые»: host вызывает официальный
+`POST /1.0/user/backlog`, принимает только полный совпадающий набор
+`result-ids` и отклоняет частичные ответы. Операция `logistics.orders.restore`
+отличается от отмены заказа и возврата отправителю.
+
+Для Почты России также доступно bounded read-only чтение строк сформированной
+партии через `GET /api/v1/logistics/batches/orders`, которое вызывает
+`GET /1.0/batch/{batch-name}/shipment` и возвращает только безопасную
+проекцию ID, barcode, статуса и времени наблюдения без PII.
+
+Тот же безопасный projection доступен для поиска одного заказа по числовому ID
+через `GET /api/v1/logistics/orders/{order_id}` и capability
+`logistics.orders.read`; runtime принимает только точное совпадение ID ответа.
+
+Партии Почты России также доступны для точечного read-only поиска по имени
+через `GET /api/v1/logistics/batches/{batch_id}` с существующей capability
+`logistics.batches.read`; состав заказов не возвращается.
+
+Поиск заказа Почты России по номеру магазина доступен через bounded
+read-only capability `logistics.orders.search` и
+`GET /api/v1/logistics/orders/search`. Runtime вызывает
+`GET /1.0/backlog/search?query=...`, проверяет точное совпадение номера и
+возвращает только безопасную проекцию заказа, партии, ШПИ, статуса и времени
+наблюдения.
 
 Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
 карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded

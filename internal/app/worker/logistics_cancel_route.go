@@ -61,7 +61,7 @@ func (route *logisticsCancelRoute) Handle(ctx context.Context, delivery eventbus
 		return nil
 	}
 	var payload logisticsShipmentChangedPayload
-	if err := decodeCommerceEvent(delivery.Event.Data, &payload); err != nil || payload.ShipmentID != delivery.Event.EntityID || payload.Operation != "cancel_requested" || payload.ApprovalRequestID == "" || payload.Version < 1 || !logistics.Status(payload.Status).Valid() {
+	if err := decodeCommerceEvent(delivery.Event.Data, &payload); err != nil || payload.ShipmentID != delivery.Event.EntityID || payload.Operation != "cancel_requested" || payload.ApprovalRequestID == "" || payload.Version < 1 || !logistics.Status(payload.Status).Valid() || (payload.CancelVariant != "" && payload.CancelVariant != "delivery" && payload.CancelVariant != "pickup") {
 		return eventbus.Permanent("logistics_cancel_invalid_payload")
 	}
 	scope, err := tenancy.ParseScope(delivery.Event.OrganizationID, delivery.Event.WorkspaceID)
@@ -121,7 +121,11 @@ func (route *logisticsCancelRoute) Handle(ctx context.Context, delivery eventbus
 	if err != nil {
 		return err
 	}
-	remote, err := canceler.CancelLogisticsShipment(ctx, account, runtime, sdk.ShipmentCancelRequest{RemoteID: shipment.RemoteID, IdempotencyKey: stableID("shipment_cancel_", delivery.Event.ID)})
+	variant := payload.CancelVariant
+	if variant == "" {
+		variant = "delivery"
+	}
+	remote, err := canceler.CancelLogisticsShipment(ctx, account, runtime, sdk.ShipmentCancelRequest{RemoteID: shipment.RemoteID, IdempotencyKey: stableID("shipment_cancel_", delivery.Event.ID), Variant: variant})
 	if err != nil {
 		return route.finishRemoteError(ctx, scope, execution, delivery, shipmentID, payload.Version, err)
 	}
@@ -156,6 +160,7 @@ type logisticsShipmentChangedPayload struct {
 	Version           int64  `json:"version"`
 	Operation         string `json:"operation"`
 	ApprovalRequestID string `json:"approval_request_id"`
+	CancelVariant     string `json:"cancel_variant"`
 }
 
 func (route *logisticsCancelRoute) prepareApproval(ctx context.Context, scope tenancy.Scope, shipmentID logistics.ShipmentID, approvalID string, delivery eventbus.Delivery) (approval.Request, error) {

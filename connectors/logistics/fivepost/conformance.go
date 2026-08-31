@@ -30,7 +30,7 @@ func NewConformanceCandidate(executable string) (*ConformanceCandidate, error) {
 	}
 	return &ConformanceCandidate{
 		SandboxFixture: fixture,
-		connector:      New(candidateTransport{}, func() time.Time { return candidateTime }),
+		connector:      NewWithConfiguration(candidateTransport{}, candidateConfigurationSource{}, func() time.Time { return candidateTime }),
 		idem:           map[string]string{},
 		hooks:          map[string]string{},
 	}, nil

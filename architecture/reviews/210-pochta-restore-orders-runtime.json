@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-210",
+  "task": "210",
+  "change_class": "mixed",
+  "summary": "Admit the bounded Russian Post operation that restores formed-batch orders to the provider backlog.",
+  "scopes": [
+    "adr/0162-pochta-restore-orders.md",
+    "architecture/reviews/210-pochta-restore-orders-runtime.json",
+    "connectors/logistics/pochta-russia/manifest.json",
+    "connectors/logistics/pochta-russia/operations.go",
+    "connectors/logistics/pochta-russia/transport.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "contracts/operations/074-logistics-v1.md",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/pochta-russia/README.md",
+    "docs/connectors/pochta-russia/capability-audit.md",
+    "docs/connectors/pochta-russia/conformance-plan.md",
+    "docs/connectors/pochta-russia/spec.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "internal/app/api/logistics.go",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/logistics.go",
+    "sdk/go/torgnexa/client.gen.go",
+    "sdk/python/torgnexa_sdk/client_gen.py",
+    "sdk/typescript/src/client.gen.d.mts",
+    "sdk/typescript/src/client.gen.mjs",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/210-pochta-restore-orders-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0162-pochta-restore-orders.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0151-pochta-formed-order-pdf.md",
+    "adr/0161-dellin-cancel-pickup.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The authenticated route resolves the logistics account inside the request workspace and the operation receipt is tenant-scoped."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Only bounded provider order references, status and observation time cross the adapter boundary; no provider payload or credentials are persisted."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"A new additive OpenAPI operation and generated SDK method expose the restore request and normalized result."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"The operation uses the existing approval and operation receipt path and does not change an existing event envelope."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"The neutral logistics port and generated SDKs add the bounded order-restore capability."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"Existing operation receipts and capability settings are reused; no schema change is required."},
+    {"area":"security", "status":"affected", "evidence":"The route requires approval, capability and idempotency; the adapter uses callback-scoped credentials and fixed HTTPS egress."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The new state-changing provider operation is explicitly write-sensitive and approval-bound."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"The existing operation and approval records provide the authoritative execution lineage."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The host rejects partial acknowledgements and prevents a second external call for an ambiguous operation receipt."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"Only the documented Russian Post HTTPS endpoint is admitted; no inbound webhook is added."},
+    {"area":"slo_observability", "status":"affected", "evidence":"The shared host transport bounds the request/response and normalizes provider failures."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the new capability or route closes restore without affecting cancellation or batch formation."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Transport, connector, registry and API tests cover success, partial acknowledgement rejection and admission boundaries."}
+  ],
+  "provider": {
+    "id": "pochta-russia",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/pochta-russia/manifest.json",
+    "connector_spec": "docs/connectors/pochta-russia/spec.md",
+    "capability_audit": "docs/connectors/pochta-russia/capability-audit.md",
+    "conformance_plan": "docs/connectors/pochta-russia/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

@@ -1928,3 +1928,240 @@ remains qualification-gated.
 - the PDF body, API key and JWT never cross the host boundary;
 - runtime support, frontend catalog, tests, architecture review and docs stay
   synchronized.
+
+## Phase 75 — 5Post universal one-parcel order create
+
+`206`
+
+Task 206 admits a bounded one-parcel 5Post order through the official
+`POST /api/v3/orders` endpoint. The neutral shipment request now carries
+explicit declared product lines and money values; account configuration
+supplies the provider sender location, undeliverable policy and barcode
+enrichment mode. The host accepts only `code=10` with one matching order and
+cargo identity and never retries an ambiguous write. Tariff calculation,
+returns and webhooks remain fail-closed.
+
+### Gate RUNTIME-206
+
+- product-line totals, currency, VAT and payment-value relationships are
+  checked before the external write;
+- the provider sender location and barcode contract are explicit tenant
+  configuration, not inferred from a neutral address or pickup point;
+- only one pickup-point order and one cargo are sent, and response IDs are
+  matched before a normalized `created` result is returned;
+- runtime support, OpenAPI, frontend catalog, tests, architecture review and
+  docs stay synchronized.
+
+## Phase 76 — 5Post C2C tariff preview
+
+`207`
+
+Task 207 admits the bounded 5Post C2C tariff endpoint through the official
+`POST /api/v1/tariff/c2c`. The neutral rate request carries explicit placement
+and issue point UUIDs plus optional declared/payment values; the host converts
+SDK grams to provider milligrams, parses decimal prices exactly into RUB minor
+units and bounds the returned delivery days. Other commercial tariffs remain
+fail-closed.
+
+### Gate RUNTIME-207
+
+- point UUIDs are explicit and are never inferred from city/address text;
+- provider decimal values are not decoded through binary floating point;
+- malformed, missing or out-of-range response costs and delivery periods fail
+  closed;
+- runtime support, OpenAPI, frontend catalog, tests, architecture review and
+  docs stay synchronized.
+
+## Phase 77 — Деловые Линии terminal-to-terminal shipment create
+
+`208`
+
+Task 208 admits the bounded terminal-to-terminal variant of the existing
+Деловые Линии shipment-create route. `sender_terminal_id` is explicit tenant
+runtime configuration and `pickup_point_ref` is the numeric receiver-terminal
+reference. Address-to-address creation remains unchanged; terminal payloads
+contain `variant=terminal` and both terminal IDs without address objects.
+
+### Gate RUNTIME-208
+
+- both terminal references are explicit, numeric and provider-owned; they are
+  never inferred from Core addresses or warehouse IDs;
+- the common approval-bound worker, SecretProvider, tenant isolation and
+  no-retry-on-ambiguous-result boundaries remain in force;
+- deterministic fixtures prove terminal payload shape and preserve the
+  address-to-address payload;
+- runtime support, frontend configuration, generated catalogs, tests,
+  architecture review and connector qualification docs stay synchronized.
+
+## Phase 78 — Деловые Линии pickup cancellation
+
+`209`
+
+Task 209 admits the bounded `delivery`/`pickup` variants of the existing
+approval-bound Dellin cancellation route. The default remains `delivery`; the
+new `pickup` mode calls the official `/v3/orders/cancel_pickup.json` endpoint
+and carries the selected mode through the tenant-scoped event to the worker.
+Both provider responses remain `cancellation_pending` until reconciliation.
+
+### Gate RUNTIME-209
+
+- the variant is a bounded enum and invalid values fail before connector
+  invocation;
+- Dellin uses only the documented delivery and pickup cancellation endpoints,
+  with numeric order identity and `requester=sender`;
+- approval, tenant, SecretProvider, idempotency and no-blind-retry boundaries
+  remain unchanged;
+- OpenAPI/event schemas, generated SDKs, frontend catalog, deterministic
+  transport/worker tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 79 — Почта России: возврат заказов из партии в «Новые»
+
+`210`
+
+Task 210 admits the official Russian Post `POST /1.0/user/backlog` operation
+through a new neutral `logistics.orders.restore` capability. The route is
+approval-bound and idempotent, sends 1–100 numeric order IDs, and accepts only
+an exact full `result-ids` acknowledgement without provider errors. This is
+distinct from cancellation and parcel return.
+
+### Gate RUNTIME-210
+
+- partial, duplicate, mismatched or provider-error acknowledgements fail closed;
+- the existing tenant, approval, SecretProvider and no-blind-retry boundaries
+  remain unchanged;
+- OpenAPI, generated SDKs, runtime support, frontend, deterministic transport/
+  connector/API tests, architecture review and qualification docs stay synchronized;
+- the operation remains separately removable without changing batch creation,
+  cancellation or return semantics.
+
+## Phase 80 — Почта России: чтение заказов внутри партии
+
+`211`
+
+Task 211 admits the bounded read-only Russian Post batch-order endpoint through
+`logistics.batches.orders.read`. The host calls
+`GET /1.0/batch/{batch-name}/shipment`, validates the numeric batch identity,
+page bounds and exact response membership, then exposes only provider order ID,
+batch ID, barcode, normalized lowercase status and UTC observation time.
+
+### Gate RUNTIME-211
+
+- recipient/address fields and raw provider payload never cross the connector
+  boundary;
+- mismatched batch IDs, duplicate rows, malformed identifiers/statuses and
+  responses larger than the requested limit fail closed;
+- the route remains read-only and does not require approval or idempotency
+  receipts;
+- OpenAPI, generated SDKs, runtime support, frontend catalog/UI, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 83 — Почта России: поиск заказа по номеру магазина
+
+`214`
+
+Task 214 admits the bounded read-only Russian Post backlog search through
+`logistics.orders.search`. The host calls `GET /1.0/backlog/search` with the
+merchant order number, enforces exact external-ID membership and a maximum of
+100 results, and exposes only stable references, status and observation time.
+
+### Gate RUNTIME-214
+
+- the route is read-only and performs no approval, idempotency or provider write;
+- the query is bounded and provider results must match the requested merchant
+  order number exactly;
+- duplicate rows, malformed references/statuses and oversized responses fail
+  closed;
+- recipient/address fields and raw provider payload never cross the connector
+  boundary;
+- OpenAPI, generated SDKs, runtime support, frontend catalog/UI, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 81 — Почта России: поиск одного заказа в партии
+
+`212`
+
+Task 212 admits the bounded Russian Post `GET /1.0/shipment/{id}` lookup through
+`logistics.orders.read`. The host accepts only a numeric provider order ID,
+supports one object or one-item array response, requires exact ID membership and
+projects no recipient/address fields.
+
+### Gate RUNTIME-212
+
+- the route is read-only and performs no approval, idempotency or provider write;
+- response ID, batch ID, barcode and status are validated and status is exposed
+  in normalized lowercase form;
+- missing/mismatched IDs, multiple rows and malformed responses fail closed;
+- OpenAPI, generated SDKs, runtime support, frontend UI/catalog, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 84 — Почта России: изменение даты передачи партии
+
+`215`
+
+Task 215 admits the approval-bound Russian Post batch hand-off date update
+through `logistics.batches.sending_date.write`. The host calls the official
+path-only `POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD`, accepts the
+documented empty success acknowledgement, and exposes only the exact batch ID,
+ISO date and normalized `UPDATED` result.
+
+### Gate RUNTIME-215
+
+- the route requires an enabled write-sensitive capability, matching approval,
+  workspace scope and tenant-scoped idempotency receipt;
+- the provider request contains no caller-controlled host, query or body, and
+  only the documented Russian Post endpoint is admitted;
+- empty successful responses and JSON without `error-code` are accepted, while
+  provider errors, malformed responses, invalid dates and mismatched IDs fail
+  closed;
+- raw provider payload, credentials and unrelated batch data never cross the
+  connector boundary;
+- OpenAPI, generated SDKs, runtime support, frontend catalog/UI, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 82 — Почта России: поиск партии по имени
+
+`213`
+
+Task 213 extends the admitted `logistics.batches.read` capability with the
+bounded Russian Post `GET /1.0/batch/{batch-name}` lookup. The host accepts only
+a numeric batch name and a single exact response projection containing the
+provider batch ID, status, shipment count and UTC observation time.
+
+### Gate RUNTIME-213
+
+- the route is read-only and performs no approval, idempotency or provider write;
+- object or single-item array responses are bounded to one exact batch;
+- mismatched names, multiple rows and malformed status/count fail closed;
+- order rows, raw provider payload and credentials never cross the host boundary;
+- OpenAPI, generated SDKs, runtime support, frontend UI/catalog, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.
+
+## Phase 85 — «Деловые Линии»: отмена Pre-Alert пакетной заявки
+
+`216`
+
+Task 216 admits the official Dellin Pre-Alert batch dissolution operation via
+`logistics.batches.cancel`. The approval-bound route calls
+`POST /v2/batch_request/cancel.json`, validates the numeric `batchRequestID` and
+accepts only `metadata.status=200` with `data.state=success`. The normalized
+result is `CANCELLED`; this operation is deliberately distinct from cancelling
+an individual terminal shipment or creating a manual return.
+
+### Gate RUNTIME-216
+
+- the route requires workspace scope, an active Dellin account, enabled
+  write-sensitive capability, matching approval and tenant-scoped idempotency;
+- only the fixed official Dellin HTTPS endpoint is admitted and credentials are
+  callback-scoped through SecretProvider;
+- non-numeric IDs, provider errors, malformed responses and ambiguous transport
+  outcomes fail closed, while raw provider payload and batch contents remain
+  outside Core;
+- OpenAPI, generated SDKs, runtime support, frontend/catalog, deterministic
+  transport/connector/API tests, architecture review and qualification docs stay
+  synchronized.

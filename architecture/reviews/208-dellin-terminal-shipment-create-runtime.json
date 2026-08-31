@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-208",
+  "task": "208",
+  "change_class": "mixed",
+  "summary": "Admit bounded Деловые Линии terminal-to-terminal shipment creation through the reviewed runtime.",
+  "scopes": [
+    "adr/0160-dellin-terminal-shipment-create.md",
+    "architecture/reviews/208-dellin-terminal-shipment-create-runtime.json",
+    "connectors/logistics/dellin/config.go",
+    "connectors/logistics/dellin/connector_test.go",
+    "connectors/logistics/dellin/operations.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/dellin/README.md",
+    "docs/connectors/dellin/capability-audit.md",
+    "docs/connectors/dellin/conformance-plan.md",
+    "docs/connectors/dellin/spec.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/logistics-write-qualification.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/generated/connector-catalog.ts",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/logistics_transport_test.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/208-dellin-terminal-shipment-create-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0160-dellin-terminal-shipment-create.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0148-pek-cargo-return.md",
+    "adr/0157-fivepost-label.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The existing authenticated shipment route resolves tenant-scoped account configuration before invoking the Dellin creator."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Terminal mode sends only explicit terminal references and bounded shipment fields; neutral address fields are omitted from the provider payload."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"No public schema change is required because the existing optional pickup_point_ref field carries the receiver terminal reference."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope, event type or event payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"The Dellin connector reuses the existing shipment-create operation and narrows terminal references in its adapter."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"The optional sender terminal is stored in the existing runtime configuration boundary without a new table or migration."},
+    {"area":"security", "status":"affected", "evidence":"Fixed-host HTTPS, callback-scoped credentials, numeric remote-reference validation and omission of unused address fields are enforced."},
+    {"area":"approvals_risk", "status":"not_affected", "evidence":"Terminal creation reuses the existing approval-bound shipment worker and write-sensitive policy checks."},
+    {"area":"audit_lineage", "status":"not_affected", "evidence":"The existing shipment operation receipt and audit boundary remain unchanged."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The existing create path does not retry an ambiguous external result, and the terminal branch adds no second external call."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The branch uses only the fixed official Dellin HTTPS request endpoint and adds no inbound callback."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Shared request timeout, response bounds and normalized errors cover the additional payload variant."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the optional config mapping or terminal branch immediately closes terminal creation while leaving address creation available."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic tests verify both terminal references, no address objects, configuration requirements and unchanged normalized success."}
+  ],
+  "provider": {
+    "id": "dellin",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/dellin/manifest.json",
+    "connector_spec": "docs/connectors/dellin/spec.md",
+    "capability_audit": "docs/connectors/dellin/capability-audit.md",
+    "conformance_plan": "docs/connectors/dellin/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

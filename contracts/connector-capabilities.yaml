@@ -59,11 +59,17 @@ capabilities:
   payments.refund: Refund payment
   payments.reconcile: Read/reconcile settlements
   logistics.batches.create: Form a provider batch from existing orders
+  logistics.batches.cancel: Dissolve a provider Pre-Alert batch
   logistics.batches.submit: Hand a formed provider batch to carrier processing
   logistics.batches.archive: Move a formed provider batch to the provider archive
   logistics.batches.archive.read: Read provider batches from the archive
   logistics.batches.unarchive: Restore a provider batch from the provider archive
+  logistics.batches.sending_date.write: Change the provider batch hand-off date
   logistics.batches.read: Read provider batch directory
+  logistics.batches.orders.read: Read orders inside a provider batch
+  logistics.orders.read: Read one provider order inside a batch
+  logistics.orders.search: Search provider orders by merchant reference
+  logistics.orders.restore: Return formed-batch orders to the provider backlog
   logistics.rates.read: Calculate delivery rates/SLA
   logistics.shipment.create: Create shipment
   logistics.track.read: Track shipment

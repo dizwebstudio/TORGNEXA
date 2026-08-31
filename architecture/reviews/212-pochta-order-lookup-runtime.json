@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-212",
+  "task": "212",
+  "change_class": "mixed",
+  "summary": "Admit the bounded Russian Post read-only lookup for one order inside a provider batch.",
+  "scopes": [
+    "adr/0164-pochta-order-lookup.md",
+    "architecture/reviews/212-pochta-order-lookup-runtime.json",
+    "connectors/logistics/pochta-russia/manifest.json",
+    "connectors/logistics/pochta-russia/operations.go",
+    "connectors/logistics/pochta-russia/transport.go",
+    "contracts/connector-capabilities.yaml",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "contracts/openapi/torgnexa-v1.yaml",
+    "contracts/operations/074-logistics-v1.md",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/pochta-russia/README.md",
+    "docs/connectors/pochta-russia/capability-audit.md",
+    "docs/connectors/pochta-russia/conformance-plan.md",
+    "docs/connectors/pochta-russia/spec.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "internal/app/api/logistics.go",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/connectors/capabilities.go",
+    "internal/platform/connectors/logistics.go",
+    "sdk/go/torgnexa/client.gen.go",
+    "sdk/python/torgnexa_sdk/client_gen.py",
+    "sdk/typescript/src/client.gen.d.mts",
+    "sdk/typescript/src/client.gen.mjs",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/212-pochta-order-lookup-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0164-pochta-order-lookup.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0163-pochta-batch-orders-read.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The authenticated route resolves the logistics account inside the request workspace."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Only provider order/batch references, barcode, normalized status and observation time cross the adapter boundary."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"A new additive OpenAPI operation and generated SDK method expose the bounded lookup."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"The operation is read-only and adds no event or envelope change."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"The neutral logistics port and generated SDKs add the admitted capability."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"No persistence or schema change is required."},
+    {"area":"security", "status":"affected", "evidence":"The route requires authenticated tenant scope, connector permission and enabled capability; credentials stay callback-scoped."},
+    {"area":"approvals_risk", "status":"not_affected", "evidence":"The bounded operation is read-only and does not require approval or idempotency receipt."},
+    {"area":"audit_lineage", "status":"not_affected", "evidence":"No state-changing operation is introduced."},
+    {"area":"reconciliation_idempotency", "status":"not_affected", "evidence":"No external write or receipt is introduced."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"Only the documented Russian Post HTTPS endpoint is admitted."},
+    {"area":"slo_observability", "status":"affected", "evidence":"The host transport bounds response size and normalizes provider failures."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the capability or route closes the lookup without affecting batch writes."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Transport, connector, registry and API tests cover safe projection and ID mismatch rejection."}
+  ],
+  "provider": {
+    "id": "pochta-russia",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/pochta-russia/manifest.json",
+    "connector_spec": "docs/connectors/pochta-russia/spec.md",
+    "capability_audit": "docs/connectors/pochta-russia/capability-audit.md",
+    "conformance_plan": "docs/connectors/pochta-russia/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

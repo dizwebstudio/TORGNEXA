@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/torgnexa/torgnexa/internal/core/logistics"
 )
 
 func TestRepositoryKeepsShipmentMutationAtomicAndCarrierNeutral(t *testing.T) {
@@ -42,5 +44,16 @@ func TestRepositoryUsesExplicitNormalizedShipmentStates(t *testing.T) {
 		if !strings.Contains(source, state) {
 			t.Fatalf("shipment lifecycle must include %q", state)
 		}
+	}
+}
+
+func TestCancelDigestKeepsLegacyDeliveryIdentity(t *testing.T) {
+	id := logistics.ShipmentID("018f47a0-1234-7890-8abc-1234567890ab")
+	legacy := cancelDigest(id, "3954004", "")
+	if legacy != cancelDigest(id, "3954004", "delivery") {
+		t.Fatal("delivery variant must preserve the legacy cancellation digest")
+	}
+	if legacy == cancelDigest(id, "3954004", "pickup") {
+		t.Fatal("pickup variant must have a distinct cancellation digest")
 	}
 }

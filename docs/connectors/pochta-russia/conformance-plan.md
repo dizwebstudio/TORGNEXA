@@ -79,6 +79,14 @@ revert-маршрут.
 использовать исключительно тестовый возврат и подтвердить необратимость,
 timeout/reconciliation и approval boundary.
 
+Для `logistics.orders.restore` fixture должен проверить `POST /1.0/user/backlog`,
+массив числовых order IDs, оба заголовка авторизации и нормализацию полного
+набора `result-ids` в `restored`. Harness обязан отклонять любой `errors`,
+частичный или переставленный с дубликатами результат, а также нечисловые ID.
+Live qualification должна подтвердить, что операция возвращает заказ из
+сформированной партии в «Новые», не является отменой и защищена
+tenant-scoped operation receipt.
+
 Для `logistics.return.separate.edit` fixture должен проверить `POST
 /1.0/returns/{barcode}`, заголовки авторизации, отсутствие caller-controlled
 URL и полный ограниченный JSON payload. Успешным считается только ответ с
@@ -87,3 +95,46 @@ URL и полный ограниченный JSON payload. Успешным сч
 Host сохраняет только `UPDATED`/`updated=true`, а live qualification
 выполняется на disposable-тестовом возврате с проверкой idempotency,
 approval и timeout/reconciliation.
+
+Для `logistics.batches.orders.read` fixture должен проверить `GET
+/1.0/batch/{batch-name}/shipment`, числовой batch ID, `size`, `page`,
+`sort=ask` и оба заголовка авторизации. Harness обязан нормализовать два
+заказа в безопасную проекцию, привести статус к lowercase, отклонить
+несовпадающую партию, дубликаты, невалидные ID/barcode/status и ответ сверх
+лимита. Fixture с полями получателя и адреса должен подтвердить, что эти поля
+не пересекают границу коннектора. Live qualification выполняется только на
+тестовой партии и не добавляет запись или изменение состояния у провайдера.
+
+Для `logistics.orders.read` fixture должен проверить `GET
+/1.0/shipment/{id}` без query/body, числовой order ID и оба заголовка
+авторизации. Harness должен принять object или массив ровно с одной записью,
+сверить ID запроса и ответа, нормализовать uppercase status в lowercase и
+отклонить другой ID, отсутствие batch ID, malformed barcode/status и массив с
+несколькими строками. Поля получателя/адреса в fixture не должны попасть в
+проекцию. Live qualification выполняется на тестовом заказе в партии и не
+изменяет состояние провайдера.
+
+Для точечного lookup партии fixture должен проверить `GET
+/1.0/batch/{batch-name}` без query/body, числовое имя, auth headers и exact
+`batch-name` в ответе. Допускается object или массив ровно с одним объектом;
+несовпадение, несколько объектов, malformed status/count и provider error
+должны отклоняться. Projection ограничена ID, статусом, количеством
+отправлений и UTC observation time; строки заказов не пересекают границу.
+
+Для `logistics.orders.search` conformance fixture должен проверить
+`GET /1.0/backlog/search` с query `query`, auth headers и ограничением
+`limit<=100` на стороне host. Проверяются точное совпадение merchant order
+number, нормализация статуса, optional batch/barcode, duplicate rejection и
+отсутствие PII/raw payload в проекции. Ответ с другим номером, malformed
+reference/status или превышением лимита остаётся provider failure. Live
+qualification read-only и не изменяет состояние заказа.
+
+Для `logistics.batches.sending_date.write` fixture должен проверить
+`POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD`, отсутствие query/body,
+числовую партию, корректное разбиение ISO-даты на path-сегменты и оба
+заголовка авторизации. Нужно принять пустой `2xx` или JSON без `error-code`,
+но отклонить provider error, malformed body, другой batch ID и неверную дату.
+Live qualification проводится на disposable сформированной партии с заранее
+одобренным запросом, проверкой operation receipt, повтором того же ключа и
+сверкой поведения после timeout; боевые партии и реальные клиентские данные
+не используются.

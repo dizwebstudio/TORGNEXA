@@ -61,13 +61,15 @@ func (stub *logisticsCancelRuntimeStub) logisticsCanceler(context.Context, tenan
 }
 
 type logisticsCancelConnectorStub struct {
-	result sdk.ShipmentResult
-	err    error
-	calls  int
+	result  sdk.ShipmentResult
+	err     error
+	calls   int
+	request sdk.ShipmentCancelRequest
 }
 
-func (stub *logisticsCancelConnectorStub) CancelLogisticsShipment(context.Context, sdk.Account, sdk.Runtime, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+func (stub *logisticsCancelConnectorStub) CancelLogisticsShipment(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
 	stub.calls++
+	stub.request = request
 	return stub.result, stub.err
 }
 
@@ -147,6 +149,24 @@ func TestLogisticsCancelRoutePersistsProviderAcceptedPendingState(t *testing.T) 
 	}
 }
 
+func TestLogisticsCancelRoutePassesPickupVariantToConnector(t *testing.T) {
+	shipment := logisticsCancelShipment()
+	remote := &logisticsCancelConnectorStub{result: sdk.ShipmentResult{RemoteID: shipment.RemoteID, Status: "cancellation_pending", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: shipment.RemoteID, ObservedAt: time.Now().UTC()}}
+	approvals := &logisticsCancelApprovalStub{request: logisticsCancelApproval(shipment)}
+	route, err := newLogisticsCancelRoute(&logisticsCancelShipmentStub{shipment: shipment}, logisticsCancelAccountStub{account: logisticsCancelAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.cancel", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, &logisticsCancelRuntimeStub{canceler: remote}, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
+		return logisticsCancelRuntimeValue{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := route.Handle(context.Background(), logisticsCancelDeliveryVariant(t, shipment, approvals.request.ID, "pickup")); err != nil {
+		t.Fatal(err)
+	}
+	if remote.calls != 1 || remote.request.Variant != "pickup" {
+		t.Fatalf("connector calls=%d variant=%q", remote.calls, remote.request.Variant)
+	}
+}
+
 func TestLogisticsCancelRouteFailsPermanentRemoteErrorAndDoesNotRetry(t *testing.T) {
 	_ = logisticsCancelScope(t)
 	shipment := logisticsCancelShipment()
@@ -200,9 +220,17 @@ func TestLogisticsCancelRouteMarksAmbiguousTransportAsUnknown(t *testing.T) {
 }
 
 func logisticsCancelDelivery(t *testing.T, shipment logistics.Shipment, approvalID string) eventbus.Delivery {
+	return logisticsCancelDeliveryVariant(t, shipment, approvalID, "")
+}
+
+func logisticsCancelDeliveryVariant(t *testing.T, shipment logistics.Shipment, approvalID, variant string) eventbus.Delivery {
 	t.Helper()
-	data := []byte(`{"shipment_id":"` + shipment.ID.String() + `","status":"created","version":1,"operation":"cancel_requested","approval_request_id":"` + approvalID + `"}`)
-	return eventbus.Delivery{Event: eventbus.Event{ID: "018f1c8a-7b3c-7def-8000-000000000099", Type: eventbus.EventType(logisticsShipmentChangedEvent), OrganizationID: "018f1c8a-7b3c-7def-8000-000000000001", WorkspaceID: "018f1c8a-7b3c-7def-8000-000000000002", EntityType: "shipment", EntityID: shipment.ID.String(), Source: "api.logistics", CorrelationID: "cancel-key", ActorID: "operator-1", Data: data}, Attempt: 1}
+	data := `{"shipment_id":"` + shipment.ID.String() + `","status":"created","version":1,"operation":"cancel_requested","approval_request_id":"` + approvalID + `"`
+	if variant != "" {
+		data += `,"cancel_variant":"` + variant + `"`
+	}
+	data += `}`
+	return eventbus.Delivery{Event: eventbus.Event{ID: "018f1c8a-7b3c-7def-8000-000000000099", Type: eventbus.EventType(logisticsShipmentChangedEvent), OrganizationID: "018f1c8a-7b3c-7def-8000-000000000001", WorkspaceID: "018f1c8a-7b3c-7def-8000-000000000002", EntityType: "shipment", EntityID: shipment.ID.String(), Source: "api.logistics", CorrelationID: "cancel-key", ActorID: "operator-1", Data: []byte(data)}, Attempt: 1}
 }
 
 func logisticsCancelScope(t *testing.T) tenancy.Scope {

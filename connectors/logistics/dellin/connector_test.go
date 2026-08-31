@@ -99,9 +99,32 @@ func TestShipmentCreationUsesConfiguredRuntime(t *testing.T) {
 	}
 }
 
+func TestTerminalShipmentCreationRequiresBothTerminalReferences(t *testing.T) {
+	request := testShipmentRequest()
+	request.PickupPointRef = "626"
+	connector := New(candidateTransport{}, nil, testConfigurationSource{configuration: Configuration{
+		RequesterUID: "requester-1", SenderCounteragentID: 123, FreightUID: "freight-1", SenderTerminalID: "36",
+		ProduceDate: "2026-09-15", DerivalWorktimeStart: "09:00", DerivalWorktimeEnd: "18:00", PaymentType: "cash",
+	}})
+	if _, err := connector.CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, request); err != nil {
+		t.Fatalf("terminal shipment creation rejected: %v", err)
+	}
+	request.PickupPointRef = "not-a-terminal"
+	if _, err := connector.CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, request); err == nil {
+		t.Fatal("invalid recipient terminal was accepted")
+	}
+}
+
 func TestShipmentCancellationReturnsPendingUntilCarrierConfirms(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).CancelLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCancelRequest{RemoteID: "3954004", IdempotencyKey: "cancel-17"})
 	if err != nil || result.RemoteID != "3954004" || result.Status != "cancellation_pending" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestBatchCancellationUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CancelLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchCancelRequest{BatchID: "24", IdempotencyKey: "cancel-batch-17"})
+	if err != nil || result.RemoteID != "24" || result.Status != "CANCELLED" || !result.Cancelled {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }

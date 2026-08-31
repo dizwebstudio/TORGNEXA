@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 157
-- tasks: 207
+- adrs: 168
+- tasks: 218
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3258
+- total source files (excluding local secrets/build/dependency/cache trees): 3293
 
 
 ## Connector category layout
@@ -707,6 +707,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0155-fivepost-tracking.md`
 - `adr/0156-fivepost-cancel.md`
 - `adr/0157-fivepost-label.md`
+- `adr/0158-fivepost-order-create.md`
+- `adr/0159-fivepost-c2c-tariff.md`
+- `adr/0160-dellin-terminal-shipment-create.md`
+- `adr/0161-dellin-cancel-pickup.md`
+- `adr/0162-pochta-restore-orders.md`
+- `adr/0163-pochta-batch-orders-read.md`
+- `adr/0164-pochta-order-lookup.md`
+- `adr/0165-pochta-batch-lookup.md`
+- `adr/0166-pochta-order-search.md`
+- `adr/0167-pochta-batch-sending-date.md`
+- `adr/0168-dellin-prealert-batch-cancel.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -901,6 +912,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/203-fivepost-tracking-runtime.json`
 - `architecture/reviews/204-fivepost-cancel-runtime.json`
 - `architecture/reviews/205-fivepost-label-runtime.json`
+- `architecture/reviews/206-fivepost-order-create-runtime.json`
+- `architecture/reviews/207-fivepost-c2c-tariff-runtime.json`
+- `architecture/reviews/208-dellin-terminal-shipment-create-runtime.json`
+- `architecture/reviews/209-dellin-cancel-pickup-runtime.json`
+- `architecture/reviews/210-pochta-restore-orders-runtime.json`
+- `architecture/reviews/211-pochta-batch-orders-read-runtime.json`
+- `architecture/reviews/212-pochta-order-lookup-runtime.json`
+- `architecture/reviews/213-pochta-batch-lookup-runtime.json`
+- `architecture/reviews/214-pochta-order-search-runtime.json`
+- `architecture/reviews/215-pochta-batch-sending-date-runtime.json`
+- `architecture/reviews/216-dellin-prealert-batch-cancel-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1107,6 +1129,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/logistics/dellin/presentation.json`
 - `connectors/logistics/dellin/transport.go`
 - `connectors/logistics/fivepost/candidate_transport.go`
+- `connectors/logistics/fivepost/config.go`
+- `connectors/logistics/fivepost/config_test.go`
 - `connectors/logistics/fivepost/conformance.go`
 - `connectors/logistics/fivepost/connector.go`
 - `connectors/logistics/fivepost/connector_test.go`
@@ -3702,6 +3726,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/203-fivepost-tracking-runtime.md`
 - `tasks/issues/204-fivepost-cancel-runtime.md`
 - `tasks/issues/205-fivepost-label-runtime.md`
+- `tasks/issues/206-fivepost-order-create-runtime.md`
+- `tasks/issues/207-fivepost-c2c-tariff-runtime.md`
+- `tasks/issues/208-dellin-terminal-shipment-create-runtime.md`
+- `tasks/issues/209-dellin-cancel-pickup-runtime.md`
+- `tasks/issues/210-pochta-restore-orders-runtime.md`
+- `tasks/issues/211-pochta-batch-orders-read-runtime.md`
+- `tasks/issues/212-pochta-order-lookup-runtime.md`
+- `tasks/issues/213-pochta-batch-lookup-runtime.md`
+- `tasks/issues/214-pochta-order-search-runtime.md`
+- `tasks/issues/215-pochta-batch-sending-date-runtime.md`
+- `tasks/issues/216-dellin-prealert-batch-cancel-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

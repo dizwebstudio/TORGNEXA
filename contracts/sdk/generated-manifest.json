@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "4b1a8947b1d513016abe195aa16bd73b4fca6393c1bab5556e257c30ac64370f",
+    "sha256": "3feac5ceed5df1b268a616d33e83cdc67c28102d94392edd0faee947d371c8e9",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -53,6 +53,11 @@
       "operation_id": "cancelAssistantRun",
       "method": "POST",
       "path": "/assistant/runs/{run_id}:cancel"
+    },
+    {
+      "operation_id": "cancelLogisticsBatch",
+      "method": "POST",
+      "path": "/logistics/batches/cancel/{batch_id}"
     },
     {
       "operation_id": "cancelLogisticsShipment",
@@ -445,6 +450,16 @@
       "path": "/lineage/timeline"
     },
     {
+      "operation_id": "getLogisticsBatch",
+      "method": "GET",
+      "path": "/logistics/batches/{batch_id}"
+    },
+    {
+      "operation_id": "getLogisticsOrder",
+      "method": "GET",
+      "path": "/logistics/orders/{order_id}"
+    },
+    {
       "operation_id": "getMCPAccountPolicy",
       "method": "GET",
       "path": "/settings/mcp-accounts/{account_id}:policy"
@@ -678,6 +693,11 @@
       "operation_id": "listInventoryWarehouses",
       "method": "GET",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "listLogisticsBatchOrders",
+      "method": "GET",
+      "path": "/logistics/batches/orders"
     },
     {
       "operation_id": "listLogisticsBatches",
@@ -935,6 +955,11 @@
       "path": "/sync/drifts/{drift_id}/actions"
     },
     {
+      "operation_id": "restoreLogisticsOrders",
+      "method": "POST",
+      "path": "/logistics/orders/restore"
+    },
+    {
       "operation_id": "retireApprovalPolicy",
       "method": "DELETE",
       "path": "/approval-policies/{policy_id}"
@@ -993,6 +1018,11 @@
       "operation_id": "searchLegalParties",
       "method": "GET",
       "path": "/counterparties/search"
+    },
+    {
+      "operation_id": "searchLogisticsOrders",
+      "method": "GET",
+      "path": "/logistics/orders/search"
     },
     {
       "operation_id": "sendAssistantMessage",
@@ -1058,6 +1088,11 @@
       "operation_id": "updateInventoryWarehouse",
       "method": "PATCH",
       "path": "/inventory/warehouses/{warehouse_id}"
+    },
+    {
+      "operation_id": "updateLogisticsBatchSendingDate",
+      "method": "POST",
+      "path": "/logistics/batches/sending-date/{batch_id}"
     },
     {
       "operation_id": "updateOfferPrice",

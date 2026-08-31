@@ -6,6 +6,7 @@
   "sdk_version": 1,
   "capabilities": [
     "logistics.label.read",
+    "logistics.batches.cancel",
     "logistics.rates.read",
     "logistics.shipment.create",
     "logistics.shipment.cancel",

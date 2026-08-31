@@ -14,6 +14,7 @@ import (
 	"time"
 
 	dellin "github.com/torgnexa/torgnexa/connectors/logistics/dellin"
+	fivepost "github.com/torgnexa/torgnexa/connectors/logistics/fivepost"
 	pek "github.com/torgnexa/torgnexa/connectors/logistics/pek"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
@@ -56,6 +57,64 @@ func TestFivePostPickupPointsUseOfficialJWTAndNormalizeDirectory(t *testing.T) {
 	}
 	if len(points) != 1 || points[0].RemoteID != "5post-pvz-1" || points[0].Name != "5Post на Тверской" || points[0].Country != "RU" || points[0].City != "Москва" || points[0].Address != "Москва, Тверская, 1" || !points[0].Active || points[0].UpdatedAt.Location() != time.UTC {
 		t.Fatalf("unexpected normalized 5Post pickup points: %+v", points)
+	}
+}
+
+func TestFivePostTokenIsCachedWithinPartnerRenewalWindow(t *testing.T) {
+	tokenCalls := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/jwt-generate-claims/rs256/1" {
+			t.Fatalf("unexpected 5Post token path: %s", r.URL.Path)
+		}
+		tokenCalls++
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+	}))
+	defer server.Close()
+
+	transport := fivepostHTTP{h: testTLSTransport(t, server)}
+	if err := transport.Ping(context.Background(), []byte("fivepost-key")); err != nil {
+		t.Fatalf("first 5Post token request failed: %v", err)
+	}
+	if err := transport.Ping(context.Background(), []byte("fivepost-key")); err != nil {
+		t.Fatalf("cached 5Post token request failed: %v", err)
+	}
+	if tokenCalls != 1 {
+		t.Fatalf("expected one token exchange within renewal window, got %d", tokenCalls)
+	}
+}
+
+func TestFivePostTariffUsesOfficialC2CContractAndExactMoney(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v1/tariff/c2c":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer fivepost-jwt" || r.Header.Get("Accept-Language") != "ru" {
+				t.Fatalf("unexpected 5Post tariff request: method=%s authorization=%q language=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Accept-Language"))
+			}
+			var request fivepostTariffRequest
+			if json.NewDecoder(r.Body).Decode(&request) != nil || request.PointFrom != "13e9d62d-1799-4e14-a27b-d218f33de7f6" || request.PointTo != "23e9d62d-1799-4e14-a27b-d218f33de7f6" || request.CalculateDate != "2026-09-01" || request.Price != "123.45" || request.PaymentAmount != "300.00" || len(request.CargoDimensions) != 1 || request.CargoDimensions[0].Weight != 1000000 {
+				t.Fatalf("unexpected 5Post tariff body: %+v", request)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"minDeliveryDays": 1, "maxDeliveryDays": 2, "transactions": []map[string]any{{"serviceType": "С2С", "paymentMethod": "CARD", "payment": 300.2, "paymentWithVat": 331.2}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	request := sdk.RateRequest{
+		From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		FromPointRef: "13e9d62d-1799-4e14-a27b-d218f33de7f6", ToPointRef: "23e9d62d-1799-4e14-a27b-d218f33de7f6", CalculateDate: "2026-09-01",
+		DeclaredValue: sdk.LogisticsMoney{MinorUnits: 12345, Currency: "RUB"}, PaymentValue: sdk.LogisticsMoney{MinorUnits: 30000, Currency: "RUB"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+	}
+	quotes, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Rates(context.Background(), []byte("fivepost-key"), request)
+	if err != nil {
+		t.Fatalf("5Post tariff request failed: %v", err)
+	}
+	if len(quotes) != 1 || quotes[0].ServiceCode != "fivepost_c2c" || quotes[0].Cost.MinorUnits != 33120 || quotes[0].Cost.Currency != "RUB" || !quotes[0].MinDeliveryAt.Equal(time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)) || !quotes[0].MaxDeliveryAt.Equal(time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("unexpected normalized 5Post tariff: %+v", quotes)
 	}
 }
 
@@ -162,6 +221,48 @@ func TestFivePostLabelRequestsOnePDFAndReturnsDigestReference(t *testing.T) {
 	wantRef := "fivepost:label:order:5f575bef-4e14-47d8-84c4-62629075dbb4:" + hex.EncodeToString(digest[:])
 	if result.ArtifactRef != wantRef || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
 		t.Fatalf("unexpected normalized 5Post label result: %+v", result)
+	}
+}
+
+func TestFivePostCreateUsesUniversalOrderContract(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v3/orders":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer fivepost-jwt" || r.Header.Get("Accept-Language") != "ru" {
+				t.Fatalf("unexpected 5Post create request: method=%s authorization=%q language=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Accept-Language"))
+			}
+			var request fivepostOrderRequest
+			if json.NewDecoder(r.Body).Decode(&request) != nil || len(request.PartnerOrders) != 1 {
+				t.Fatalf("unexpected 5Post create body: %+v", request)
+			}
+			order := request.PartnerOrders[0]
+			if order.SenderOrderID != "order-5post-1" || order.ClientOrderID != "order-5post-1" || order.SenderLocation != "Warehouse_124" || order.ReceiverLocation != "13e9d62d-1799-4e14-a27b-d218f33de7f6" || order.Undeliverable != "RETURN" || order.Cost.PaymentValue != "0.00" || order.Cost.Price != "123.45" || order.Cost.PaymentCurrency != "RUB" || len(order.Cargoes) != 1 || len(order.Cargoes[0].ProductValues) != 1 || order.Cargoes[0].ProductValues[0].Name != "Книга" || order.Cargoes[0].ProductValues[0].Price != "123.45" || order.Cargoes[0].Weight != 1000000 || len(order.Cargoes[0].Barcodes) != 0 {
+				t.Fatalf("unexpected 5Post create order: %+v", order)
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"orderId": "5f575bef-4e14-47d8-84c4-62629075dbb4", "senderOrderId": "order-5post-1", "code": 10, "alreadyCreated": false, "cargoes": []map[string]string{{"cargoId": "3f575bef-4e14-47d8-84c4-62629075dbb5", "senderCargoId": "order-5post-1-cargo-1", "barcode": "99970000000001"}}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order-5post-1", ServiceCode: "fivepost-pickup", IdempotencyKey: "create-5post-1",
+		From: sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "ПВЗ"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}}, PickupPointRef: "13e9d62d-1799-4e14-a27b-d218f33de7f6",
+		Sender: sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"}, Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567"},
+		Items:         []sdk.ShipmentItem{{Name: "Книга", Quantity: 1, UnitPrice: sdk.LogisticsMoney{MinorUnits: 12345, Currency: "RUB"}, VATPercent: 22}},
+		DeclaredValue: sdk.LogisticsMoney{MinorUnits: 12345, Currency: "RUB"}, PaymentValue: sdk.LogisticsMoney{MinorUnits: 0, Currency: "RUB"},
+	}
+	configuration := fivepost.Configuration{SenderLocation: "Warehouse_124", UndeliverableOption: "RETURN", BarcodeEnrichment: "ENABLED"}
+	result, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Create(context.Background(), []byte("fivepost-key"), request, configuration)
+	if err != nil {
+		t.Fatalf("5Post create request failed: %v", err)
+	}
+	if result.RemoteID != "5f575bef-4e14-47d8-84c4-62629075dbb4" || result.Status != "created" || result.TrackingNumber != "99970000000001" || result.Cost.MinorUnits != 12345 || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized 5Post shipment: %+v", result)
 	}
 }
 
@@ -760,6 +861,70 @@ func TestDellinCancellationReturnsAcceptedPendingState(t *testing.T) {
 	}
 }
 
+func TestDellinBatchCancellationUsesOfficialPreAlertEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "batch-cancel-session"}})
+		case "/v2/batch_request/cancel.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии batch cancellation request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "pat-1") {
+				t.Fatalf("PAT leaked into Деловые Линии batch cancellation request: %s", body)
+			}
+			var request struct {
+				AppKey         string `json:"appkey"`
+				SessionID      string `json:"sessionID"`
+				BatchRequestID int64  `json:"batchRequestID"`
+			}
+			if json.Unmarshal(body, &request) != nil || request.AppKey != "app-1" || request.SessionID != "batch-cancel-session" || request.BatchRequestID != 24 {
+				t.Fatalf("unexpected Деловые Линии batch cancellation body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"state": "success"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.CancelBatch(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.LogisticsBatchCancelRequest{BatchID: "24", IdempotencyKey: "cancel-batch-17"})
+	if err != nil || result.RemoteID != "24" || result.Status != "CANCELLED" || !result.Cancelled || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Деловые Линии batch cancellation: result=%+v err=%v", result, err)
+	}
+}
+
+func TestDellinPickupCancellationUsesPickupEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "pickup-cancel-session"}})
+		case "/v3/orders/cancel_pickup.json":
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read Деловые Линии pickup cancellation: %v", err)
+			}
+			var request struct {
+				OrderID   int64  `json:"orderID"`
+				Requester string `json:"requester"`
+			}
+			if json.Unmarshal(body, &request) != nil || request.OrderID != 3954004 || request.Requester != "sender" {
+				t.Fatalf("unexpected Деловые Линии pickup cancellation body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"status": "success"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Cancel(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentCancelRequest{RemoteID: "3954004", IdempotencyKey: "cancel-pickup-17", Variant: "pickup"})
+	if err != nil || result.RemoteID != "3954004" || result.Status != "cancellation_pending" {
+		t.Fatalf("unexpected normalized Деловые Линии pickup cancellation: result=%+v err=%v", result, err)
+	}
+}
+
 func TestDellinCancellationRejectsNonSuccessDecisionResponse(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v4/auth/login.json" {
@@ -989,6 +1154,61 @@ func TestDellinShipmentCreationUsesOfficialRequestPayload(t *testing.T) {
 	}
 	if result.RemoteID != "3954004" || result.TrackingNumber != "41508460D0905400400000014" || result.Status != "created" || result.Cost.Currency != "RUB" {
 		t.Fatalf("unexpected normalized Деловые Линии shipment: %+v", result)
+	}
+}
+
+func TestDellinTerminalShipmentCreationUsesExplicitTerminalReferences(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "terminal-session"}})
+		case "/v2/request.json":
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read Деловые Линии terminal request: %v", err)
+			}
+			var request map[string]any
+			if json.Unmarshal(body, &request) != nil {
+				t.Fatalf("invalid Деловые Линии terminal request: %s", body)
+			}
+			delivery, ok := request["delivery"].(map[string]any)
+			if !ok {
+				t.Fatalf("missing terminal delivery: %s", body)
+			}
+			derival, _ := delivery["derival"].(map[string]any)
+			arrival, _ := delivery["arrival"].(map[string]any)
+			if derival["variant"] != "terminal" || derival["terminalID"] != "36" || arrival["variant"] != "terminal" || arrival["terminalID"] != "626" {
+				t.Fatalf("unexpected terminal references: %s", body)
+			}
+			if _, exists := derival["address"]; exists {
+				t.Fatalf("terminal derival unexpectedly contains address: %s", body)
+			}
+			if _, exists := arrival["address"]; exists {
+				t.Fatalf("terminal arrival unexpectedly contains address: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"state": "success", "requestID": 3954005, "barcode": "41508460D0905400400000015"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order-terminal-17", ServiceCode: "dellin_auto", IdempotencyKey: "create-terminal-17",
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}}, PickupPointRef: "626",
+		Sender: sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"}, Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567"},
+	}
+	result, err := transport.Create(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), request, dellin.Configuration{
+		RequesterUID: "requester-1", SenderCounteragentID: 123, FreightUID: "freight-1", SenderTerminalID: "36",
+		ProduceDate: "2026-09-15", DerivalWorktimeStart: "09:00", DerivalWorktimeEnd: "18:00", PaymentType: "cash",
+	})
+	if err != nil {
+		t.Fatalf("Деловые Линии terminal create request failed: %v", err)
+	}
+	if result.RemoteID != "3954005" || result.TrackingNumber != "41508460D0905400400000015" || result.Status != "created" {
+		t.Fatalf("unexpected normalized terminal shipment: %+v", result)
 	}
 }
 
@@ -1288,6 +1508,142 @@ func TestRussianPostBatchDirectoryRejectsDuplicateRows(t *testing.T) {
 	}
 }
 
+func TestRussianPostBatchOrdersRequestUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/batch/24/shipment" || r.URL.Query().Get("size") != "2" || r.URL.Query().Get("page") != "3" || r.URL.Query().Get("sort") != "ask" {
+			t.Fatalf("unexpected Почта России batch orders request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch order credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"id": 57565818, "batch-name": "24", "barcode": "80084740397510", "batch-status": "CREATED", "recipient-name": "Не должен выйти"},
+			{"id": 57565819, "batch-name": "24", "barcode": "80084740397527", "batch-status": "CREATED"},
+		})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	orders, err := transport.BatchOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchOrdersQuery{BatchID: "24", Limit: 2, Page: 3})
+	if err != nil {
+		t.Fatalf("Почта России batch order request failed: %v", err)
+	}
+	if len(orders) != 2 || orders[0].RemoteID != "57565818" || orders[0].BatchID != "24" || orders[0].TrackingNumber != "80084740397510" || orders[0].Status != "created" {
+		t.Fatalf("unexpected normalized Почта России batch orders: %+v", orders)
+	}
+	if orders[0].ObservedAt.IsZero() || orders[0].ObservedAt.Location() != time.UTC {
+		t.Fatalf("batch order observation timestamp is not UTC: %v", orders[0].ObservedAt)
+	}
+}
+
+func TestRussianPostBatchLookupRequestUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/batch/24" || r.URL.RawQuery != "" {
+			t.Fatalf("unexpected Почта России batch lookup request: method=%s path=%s query=%q", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch lookup credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"batch-name": "24", "batch-status": "CREATED", "shipment-count": 2})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	batch, err := transport.BatchByName(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchLookupQuery{BatchID: "24"})
+	if err != nil {
+		t.Fatalf("Почта России batch lookup request failed: %v", err)
+	}
+	if batch.RemoteID != "24" || batch.Status != "CREATED" || batch.ShipmentCount != 2 || batch.ObservedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized Почта России batch: %+v", batch)
+	}
+}
+
+func TestRussianPostBatchLookupRejectsMismatchedName(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"batch-name": "25", "batch-status": "CREATED", "shipment-count": 2})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.BatchByName(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchLookupQuery{BatchID: "24"}); err == nil {
+		t.Fatal("mismatched Почта России batch accepted")
+	}
+}
+
+func TestRussianPostBatchOrdersRejectMismatchedBatch(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"id": 57565818, "batch-name": "25", "barcode": "80084740397510", "batch-status": "CREATED"}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.BatchOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchOrdersQuery{BatchID: "24", Limit: 10}); err == nil {
+		t.Fatal("mismatched Почта России batch order accepted")
+	}
+}
+
+func TestRussianPostOrderInBatchRequestUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/shipment/57565818" || r.URL.RawQuery != "" {
+			t.Fatalf("unexpected Почта России order request: method=%s path=%s query=%q", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России order credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": 57565818, "batch-name": "24", "barcode": "80084740397510", "batch-status": "CREATED", "recipient-name": "Не должен выйти",
+		})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	order, err := transport.OrderInBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderQuery{RemoteID: "57565818"})
+	if err != nil {
+		t.Fatalf("Почта России order request failed: %v", err)
+	}
+	if order.RemoteID != "57565818" || order.BatchID != "24" || order.TrackingNumber != "80084740397510" || order.Status != "created" || order.ObservedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized Почта России order: %+v", order)
+	}
+}
+
+func TestRussianPostOrderInBatchRejectsMismatchedID(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": 57565819, "batch-name": "24", "barcode": "80084740397527", "batch-status": "CREATED"})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.OrderInBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderQuery{RemoteID: "57565818"}); err == nil {
+		t.Fatal("mismatched Почта России order accepted")
+	}
+}
+
+func TestRussianPostOrderSearchRequestUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/backlog/search" || r.URL.Query().Get("query") != "shop-order-1" {
+			t.Fatalf("unexpected Почта России order search request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России order search credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"id": 57565818, "order-num": "shop-order-1", "batch-name": "24", "barcode": "80084740397510", "batch-status": "CREATED", "recipient-name": "Не должен выйти"}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	orders, err := transport.SearchOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderSearchQuery{ExternalID: "shop-order-1", Limit: 10})
+	if err != nil {
+		t.Fatalf("Почта России order search request failed: %v", err)
+	}
+	if len(orders) != 1 || orders[0].RemoteID != "57565818" || orders[0].ExternalID != "shop-order-1" || orders[0].BatchID != "24" || orders[0].Status != "created" || orders[0].ObservedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized Почта России search: %+v", orders)
+	}
+}
+
+func TestRussianPostOrderSearchRejectsDuplicateResults(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"id": 57565818, "order-num": "shop-order-1", "status": "CREATED"}, {"id": 57565818, "order-num": "shop-order-1", "status": "CREATED"}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.SearchOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderSearchQuery{ExternalID: "shop-order-1", Limit: 10}); err == nil {
+		t.Fatal("duplicate Почта России order search results accepted")
+	}
+}
+
 func TestRussianPostArchivedBatchDirectoryUsesOfficialEndpoint(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/1.0/archive" || r.URL.RawQuery != "" {
@@ -1346,6 +1702,44 @@ func TestRussianPostBatchCreationRejectsNonNumericOrderID(t *testing.T) {
 	transport := pochtarussiaHTTP{h: &httpTransport{}}
 	if _, err := transport.CreateBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchCreateRequest{OrderIDs: []string{"batch-1"}, IdempotencyKey: "batch-idem-2"}); err == nil {
 		t.Fatal("non-numeric Почта России batch order id accepted")
+	}
+}
+
+func TestRussianPostOrderRestoreUsesBacklogEndpointAndExactAcknowledgement(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/1.0/user/backlog" {
+			t.Fatalf("unexpected Почта России order restore request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		var orderIDs []int64
+		if err := json.NewDecoder(r.Body).Decode(&orderIDs); err != nil || len(orderIDs) != 2 || orderIDs[0] != 57565818 || orderIDs[1] != 57565819 {
+			t.Fatalf("unexpected Почта России order restore body: %v", orderIDs)
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России order restore credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"result-ids": []any{57565819, 57565818}, "errors": []any{}})
+	}))
+	defer server.Close()
+
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.RestoreOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderRestoreRequest{OrderIDs: []string{"57565818", "57565819"}, IdempotencyKey: "restore-orders-1"})
+	if err != nil {
+		t.Fatalf("Почта России order restore failed: %v", err)
+	}
+	if !samePochtaOrderIDSet(result.OrderIDs, []string{"57565818", "57565819"}) || result.Status != "restored" || result.ObservedAt.IsZero() || result.ObservedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized Почта России order restore: %+v", result)
+	}
+}
+
+func TestRussianPostOrderRestoreRejectsPartialAcknowledgement(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"result-ids": []any{57565818}, "errors": []any{}})
+	}))
+	defer server.Close()
+
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.RestoreOrders(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsOrderRestoreRequest{OrderIDs: []string{"57565818", "57565819"}, IdempotencyKey: "restore-orders-2"}); err == nil {
+		t.Fatal("partial Почта России order restore acknowledgement accepted")
 	}
 }
 
@@ -1930,6 +2324,33 @@ func TestRussianPostBatchUnarchiveUsesOfficialEndpoint(t *testing.T) {
 	defer invalidServer.Close()
 	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).UnarchiveBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchUnarchiveRequest{BatchID: "25", IdempotencyKey: "restore-25"}); err == nil {
 		t.Fatal("batch restore error response accepted")
+	}
+}
+
+func TestRussianPostBatchSendingDateUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil || len(body) != 0 || r.Method != http.MethodPost || r.URL.Path != "/1.0/batch/25/sending/2026/09/05" || r.URL.RawQuery != "" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России sending date request: method=%s path=%s query=%s body=%q", r.Method, r.URL.Path, r.URL.RawQuery, body)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.UpdateBatchSendingDate(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchSendingDateRequest{BatchID: "25", SendingDate: "2026-09-05", IdempotencyKey: "sending-date-25"})
+	if err != nil {
+		t.Fatalf("Почта России sending date update failed: %v", err)
+	}
+	if result.RemoteID != "25" || result.SendingDate != "2026-09-05" || result.Status != "UPDATED" || !result.Updated || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России sending date update: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"error-code": "BATCH_NOT_FOUND"})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).UpdateBatchSendingDate(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchSendingDateRequest{BatchID: "25", SendingDate: "2026-09-05", IdempotencyKey: "sending-date-25-invalid"}); err == nil {
+		t.Fatal("batch sending date error response accepted")
 	}
 }
 

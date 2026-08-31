@@ -117,3 +117,48 @@ API «Отправка». В запрос можно передать `mailType`
 [спецификация тарифного калькулятора](https://tariff.pochta.ru/post-calculator-api.pdf),
 [сервис отслеживания](https://tracking.pochta.ru/specification) и
 [инструкция по подключению](https://tracking.pochta.ru/support/faq/how_to_get_access).
+
+Возврат заказов из сформированной партии в список «Новые» доступен через
+approval-bound `POST /api/v1/logistics/orders/restore`. Runtime вызывает
+официальный `POST /1.0/user/backlog` и принимает только полный совпадающий
+набор `result-ids`; ошибки провайдера и частичные ответы остаются ошибками.
+Capability называется `logistics.orders.restore` и не подменяет отмену заказа
+или возврат посылки отправителю.
+
+Одну партию можно найти по имени через `GET
+/api/v1/logistics/batches/{batch_id}` с capability `logistics.batches.read`.
+Runtime вызывает `GET /1.0/batch/{batch-name}` без тела, проверяет точное
+совпадение имени и возвращает только статус и число отправлений без состава
+заказов.
+
+Состав партии доступен через bounded read-only capability
+`logistics.batches.orders.read`: `GET /api/v1/logistics/batches/orders` вызывает
+`GET /1.0/batch/{batch-name}/shipment` и передаёт `size`, `page` и `sort=ask`.
+Наружу возвращаются только ID заказа, batch ID, barcode, статус и время
+наблюдения. Адреса, получатели и сырой provider payload не выдаются; партия
+проверяется на точное совпадение, а дубликаты и превышение лимита закрываются
+ошибкой.
+
+Один заказ внутри партии можно найти через `logistics.orders.read` и
+`GET /api/v1/logistics/orders/{order_id}`. Runtime вызывает
+`GET /1.0/shipment/{id}`, проверяет совпадение числового ID и возвращает только
+ID заказа, партию, ШПИ, статус и время наблюдения. Данные получателя и адреса
+не выходят из host transport.
+
+Поиск заказа по назначенному магазином номеру использует bounded read-only
+capability `logistics.orders.search` и маршрут
+`GET /api/v1/logistics/orders/search`. Runtime вызывает официальный
+`GET /1.0/backlog/search?query=...`, проверяет точное совпадение номера и
+возвращает только ID заказа, номер магазина, необязательные партию/ШПИ,
+статус и время наблюдения. Адреса, получатели и raw provider payload не
+выдаются; дубликаты, невалидные строки и выдача больше 100 записей закрываются
+ошибкой.
+
+Для сформированной партии добавлена approval-bound операция изменения даты
+передачи: `POST /api/v1/logistics/batches/sending-date/{batch_id}` с capability
+`logistics.batches.sending_date.write`. Host вызывает официальный
+`POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD` без тела и query, принимает
+пустое успешное подтверждение либо JSON без `error-code` и возвращает только
+точный batch ID, новую дату и `UPDATED`. Операция защищена approval и
+tenant-scoped idempotency receipt; provider error или неоднозначный ответ
+закрываются fail-closed.

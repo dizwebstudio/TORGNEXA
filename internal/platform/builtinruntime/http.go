@@ -57,8 +57,10 @@ import (
 const maxResponseBody = 16 << 20
 
 type httpTransport struct {
-	resolver *net.Resolver
-	client   *http.Client
+	resolver       *net.Resolver
+	client         *http.Client
+	fivepostMu     sync.Mutex
+	fivepostTokens map[[32]byte]fivepostCachedToken
 }
 
 // newHTTPTransport builds one pinned-dial http.Client shared by every

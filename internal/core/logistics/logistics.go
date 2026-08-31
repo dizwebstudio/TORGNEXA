@@ -224,12 +224,13 @@ func (result RemoteResult) Validate() error {
 type Mutation struct {
 	EventID, AuditID, ActorID, Source, CorrelationID, CausationID string
 	ApprovalRequestID                                             string
+	CancelVariant                                                 string
 	OccurredAt                                                    time.Time
 }
 
 // Validate checks the bounded mutation metadata.
 func (mutation Mutation) Validate() error {
-	if !referencePattern.MatchString(mutation.EventID) || !referencePattern.MatchString(mutation.AuditID) || !referencePattern.MatchString(mutation.ActorID) || !referencePattern.MatchString(mutation.Source) || !referencePattern.MatchString(mutation.CorrelationID) || (mutation.CausationID != "" && !referencePattern.MatchString(mutation.CausationID)) || (mutation.ApprovalRequestID != "" && !referencePattern.MatchString(mutation.ApprovalRequestID)) || mutation.OccurredAt.IsZero() || mutation.OccurredAt.Location() != time.UTC {
+	if !referencePattern.MatchString(mutation.EventID) || !referencePattern.MatchString(mutation.AuditID) || !referencePattern.MatchString(mutation.ActorID) || !referencePattern.MatchString(mutation.Source) || !referencePattern.MatchString(mutation.CorrelationID) || (mutation.CausationID != "" && !referencePattern.MatchString(mutation.CausationID)) || (mutation.ApprovalRequestID != "" && !referencePattern.MatchString(mutation.ApprovalRequestID)) || (mutation.CancelVariant != "" && mutation.CancelVariant != "delivery" && mutation.CancelVariant != "pickup") || mutation.OccurredAt.IsZero() || mutation.OccurredAt.Location() != time.UTC {
 		return ErrInvalidRecord
 	}
 	return nil

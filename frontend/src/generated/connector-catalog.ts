@@ -331,15 +331,15 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#1F2937",
       accent: "#1D4ED8",
     },
-    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.batches.cancel", "logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.batches.cancel", "logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
-      runtimeConfigTemplate: {"requester_uid":"replace-with-dellin-counterparty-uid","sender_counteragent_id":1,"freight_uid":"replace-with-freight-uid","produce_date":"2026-09-15","derival_worktime_start":"09:00","derival_worktime_end":"18:00","payment_type":"cash"},
+      runtimeConfigTemplate: {"requester_uid":"replace-with-dellin-counterparty-uid","sender_counteragent_id":1,"freight_uid":"replace-with-freight-uid","sender_terminal_id":"replace-with-sender-terminal-id-for-terminal-routes","produce_date":"2026-09-15","derival_worktime_start":"09:00","derival_worktime_end":"18:00","payment_type":"cash"},
     },
   },
   {
@@ -426,14 +426,15 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#C62828",
     },
-    capabilities: ["logistics.label.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.label.read", "logistics.shipment.cancel", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
+      runtimeConfigTemplate: {"sender_location":"replace-with-fivepost-partner-location-id","return_location":"replace-with-fivepost-return-location-id","brand_name":"Магазин Пример","undeliverable_option":"RETURN","barcode_enrichment":"ENABLED"},
     },
   },
   {
@@ -1016,12 +1017,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#003B73",
     },
-    capabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.orders.read", "logistics.batches.read", "logistics.batches.sending_date.write", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.orders.read", "logistics.orders.restore", "logistics.orders.search", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.orders.read", "logistics.batches.read", "logistics.batches.sending_date.write", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.orders.read", "logistics.orders.restore", "logistics.orders.search", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
     },

@@ -887,14 +887,13 @@ HTTPS endpoint; host сохраняет tenant-scoped idempotency и audit evide
 Task 202 is repository-complete: 5Post теперь допускает bounded
 `pickup.points.read` через официальный JWT exchange и `POST
 /api/v1/pickuppoints/query`. Нормализация ограничена идентификатором, именем,
-адресом, страной/городом, активностью и временем наблюдения; тарифы, создание,
-отмена, tracking и этикетки остаются fail-closed.
+адресом, страной/городом, активностью и временем наблюдения; тарифы остаются
+fail-closed.
 
 Task 203 is repository-complete: 5Post теперь допускает bounded
 `logistics.track.read` через официальный `POST /api/v1/getOrderStatus` для
 одного remote order ID. Host принимает только один совпавший результат,
-нормализует статус и дату изменения; создание, отмена и этикетки остаются
-fail-closed.
+нормализует статус и дату изменения; тарифы остаются fail-closed.
 
 Task 204 is repository-complete: 5Post теперь допускает approval-bound
 `logistics.shipment.cancel` через официальный `DELETE
@@ -905,5 +904,115 @@ Task 204 is repository-complete: 5Post теперь допускает approval-
 Task 205 is repository-complete: 5Post теперь допускает bounded
 `logistics.label.read` для одного UUID через официальный
 `POST /api/v1/orderLabels/byOrderId?format=PDF`. Host проверяет PDF MIME/signature
-и возвращает только content-addressed digest reference; создание заказа
-остаётся fail-closed.
+и возвращает только content-addressed digest reference; тарифы остаются
+fail-closed.
+
+## 5Post — универсальное создание заказа
+
+Task 206 is repository-complete: 5Post теперь допускает bounded однопосылочное
+создание заказа через официальный `POST /api/v3/orders`. Runtime требует
+явную конфигурацию склада отправителя, политики невостребованного заказа и
+режима штрихкодов, а также товарные строки с точной стоимостью и НДС; принимает
+только один успешный ответ `code=10` с совпадающими order/cargo identities.
+Тарифный preview, возвраты и webhooks остаются fail-closed.
+
+## 5Post — C2C тариф
+
+Task 207 is repository-complete: 5Post теперь допускает bounded C2C tariff
+preview через официальный `POST /api/v1/tariff/c2c`. Запрос требует явные UUID
+точки размещения и точки выдачи, передаёт вес в миллиграммах, а runtime
+нормализует точные десятичные `paymentWithVat` и сроки доставки в нейтральный
+rate quote. Прочие коммерческие тарифы, курьерская доставка, возвраты и
+webhooks остаются fail-closed.
+
+## Деловые Линии — bounded terminal-to-terminal shipment create
+
+Task 208 is repository-complete: существующая capability
+`logistics.shipment.create` для «Деловых Линий» теперь допускает address-to-address
+и bounded terminal-to-terminal маршруты через официальный `POST /v2/request.json`.
+ID терминала отправителя задаётся в runtime config как `sender_terminal_id`, а
+ID терминала получателя передаётся как числовой `pickup_point_ref`; в terminal
+payload адресные объекты не отправляются. Approval, SecretProvider, tenant и
+неповторяемый при неопределённости worker-контур сохранены. Терминальная отмена,
+гибридные маршруты и возвраты остаются отдельными fail-closed границами.
+
+## Деловые Линии — отмена забора от адреса
+
+Task 209 is repository-complete: существующий approval-bound workflow отмены
+теперь поддерживает bounded режимы `delivery` и `pickup`. Для «Деловых Линий»
+они вызывают официальные `cancel_delivery.json` и `cancel_pickup.json`, а
+асинхронный ответ нормализуется в `cancellation_pending` до reconciliation.
+Пустое тело и старые клиенты сохраняют режим `delivery` по умолчанию. Отмена
+терминального заказа, ручные возвраты и финальное решение перевозчика остаются
+fail-closed.
+
+## Почта России — возврат заказов в «Новые»
+
+Task 210 is repository-complete: добавлена отдельная capability
+`logistics.orders.restore` и approval-bound операция
+`POST /api/v1/logistics/orders/restore`. Host вызывает официальный
+`POST /1.0/user/backlog`, принимает только полный совпадающий набор числовых
+order IDs, отвергает `errors` и частичные ответы и защищает внешний вызов
+tenant-scoped operation receipt. Операция возвращает заказы в backlog и не
+подменяет отмену или возврат посылки; прочие неподтверждённые операции Почты
+России остаются fail-closed.
+
+## Почта России — чтение заказов внутри партии
+
+Task 211 is repository-complete: добавлена bounded read-only capability
+`logistics.batches.orders.read` и маршрут
+`GET /api/v1/logistics/batches/orders`. Host вызывает официальный
+`GET /1.0/batch/{batch-name}/shipment`, передаёт размер/страницу/сортировку,
+проверяет exact batch match и дубликаты и возвращает только безопасную
+проекцию ID, barcode, статуса и времени наблюдения. Поля получателя, адреса и
+сырой provider payload остаются за границей коннектора.
+
+## Почта России — поиск одного заказа в партии
+
+Task 212 is repository-complete: добавлена bounded read-only capability
+`logistics.orders.read` и маршрут `GET /api/v1/logistics/orders/{order_id}`.
+Runtime вызывает `GET /1.0/shipment/{id}`, принимает object или single-item
+array, сверяет exact order ID и возвращает только безопасную проекцию заказа,
+партии, ШПИ, статуса и времени наблюдения. PII, raw provider payload и любые
+изменения состояния провайдера исключены.
+
+## Почта России — поиск партии по имени
+
+Task 213 is repository-complete: существующая capability
+`logistics.batches.read` теперь также покрывает точечный маршрут
+`GET /api/v1/logistics/batches/{batch_id}`. Runtime вызывает
+`GET /1.0/batch/{batch-name}` без тела, принимает ровно одну партию с точным
+именем и возвращает только статус и количество отправлений. Состав заказов и
+raw provider payload исключены.
+
+## Почта России — поиск заказа по номеру магазина
+
+Task 214 is repository-complete: добавлена отдельная bounded read-only
+capability `logistics.orders.search` и маршрут
+`GET /api/v1/logistics/orders/search`. Runtime вызывает
+`GET /1.0/backlog/search?query=...`, проверяет точное совпадение номера
+магазина, дубликаты и лимит 100 и возвращает только безопасную проекцию заказа,
+партии, ШПИ, статуса и времени наблюдения. Адреса, получатели и raw provider
+payload исключены; approval и idempotency receipt не требуются.
+
+## Почта России — изменение даты передачи партии
+
+Task 215 is repository-complete: добавлена approval-bound capability
+`logistics.batches.sending_date.write` и маршрут
+`POST /api/v1/logistics/batches/sending-date/{batch_id}`. Runtime вызывает
+официальный `POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD` без body/query,
+принимает пустое успешное подтверждение или JSON без `error-code` и сохраняет
+только точный batch ID, дату и `UPDATED`/`updated=true`. Добавлены
+tenant-scoped idempotency receipt, frontend UI, generated SDK, transport/API/
+connector/registry tests, ADR и qualification evidence.
+
+## Деловые Линии — отмена Pre-Alert пакетной заявки
+
+Task 216 is repository-complete: добавлена approval-bound capability
+`logistics.batches.cancel` и маршрут
+`POST /api/v1/logistics/batches/cancel/{batch_id}`. Runtime вызывает официальный
+`POST /v2/batch_request/cancel.json` с числовым `batchRequestID`, принимает только
+`metadata.status=200` и `data.state=success` и нормализует результат в
+`CANCELLED`/`cancelled=true`. Операция расформировывает Pre-Alert пакетную
+заявку, но не отменяет отдельную терминальную перевозку и не является ручным
+возвратом; остальные эти границы остаются fail-closed.

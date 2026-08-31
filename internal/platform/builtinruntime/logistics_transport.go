@@ -51,9 +51,21 @@ type fivepostTokenResponse struct {
 	JWT    string `json:"jwt"`
 }
 
+type fivepostCachedToken struct {
+	JWT       string
+	ExpiresAt time.Time
+}
+
 func (transport fivepostHTTP) token(ctx context.Context, secret []byte) (string, error) {
 	if len(secret) == 0 || transport.h == nil {
 		return "", errors.New("5post token request unavailable")
+	}
+	key := sha256.Sum256(secret)
+	transport.h.fivepostMu.Lock()
+	defer transport.h.fivepostMu.Unlock()
+	now := time.Now().UTC()
+	if cached, ok := transport.h.fivepostTokens[key]; ok && cached.JWT != "" && now.Before(cached.ExpiresAt) {
+		return cached.JWT, nil
 	}
 	form := url.Values{"subject": []string{"OpenAPI"}, "audience": []string{"A122019!"}}
 	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/jwt-generate-claims/rs256/1", url.Values{"apikey": []string{string(secret)}}, []byte(form.Encode()), http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}, "Accept": []string{"application/json"}}, nil, nil)
@@ -67,7 +79,22 @@ func (transport fivepostHTTP) token(ctx context.Context, secret []byte) (string,
 	if json.Unmarshal(responseBody, &response) != nil || response.Status != "ok" || strings.TrimSpace(response.JWT) == "" {
 		return "", errors.New("5post token response rejected")
 	}
-	return strings.TrimSpace(response.JWT), nil
+	if transport.h.fivepostTokens == nil {
+		transport.h.fivepostTokens = make(map[[32]byte]fivepostCachedToken)
+	}
+	for cachedKey, cached := range transport.h.fivepostTokens {
+		if !now.Before(cached.ExpiresAt) {
+			delete(transport.h.fivepostTokens, cachedKey)
+		}
+	}
+	if len(transport.h.fivepostTokens) >= 64 {
+		transport.h.fivepostTokens = make(map[[32]byte]fivepostCachedToken)
+	}
+	jwt := strings.TrimSpace(response.JWT)
+	// The partner contract limits token generation; renew before the documented
+	// one-hour lifetime so repeated operations do not mint a token per call.
+	transport.h.fivepostTokens[key] = fivepostCachedToken{JWT: jwt, ExpiresAt: now.Add(50 * time.Minute)}
+	return jwt, nil
 }
 
 func (transport fivepostHTTP) Ping(ctx context.Context, secret []byte) error {
@@ -139,6 +166,141 @@ func (transport fivepostHTTP) Pickup(ctx context.Context, secret []byte, query s
 	return result, nil
 }
 
+type fivepostTariffRequest struct {
+	CalculateDate   string                   `json:"calculateDate,omitempty"`
+	PointFrom       string                   `json:"pointFrom"`
+	PointTo         string                   `json:"pointTo"`
+	Price           json.Number              `json:"price,omitempty"`
+	PaymentAmount   json.Number              `json:"paymentAmount,omitempty"`
+	CargoDimensions []fivepostCargoDimension `json:"cargoDimensions"`
+}
+
+type fivepostCargoDimension struct {
+	Weight int64 `json:"weight"`
+}
+
+type fivepostTariffTransaction struct {
+	ServiceType    string      `json:"serviceType"`
+	PaymentMethod  string      `json:"paymentMethod"`
+	Payment        json.Number `json:"payment"`
+	PaymentWithVAT json.Number `json:"paymentWithVat"`
+}
+
+type fivepostTariffResponse struct {
+	MinDeliveryDays json.Number                 `json:"minDeliveryDays"`
+	MaxDeliveryDays json.Number                 `json:"maxDeliveryDays"`
+	LegacyMaxDays   json.Number                 `json:"maхDeliveryDays"`
+	Transactions    []fivepostTariffTransaction `json:"transactions"`
+}
+
+// Rates calculates the documented C2C tariff between two explicit 5Post
+// points. The partner contract uses milligrams for cargo weight and returns
+// decimal prices without a currency field; this bounded adapter therefore
+// admits only RUB money and converts prices without binary floating point.
+func (transport fivepostHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	fromPoint := strings.TrimSpace(request.FromPointRef)
+	toPoint := strings.TrimSpace(request.ToPointRef)
+	if transport.h == nil || request.Validate() != nil || !fivepostOrderIDPattern.MatchString(fromPoint) || !fivepostOrderIDPattern.MatchString(toPoint) {
+		return nil, errors.New("5post tariff request is unavailable")
+	}
+	if (request.DeclaredValue.Currency != "" && strings.ToUpper(request.DeclaredValue.Currency) != "RUB") || (request.PaymentValue.Currency != "" && strings.ToUpper(request.PaymentValue.Currency) != "RUB") {
+		return nil, errors.New("5post tariff money must be RUB")
+	}
+	var price, paymentAmount json.Number
+	var err error
+	if request.DeclaredValue.Currency != "" {
+		price, err = fivepostMoneyNumber(request.DeclaredValue.MinorUnits)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if request.PaymentValue.Currency != "" {
+		paymentAmount, err = fivepostMoneyNumber(request.PaymentValue.MinorUnits)
+		if err != nil {
+			return nil, err
+		}
+	}
+	dimensions := make([]fivepostCargoDimension, 0, len(request.Parcels))
+	for _, parcel := range request.Parcels {
+		if parcel.WeightGrams > (int64(^uint64(0)>>1))/1000 {
+			return nil, errors.New("5post tariff weight is out of range")
+		}
+		dimensions = append(dimensions, fivepostCargoDimension{Weight: parcel.WeightGrams * 1000})
+	}
+	body, err := json.Marshal(fivepostTariffRequest{CalculateDate: request.CalculateDate, PointFrom: fromPoint, PointTo: toPoint, Price: price, PaymentAmount: paymentAmount, CargoDimensions: dimensions})
+	if err != nil {
+		return nil, err
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/api/v1/tariff/c2c", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("5post tariff request rejected with status %d", status)
+	}
+	var response fivepostTariffResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Transactions) == 0 {
+		return nil, errors.New("5post tariff response rejected")
+	}
+	maxDays := response.MaxDeliveryDays
+	if maxDays.String() == "" {
+		maxDays = response.LegacyMaxDays
+	}
+	minDeliveryDays, err := fivepostNonNegativeDays(response.MinDeliveryDays)
+	if err != nil {
+		return nil, err
+	}
+	maxDeliveryDays, err := fivepostNonNegativeDays(maxDays)
+	if err != nil || maxDeliveryDays < minDeliveryDays || maxDeliveryDays > 3660 {
+		return nil, errors.New("5post tariff response has invalid delivery period")
+	}
+	var cost int64
+	for _, transaction := range response.Transactions {
+		amount := transaction.PaymentWithVAT
+		if amount.String() == "" {
+			amount = transaction.Payment
+		}
+		minorUnits, parseErr := fivepostTariffMinorUnits(amount)
+		if parseErr != nil || cost > (int64(^uint64(0)>>1))-minorUnits {
+			return nil, errors.New("5post tariff response has invalid cost")
+		}
+		cost += minorUnits
+	}
+	now := time.Now().UTC()
+	base := now
+	if request.CalculateDate != "" {
+		base, err = time.Parse("2006-01-02", request.CalculateDate)
+		if err != nil {
+			return nil, errors.New("5post tariff request has invalid calculate date")
+		}
+		base = base.UTC()
+	}
+	return []sdk.RateQuote{{ServiceCode: "fivepost_c2c", Cost: sdk.LogisticsMoney{MinorUnits: cost, Currency: "RUB"}, MinDeliveryAt: base.Add(time.Duration(minDeliveryDays) * 24 * time.Hour), MaxDeliveryAt: base.Add(time.Duration(maxDeliveryDays) * 24 * time.Hour), ObservedAt: now}}, nil
+}
+
+func fivepostNonNegativeDays(value json.Number) (int64, error) {
+	days, err := strconv.ParseInt(value.String(), 10, 64)
+	if err != nil || days < 0 {
+		return 0, errors.New("5post tariff response has invalid delivery days")
+	}
+	return days, nil
+}
+
+func fivepostTariffMinorUnits(value json.Number) (int64, error) {
+	if strings.TrimSpace(value.String()) == "" {
+		return 0, errors.New("5post tariff response has no cost")
+	}
+	minorUnits, err := decimalToMinorUnits(value.String())
+	if err != nil || minorUnits < 0 {
+		return 0, errors.New("5post tariff response has invalid cost")
+	}
+	return minorUnits, nil
+}
+
 func fivepostCountryCode(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "ru", "россия", "russia", "российская федерация":
@@ -152,8 +314,182 @@ func fivepostCountryCode(value string) string {
 	}
 }
 
-func (fivepostHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+type fivepostOrderRequest struct {
+	PartnerOrders []fivepostPartnerOrder `json:"partnerOrders"`
+}
+
+type fivepostPartnerOrder struct {
+	SenderOrderID    string               `json:"senderOrderId"`
+	ClientOrderID    string               `json:"clientOrderId"`
+	BrandName        string               `json:"brandName,omitempty"`
+	ClientName       string               `json:"clientName"`
+	ClientPhone      string               `json:"clientPhone"`
+	ClientEmail      string               `json:"clientEmail,omitempty"`
+	SenderLocation   string               `json:"senderLocation"`
+	ReturnLocation   string               `json:"returnLocation,omitempty"`
+	ReceiverLocation string               `json:"receiverLocation"`
+	Undeliverable    string               `json:"undeliverableOption"`
+	Cost             fivepostOrderCost    `json:"cost"`
+	Cargoes          []fivepostOrderCargo `json:"cargoes"`
+}
+
+type fivepostOrderCost struct {
+	DeliveryCost         json.Number `json:"deliveryCost,omitempty"`
+	DeliveryCostCurrency string      `json:"deliveryCostCurrency,omitempty"`
+	PaymentValue         json.Number `json:"paymentValue"`
+	PaymentCurrency      string      `json:"paymentCurrency"`
+	PaymentType          string      `json:"paymentType,omitempty"`
+	Price                json.Number `json:"price"`
+	PriceCurrency        string      `json:"priceCurrency"`
+}
+
+type fivepostOrderCargo struct {
+	Barcodes      []fivepostOrderBarcode `json:"barcodes,omitempty"`
+	SenderCargoID string                 `json:"senderCargoId"`
+	Height        int64                  `json:"height"`
+	Length        int64                  `json:"length"`
+	Width         int64                  `json:"width"`
+	Weight        int64                  `json:"weight"`
+	Price         json.Number            `json:"price"`
+	Currency      string                 `json:"currency"`
+	ProductValues []fivepostProductValue `json:"productValues"`
+}
+
+type fivepostOrderBarcode struct {
+	Value string `json:"value"`
+}
+
+type fivepostProductValue struct {
+	Name       string      `json:"name"`
+	Value      int64       `json:"value"`
+	Price      json.Number `json:"price"`
+	Currency   string      `json:"currency"`
+	VAT        int         `json:"vat"`
+	VendorCode string      `json:"vendorCode,omitempty"`
+	Barcode    string      `json:"barcode,omitempty"`
+}
+
+type fivepostOrderResponse struct {
+	OrderID        string `json:"orderId"`
+	SenderOrderID  string `json:"senderOrderId"`
+	Code           int    `json:"code"`
+	AlreadyCreated bool   `json:"alreadyCreated"`
+	Cargoes        []struct {
+		CargoID       string `json:"cargoId"`
+		SenderCargoID string `json:"senderCargoId"`
+		Barcode       string `json:"barcode"`
+	} `json:"cargoes"`
+}
+
+// Create submits one fully declared pickup-point order through the official
+// 5Post universal order endpoint. The neutral request is deliberately narrow:
+// one parcel, explicit product value, explicit account warehouse and an
+// explicit barcode-enrichment contract.
+func (transport fivepostHTTP) Create(ctx context.Context, secret []byte, request sdk.ShipmentCreateRequest, configuration fivepost.Configuration) (sdk.ShipmentResult, error) {
+	if transport.h == nil || request.Validate() != nil || configuration.Validate() != nil || len(request.Parcels) != 1 || len(request.Items) == 0 || !fivepostOrderIDPattern.MatchString(strings.TrimSpace(request.PickupPointRef)) || request.DeclaredValue.MinorUnits <= 0 || request.DeclaredValue.Validate() != nil {
+		return sdk.ShipmentResult{}, errors.New("5post order creation request is unavailable")
+	}
+	parcel := request.Parcels[0]
+	if parcel.WeightGrams > (int64(^uint64(0)>>1))/1000 {
+		return sdk.ShipmentResult{}, errors.New("5post order weight is out of range")
+	}
+	currency := strings.ToUpper(strings.TrimSpace(request.DeclaredValue.Currency))
+	if currency == "" {
+		return sdk.ShipmentResult{}, errors.New("5post order currency is missing")
+	}
+	var productTotal int64
+	products := make([]fivepostProductValue, 0, len(request.Items))
+	for _, item := range request.Items {
+		if item.UnitPrice.Currency != currency || item.Validate() != nil || item.UnitPrice.MinorUnits > (int64(^uint64(0)>>1))/item.Quantity {
+			return sdk.ShipmentResult{}, errors.New("5post order product line is invalid")
+		}
+		lineTotal := item.UnitPrice.MinorUnits * item.Quantity
+		if productTotal > (int64(^uint64(0)>>1))-lineTotal {
+			return sdk.ShipmentResult{}, errors.New("5post order value is out of range")
+		}
+		productTotal += lineTotal
+		price, err := fivepostMoneyNumber(item.UnitPrice.MinorUnits)
+		if err != nil {
+			return sdk.ShipmentResult{}, err
+		}
+		products = append(products, fivepostProductValue{Name: item.Name, Value: item.Quantity, Price: price, Currency: currency, VAT: item.VATPercent, VendorCode: item.SKU, Barcode: item.Barcode})
+	}
+	if productTotal != request.DeclaredValue.MinorUnits {
+		return sdk.ShipmentResult{}, errors.New("5post order value does not match product lines")
+	}
+	deliveryCost := request.DeliveryCost
+	if deliveryCost.Currency == "" {
+		deliveryCost.Currency = currency
+	}
+	if deliveryCost.Currency != currency || deliveryCost.Validate() != nil {
+		return sdk.ShipmentResult{}, errors.New("5post delivery cost is invalid")
+	}
+	paymentValue := int64(0)
+	if request.PaymentValue.Currency != "" {
+		if request.PaymentValue.Currency != currency || request.PaymentValue.Validate() != nil {
+			return sdk.ShipmentResult{}, errors.New("5post payment value is invalid")
+		}
+		if request.PaymentValue.MinorUnits > 0 && (deliveryCost.MinorUnits > (int64(^uint64(0)>>1))-request.DeclaredValue.MinorUnits || request.PaymentValue.MinorUnits != request.DeclaredValue.MinorUnits+deliveryCost.MinorUnits) {
+			return sdk.ShipmentResult{}, errors.New("5post payment value does not match order value")
+		}
+		if request.PaymentValue.MinorUnits == 0 && deliveryCost.MinorUnits != 0 {
+			return sdk.ShipmentResult{}, errors.New("5post zero payment requires zero delivery cost")
+		}
+		paymentValue = request.PaymentValue.MinorUnits
+	} else if deliveryCost.MinorUnits != 0 {
+		return sdk.ShipmentResult{}, errors.New("5post delivery cost requires payment value")
+	}
+	orderPrice, err := fivepostMoneyNumber(request.DeclaredValue.MinorUnits)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	deliveryPrice, err := fivepostMoneyNumber(deliveryCost.MinorUnits)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	paymentPrice, err := fivepostMoneyNumber(paymentValue)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	senderCargoID := strings.TrimSpace(request.ExternalID) + "-cargo-1"
+	if len(senderCargoID) > 128 {
+		return sdk.ShipmentResult{}, errors.New("5post sender cargo identifier is too long")
+	}
+	cargo := fivepostOrderCargo{SenderCargoID: senderCargoID, Height: parcel.HeightMM, Length: parcel.LengthMM, Width: parcel.WidthMM, Weight: parcel.WeightGrams * 1000, Price: orderPrice, Currency: currency, ProductValues: products}
+	if configuration.BarcodeEnrichment != "ENABLED" {
+		barcode := senderCargoID
+		if len(barcode) > 34 {
+			return sdk.ShipmentResult{}, errors.New("5post cargo barcode is too long")
+		}
+		cargo.Barcodes = []fivepostOrderBarcode{{Value: barcode}}
+	}
+	body, err := json.Marshal(fivepostOrderRequest{PartnerOrders: []fivepostPartnerOrder{{SenderOrderID: request.ExternalID, ClientOrderID: request.ExternalID, BrandName: configuration.BrandName, ClientName: request.Recipient.Name, ClientPhone: request.Recipient.Phone, ClientEmail: request.Recipient.Email, SenderLocation: configuration.SenderLocation, ReturnLocation: configuration.ReturnLocation, ReceiverLocation: request.PickupPointRef, Undeliverable: configuration.UndeliverableOption, Cost: fivepostOrderCost{DeliveryCost: deliveryPrice, DeliveryCostCurrency: currency, PaymentValue: paymentPrice, PaymentCurrency: currency, Price: orderPrice, PriceCurrency: currency}, Cargoes: []fivepostOrderCargo{cargo}}}})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/api/v3/orders", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("5post order creation rejected with status %d", status)
+	}
+	var response []fivepostOrderResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response) != 1 || response[0].Code != 10 || response[0].AlreadyCreated || !fivepostOrderIDPattern.MatchString(strings.TrimSpace(response[0].OrderID)) || response[0].SenderOrderID != request.ExternalID || len(response[0].Cargoes) != 1 || !fivepostOrderIDPattern.MatchString(strings.TrimSpace(response[0].Cargoes[0].CargoID)) || strings.TrimSpace(response[0].Cargoes[0].SenderCargoID) != senderCargoID {
+		return sdk.ShipmentResult{}, errors.New("5post order creation response rejected")
+	}
+	return sdk.ShipmentResult{RemoteID: strings.TrimSpace(response[0].OrderID), Status: "created", Cost: sdk.LogisticsMoney{MinorUnits: request.DeclaredValue.MinorUnits, Currency: currency}, TrackingNumber: strings.TrimSpace(response[0].Cargoes[0].Barcode), ObservedAt: time.Now().UTC()}, nil
+}
+
+func fivepostMoneyNumber(minorUnits int64) (json.Number, error) {
+	if minorUnits < 0 {
+		return "", errors.New("5post money value is negative")
+	}
+	return json.Number(strconv.FormatInt(minorUnits/100, 10) + "." + fmt.Sprintf("%02d", minorUnits%100)), nil
 }
 
 type fivepostTrackingRecord struct {
@@ -1892,12 +2228,12 @@ func (transport dellinHTTP) Ping(ctx context.Context, secret []byte) error {
 }
 
 type dellinCreateAddress struct {
-	Search string `json:"search"`
+	Search string `json:"search,omitempty"`
 }
 
 type dellinCreateTime struct {
-	WorktimeStart string `json:"worktimeStart"`
-	WorktimeEnd   string `json:"worktimeEnd"`
+	WorktimeStart string `json:"worktimeStart,omitempty"`
+	WorktimeEnd   string `json:"worktimeEnd,omitempty"`
 }
 
 type dellinCreateContactPerson struct {
@@ -1932,16 +2268,18 @@ type dellinCreateRequest struct {
 			Type string `json:"type"`
 		} `json:"deliveryType"`
 		Derival struct {
-			ProduceDate string              `json:"produceDate"`
-			Variant     string              `json:"variant"`
-			Payer       string              `json:"payer"`
-			Address     dellinCreateAddress `json:"address"`
-			Time        dellinCreateTime    `json:"time"`
+			ProduceDate string               `json:"produceDate"`
+			Variant     string               `json:"variant"`
+			Payer       string               `json:"payer"`
+			Address     *dellinCreateAddress `json:"address,omitempty"`
+			TerminalID  string               `json:"terminalID,omitempty"`
+			Time        *dellinCreateTime    `json:"time,omitempty"`
 		} `json:"derival"`
 		Arrival struct {
-			Variant string              `json:"variant"`
-			Payer   string              `json:"payer"`
-			Address dellinCreateAddress `json:"address"`
+			Variant    string               `json:"variant"`
+			Payer      string               `json:"payer"`
+			Address    *dellinCreateAddress `json:"address,omitempty"`
+			TerminalID string               `json:"terminalID,omitempty"`
 		} `json:"arrival"`
 		Comment string `json:"comment,omitempty"`
 	} `json:"delivery"`
@@ -1991,6 +2329,15 @@ type dellinCancelResponse struct {
 	} `json:"metadata"`
 	Data struct {
 		Status string `json:"status"`
+	} `json:"data"`
+}
+
+type dellinBatchCancelResponse struct {
+	Metadata struct {
+		Status int `json:"status"`
+	} `json:"metadata"`
+	Data struct {
+		State string `json:"state"`
 	} `json:"data"`
 }
 
@@ -2082,8 +2429,12 @@ func dellinCreateResult(responseBody []byte) (sdk.ShipmentResult, error) {
 }
 
 func (transport dellinHTTP) Create(ctx context.Context, secret []byte, request sdk.ShipmentCreateRequest, configuration dellin.Configuration) (sdk.ShipmentResult, error) {
-	if transport.h == nil || request.Validate() != nil || len(request.Parcels) > 50 || request.PickupPointRef != "" || configuration.Validate() != nil {
+	if transport.h == nil || request.Validate() != nil || len(request.Parcels) > 50 || configuration.Validate() != nil {
 		return sdk.ShipmentResult{}, errors.New("Деловые Линии shipment creation request is unavailable")
+	}
+	terminalDelivery := strings.TrimSpace(request.PickupPointRef) != ""
+	if terminalDelivery && (!dellin.IsValidTerminalReference(strings.TrimSpace(request.PickupPointRef)) || configuration.SenderTerminalID == "") {
+		return sdk.ShipmentResult{}, errors.New("Деловые Линии terminal shipment requires configured sender and recipient terminals")
 	}
 	deliveryType, err := dellinDeliveryType(request.ServiceCode)
 	if err != nil {
@@ -2132,13 +2483,20 @@ func (transport dellinHTTP) Create(ctx context.Context, secret []byte, request s
 	body := dellinCreateRequest{AppKey: credentials.AppKey, SessionID: sessionID, InOrder: true, CargoCode: request.ExternalID}
 	body.Delivery.DeliveryType.Type = deliveryType
 	body.Delivery.Derival.ProduceDate = configuration.ProduceDate
-	body.Delivery.Derival.Variant = "address"
 	body.Delivery.Derival.Payer = "sender"
-	body.Delivery.Derival.Address = dellinCreateAddress{Search: fromSearch}
-	body.Delivery.Derival.Time = dellinCreateTime{WorktimeStart: configuration.DerivalWorktimeStart, WorktimeEnd: configuration.DerivalWorktimeEnd}
-	body.Delivery.Arrival.Variant = "address"
 	body.Delivery.Arrival.Payer = "sender"
-	body.Delivery.Arrival.Address = dellinCreateAddress{Search: toSearch}
+	if terminalDelivery {
+		body.Delivery.Derival.Variant = "terminal"
+		body.Delivery.Derival.TerminalID = configuration.SenderTerminalID
+		body.Delivery.Arrival.Variant = "terminal"
+		body.Delivery.Arrival.TerminalID = strings.TrimSpace(request.PickupPointRef)
+	} else {
+		body.Delivery.Derival.Variant = "address"
+		body.Delivery.Derival.Address = &dellinCreateAddress{Search: fromSearch}
+		body.Delivery.Derival.Time = &dellinCreateTime{WorktimeStart: configuration.DerivalWorktimeStart, WorktimeEnd: configuration.DerivalWorktimeEnd}
+		body.Delivery.Arrival.Variant = "address"
+		body.Delivery.Arrival.Address = &dellinCreateAddress{Search: toSearch}
+	}
 	body.Delivery.Comment = "TORGNEXA " + request.ExternalID
 	body.Members.Requester.Role = "sender"
 	body.Members.Requester.UID = configuration.RequesterUID
@@ -2548,13 +2906,26 @@ func (transport dellinHTTP) Label(ctx context.Context, secret []byte, request sd
 	}, nil
 }
 
-// Cancel submits the official address-delivery cancellation request. Dellin
-// returns success when the request is accepted for later decision; it does
-// not mean the shipment is already cancelled.
+// Cancel submits one of the official address-delivery cancellation requests.
+// Dellin returns success when the request is accepted for later decision; it
+// does not mean the shipment is already cancelled.
 func (transport dellinHTTP) Cancel(ctx context.Context, secret []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
 	remoteID := strings.TrimSpace(request.RemoteID)
 	if transport.h == nil || !safeCodePattern.MatchString(remoteID) || strings.TrimSpace(request.IdempotencyKey) == "" {
 		return sdk.ShipmentResult{}, errors.New("Деловые Линии cancellation request is unavailable")
+	}
+	variant := strings.TrimSpace(request.Variant)
+	if variant == "" {
+		variant = "delivery"
+	}
+	var endpoint string
+	switch variant {
+	case "delivery":
+		endpoint = "/v3/orders/cancel_delivery.json"
+	case "pickup":
+		endpoint = "/v3/orders/cancel_pickup.json"
+	default:
+		return sdk.ShipmentResult{}, errors.New("Деловые Линии cancellation variant is unsupported")
 	}
 	orderID, err := strconv.ParseInt(remoteID, 10, 64)
 	if err != nil || orderID < 1 {
@@ -2577,7 +2948,7 @@ func (transport dellinHTTP) Cancel(ctx context.Context, secret []byte, request s
 	if err != nil {
 		return sdk.ShipmentResult{}, err
 	}
-	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v3/orders/cancel_delivery.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", endpoint, url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
 	if err != nil {
 		return sdk.ShipmentResult{}, err
 	}
@@ -2589,6 +2960,48 @@ func (transport dellinHTTP) Cancel(ctx context.Context, secret []byte, request s
 		return sdk.ShipmentResult{}, errors.New("Деловые Линии cancellation response rejected")
 	}
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: "cancellation_pending", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
+}
+
+// CancelBatch dissolves one Pre-Alert batch through the official Dellin API.
+// The provider returns a terminal success state for this operation; the
+// method is still protected by the host idempotency and approval boundary.
+func (transport dellinHTTP) CancelBatch(ctx context.Context, secret []byte, request sdk.LogisticsBatchCancelRequest) (sdk.LogisticsBatchCancellation, error) {
+	batchID := strings.TrimSpace(request.BatchID)
+	if transport.h == nil || !safeCodePattern.MatchString(batchID) || strings.TrimSpace(request.IdempotencyKey) == "" {
+		return sdk.LogisticsBatchCancellation{}, errors.New("Деловые Линии batch cancellation request is unavailable")
+	}
+	remoteID, err := strconv.ParseInt(batchID, 10, 64)
+	if err != nil || remoteID < 1 {
+		return sdk.LogisticsBatchCancellation{}, errors.New("Деловые Линии batch cancellation requires a numeric batch ID")
+	}
+	credentials, err := readDellinCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatchCancellation{}, err
+	}
+	sessionID, err := transport.login(ctx, credentials)
+	if err != nil {
+		return sdk.LogisticsBatchCancellation{}, err
+	}
+	body, err := json.Marshal(struct {
+		AppKey         string `json:"appkey"`
+		SessionID      string `json:"sessionID"`
+		BatchRequestID int64  `json:"batchRequestID"`
+	}{AppKey: credentials.AppKey, SessionID: sessionID, BatchRequestID: remoteID})
+	if err != nil {
+		return sdk.LogisticsBatchCancellation{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.dellin.ru", "/v2/batch_request/cancel.json", url.Values{}, body, http.Header{"Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}}, nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatchCancellation{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatchCancellation{}, fmt.Errorf("Деловые Линии batch cancellation request rejected with status %d", status)
+	}
+	var response dellinBatchCancelResponse
+	if json.Unmarshal(responseBody, &response) != nil || (response.Metadata.Status != 0 && response.Metadata.Status != http.StatusOK) || strings.ToLower(strings.TrimSpace(response.Data.State)) != "success" {
+		return sdk.LogisticsBatchCancellation{}, errors.New("Деловые Линии batch cancellation response rejected")
+	}
+	return sdk.LogisticsBatchCancellation{RemoteID: batchID, Status: "CANCELLED", Cancelled: true, ObservedAt: time.Now().UTC()}, nil
 }
 
 func (transport dellinHTTP) Rates(ctx context.Context, secret []byte, request sdk.RateRequest) ([]sdk.RateQuote, error) {
@@ -2799,6 +3212,22 @@ type pochtarussiaBatch struct {
 	ShipmentCount json.RawMessage `json:"shipment-count"`
 }
 
+type pochtarussiaBatchOrder struct {
+	ID        json.RawMessage `json:"id"`
+	BatchName json.RawMessage `json:"batch-name"`
+	Barcode   json.RawMessage `json:"barcode"`
+	Status    string          `json:"batch-status"`
+}
+
+type pochtarussiaOrderSearchItem struct {
+	ID          json.RawMessage `json:"id"`
+	ExternalID  string          `json:"order-num"`
+	BatchName   json.RawMessage `json:"batch-name"`
+	Barcode     json.RawMessage `json:"barcode"`
+	BatchStatus string          `json:"batch-status"`
+	Status      string          `json:"status"`
+}
+
 const pochtarussiaPickupLimit = 50
 
 func readPochtaRussiaCredentials(secret []byte) (pochtarussiaCredentials, error) {
@@ -3007,6 +3436,78 @@ func (transport pochtarussiaHTTP) Cancel(ctx context.Context, secret []byte, req
 		return sdk.ShipmentResult{}, errors.New("Почта России cancellation response identifier mismatch")
 	}
 	return sdk.ShipmentResult{RemoteID: deletedID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Now().UTC()}, nil
+}
+
+// RestoreOrders moves existing orders from a CREATED Russian Post batch back
+// to the provider's "New" backlog. The provider returns per-item errors, so a
+// partial acknowledgement is rejected rather than exposed as a successful
+// restore of only part of the requested set.
+func (transport pochtarussiaHTTP) RestoreOrders(ctx context.Context, secret []byte, request sdk.LogisticsOrderRestoreRequest) (sdk.LogisticsOrderRestore, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsOrderRestore{}, err
+	}
+	orderIDs := make([]int64, 0, len(request.OrderIDs))
+	for _, rawID := range request.OrderIDs {
+		if !pochtarussiaOrderIDPattern.MatchString(strings.TrimSpace(rawID)) {
+			return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore id is invalid")
+		}
+		orderID, parseErr := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+		if parseErr != nil || orderID <= 0 {
+			return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore id is invalid")
+		}
+		orderIDs = append(orderIDs, orderID)
+	}
+	payload, err := json.Marshal(orderIDs)
+	if err != nil {
+		return sdk.LogisticsOrderRestore{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", "/1.0/user/backlog", url.Values{}, payload, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsOrderRestore{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsOrderRestore{}, fmt.Errorf("Почта России order restore rejected with status %d", status)
+	}
+	var response pochtarussiaBacklogResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Errors) != 0 || len(response.ResultIDs) != len(request.OrderIDs) {
+		return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore response rejected")
+	}
+	resultIDs := make([]string, 0, len(response.ResultIDs))
+	for _, rawID := range response.ResultIDs {
+		orderID, parseErr := pochtarussiaBacklogID(rawID)
+		if parseErr != nil {
+			return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore response rejected")
+		}
+		resultIDs = append(resultIDs, orderID)
+	}
+	if !samePochtaOrderIDSet(resultIDs, request.OrderIDs) {
+		return sdk.LogisticsOrderRestore{}, errors.New("Почта России order restore response identifier mismatch")
+	}
+	return sdk.LogisticsOrderRestore{OrderIDs: resultIDs, Status: "restored", ObservedAt: time.Now().UTC()}, nil
+}
+
+func samePochtaOrderIDSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]struct{}, len(left))
+	for _, value := range left {
+		normalized := strings.TrimSpace(value)
+		if _, exists := seen[normalized]; exists {
+			return false
+		}
+		seen[normalized] = struct{}{}
+	}
+	for _, value := range right {
+		if _, exists := seen[strings.TrimSpace(value)]; !exists {
+			return false
+		}
+	}
+	return true
 }
 
 // Return creates one return shipment for an existing RPO through the official
@@ -3759,6 +4260,206 @@ func (transport pochtarussiaHTTP) Batches(ctx context.Context, secret []byte, qu
 	return result, nil
 }
 
+// BatchByName reads one Russian Post batch by its provider name. The host
+// accepts one object or one-item array because both shapes have appeared in
+// compatible client implementations, but never more than one batch.
+func (transport pochtarussiaHTTP) BatchByName(ctx context.Context, secret []byte, query sdk.LogisticsBatchLookupQuery) (sdk.LogisticsBatch, error) {
+	if transport.h == nil || query.Validate() != nil || !pochtarussiaOrderIDPattern.MatchString(query.BatchID) {
+		return sdk.LogisticsBatch{}, errors.New("Почта России batch lookup request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	path := "/1.0/batch/" + url.PathEscape(query.BatchID)
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", path, nil, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatch{}, fmt.Errorf("Почта России batch lookup rejected with status %d", status)
+	}
+	var item pochtarussiaBatch
+	if json.Unmarshal(responseBody, &item) != nil || strings.TrimSpace(item.Name) == "" {
+		var items []pochtarussiaBatch
+		if json.Unmarshal(responseBody, &items) != nil || len(items) != 1 {
+			return sdk.LogisticsBatch{}, errors.New("Почта России batch lookup response rejected")
+		}
+		item = items[0]
+	}
+	name := strings.TrimSpace(item.Name)
+	batchStatus := strings.TrimSpace(item.Status)
+	count, countErr := pochtarussiaNonNegativeInt(item.ShipmentCount)
+	if name != query.BatchID || !pochtarussiaOrderIDPattern.MatchString(name) || !safeCodePattern.MatchString(batchStatus) || countErr != nil || count > 1000000 {
+		return sdk.LogisticsBatch{}, errors.New("Почта России batch lookup response has invalid batch")
+	}
+	return sdk.LogisticsBatch{RemoteID: name, Status: batchStatus, ShipmentCount: int(count), ObservedAt: time.Now().UTC()}, nil
+}
+
+// BatchOrders reads the official Russian Post order rows for one batch. The
+// host deliberately keeps only provider identities, barcode, batch status
+// and observation time; recipient and address fields are never projected.
+func (transport pochtarussiaHTTP) BatchOrders(ctx context.Context, secret []byte, query sdk.LogisticsBatchOrdersQuery) ([]sdk.LogisticsBatchOrder, error) {
+	if transport.h == nil || query.Validate(100) != nil || !pochtarussiaOrderIDPattern.MatchString(query.BatchID) {
+		return nil, errors.New("Почта России batch orders request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{
+		"size": []string{strconv.Itoa(query.Limit)},
+		"page": []string{strconv.Itoa(query.Page)},
+		"sort": []string{"ask"},
+	}
+	path := "/1.0/batch/" + url.PathEscape(query.BatchID) + "/shipment"
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", path, params, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Почта России batch orders request rejected with status %d", status)
+	}
+	var response []pochtarussiaBatchOrder
+	if json.Unmarshal(responseBody, &response) != nil || len(response) > query.Limit {
+		return nil, errors.New("Почта России batch orders response rejected")
+	}
+	now := time.Now().UTC()
+	result := make([]sdk.LogisticsBatchOrder, 0, len(response))
+	seen := make(map[string]struct{}, len(response))
+	for _, item := range response {
+		orderID, orderErr := pochtarussiaBacklogID(item.ID)
+		batchID, batchErr := pochtarussiaBacklogID(item.BatchName)
+		tracking, trackingErr := pochtarussiaBatchTrackingID(item.Barcode)
+		orderStatus := strings.ToLower(strings.TrimSpace(item.Status))
+		if orderErr != nil || batchErr != nil || trackingErr != nil || batchID != query.BatchID || !safeCodePattern.MatchString(orderStatus) {
+			return nil, errors.New("Почта России batch orders response has invalid order")
+		}
+		if _, duplicate := seen[orderID]; duplicate {
+			return nil, errors.New("Почта России batch orders response has duplicate order")
+		}
+		seen[orderID] = struct{}{}
+		result = append(result, sdk.LogisticsBatchOrder{RemoteID: orderID, BatchID: batchID, TrackingNumber: tracking, Status: orderStatus, ObservedAt: now})
+	}
+	return result, nil
+}
+
+// OrderInBatch reads one Russian Post order by its internal ID. The provider
+// response is reduced to the same safe projection as BatchOrders.
+func (transport pochtarussiaHTTP) OrderInBatch(ctx context.Context, secret []byte, query sdk.LogisticsOrderQuery) (sdk.LogisticsBatchOrder, error) {
+	if transport.h == nil || query.Validate() != nil || !pochtarussiaOrderIDPattern.MatchString(query.RemoteID) {
+		return sdk.LogisticsBatchOrder{}, errors.New("Почта России order request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatchOrder{}, err
+	}
+	path := "/1.0/shipment/" + url.PathEscape(query.RemoteID)
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", path, nil, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatchOrder{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatchOrder{}, fmt.Errorf("Почта России order request rejected with status %d", status)
+	}
+	var item pochtarussiaBatchOrder
+	if json.Unmarshal(responseBody, &item) != nil || item.ID == nil {
+		var items []pochtarussiaBatchOrder
+		if json.Unmarshal(responseBody, &items) != nil || len(items) != 1 {
+			return sdk.LogisticsBatchOrder{}, errors.New("Почта России order response rejected")
+		}
+		item = items[0]
+	}
+	orderID, orderErr := pochtarussiaBacklogID(item.ID)
+	batchID, batchErr := pochtarussiaBacklogID(item.BatchName)
+	tracking, trackingErr := pochtarussiaBatchTrackingID(item.Barcode)
+	orderStatus := strings.ToLower(strings.TrimSpace(item.Status))
+	if orderErr != nil || batchErr != nil || trackingErr != nil || orderID != query.RemoteID || !pochtarussiaOrderIDPattern.MatchString(batchID) || !safeCodePattern.MatchString(orderStatus) {
+		return sdk.LogisticsBatchOrder{}, errors.New("Почта России order response has invalid order")
+	}
+	return sdk.LogisticsBatchOrder{RemoteID: orderID, BatchID: batchID, TrackingNumber: tracking, Status: orderStatus, ObservedAt: time.Now().UTC()}, nil
+}
+
+// SearchOrders reads bounded Russian Post backlog results by merchant order
+// number. Only stable references and status cross the host boundary.
+func (transport pochtarussiaHTTP) SearchOrders(ctx context.Context, secret []byte, query sdk.LogisticsOrderSearchQuery) ([]sdk.LogisticsOrderSummary, error) {
+	if transport.h == nil || query.Validate(100) != nil {
+		return nil, errors.New("Почта России order search request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/1.0/backlog/search", url.Values{"query": []string{query.ExternalID}}, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Почта России order search rejected with status %d", status)
+	}
+	var response []pochtarussiaOrderSearchItem
+	if json.Unmarshal(responseBody, &response) != nil || len(response) > query.Limit {
+		return nil, errors.New("Почта России order search response rejected")
+	}
+	now := time.Now().UTC()
+	result := make([]sdk.LogisticsOrderSummary, 0, len(response))
+	seen := make(map[string]struct{}, len(response))
+	for _, item := range response {
+		orderID, orderErr := pochtarussiaBacklogID(item.ID)
+		batchID, batchErr := pochtarussiaOptionalBacklogID(item.BatchName)
+		tracking, trackingErr := pochtarussiaOptionalBatchTrackingID(item.Barcode)
+		externalID := strings.TrimSpace(item.ExternalID)
+		orderStatus := strings.TrimSpace(item.BatchStatus)
+		if orderStatus == "" {
+			orderStatus = strings.TrimSpace(item.Status)
+		}
+		orderStatus = strings.ToLower(orderStatus)
+		if orderErr != nil || batchErr != nil || trackingErr != nil || !logisticsBatchRemoteIDPattern.MatchString(externalID) || !safeCodePattern.MatchString(orderStatus) {
+			return nil, errors.New("Почта России order search response has invalid order")
+		}
+		if _, duplicate := seen[orderID]; duplicate {
+			return nil, errors.New("Почта России order search response has duplicate order")
+		}
+		seen[orderID] = struct{}{}
+		result = append(result, sdk.LogisticsOrderSummary{RemoteID: orderID, ExternalID: externalID, BatchID: batchID, TrackingNumber: tracking, Status: orderStatus, ObservedAt: now})
+	}
+	return result, nil
+}
+
+func pochtarussiaOptionalBacklogID(raw json.RawMessage) (string, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	return pochtarussiaBacklogID(raw)
+}
+
+func pochtarussiaOptionalBatchTrackingID(raw json.RawMessage) (string, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	return pochtarussiaBatchTrackingID(raw)
+}
+
+func pochtarussiaBatchTrackingID(raw json.RawMessage) (string, error) {
+	var text string
+	if json.Unmarshal(raw, &text) != nil {
+		var number json.Number
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if decoder.Decode(&number) != nil {
+			return "", errors.New("Почта России batch order response has invalid barcode")
+		}
+		text = number.String()
+	}
+	text = strings.TrimSpace(text)
+	if !pochtarussiaTrackingBarcode(text) {
+		return "", errors.New("Почта России batch order response has invalid barcode")
+	}
+	return text, nil
+}
+
 // ArchivedBatches reads one bounded collection from the official Russian Post
 // archive endpoint. The provider response is reduced to the same neutral batch
 // projection as the active directory; order rows and raw provider fields stay
@@ -3968,6 +4669,48 @@ func (transport pochtarussiaHTTP) UnarchiveBatch(ctx context.Context, secret []b
 		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch restore response rejected")
 	}
 	return sdk.LogisticsBatchUnarchive{RemoteID: remoteID, Status: "RESTORED", Archived: false, ObservedAt: time.Now().UTC()}, nil
+}
+
+// UpdateBatchSendingDate changes the hand-off date for one Russian Post
+// batch. The provider endpoint is path-only and may acknowledge success with
+// an empty body; any explicit error code remains a provider failure.
+func (transport pochtarussiaHTTP) UpdateBatchSendingDate(ctx context.Context, secret []byte, request sdk.LogisticsBatchSendingDateRequest) (sdk.LogisticsBatchSendingDateUpdate, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, errors.New("Почта России batch sending date request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, err
+	}
+	if !pochtarussiaOrderIDPattern.MatchString(request.BatchID) {
+		return sdk.LogisticsBatchSendingDateUpdate{}, errors.New("Почта России batch name is invalid")
+	}
+	batchID, err := strconv.ParseInt(request.BatchID, 10, 64)
+	if err != nil || batchID <= 0 {
+		return sdk.LogisticsBatchSendingDateUpdate{}, errors.New("Почта России batch name is invalid")
+	}
+	sendingDate, err := time.Parse("2006-01-02", request.SendingDate)
+	if err != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, errors.New("Почта России sending date is invalid")
+	}
+	path := fmt.Sprintf("/1.0/batch/%d/sending/%04d/%02d/%02d", batchID, sendingDate.Year(), sendingDate.Month(), sendingDate.Day())
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", path, url.Values{}, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatchSendingDateUpdate{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatchSendingDateUpdate{}, fmt.Errorf("Почта России batch sending date update rejected with status %d", status)
+	}
+	trimmed := bytes.TrimSpace(responseBody)
+	if len(trimmed) > 0 {
+		var response struct {
+			ErrorCode string `json:"error-code"`
+		}
+		if json.Unmarshal(trimmed, &response) != nil || strings.TrimSpace(response.ErrorCode) != "" {
+			return sdk.LogisticsBatchSendingDateUpdate{}, errors.New("Почта России batch sending date response rejected")
+		}
+	}
+	return sdk.LogisticsBatchSendingDateUpdate{RemoteID: request.BatchID, SendingDate: request.SendingDate, Status: "UPDATED", Updated: true, ObservedAt: time.Now().UTC()}, nil
 }
 
 var _ pochtarussia.Transport = pochtarussiaHTTP{}

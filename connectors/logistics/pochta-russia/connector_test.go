@@ -71,6 +71,34 @@ func TestTrackingUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestBatchOrdersUseCandidateTransport(t *testing.T) {
+	orders, err := New(candidateTransport{}, nil).ReadLogisticsBatchOrders(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchOrdersQuery{BatchID: "24", Limit: 10})
+	if err != nil || len(orders) != 2 || orders[0].BatchID != "24" || orders[0].RemoteID != "57565818" || orders[0].TrackingNumber != "80084740397510" || orders[0].Status != "created" {
+		t.Fatalf("orders=%+v err=%v", orders, err)
+	}
+}
+
+func TestBatchLookupUsesCandidateTransport(t *testing.T) {
+	batch, err := New(candidateTransport{}, nil).ReadLogisticsBatchByName(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchLookupQuery{BatchID: "24"})
+	if err != nil || batch.RemoteID != "24" || batch.Status != "CREATED" || batch.ShipmentCount != 2 || batch.ObservedAt.IsZero() {
+		t.Fatalf("batch=%+v err=%v", batch, err)
+	}
+}
+
+func TestOrderInBatchUsesCandidateTransport(t *testing.T) {
+	order, err := New(candidateTransport{}, nil).ReadLogisticsOrder(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsOrderQuery{RemoteID: "57565818"})
+	if err != nil || order.RemoteID != "57565818" || order.BatchID != "24" || order.TrackingNumber != "80084740397510" || order.Status != "created" {
+		t.Fatalf("order=%+v err=%v", order, err)
+	}
+}
+
+func TestOrderSearchUsesCandidateTransport(t *testing.T) {
+	orders, err := New(candidateTransport{}, nil).SearchLogisticsOrders(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsOrderSearchQuery{ExternalID: "shop-order-1", Limit: 10})
+	if err != nil || len(orders) != 1 || orders[0].RemoteID != "57565818" || orders[0].ExternalID != "shop-order-1" || orders[0].Status != "created" {
+		t.Fatalf("orders=%+v err=%v", orders, err)
+	}
+}
+
 func TestShipmentCreationUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCreateRequest{
 		ExternalID: "order-001", ServiceCode: "pochta_parcel_online", IdempotencyKey: "idem-001",
@@ -151,11 +179,27 @@ func TestBatchArchiveUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestBatchSendingDateUpdateUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).UpdateLogisticsBatchSendingDate(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchSendingDateRequest{BatchID: "24", SendingDate: "2026-09-05", IdempotencyKey: "sending-date-idem-001"})
+	if err != nil || result.RemoteID != "24" || result.SendingDate != "2026-09-05" || result.Status != "UPDATED" || !result.Updated || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 func TestBatchUnarchiveUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).UnarchiveLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchUnarchiveRequest{
 		BatchID: "batch-conformance-001", IdempotencyKey: "restore-idem-001",
 	})
 	if err != nil || result.RemoteID != "batch-conformance-001" || result.Status != "RESTORED" || result.Archived || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestOrderRestoreUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).RestoreLogisticsOrders(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsOrderRestoreRequest{
+		OrderIDs: []string{"57565818", "57565819"}, IdempotencyKey: "restore-orders-001",
+	})
+	if err != nil || !sameStringSet(result.OrderIDs, []string{"57565818", "57565819"}) || result.Status != "restored" || result.ObservedAt.IsZero() {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }

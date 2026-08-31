@@ -17,7 +17,8 @@ bounded `logistics.batches.create`, `logistics.batches.read`,
 `logistics.batches.submit`, `logistics.batches.archive`, `logistics.batches.unarchive`, `pickup.points.read`, `logistics.rates.read`,
 `logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`,
 `logistics.return.separate.create`, `logistics.return.separate.delete`, `logistics.label.read`
-и `logistics.track.read`.
+и `logistics.track.read`. Для сформированных партий также включена отдельная
+операция `logistics.orders.restore`.
 Создание одного заказа
 выполняется через официальный `PUT /1.0/user/backlog`; адаптер принимает
 только известные коды посылки, требует российские индексы и адрес с номером
@@ -99,3 +100,62 @@ fan-out общий запрос принимает SDK-лимит до 500, но
 проверяет уникальные имена партий, статусы и неотрицательное число
 отправлений. Это read-only проекция: строки заказов в неё не включаются;
 передача партии в работу выполняется отдельным check-in маршрутом.
+
+Возврат заказов из сформированной партии в список «Новые» выполняется через
+approval-bound `POST /api/v1/logistics/orders/restore`. Адаптер вызывает
+официальный `POST /1.0/user/backlog` с массивом из 1–100 числовых внутренних
+идентификаторов заказов. Ответ содержит `result-ids` и поэлементные `errors`;
+частичный результат, ошибка или несовпадение набора идентификаторов отклоняются
+как provider failure. Полный набор нормализуется в статус `restored`, а
+tenant-scoped operation receipt не допускает повторного внешнего вызова при
+неопределённом исходе. Это возврат в backlog, а не отмена заказа и не возврат
+посылки отправителю.
+
+Состав одной сформированной партии читается отдельной bounded read-only
+операцией `logistics.batches.orders.read` через
+`GET /api/v1/logistics/batches/orders`. Host вызывает официальный
+`GET /1.0/batch/{batch-name}/shipment` с числовым именем партии и параметрами
+`size`, `page`, `sort=ask`. В нейтральную проекцию попадают только ID заказа,
+имя партии, barcode, нормализованный статус и время наблюдения; получатель,
+адреса и прочие поля ответа провайдера не пересекают границу коннектора.
+Несовпадение партии, дубликаты, некорректные ID/barcode/status и ответ больше
+запрошенного лимита отклоняются как provider failure.
+
+Поиск партии по имени доступен через существующую capability
+`logistics.batches.read` и `GET /api/v1/logistics/batches/{batch_id}`. Host
+вызывает официальный `GET /1.0/batch/{batch-name}` без query/body, принимает
+числовое имя партии и возвращает только ID, статус, число отправлений и UTC
+время наблюдения. Ответ с другим именем, несколькими партиями, невалидным
+статусом или количеством отклоняется как provider failure.
+
+Поиск одного заказа в партии доступен через read-only capability
+`logistics.orders.read` и `GET /api/v1/logistics/orders/{order_id}`. Host
+вызывает официальный `GET /1.0/shipment/{id}`, принимает только числовой ID,
+сверяет его с ID в ответе и возвращает ту же безопасную проекцию, что и список
+партии. Пустой/массивный ответ более чем с одной строкой, другой ID,
+отсутствующий batch ID, невалидный barcode или статус закрываются как
+provider failure.
+
+Поиск заказов по назначенному магазином номеру доступен через bounded
+read-only capability `logistics.orders.search` и
+`GET /api/v1/logistics/orders/search`. Host вызывает официальный
+`GET /1.0/backlog/search?query={external_id}`, передаёт только проверенный
+номер заказа и ограничивает выдачу 100 строками. В нейтральную проекцию
+попадают ID заказа, исходный номер магазина, необязательные номер партии и
+ШПИ, нормализованный статус и UTC-время наблюдения. Точные совпадения номера
+магазина обязательны; адреса, получатели и raw provider payload за границу
+коннектора не выходят. Невалидный ответ, дубликаты и превышение лимита
+остаются provider failure. Маршрут подтверждён [официальной спецификацией API
+«Отправка»](https://otpravka.pochta.ru/specification).
+
+Изменение дня передачи сформированной партии доступно через отдельную
+approval-bound capability `logistics.batches.sending_date.write` и маршрут
+`POST /api/v1/logistics/batches/sending-date/{batch_id}`. Host принимает
+числовое имя партии и дату `YYYY-MM-DD`, вызывает официальный
+`POST /1.0/batch/{batch-name}/sending/YYYY/MM/DD` без тела и query-параметров.
+Почта России может подтвердить операцию пустым ответом; также допускается
+JSON-объект без `error-code`, но любой код ошибки, malformed response или
+несовпадение партии остаются provider failure. Наружу выходит только точное
+имя партии, новая дата, `UPDATED`/`updated=true` и время наблюдения. Approval,
+tenant-scoped idempotency receipt и проверка нормализованного результата
+обязательны.

@@ -11,11 +11,35 @@ import (
 // not expose raw provider payloads to Core.
 type Transport interface {
 	Ping(context.Context, []byte) error
-	Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error)
+	Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error)
+	Create(context.Context, []byte, sdk.ShipmentCreateRequest, Configuration) (sdk.ShipmentResult, error)
 	Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
 	Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error)
 	Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error)
 	Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
+}
+
+// ReadLogisticsRates calculates one bounded C2C tariff preview between two
+// explicit 5Post pickup-point UUIDs.
+func (c *Connector) ReadLogisticsRates(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.RateRequest) ([]sdk.RateQuote, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
+	}
+	var result []sdk.RateQuote
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		result, callErr = c.transport.Rates(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, quote := range result {
+		if quote.Validate() != nil {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response", 0)
+		}
+	}
+	return result, nil
 }
 
 func manifest() sdk.Manifest {
@@ -25,13 +49,20 @@ func manifest() sdk.Manifest {
 
 // CreateLogisticsShipment creates a partner shipment and normalizes its identity.
 func (c *Connector) CreateLogisticsShipment(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
-	if request.Validate() != nil {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
+	if c.configuration == nil {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "configuration_rejected", 0)
+	}
+	configuration, err := c.configuration.Resolve(ctx, account)
+	if err != nil || configuration.Validate() != nil {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "configuration_rejected", 0)
+	}
 	var result sdk.ShipmentResult
-	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+	err = useSecret(ctx, runtime, account, func(secret []byte) error {
 		var callErr error
-		result, callErr = c.transport.Create(ctx, secret, request)
+		result, callErr = c.transport.Create(ctx, secret, request, configuration)
 		return callErr
 	})
 	if err != nil {
@@ -124,6 +155,7 @@ func validateShipment(result sdk.ShipmentResult) (sdk.ShipmentResult, error) {
 }
 
 var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
+var _ sdk.LogisticsRateReader = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
