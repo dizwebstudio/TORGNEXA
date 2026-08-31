@@ -30,6 +30,18 @@ func TestSnapshotDigestIsStableAndExcludesDigest(t *testing.T) {
 	}
 }
 
+func TestTargetSameAccountRejectsCrossAccountIdentity(t *testing.T) {
+	target := testSnapshot(t).Target
+	if !target.SameAccount(target) {
+		t.Fatal("target must match its own account identity")
+	}
+	other := target
+	other.ConnectorID = "another-marketplace"
+	if target.SameAccount(other) {
+		t.Fatal("different connector account identity must not match")
+	}
+}
+
 func TestPublicationStateMachineRejectsSkippingPreflight(t *testing.T) {
 	if CanTransition(StateDraft, StatePublished) {
 		t.Fatal("draft must not become published without preflight and worker stages")

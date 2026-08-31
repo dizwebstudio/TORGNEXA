@@ -55,7 +55,7 @@ type marketplacePreflightRequest struct {
 
 func (api marketplacePublicationAPI) preflight(w http.ResponseWriter, r *http.Request) {
 	scope, ok := ScopeFromContext(r.Context())
-	if !ok || api.repository == nil || api.quality == nil {
+	if !ok || api.repository == nil || api.quality == nil || api.accounts == nil || api.runtime == nil {
 		writeProblem(w, http.StatusServiceUnavailable, "Marketplace publication is unavailable")
 		return
 	}
@@ -67,6 +67,18 @@ func (api marketplacePublicationAPI) preflight(w http.ResponseWriter, r *http.Re
 	digest, err := input.Snapshot.ComputeDigest()
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, accountErr := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), input.Snapshot.Target.ConnectorAccountID)
+	accountTarget := marketplacepublication.Target{OrganizationID: account.OrganizationID, WorkspaceID: account.WorkspaceID, ConnectorAccountID: account.ID, ConnectorID: account.ConnectorID}
+	supportsProductsWrite := api.runtime.SupportsCapability(account.ConnectorID, "products.write")
+	if accountErr != nil || account.Status != sdk.AccountActive || !input.Snapshot.Target.SameAccount(accountTarget) || account.Family != sdk.FamilyMarketplace || !supportsProductsWrite {
+		writeProblem(w, http.StatusConflict, "Marketplace product publication is not enabled for this account")
+		return
+	}
+	settings, settingsErr := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if settingsErr != nil || !sdk.CapabilityEnabled(settings, "products.write") {
+		writeProblem(w, http.StatusConflict, "products.write is disabled for this account")
 		return
 	}
 	receipt, err := api.quality.Receipt(r.Context(), scope, input.QualityReceiptID)

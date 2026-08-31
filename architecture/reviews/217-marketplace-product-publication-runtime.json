@@ -40,6 +40,7 @@
     "internal/platform/connectors/catalog_generated.go",
     "internal/platform/connectors/product_publication.go",
     "internal/platform/connectors/product_publication_test.go",
+    "internal/platform/migration/catalog_test.go",
     "internal/platform/postgres/marketplacepublicationrepo/repository.go",
     "migrations/000044_marketplace_product_publication.sql",
     "migrations/catalog.json",

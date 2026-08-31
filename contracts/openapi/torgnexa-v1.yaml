@@ -41,6 +41,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflight'}}}}
       responses:
         '200': {description: Snapshot and quality receipt passed the local publication gate, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflightResult'}}}}
+        '409': {description: 'Marketplace account capability is unavailable for this target'}
         '422': {description: 'Quality receipt is missing, stale or does not match the snapshot'}
   /marketplace-publications:
     get:
