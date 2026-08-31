@@ -113,6 +113,99 @@ func maxContentLimits(request sdk.SocialPublishRequest) bool {
 		return false
 	}
 }
+
+// EditSocial updates one previously published MAX message in the configured
+// channel. Media is re-opened through the released-upload boundary immediately
+// before the provider call; only provider attachment tokens leave the host.
+func (connector *Connector) EditSocial(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.SocialEditRequest, media sdk.MediaAccessor) (sdk.SocialPublishResult, error) {
+	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.ValidateSocialEdit(Manifest(), request) != nil {
+		return sdk.SocialPublishResult{}, sdk.ErrInvalidSocialRequest
+	}
+	if !maxContentLimits(sdk.SocialPublishRequest{Kind: request.Kind, Text: request.Text, Media: request.Media, Buttons: request.Buttons}) {
+		return sdk.SocialPublishResult{}, sdk.ErrInvalidSocialRequest
+	}
+	configuration, err := connector.configuration(ctx, account)
+	if err != nil {
+		return sdk.SocialPublishResult{}, err
+	}
+	chatID, mid, err := parseRemotePublicationID(request.RemotePublicationID)
+	if err != nil || chatID != configuration.ChatID {
+		return sdk.SocialPublishResult{}, sdk.ErrInvalidSocialRequest
+	}
+	var result sdk.SocialPublishResult
+	err = connector.useSecret(ctx, runtime, account.SecretReference, validToken, func(token []byte) error {
+		attachments := make([]attachment, 0, len(request.Media)+1)
+		for _, ref := range request.Media {
+			item, uploadErr := connector.uploadMedia(ctx, account, token, media, ref)
+			if uploadErr != nil {
+				return uploadErr
+			}
+			attachments = append(attachments, item)
+		}
+		if len(request.Buttons) > 0 {
+			keyboard, buttonErr := encodeButtons(request.Buttons)
+			if buttonErr != nil {
+				return buttonErr
+			}
+			attachments = append(attachments, keyboard)
+		}
+		body, marshalErr := json.Marshal(newMessageBody{Text: request.Text, Attachments: attachments, Notify: true})
+		if marshalErr != nil {
+			return sdk.ErrInvalidSocialRequest
+		}
+		raw, callErr := connector.call(ctx, token, "PUT", "/messages", []Param{{Name: "message_id", Value: mid}}, body, true)
+		if callErr != nil {
+			return callErr
+		}
+		if successErr := requireSuccess(raw); successErr != nil {
+			return successErr
+		}
+		result = sdk.SocialPublishResult{RemotePublicationID: request.RemotePublicationID, Status: sdk.SocialRemotePublished, ObservedAt: connector.now().UTC()}
+		return result.Validate()
+	})
+	return result, err
+}
+
+// DeleteSocial deletes one previously published MAX message in the configured
+// channel. The provider's boolean response is accepted only when it is
+// explicitly true; transport ambiguity remains a non-retryable unknown write.
+func (connector *Connector) DeleteSocial(ctx context.Context, account sdk.Account, runtime sdk.Runtime, remoteID string) (sdk.SocialDeleteResult, error) {
+	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "social.post.delete") != nil {
+		return sdk.SocialDeleteResult{}, sdk.ErrInvalidSocialRequest
+	}
+	configuration, err := connector.configuration(ctx, account)
+	if err != nil {
+		return sdk.SocialDeleteResult{}, err
+	}
+	chatID, mid, err := parseRemotePublicationID(remoteID)
+	if err != nil || chatID != configuration.ChatID {
+		return sdk.SocialDeleteResult{}, sdk.ErrInvalidSocialRequest
+	}
+	var result sdk.SocialDeleteResult
+	err = connector.useSecret(ctx, runtime, account.SecretReference, validToken, func(token []byte) error {
+		raw, callErr := connector.call(ctx, token, "DELETE", "/messages", []Param{{Name: "message_id", Value: mid}}, nil, true)
+		if callErr != nil {
+			return callErr
+		}
+		if successErr := requireSuccess(raw); successErr != nil {
+			return successErr
+		}
+		result = sdk.SocialDeleteResult{RemotePublicationID: remoteID, Deleted: true, ObservedAt: connector.now().UTC()}
+		return result.Validate()
+	})
+	return result, err
+}
+
+func requireSuccess(raw json.RawMessage) error {
+	var response struct {
+		Success *bool `json:"success"`
+	}
+	if json.Unmarshal(raw, &response) != nil || response.Success == nil || !*response.Success {
+		return ErrInvalidResponse
+	}
+	return nil
+}
+
 func runeLen(v string) int { return len([]rune(v)) }
 
 func encodeButtons(buttons []sdk.SocialButton) (attachment, error) {
@@ -363,4 +456,6 @@ func validUploadURL(value, typ string) bool {
 }
 
 var _ sdk.SocialPublisher = (*Connector)(nil)
+var _ sdk.SocialEditor = (*Connector)(nil)
+var _ sdk.SocialDeleter = (*Connector)(nil)
 var _ sdk.SocialPublicationStatusReader = (*Connector)(nil)

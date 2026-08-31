@@ -20,7 +20,8 @@ Primary official surfaces reviewed:
 | `social.post.buttons` | **granted: URL-only** | HTTPS link buttons only, max three per row in this adapter. |
 | `social.webhooks` | **granted** | production Webhook, secret verification, exact channel/type validation, host-owned durable dedup. |
 | status read | **implemented additive interface** | `GET /messages/{mid}`, exact recipient channel required. |
-| edit/delete | **not declared** | API support exists but Task-042 does not qualify destructive remote mutation. |
+| `social.post.edit` | **granted: bounded** | Approval-bound `PUT /messages`, exact configured channel, text/media/buttons revalidation and released-upload boundary. |
+| `social.post.delete` | **granted: bounded** | Approval-bound `DELETE /messages`, exact configured channel and explicit `success=true` only. |
 | comments/analytics/callback actions | **not declared** | No Task-042 qualification. |
 | Long Polling | **not admitted for production** | Official guidance identifies Webhook as the production mechanism. |
 
@@ -28,12 +29,13 @@ Primary official surfaces reviewed:
 
 The manifest table above records the adapter's qualified SDK ceiling. The
 current application runtime grants text, released image/video uploads, HTTPS
-URL buttons and the corresponding `POST /messages?chat_id=...` attachment path.
+URL buttons, approval-bound edit/delete and the corresponding
+`POST /messages?chat_id=...` attachment path.
 Health may call
 only `GET /me`, `GET /chats/{chatId}` and
 `GET /chats/{chatId}/members/me`. Uploads are limited to the official image and
-video hosts, and all media is revalidated by the Task-088 bridge. Webhooks and
-destructive remote mutations are not application operations. This subset is
+video hosts, and all media is revalidated by the Task-088 bridge. Edit/delete
+are exposed only through the existing approval and immutable receipt flow. This subset is
 generated from
 `contracts/connectors/builtin-runtime-support-v1.json` and is what the UI/API
 advertise. Official references: [message creation](https://dev.max.ru/docs-api/methods/POST/messages),

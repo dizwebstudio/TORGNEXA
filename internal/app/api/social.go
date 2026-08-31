@@ -22,6 +22,7 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
+	"github.com/torgnexa/torgnexa/internal/platform/uploads"
 )
 
 const (
@@ -77,6 +78,8 @@ type socialRouteDependency struct {
 	operations               socialOperationStore
 	webhookControllerRuntime socialWebhookControllerRuntime
 	audit                    auditCapturer
+	uploadAccess              uploadReleaseGate
+	uploadContent             uploads.ReleaseReader
 }
 
 type socialAPI struct {
@@ -88,6 +91,7 @@ type socialAPI struct {
 	receipts   socialRemoteReceiptStore
 	approvals  socialApprovalStore
 	operations socialOperationStore
+	media      sdk.MediaAccessor
 }
 
 type socialChannelView struct {
@@ -135,6 +139,7 @@ func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAcc
 		api.receipts = dependencies[0].receipts
 		api.approvals = dependencies[0].approvals
 		api.operations = dependencies[0].operations
+		api.media = releasedUploadMedia{gate: dependencies[0].uploadAccess, content: dependencies[0].uploadContent}
 	}
 	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: socialChannelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listChannels)},
@@ -549,7 +554,7 @@ func (api socialAPI) editPublication(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Social publication editing is unavailable")
 		return
 	}
-	updated, err := editor.EditSocial(r.Context(), account, runtime, request, nil)
+	updated, err := editor.EditSocial(r.Context(), account, runtime, request, api.media)
 	if err != nil {
 		writeProblem(w, http.StatusBadGateway, "Social provider unavailable")
 		return

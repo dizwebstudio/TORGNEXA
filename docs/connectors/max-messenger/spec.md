@@ -33,7 +33,7 @@ route verifies the account capability and ephemeral
 `X-Max-Bot-Api-Secret` before publishing a minimized event; subscription and
 unsubscription lifecycle calls remain SDK-only.
 
-Not admitted: provider scheduling, Long Polling in production, edit/delete, comments, analytics, callback buttons, arbitrary files/audio, user messaging, or provider-native workflow state.
+Not admitted: provider scheduling, Long Polling in production, comments, analytics, callback buttons, arbitrary files/audio, user messaging, or provider-native workflow state.
 
 ## Account and channel isolation
 
@@ -48,6 +48,14 @@ Only a Task-020 READY Publication is dispatched by the host. Text is bounded to 
 For media, `MediaAccessor.OpenReleased` is called immediately before each upload. The qualified baseline accepts official image formats up to 50 MiB and MP4/MOV/MKV/WebM video up to 250 MiB. The connector obtains an upload URL from `POST /uploads`, then permits upload egress only to the official type-specific HTTPS hosts used in this baseline (`iu.oneme.ru` for image and `omub.okcdn.ru` for video). Userinfo, non-443 ports, encoded authorities, fragments and host-suffix tricks are rejected.
 
 The channel send uses `POST /messages?chat_id=...` with `notify=true`. Link buttons are HTTPS-only and are laid out at most three per row.
+
+Approval-bound editing and deletion use the same configured channel and the
+provider message ID from the immutable remote receipt. `EditSocial` calls
+`PUT /messages?message_id=...`, revalidates text/media/buttons and accepts only
+`success=true`; released media is uploaded immediately before the edit and
+only opaque attachment tokens are sent. `DeleteSocial` calls
+`DELETE /messages?message_id=...` and accepts only `success=true`. Ambiguous
+write transport failures remain `write_outcome_unknown` and are not retried.
 
 ## Status and retry semantics
 

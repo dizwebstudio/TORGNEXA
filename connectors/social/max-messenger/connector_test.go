@@ -231,6 +231,50 @@ func TestPublishImageRevalidatesReleaseAndRestrictsUploadHost(t *testing.T) {
 	}
 }
 
+func TestEditAndDeleteStayConfiguredChannel(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"success":true}`)}, {StatusCode: 200, Body: []byte(`{"success":true}`)}}}
+	c := New(transport, staticConfig{config()}, now)
+	remoteID := "max:-70801090403050:mid.ffffbdb48e6c3775019d496b34394b84"
+	edited, err := c.EditSocial(context.Background(), account(), runtime(), sdk.SocialEditRequest{RemotePublicationID: remoteID, Kind: sdk.SocialPostText, Text: "Изменённый текст"}, nil)
+	if err != nil || edited.RemotePublicationID != remoteID || edited.Status != sdk.SocialRemotePublished {
+		t.Fatalf("edited=%+v err=%v", edited, err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].Method != "PUT" || transport.requests[0].Path != "/messages" || len(transport.requests[0].Params) != 1 || transport.requests[0].Params[0] != (Param{Name: "message_id", Value: "mid.ffffbdb48e6c3775019d496b34394b84"}) {
+		t.Fatalf("unexpected edit request: %+v", transport.requests)
+	}
+	var body map[string]any
+	if json.Unmarshal(transport.requests[0].Body, &body) != nil || body["text"] != "Изменённый текст" || body["notify"] != true {
+		t.Fatalf("unexpected edit body: %s", transport.requests[0].Body)
+	}
+	deleted, err := c.DeleteSocial(context.Background(), account(), runtime(), remoteID)
+	if err != nil || !deleted.Deleted || deleted.RemotePublicationID != remoteID {
+		t.Fatalf("deleted=%+v err=%v", deleted, err)
+	}
+	if len(transport.requests) != 2 || transport.requests[1].Method != "DELETE" || transport.requests[1].Path != "/messages" || len(transport.requests[1].Params) != 1 || transport.requests[1].Params[0] != (Param{Name: "message_id", Value: "mid.ffffbdb48e6c3775019d496b34394b84"}) {
+		t.Fatalf("unexpected delete request: %+v", transport.requests)
+	}
+	if _, err = c.DeleteSocial(context.Background(), account(), runtime(), "max:-1:mid.ffffbdb48e6c3775019d496b34394b84"); err == nil || len(transport.requests) != 2 {
+		t.Fatalf("foreign channel was not rejected before egress: %v", err)
+	}
+}
+
+func TestEditImageUsesReleasedUpload(t *testing.T) {
+	transport := &scriptedTransport{
+		responses:       []Response{{StatusCode: 200, Body: uploadInitImageFixture}, {StatusCode: 200, Body: []byte(`{"success":true}`)}},
+		uploadResponses: []Response{{StatusCode: 200, Body: uploadImageFixture}},
+	}
+	media := &testMedia{body: []byte("jpeg"), desc: sdk.MediaDescriptor{MediaType: "image/jpeg", SizeBytes: 4, SHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}}
+	c := New(transport, staticConfig{config()}, now)
+	remoteID := "max:-70801090403050:mid.ffffbdb48e6c3775019d496b34394b84"
+	result, err := c.EditSocial(context.Background(), account(), runtime(), sdk.SocialEditRequest{RemotePublicationID: remoteID, Kind: sdk.SocialPostMedia, Text: "Обновлённое фото", Media: []sdk.SocialMediaRef{imageRef()}}, media)
+	if err != nil || result.RemotePublicationID != remoteID || media.opens != 1 || len(transport.uploads) != 1 {
+		t.Fatalf("result=%+v err=%v opens=%d uploads=%d", result, err, media.opens, len(transport.uploads))
+	}
+	if len(transport.requests) != 2 || transport.requests[0].Path != "/uploads" || transport.requests[1].Method != "PUT" {
+		t.Fatalf("unexpected edit upload sequence: %+v", transport.requests)
+	}
+}
+
 func TestReadStatusIsBoundToConfiguredChannel(t *testing.T) {
 	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: sendMessageFixture}}}
 	c := New(transport, staticConfig{config()}, now)

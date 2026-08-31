@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-200",
+  "task": "200",
+  "change_class": "mixed",
+  "summary": "Admit bounded approval-bound MAX message edit and delete through the existing Social API.",
+  "scopes": [
+    "adr/0152-max-message-edit-delete.md",
+    "architecture/reviews/200-max-message-edit-delete-runtime.json",
+    "connectors/social/max-messenger/connector_test.go",
+    "connectors/social/max-messenger/manifest.json",
+    "connectors/social/max-messenger/social.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/max-messenger/README.md",
+    "docs/connectors/max-messenger/capability-audit.md",
+    "docs/connectors/max-messenger/conformance-plan.md",
+    "docs/connectors/max-messenger/spec.md",
+    "frontend/src/generated/connector-catalog.ts",
+    "frontend/src/pages/SocialPage.tsx",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/200-max-message-edit-delete-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0152-max-message-edit-delete.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0127-max-media-worker-route.md",
+    "adr/0134-max-publication-buttons.md",
+    "adr/0135-max-inbound-webhooks.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The existing tenant-scoped publication, channel account and remote receipt are the only source of the mutation target."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Released media is re-opened through the existing host boundary and provider responses are reduced to normalized results."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"Existing provider-neutral Social edit/delete routes now admit MAX through additive runtime support without a new public endpoint."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope, event type or event payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"MAX manifest and SDK adapter now implement the already defined SocialEditor and SocialDeleter interfaces."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"Existing publication, remote receipt, operation receipt and audit storage are sufficient."},
+    {"area":"security", "status":"affected", "evidence":"Approval, capability, exact configured channel, message ID validation and explicit provider success are required before mutation."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The existing social.publication.edit/delete approval and risk boundaries remain mandatory for MAX."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"Existing operation and publication audit records preserve the immutable remote receipt and mutation outcome."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"Tenant-scoped operation receipts prevent duplicate API calls; ambiguous writes are not retried."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"Mutation egress is fixed to platform-api2.max.ru and released media uploads retain the existing exact host allowlist."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Existing MAX timeout, rate-limit and normalized write-outcome handling covers the new methods."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the two runtime capabilities or registry branches closes MAX mutations without migration."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic adapter and registry tests verify exact methods, message ID, configured channel, success response and media upload path."}
+  ],
+  "provider": {
+    "id": "max-messenger",
+    "route": "connector_sdk",
+    "manifest": "connectors/social/max-messenger/manifest.json",
+    "connector_spec": "docs/connectors/max-messenger/spec.md",
+    "capability_audit": "docs/connectors/max-messenger/capability-audit.md",
+    "conformance_plan": "docs/connectors/max-messenger/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

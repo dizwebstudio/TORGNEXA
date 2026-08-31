@@ -4,7 +4,7 @@ Task-064 admission uses the common 13-check Connector SDK v1 suite for provider 
 
 Provider-specific deterministic evidence additionally covers:
 
-- committed manifest equality and exactly five admitted capabilities;
+- committed manifest equality and exactly seven admitted capabilities;
 - strict numeric channel configuration plus separate bot-token/webhook-secret references;
 - exact bot/channel health proof and posting permission;
 - text and HTTPS link-button publication;
@@ -13,6 +13,9 @@ Provider-specific deterministic evidence additionally covers:
 - worker mapping from Core image/gallery/video variants to the provider-neutral
   SocialPublishRequest and receipt-safe publication lifecycle;
 - exact channel-bound remote publication IDs and status reads;
+- approval-bound single-message edit/delete with exact `message_id`, strict
+  `success=true` response handling, released-upload revalidation and foreign
+  channel rejection;
 - non-retryable ambiguous write outcomes;
 - production webhook endpoint validation, subscription/unsubscription and fixed update allowlist;
 - constant-time webhook-secret verification;

@@ -866,3 +866,13 @@ Task 199 is repository-complete: существующий `logistics.label.read`
 проверяет `application/pdf` и сигнатуру `%PDF-`, а наружу выдаёт только
 opaque digest reference; UI добавляет пункт «Форма сформированного заказа».
 Прочие документы, не покрытые этими маршрутами, остаются fail-closed.
+
+## MAX — редактирование и удаление сообщений
+
+Task 200 is repository-complete: MAX теперь допускает approval-bound
+`social.post.edit` и `social.post.delete` через официальный `PUT/DELETE
+/messages?message_id=...`. Host повторно проверяет канал, текст/media/buttons
+и released uploads, принимает только явный `success=true`, а tenant-scoped
+operation receipt не допускает повторный внешний вызов при неизвестном исходе.
+Комментарии, callback actions и управление подпиской webhook остаются
+fail-closed.

@@ -1828,3 +1828,14 @@ The host calls `GET /1.0/forms/{order-id}/forms` for one numeric order after
 batch formation, sends `print-type=PAPER` and the current date, validates the
 PDF response and returns only an opaque digest reference. Other unqualified
 documents remain fail-closed.
+
+## Phase 69 — MAX — редактирование и удаление сообщений
+
+`200`
+
+Task 200 admits bounded approval-bound MAX `social.post.edit` and
+`social.post.delete` through the existing Social API and immutable remote
+receipt. The host calls `PUT/DELETE /messages?message_id=...` on the fixed
+official host, revalidates released media and HTTPS buttons, accepts only
+`success=true` and never retries an ambiguous write. Comments, callback
+actions and webhook subscription lifecycle remain fail-closed.

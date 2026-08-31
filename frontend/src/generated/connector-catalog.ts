@@ -660,12 +660,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#6D28D9",
     },
-    capabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
+    capabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
     authKinds: ["bearer"],
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
+      operationalCapabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-70801090403050,"webhook_secret_reference":""},
