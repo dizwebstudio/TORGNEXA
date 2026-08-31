@@ -12,7 +12,7 @@ qualification evidence.
 |---|---|---|
 | СДЭК | тарифы, отправление create/cancel, отказ с возвратом в интернет-магазин, клиентский возврат с тарифом, tracking, label, ПВЗ, проверка ORDER_STATUS webhook | — |
 | Деловые Линии | тарифы, отправление create (address-to-address), заявка на отмену address-delivery, tracking, label, ПВЗ | терминальная отмена/ручной возврат |
-| ПЭК | тарифы, bounded self-delivery shipment create, tracking, ПВЗ, отмена предварительного оформления, одиночная PDF-этикетка, печатная форма заявки | отмена сформированного груза/возврат, пакетная печать заявок |
+| ПЭК | тарифы, bounded self-delivery shipment create, tracking, ПВЗ, отмена предварительного оформления, возврат одного принятого груза отправителю, одиночная PDF-этикетка, печатная форма заявки | отмена сформированного груза, пакетная печать заявок |
 | Почта России | партии (bounded read/archive-read/create/submit/archive/unarchive), тарифы, tracking, ПВЗ, label, возвратная этикетка для существующего RPO, создание одиночного заказа в backlog, cancel нового заказа, возврат для существующего RPO, отдельное возвратное отправление (создание/редактирование/удаление) | прочие операции партий, документов и возвратов |
 | 5Post | проверка кабинета | тарифы, create/cancel, tracking, label, ПВЗ |
 | Ozon Доставка | проверка кабинета | тарифы, create/cancel, tracking, label, ПВЗ |
@@ -40,7 +40,7 @@ qualification evidence.
 | Robokassa | create, status, reconcile, refund, webhooks | — |
 | YooKassa | create, status, refund, reconcile, webhooks | — |
 | СБП | create, status, refund, reconcile, webhooks | live-квалификация эквайера |
-| Telegram | текстовая, фото/альбомная и MP4-видеопубликация через released-upload bridge, HTTPS-кнопки для одиночного сообщения, редактирование одного опубликованного сообщения по approval | удаление, webhooks |
+| Telegram | текстовая, фото/альбомная и MP4-видеопубликация через released-upload bridge, HTTPS-кнопки для одиночного сообщения, редактирование и удаление одного опубликованного сообщения по approval, проверка channel_post webhook через Inbox/outbox, подписка/отписка webhook через `setWebhook`/`getWebhookInfo`/`deleteWebhook` | callback actions и прочие update-типы |
 | MAX | текстовая, фото/альбомная и видео-публикация через released-upload bridge, HTTPS-кнопки для публикаций, приём входящих webhooks через Inbox/outbox | edit/delete, управление подпиской webhook |
 | AI, объявления, ЭДО, маркировка, гос-системы | health-check/отдельная поверхность согласно runtime support | domain-операции из manifest до отдельной qualification |
 

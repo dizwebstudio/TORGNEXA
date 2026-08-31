@@ -65,7 +65,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("CBR FX separate-surface support is inaccurate: %+v", cbr)
 	}
 	telegram, ok := SupportFor("telegram")
-	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || !SupportsCapability("telegram", "social.post.media") || !SupportsCapability("telegram", "social.post.video") || !SupportsCapability("telegram", "social.post.buttons") || !SupportsCapability("telegram", "social.post.edit") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
+	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || !SupportsCapability("telegram", "social.post.media") || !SupportsCapability("telegram", "social.post.video") || !SupportsCapability("telegram", "social.post.buttons") || !SupportsCapability("telegram", "social.post.edit") || !SupportsCapability("telegram", "social.post.delete") || !SupportsCapability("telegram", "social.webhooks") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
 		t.Fatalf("Telegram social runtime support is inaccurate: %+v", telegram)
 	}
 	max, ok := SupportFor("max-messenger")
@@ -99,7 +99,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "dellin" {
 				wantCapabilities = 6
 			} else if connectorID == "pek" {
-				wantCapabilities = 6
+				wantCapabilities = 7
 			} else if connectorID == "pochta-russia" {
 				wantCapabilities = 16
 			}
@@ -135,7 +135,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.label.read") {
 				t.Fatalf("%s label support is inaccurate: %+v", connectorID, carrier)
 			}
-			if (connectorID == "cdek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.return.create") {
+			if (connectorID == "cdek" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.return.create") {
 				t.Fatalf("%s return support is inaccurate: %+v", connectorID, carrier)
 			}
 			if connectorID == "pochta-russia" && (!SupportsCapability(connectorID, "logistics.return.separate.create") || !SupportsCapability(connectorID, "logistics.return.separate.delete") || !SupportsCapability(connectorID, "logistics.return.separate.edit")) {
@@ -224,20 +224,52 @@ func TestSocialEditorAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestSocialDeleterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"chat_id":-70801090403050}`), nil
+	}
+	if deleter, err := registry.SocialDeleter(supportTestAccount(t, "telegram"), load); err != nil || deleter == nil {
+		t.Fatalf("Telegram deleter unavailable: deleter=%T err=%v", deleter, err)
+	}
+	if _, err := registry.SocialDeleter(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted MAX social deleter resolved: %v", err)
+	}
+}
+
 func TestSocialWebhookReceiverAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) {
 		return json.RawMessage(`{"chat_id":-70801090403050,"webhook_secret_reference":"sec:v1:1123456789abcdef0123456789abcdef"}`), nil
 	}
-	receiver, err := registry.SocialWebhookReceiver(supportTestAccount(t, "max-messenger"), load)
+	for _, connectorID := range []string{"max-messenger", "telegram"} {
+		receiver, err := registry.SocialWebhookReceiver(supportTestAccount(t, connectorID), load)
+		if err != nil {
+			t.Fatalf("%s webhook receiver unavailable: %v", connectorID, err)
+		}
+		if _, ok := receiver.(sdk.SocialWebhookReceiver); !ok {
+			t.Fatalf("%s receiver has unexpected type %T", connectorID, receiver)
+		}
+	}
+}
+
+func TestSocialWebhookControllerAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"chat_id":-70801090403050,"webhook_secret_reference":"sec:v1:1123456789abcdef0123456789abcdef"}`), nil
+	}
+	controller, err := registry.SocialWebhookController(supportTestAccount(t, "telegram"), load)
 	if err != nil {
-		t.Fatalf("MAX webhook receiver unavailable: %v", err)
+		t.Fatalf("telegram webhook controller unavailable: %v", err)
 	}
-	if _, ok := receiver.(sdk.SocialWebhookReceiver); !ok {
-		t.Fatalf("MAX receiver has unexpected type %T", receiver)
+	if _, ok := controller.(sdk.SocialWebhookController); !ok {
+		t.Fatalf("telegram controller has unexpected type %T", controller)
 	}
-	if _, err := registry.SocialWebhookReceiver(supportTestAccount(t, "telegram"), load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted Telegram webhook receiver resolved: %v", err)
+	if _, err := registry.SocialWebhookController(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("MAX webhook controller was admitted: %v", err)
+	}
+	if _, err := registry.SocialWebhookController(supportTestAccount(t, "vk"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted social webhook controller resolved: %v", err)
 	}
 }
 
@@ -825,7 +857,7 @@ func TestLogisticsReturnCreatorAdmissionIsExact(t *testing.T) {
 	if err != nil || creator == nil {
 		t.Fatalf("Russian Post return creator unavailable: creator=%T err=%v", creator, err)
 	}
-	for _, connectorID := range []string{"pek", "dellin", "fivepost", "ozon-delivery"} {
+	for _, connectorID := range []string{"dellin", "fivepost", "ozon-delivery"} {
 		if _, err := registry.LogisticsReturnCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified return creator resolved: %v", connectorID, err)
 		}

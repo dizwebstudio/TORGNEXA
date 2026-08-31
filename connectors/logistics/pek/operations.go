@@ -18,6 +18,7 @@ type Transport interface {
 	Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error)
 	Create(context.Context, []byte, sdk.ShipmentCreateRequest, Configuration) (sdk.ShipmentResult, error)
 	Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error)
+	Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error)
 	Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
 	Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error)
 	Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
@@ -90,6 +91,28 @@ func (c *Connector) CancelLogisticsShipment(ctx context.Context, account sdk.Acc
 	err := useSecret(ctx, runtime, account, func(secret []byte) error {
 		var callErr error
 		result, callErr = c.transport.Cancel(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	return validateShipment(result)
+}
+
+// CreateLogisticsReturn requests return-to-sender for one cargo that has
+// already been accepted by ПЭК. The provider operation is distinct from
+// cancellation of a pre-registration and is intentionally limited to one
+// cargo code.
+func (c *Connector) CreateLogisticsReturn(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
+	originalRemoteID := strings.TrimSpace(request.OriginalRemoteID)
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil || originalRemoteID != request.OriginalRemoteID || !pekCargoCodePattern.MatchString(originalRemoteID) || request.MailType != "pek_cargo_return" || request.TariffCode != 0 {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
+	}
+	request.OriginalRemoteID = originalRemoteID
+	var result sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		result, callErr = c.transport.Return(ctx, secret, request)
 		return callErr
 	})
 	if err != nil {
@@ -172,6 +195,7 @@ func validateShipment(result sdk.ShipmentResult) (sdk.ShipmentResult, error) {
 var _ sdk.LogisticsRateReader = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
+var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.PickupPointReader = (*Connector)(nil)

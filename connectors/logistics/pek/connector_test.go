@@ -59,6 +59,33 @@ func TestShipmentCancellationUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestCargoReturnUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CreateLogisticsReturn(context.Background(), testAccount(), testRuntime{}, sdk.ReturnCreateRequest{
+		OriginalRemoteID: "780339690775",
+		ExternalID:       "return-pek-1",
+		MailType:         "pek_cargo_return",
+		IdempotencyKey:   "return-pek-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RemoteID != "780339690775" || result.Status != "created" || result.TrackingNumber != result.RemoteID {
+		t.Fatalf("unexpected cargo return result: %+v", result)
+	}
+}
+
+func TestCargoReturnRejectsOtherReturnKinds(t *testing.T) {
+	_, err := New(candidateTransport{}, nil).CreateLogisticsReturn(context.Background(), testAccount(), testRuntime{}, sdk.ReturnCreateRequest{
+		OriginalRemoteID: "780339690775",
+		ExternalID:       "return-pek-1",
+		MailType:         "POSTAL_PARCEL",
+		IdempotencyKey:   "return-pek-1",
+	})
+	if err == nil {
+		t.Fatal("expected unsupported ПЭК return kind to be rejected")
+	}
+}
+
 func TestShipmentLabelUsesCandidateTransport(t *testing.T) {
 	label, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "780339690775", Format: "pdf"})
 	if err != nil {

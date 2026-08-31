@@ -34,6 +34,13 @@ func (candidateTransport) Cancel(_ context.Context, _ []byte, request sdk.Shipme
 	return result, nil
 }
 
+func (candidateTransport) Return(_ context.Context, _ []byte, request sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
+	result := candidateShipment("created")
+	result.RemoteID = request.OriginalRemoteID
+	result.TrackingNumber = request.OriginalRemoteID
+	return result, nil
+}
+
 func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
 	return sdk.LabelResult{ArtifactRef: "pek:print:" + request.RemoteID + ":fixture", MediaType: "application/pdf", ObservedAt: candidateTime}, nil
 }

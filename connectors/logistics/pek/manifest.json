@@ -4,9 +4,10 @@
   "family": "logistics",
   "version": "1.0.0",
   "sdk_version": 1,
-  "capabilities": [
+	  "capabilities": [
 	"logistics.label.read",
     "logistics.rates.read",
+	"logistics.return.create",
     "logistics.shipment.cancel",
     "logistics.shipment.create",
     "logistics.track.read",

@@ -9,6 +9,8 @@ Primary evidence:
 - `InlineKeyboardMarkup`
 - `editMessageText`, `editMessageMedia`
 - `deleteMessage`, `deleteMessages`
+- `setWebhook` / Bot API webhook update envelope
+- `getWebhookInfo` / `deleteWebhook`
 - `ResponseParameters.retry_after`
 
 | Capability | Decision | Admission boundary |
@@ -19,8 +21,9 @@ Primary evidence:
 | `social.post.buttons` | **granted: URL-only** | HTTPS URL buttons only; callback-data buttons deferred with inbound-update lifecycle. |
 | `social.post.edit` | **granted: single-message only** | text via `editMessageText`; one photo/video replacement via `editMessageMedia`; album edit denied. |
 | `social.post.delete` | **granted: bounded receipt set** | `deleteMessage` / `deleteMessages`, max 10 IDs because the only multi-message remote receipt produced by this connector is a Telegram album. Provider time/permission restrictions remain authoritative. |
+| `social.webhooks` | **granted: channel posts only** | `channel_post` and `edited_channel_post`, secret-token verification, exact channel/message validation and host-owned durable dedup. |
 | comments/analytics | **not declared** | No Task-041 qualification. |
-| inbound callbacks | **not declared** | Requires a separate webhook/update security contract. |
+| callback queries and other updates | **not declared** | No application authorization or canonical entity bridge. |
 
 ## Production runtime subset
 
@@ -29,9 +32,14 @@ Task 174 composes `social.post.text`, `social.post.media` and
 `social.post.buttons` through the canonical variant, API and worker route;
 buttons are HTTPS-only and are admitted for text, one photo and one video.
 Task 192 composes `social.post.edit` for one already published message through
-an approval-bound, receipt-backed API operation. Deletion still needs its own
-application authorization and reconciliation flow; webhooks need a separate
-inbound security contract.
+an approval-bound, receipt-backed API operation. Task 193 composes
+`social.post.delete` for one already published message through the same
+approval, immutable-receipt and durable-idempotency boundary. Task 194 composes
+verified Telegram channel-post webhooks through the public tenant-bound route
+and host-owned Inbox/outbox. Task 195 composes the bounded subscription
+lifecycle through the authenticated host route: `setWebhook` uses the exact
+deployment endpoint, callback-scoped secret and the two admitted update
+types; unsubscribe checks `getWebhookInfo` before `deleteWebhook`.
 
 ## Retry decision
 

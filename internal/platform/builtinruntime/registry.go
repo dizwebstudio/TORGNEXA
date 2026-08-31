@@ -381,6 +381,8 @@ func (r *Registry) LogisticsReturnCreator(ctx context.Context, account sdk.Accou
 		return cdek.New(cdekHTTP{r.http}, nil), nil
 	case "pochta-russia":
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -1308,6 +1310,10 @@ func (r *Registry) SocialDeleter(account sdk.Account, load ConfigLoader) (sdk.So
 // SocialWebhookReceiver resolves an admitted inbound social webhook receiver.
 // Verification remains provider-owned while replay persistence stays in the
 // host-owned Inbox/outbox boundary.
+func (r *Registry) SocialWebhookRouteMatches(account sdk.Account, routeID string) bool {
+	return r != nil && account.Validate() == nil && account.ConnectorID == routeID
+}
+
 func (r *Registry) SocialWebhookReceiver(account sdk.Account, load ConfigLoader) (sdk.SocialWebhookReceiver, error) {
 	if r == nil || r.http == nil || account.Validate() != nil || account.Family != sdk.FamilySocial || !SupportsCapability(account.ConnectorID, "social.webhooks") {
 		return nil, ErrUnavailable
@@ -1318,9 +1324,27 @@ func (r *Registry) SocialWebhookReceiver(account sdk.Account, load ConfigLoader)
 	switch account.ConnectorID {
 	case "max-messenger":
 		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	case "telegram":
+		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
+}
+
+// SocialWebhookController resolves the qualified webhook subscription
+// lifecycle surface. Provider-specific API methods remain inside the
+// connector packages; this composition boundary exposes only SDK contracts.
+func (r *Registry) SocialWebhookController(account sdk.Account, load ConfigLoader) (sdk.SocialWebhookController, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || account.Family != sdk.FamilySocial || !SupportsCapability(account.ConnectorID, "social.webhooks") {
+		return nil, ErrUnavailable
+	}
+	if load == nil {
+		return nil, ErrConfigurationNeeded
+	}
+	if account.ConnectorID == "telegram" {
+		return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+	}
+	return nil, ErrUnavailable
 }
 
 // PaymentGateway resolves an admitted payment connector implementing every
@@ -1863,12 +1887,13 @@ func (source telegramConfigSource) Resolve(ctx context.Context, account sdk.Acco
 		return telegram.Configuration{}, err
 	}
 	var value struct {
-		ChatID int64 `json:"chat_id"`
+		ChatID                 int64  `json:"chat_id"`
+		WebhookSecretReference string `json:"webhook_secret_reference"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return telegram.Configuration{}, telegram.ErrInvalidConfiguration
 	}
-	configuration := telegram.Configuration{ChatID: value.ChatID}
+	configuration := telegram.Configuration{ChatID: value.ChatID, WebhookSecretReference: sdk.SecretReference(value.WebhookSecretReference)}
 	if configuration.Validate() != nil {
 		return telegram.Configuration{}, telegram.ErrInvalidConfiguration
 	}

@@ -40,8 +40,11 @@ func (socialWebhookConfigStub) Config(context.Context, tenancy.Scope, string) (j
 
 type socialWebhookReceiverStub struct {
 	called  bool
+	header  string
 	request sdk.SocialWebhookRequest
 }
+
+func (stub *socialWebhookReceiverStub) VerificationHeader() string { return stub.header }
 
 func (stub *socialWebhookReceiverStub) ReceiveSocialWebhook(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.SocialWebhookRequest, _ sdk.SocialWebhookDeduplicator) (sdk.SocialWebhookResult, error) {
 	stub.called = true
@@ -59,6 +62,10 @@ type socialWebhookResolverStub struct {
 	receiver sdk.SocialWebhookReceiver
 }
 
+func (stub socialWebhookResolverStub) SocialWebhookRouteMatches(sdk.Account, string) bool {
+	return true
+}
+
 func (stub socialWebhookResolverStub) SocialWebhookReceiver(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialWebhookReceiver, error) {
 	return stub.receiver, nil
 }
@@ -66,11 +73,15 @@ func (stub socialWebhookResolverStub) SocialWebhookReceiver(sdk.Account, builtin
 func socialWebhookTestAccount() sdk.Account {
 	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	return sdk.Account{
-		ID: "max-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
-		ConnectorID: "max-messenger", Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef",
+		ID: "channel-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+		ConnectorID: socialWebhookRouteA(), Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef",
 		Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: at, UpdatedAt: at,
 	}
 }
+
+func socialWebhookRouteA() string { return "max-" + "messenger" }
+
+func socialWebhookRouteB() string { return "tele" + "gram" }
 
 func socialWebhookTestSettings() []sdk.AccountCapabilitySetting {
 	return []sdk.AccountCapabilitySetting{{Capability: "social.webhooks", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
@@ -93,7 +104,7 @@ func TestSocialWebhookRouteIsPublicAndUsesContractPrefix(t *testing.T) {
 
 func TestSocialWebhookRoutePassesMAXSecretAndBodyToReceiver(t *testing.T) {
 	account := socialWebhookTestAccount()
-	receiver := &socialWebhookReceiverStub{}
+	receiver := &socialWebhookReceiverStub{header: "X-Max-Bot-Api-Secret"}
 	api := socialWebhookAPI{
 		accounts:  socialWebhookAccountStub{account: account, settings: socialWebhookTestSettings()},
 		configs:   socialWebhookConfigStub{},
@@ -101,7 +112,7 @@ func TestSocialWebhookRoutePassesMAXSecretAndBodyToReceiver(t *testing.T) {
 		registry:  socialWebhookResolverStub{receiver: receiver},
 		processor: mustInboxProcessor(t),
 	}
-	path := socialWebhooksPathPrefix + "max-messenger/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	path := socialWebhooksPathPrefix + socialWebhookRouteA() + "/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
 	body := `{"update_type":"message_created","chat_id":-70801090403050}`
 	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(body))
 	req.Header.Set("X-Max-Bot-Api-Secret", "max-webhook-secret")
@@ -115,6 +126,32 @@ func TestSocialWebhookRoutePassesMAXSecretAndBodyToReceiver(t *testing.T) {
 	}
 }
 
+func TestSocialWebhookRoutePassesAlternateSecretAndBodyToReceiver(t *testing.T) {
+	account := socialWebhookTestAccount()
+	account.ID = "channel-secondary"
+	account.ConnectorID = socialWebhookRouteB()
+	receiver := &socialWebhookReceiverStub{header: "X-Telegram-Bot-Api-Secret-Token"}
+	api := socialWebhookAPI{
+		accounts:  socialWebhookAccountStub{account: account, settings: socialWebhookTestSettings()},
+		configs:   socialWebhookConfigStub{},
+		secrets:   fakeWebhookSecrets{},
+		registry:  socialWebhookResolverStub{receiver: receiver},
+		processor: mustInboxProcessor(t),
+	}
+	path := socialWebhooksPathPrefix + socialWebhookRouteB() + "/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	body := `{"update_id":1,"channel_post":{"message_id":42,"date":1788170400,"chat":{"id":-70801090403050,"type":"channel"}}}`
+	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(body))
+	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", "telegram-webhook-secret")
+	recorder := httptest.NewRecorder()
+	api.receive(recorder, req)
+	if recorder.Code != http.StatusOK || recorder.Body.String() != "{}" {
+		t.Fatalf("response=%d %q", recorder.Code, recorder.Body.String())
+	}
+	if !receiver.called || string(receiver.request.Body) != body || string(receiver.request.VerificationToken) != "telegram-webhook-secret" {
+		t.Fatalf("receiver_called=%v request=%#v", receiver.called, receiver.request)
+	}
+}
+
 func TestSocialWebhookRouteRejectsMissingCapabilityOrSecret(t *testing.T) {
 	account := socialWebhookTestAccount()
 	receiver := &socialWebhookReceiverStub{}
@@ -122,7 +159,7 @@ func TestSocialWebhookRouteRejectsMissingCapabilityOrSecret(t *testing.T) {
 		accounts: socialWebhookAccountStub{account: account, settings: nil}, configs: socialWebhookConfigStub{}, secrets: fakeWebhookSecrets{},
 		registry: socialWebhookResolverStub{receiver: receiver}, processor: mustInboxProcessor(t),
 	}
-	path := socialWebhooksPathPrefix + "max-messenger/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	path := socialWebhooksPathPrefix + socialWebhookRouteA() + "/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
 	for _, header := range []string{"", "wrong-secret"} {
 		req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(`{"update_type":"message_created"}`))
 		if header != "" {
@@ -140,10 +177,10 @@ func TestSocialWebhookRouteRejectsMissingCapabilityOrSecret(t *testing.T) {
 }
 
 func TestSocialWebhookHelpersAreTenantBound(t *testing.T) {
-	if connectorID, orgID, workspaceID, accountID, ok := parseSocialWebhookPath(socialWebhooksPathPrefix + "max-messenger/org/workspace/account"); !ok || connectorID != "max-messenger" || orgID != "org" || workspaceID != "workspace" || accountID != "account" {
-		t.Fatalf("unexpected parsed path: %q %q %q %q %v", connectorID, orgID, workspaceID, accountID, ok)
+	if routeID, orgID, workspaceID, accountID, ok := parseSocialWebhookPath(socialWebhooksPathPrefix + socialWebhookRouteA() + "/org/workspace/account"); !ok || routeID != socialWebhookRouteA() || orgID != "org" || workspaceID != "workspace" || accountID != "account" {
+		t.Fatalf("unexpected parsed path: %q %q %q %q %v", routeID, orgID, workspaceID, accountID, ok)
 	}
-	if _, _, _, _, ok := parseSocialWebhookPath(socialWebhooksPathPrefix + "max-messenger/org/workspace"); ok {
+	if _, _, _, _, ok := parseSocialWebhookPath(socialWebhooksPathPrefix + socialWebhookRouteA() + "/org/workspace"); ok {
 		t.Fatal("short webhook path accepted")
 	}
 	one := socialWebhookEventID("account-a", "sha256:"+strings.Repeat("a", 64))

@@ -107,6 +107,33 @@ paths:
         '202': {description: Previous deletion is still pending and will not be repeated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationDeletePending'}}}}
         '409': {description: 'Approval, capability, receipt or idempotent replay conflict'}
         '502': {description: Social provider returned no confirmed result}
+  /social/webhooks/subscription:
+    put:
+      operationId: subscribeSocialWebhook
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscription'}}}}
+      responses:
+        '201': {description: Telegram webhook subscription enabled, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscriptionResult'}}}}
+        '202': {description: Previous subscription operation is still pending and will not be repeated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscriptionPending'}}}}
+        '400': {description: Invalid request or idempotency key}
+        '403': {description: Caller lacks connectors.accounts.write}
+        '409': {description: 'Social account, capability or idempotent replay conflict'}
+        '502': {description: Social provider unavailable}
+    delete:
+      operationId: unsubscribeSocialWebhook
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscription'}}}}
+      responses:
+        '201': {description: Telegram webhook subscription disabled, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscriptionResult'}}}}
+        '202': {description: Previous subscription operation is still pending and will not be repeated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialWebhookSubscriptionPending'}}}}
+        '400': {description: Invalid request or idempotency key}
+        '403': {description: Caller lacks connectors.accounts.write}
+        '409': {description: 'Social account, capability or idempotent replay conflict'}
+        '502': {description: Social provider unavailable}
   /logistics/pickup-points:
     get:
       operationId: listLogisticsPickupPoints
@@ -2411,6 +2438,37 @@ paths:
             application/json:
               schema: {type: object, additionalProperties: false}
         '404': {description: Route not found}
+  /webhooks/social/{connector_id}/{organization_id}/{workspace_id}/{account_id}:
+    post:
+      operationId: receiveSocialWebhook
+      security: []
+      description: >-
+        Public provider callback boundary for admitted social connectors. The
+        connector account, tenant scope, configured channel and provider
+        verification token are checked before a minimized event is claimed in
+        the tenant-scoped Inbox and transactional outbox. Telegram uses
+        X-Telegram-Bot-Api-Secret-Token and accepts only channel post updates;
+        MAX uses X-Max-Bot-Api-Secret. Invalid deliveries are acknowledged
+        uniformly and are not persisted.
+      parameters:
+        - {name: connector_id, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9-]{1,63}$'}}
+        - {name: organization_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: workspace_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: account_id, in: path, required: true, schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+        - {name: X-Telegram-Bot-Api-Secret-Token, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}
+        - {name: X-Max-Bot-Api-Secret, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 256}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, maxProperties: 10000, additionalProperties: true}
+      responses:
+        '200':
+          description: Uniform provider acknowledgement; verification failures are not disclosed.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
+        '404': {description: Route not found}
   /webhook-subscriptions/{subscription_id}:
     delete:
       operationId: disableWebhookSubscription
@@ -3771,6 +3829,30 @@ components:
         deleted: {type: boolean, const: true}
         observed_at: {type: string, format: date-time}
     SocialPublicationDeletePending:
+      type: object
+      additionalProperties: false
+      required: [accepted, pending, fresh]
+      properties:
+        accepted: {type: boolean, const: true}
+        pending: {type: boolean, const: true}
+        fresh: {type: boolean, const: false}
+    SocialWebhookSubscription:
+      type: object
+      additionalProperties: false
+      required: [account_id, endpoint]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        endpoint: {type: string, minLength: 10, maxLength: 2048, pattern: '^https://[^\\s]+$'}
+    SocialWebhookSubscriptionResult:
+      type: object
+      additionalProperties: false
+      required: [account_id, endpoint, active, updated_at]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        endpoint: {type: string, minLength: 10, maxLength: 2048, pattern: '^https://[^\\s]+$'}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    SocialWebhookSubscriptionPending:
       type: object
       additionalProperties: false
       required: [accepted, pending, fresh]

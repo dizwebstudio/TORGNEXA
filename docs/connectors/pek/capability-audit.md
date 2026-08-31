@@ -9,13 +9,14 @@
 - [Аутентификация и протокол API ПЭК](https://test-kabinet.pecom.ru/preweb/api/v1) — Basic, HTTPS, JSON и POST;
 - [Публичный API ПЭК](https://pecom.ru/business/developers/api_public/) — расчёт стоимости и список городов;
 - [Операции со всеми видами заявок](https://test-kabinet.pecom.ru/preweb/api/v1/help/order) — аннулирование и PDF-печатные формы;
-- [Операции с грузами](https://test-kabinet.pecom.ru/preweb/api/v1/help/cargos) — статусы грузов;
+- [Операции с грузами](https://test-kabinet.pecom.ru/preweb/api/v1/help/cargos) — статусы и возврат отправителю;
 - [Заявки на забор](https://test-kabinet.pecom.ru/preweb/api/v1/help/cargopickup) — оформление заявок.
 
 В production-каталоге доступны проверка credentials, bounded read-only
 `pickup.points.read`, `logistics.rates.read`, `logistics.track.read` и
-`logistics.label.read`, а также ограниченные `logistics.shipment.create` и
-`logistics.shipment.cancel`. Create подаёт одну заявку самовывозом через
+`logistics.label.read`, ограниченные `logistics.shipment.create` и
+`logistics.shipment.cancel`, а также `logistics.return.create` для одного уже
+принятого груза. Create подаёт одну заявку самовывозом через
 `/preregistration/submit/` после проверки sender warehouse, контактов, стран,
 сервиса и габаритов; cancel аннулирует одно предварительное оформление.
 Справочник
@@ -28,8 +29,11 @@
 50 элементами, а русское описание статуса не пересекает границу API — наружу
 выходит только нейтральный код.
 
-Отмена сформированного груза, возврат, вебхуки и пакетная печать заявок
-(`type=multiple`) не включены в runtime support до получения тестового кабинета,
-актуальных fixtures и отдельной проверки этих контрактов. Для аннулирования заявки
-runtime отправляет ровно один код в `/order/cancellation/` и не принимает
-неуспешный либо относящийся к другому коду ответ.
+Возврат одного принятого груза выполняется через официальный
+`/cargos/cancelandreturncargo/`: запрос содержит ровно один числовой `code`, а
+ответ принимается только при `success=true`; `success=false` нормализуется как
+подтверждённый отказ без сохранения provider description. Отмена сформированного
+груза, вебхуки и пакетная печать заявок (`type=multiple`) не включены в runtime
+support. Для аннулирования предварительной заявки runtime отправляет ровно один
+код в `/order/cancellation/` и не принимает неуспешный либо относящийся к
+другому коду ответ.

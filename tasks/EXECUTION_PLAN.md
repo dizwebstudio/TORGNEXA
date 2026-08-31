@@ -1744,3 +1744,55 @@ write-sensitive request, an immutable remote publication receipt and an
 same-message result. A tenant-scoped operation receipt prevents duplicate
 provider calls and leaves ambiguous outcomes pending. Telegram deletion and
 webhooks remain fail-closed.
+
+## Phase 62 — Telegram — удаление опубликованного сообщения
+
+`193`
+
+Task 193 admits approval-bound deletion of one already published Telegram
+message through `DELETE /api/v1/social/publications/{publication_id}`. The API
+requires the enabled `social.post.delete` capability, the matching approved
+write-sensitive request, an immutable remote publication receipt and an
+`Idempotency-Key`; the runtime accepts only the Telegram deleter and a
+confirmed same-message deletion result. A tenant-scoped operation receipt
+prevents duplicate provider calls and leaves ambiguous outcomes pending.
+Telegram webhooks remain fail-closed.
+
+## Phase 63 — Telegram — входящие channel-post webhook
+
+`194`
+
+Task 194 admits verified Telegram `channel_post` and `edited_channel_post`
+updates through the existing tenant-bound Social webhook route. The host
+extracts the `X-Telegram-Bot-Api-Secret-Token` header, while the connector
+compares it against a separate callback-scoped SecretProvider reference,
+canonicalizes the bounded JSON and checks the exact configured channel and
+message timestamp. A content-addressed claim is deduplicated through the
+Task-009 Inbox and transactional outbox. Direct messages, groups, callback
+queries, subscription lifecycle and other update types remain fail-closed.
+
+## Phase 64 — Telegram — lifecycle подписки webhook
+
+`195`
+
+Task 195 admits the bounded Telegram webhook subscription lifecycle through
+the authenticated host API. `PUT /social/webhooks/subscription` calls the
+official `setWebhook` method with only `channel_post` and
+`edited_channel_post`; `DELETE` first checks `getWebhookInfo` and calls
+`deleteWebhook` only for the exact requested endpoint. Both operations require
+an active social account, `social.webhooks`, `connectors.accounts.write`,
+durable idempotency and audit. Callback-scoped secrets stay behind
+SecretProvider, completed replays do not call Telegram again, and callback
+actions plus other update types remain fail-closed.
+
+## Phase 65 — ПЭК — возврат принятого груза отправителю
+
+`196`
+
+Task 196 admits the bounded ПЭК return-to-sender operation through the existing
+approval-bound `POST /api/v1/returns/{return_id}/logistics` and durable worker.
+The adapter calls the official `POST /api/v1/cargos/cancelandreturncargo/` with
+one cargo code and accepts only `success=true`; a confirmed provider rejection
+is permanent and a network-ambiguous result remains unknown for reconciliation.
+Pre-registration cancellation, formed-cargo cancellation, address delivery,
+batch printing and webhooks remain outside this qualification.

@@ -234,6 +234,29 @@ receipt. The adapter accepts only a confirmed update for the same remote
 message and completed retries do not call Telegram again; unknown outcomes
 remain pending. Telegram deletion and webhooks remain fail-closed.
 
+## Telegram — удаление опубликованного сообщения
+
+Task 193 is repository-complete: the qualified `social.post.delete` capability
+now exposes approval-bound `DELETE /api/v1/social/publications/{publication_id}`
+for one already published Telegram message. The route requires the matching
+approved write-sensitive request, an active Telegram account with the enabled
+capability, the immutable publication receipt and a tenant-scoped idempotency
+receipt. The adapter accepts only a confirmed deletion for the same remote
+message and completed retries do not call Telegram again; unknown outcomes
+remain pending. Telegram webhooks remain fail-closed.
+
+## Telegram — входящие channel-post webhook
+
+Task 194 is repository-complete: the qualified `social.webhooks` capability
+now accepts only verified `channel_post` and `edited_channel_post` updates for
+the configured Telegram channel through the tenant-bound social webhook route.
+The callback-scoped `X-Telegram-Bot-Api-Secret-Token` is compared against a
+separate SecretProvider reference; canonical content-addressed claims are
+deduplicated through the existing Inbox/transactional outbox. Direct messages,
+groups, callback queries, subscription lifecycle and other update types remain
+fail-closed. Live qualification still needs a non-production bot/channel and
+deployment-managed webhook secret.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official
@@ -794,3 +817,25 @@ provider quantity bound, returns asynchronous acceptance as
 `Applied=true, Reconciled=false`, and is covered by deterministic request and
 failure tests. Product, order-status and other provider writes remain closed;
 credentialed staging qualification is still a release-topology gate.
+
+## Telegram — lifecycle подписки webhook
+
+Task 195 is repository-complete: the authenticated host API now exposes
+idempotent subscribe/unsubscribe operations backed by the provider-neutral
+`SocialWebhookController`. Telegram uses official `setWebhook`,
+`getWebhookInfo` and `deleteWebhook` calls, sends only the two admitted channel
+update types, and refuses to delete a different active endpoint. Credentials
+remain callback-scoped, lifecycle results are normalized into the existing
+operation receipt and audit boundary, and callback actions plus other update
+types remain fail-closed.
+
+## Task 196 — ПЭК: возврат принятого груза отправителю
+
+Task 196 is repository-complete: ПЭК теперь допускает один bounded возврат уже
+принятого груза через официальный `POST
+/api/v1/cargos/cancelandreturncargo/`. Запрос содержит один числовой `code`,
+а `success=true` нормализуется существующим return-logistics worker как
+созданный возврат с тем же remote ID. `success=false` становится
+подтверждённым конфликтом без сохранения provider description; сетевой
+неопределённый результат остаётся для сверки. Отмена сформированного груза,
+адресная доставка, пакетная печать и вебхуки остаются fail-closed.

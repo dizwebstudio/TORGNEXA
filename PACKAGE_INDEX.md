@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 144
-- tasks: 194
+- adrs: 148
+- tasks: 198
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3214
+- total source files (excluding local secrets/build/dependency/cache trees): 3229
 
 
 ## Connector category layout
@@ -694,6 +694,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0142-pochta-separate-return-delete.md`
 - `adr/0143-pochta-separate-return-edit.md`
 - `adr/0144-telegram-publication-edit.md`
+- `adr/0145-telegram-publication-delete.md`
+- `adr/0146-telegram-inbound-webhook-runtime.md`
+- `adr/0147-telegram-webhook-subscription-lifecycle.md`
+- `adr/0148-pek-cargo-return.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -875,6 +879,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/190-pochta-separate-return-delete.json`
 - `architecture/reviews/191-pochta-separate-return-edit.json`
 - `architecture/reviews/192-telegram-publication-edit.json`
+- `architecture/reviews/193-telegram-publication-delete.json`
+- `architecture/reviews/194-telegram-inbound-webhook-runtime.json`
+- `architecture/reviews/195-telegram-webhook-subscription-lifecycle.json`
+- `architecture/reviews/196-pek-cargo-return.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1313,6 +1321,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/social/telegram/manifest.json`
 - `connectors/social/telegram/presentation.json`
 - `connectors/social/telegram/social.go`
+- `connectors/social/telegram/webhook.go`
 - `connectors/social/threads/config.go`
 - `connectors/social/threads/conformance.go`
 - `connectors/social/threads/connector.go`
@@ -2762,6 +2771,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/settings_security_test.go`
 - `internal/app/api/social.go`
 - `internal/app/api/social_test.go`
+- `internal/app/api/social_webhook_subscription.go`
+- `internal/app/api/social_webhook_subscription_test.go`
 - `internal/app/api/social_webhooks.go`
 - `internal/app/api/social_webhooks_test.go`
 - `internal/app/api/sync.go`
@@ -3658,6 +3669,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/190-pochta-separate-return-delete.md`
 - `tasks/issues/191-pochta-separate-return-edit.md`
 - `tasks/issues/192-telegram-publication-edit.md`
+- `tasks/issues/193-telegram-publication-delete.md`
+- `tasks/issues/194-telegram-inbound-webhook-runtime.md`
+- `tasks/issues/195-telegram-webhook-subscription-lifecycle.md`
+- `tasks/issues/196-pek-cargo-return.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

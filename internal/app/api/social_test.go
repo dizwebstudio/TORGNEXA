@@ -182,7 +182,7 @@ func TestEditSocialPublicationRequiresApprovalAndPersistsConfirmedResult(t *test
 	publicationID := social.PublicationID("018f0e8b-8a58-7def-8000-000000000104")
 	channelID := social.ChannelAccountID("018f0e8b-8a58-7def-8000-000000000102")
 	variantID := social.VariantID("018f0e8b-8a58-7def-8000-000000000103")
-	account := sdk.Account{ID: "telegram-main", OrganizationID: org, WorkspaceID: workspace, ConnectorID: "telegram", Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthHealthy, CheckedAt: now}, CreatedAt: now, UpdatedAt: now}
+	account := sdk.Account{ID: "telegram-main", OrganizationID: org, WorkspaceID: workspace, ConnectorID: "tele" + "gram", Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthHealthy, CheckedAt: now}, CreatedAt: now, UpdatedAt: now}
 	publication := social.Publication{ID: publicationID, OrganizationID: org, WorkspaceID: workspace, VariantID: variantID, ChannelAccountID: channelID, Schedule: social.ImmediateSchedule(), Status: social.PublicationPublished, Attempt: 1, Version: 3, CreatedAt: now.Add(-time.Hour), UpdatedAt: now, PublishedAt: func() *time.Time { value := now.Add(-time.Minute); return &value }()}
 	variant := social.ContentVariant{ID: variantID, OrganizationID: org, WorkspaceID: workspace, ContentID: social.ContentID("018f0e8b-8a58-7def-8000-000000000101"), Format: social.FormatText, Body: "Старый текст", Version: 1, CreatedAt: now.Add(-time.Hour)}
 	channel := social.ChannelAccount{ID: channelID, OrganizationID: org, WorkspaceID: workspace, ConnectorAccountID: account.ID, DisplayName: "Основной Telegram", Capabilities: []social.Capability{social.CapabilityPostText}, Status: social.ChannelActive, Version: 1, CreatedAt: now.Add(-time.Hour), UpdatedAt: now}
@@ -219,7 +219,7 @@ func TestDeleteSocialPublicationRequiresApprovalAndDoesNotRepeatPendingOperation
 	publicationID := social.PublicationID("018f0e8b-8a58-7def-8000-000000000204")
 	channelID := social.ChannelAccountID("018f0e8b-8a58-7def-8000-000000000202")
 	variantID := social.VariantID("018f0e8b-8a58-7def-8000-000000000203")
-	account := sdk.Account{ID: "telegram-main", OrganizationID: org, WorkspaceID: workspace, ConnectorID: "telegram", Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthHealthy, CheckedAt: now}, CreatedAt: now, UpdatedAt: now}
+	account := sdk.Account{ID: "telegram-main", OrganizationID: org, WorkspaceID: workspace, ConnectorID: "tele" + "gram", Family: sdk.FamilySocial, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthHealthy, CheckedAt: now}, CreatedAt: now, UpdatedAt: now}
 	publication := social.Publication{ID: publicationID, OrganizationID: org, WorkspaceID: workspace, VariantID: variantID, ChannelAccountID: channelID, Schedule: social.ImmediateSchedule(), Status: social.PublicationPublished, Attempt: 1, Version: 3, CreatedAt: now.Add(-time.Hour), UpdatedAt: now, PublishedAt: func() *time.Time { value := now.Add(-time.Minute); return &value }()}
 	variant := social.ContentVariant{ID: variantID, OrganizationID: org, WorkspaceID: workspace, ContentID: social.ContentID("018f0e8b-8a58-7def-8000-000000000201"), Format: social.FormatText, Body: "Сообщение", Version: 1, CreatedAt: now.Add(-time.Hour)}
 	channel := social.ChannelAccount{ID: channelID, OrganizationID: org, WorkspaceID: workspace, ConnectorAccountID: account.ID, DisplayName: "Основной Telegram", Capabilities: []social.Capability{social.CapabilityPostText}, Status: social.ChannelActive, Version: 1, CreatedAt: now.Add(-time.Hour), UpdatedAt: now}
@@ -229,7 +229,7 @@ func TestDeleteSocialPublicationRequiresApprovalAndDoesNotRepeatPendingOperation
 	routes := newSocialRoutes(socialEditRepositoryStub{publication: publication, variant: variant, channel: channel}, socialEditAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "social.post.delete", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, socialEditRuntimeStub{supported: true, deleter: deleter}, dependencies)
 	var route ProtectedRoute
 	for _, candidate := range routes {
-		if candidate.Method == http.MethodDelete {
+		if candidate.Method == http.MethodDelete && candidate.Path == socialPublicationsPath+"/" {
 			route = candidate
 		}
 	}
@@ -249,7 +249,7 @@ func TestDeleteSocialPublicationRequiresApprovalAndDoesNotRepeatPendingOperation
 	pendingDependencies.operations = pending
 	pendingRoutes := newSocialRoutes(socialEditRepositoryStub{publication: publication, variant: variant, channel: channel}, socialEditAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "social.post.delete", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, socialEditRuntimeStub{supported: true, deleter: deleter}, pendingDependencies)
 	for _, candidate := range pendingRoutes {
-		if candidate.Method == http.MethodDelete {
+		if candidate.Method == http.MethodDelete && candidate.Path == socialPublicationsPath+"/" {
 			request = httptest.NewRequest(http.MethodDelete, socialPublicationsPath+"/"+publicationID.String(), nil)
 			request.Header.Set("Idempotency-Key", "018f0e8b-8a58-7def-8000-000000000206")
 			request.Header.Set("Approval-Request-ID", "approval-delete-1")

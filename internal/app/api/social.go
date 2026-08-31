@@ -52,6 +52,10 @@ type socialDeleterRuntime interface {
 	SocialDeleter(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialDeleter, error)
 }
 
+type socialWebhookControllerRuntime interface {
+	SocialWebhookController(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialWebhookController, error)
+}
+
 type socialRemoteReceiptStore interface {
 	Receipt(context.Context, tenancy.Scope, string) (socialdispatchrepo.Receipt, error)
 }
@@ -66,11 +70,13 @@ type socialApprovalStore interface {
 }
 
 type socialRouteDependency struct {
-	secrets    secrets.SecretProvider
-	configs    connectorRuntimeConfigRepository
-	receipts   socialRemoteReceiptStore
-	approvals  socialApprovalStore
-	operations socialOperationStore
+	secrets                  secrets.SecretProvider
+	configs                  connectorRuntimeConfigRepository
+	receipts                 socialRemoteReceiptStore
+	approvals                socialApprovalStore
+	operations               socialOperationStore
+	webhookControllerRuntime socialWebhookControllerRuntime
+	audit                    auditCapturer
 }
 
 type socialAPI struct {
@@ -130,7 +136,7 @@ func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAcc
 		api.approvals = dependencies[0].approvals
 		api.operations = dependencies[0].operations
 	}
-	return []ProtectedRoute{
+	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: socialChannelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listChannels)},
 		{Method: http.MethodPost, Path: socialChannelsPath, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.createChannel)},
 		{Method: http.MethodPut, Path: socialChannelsPath + "/", PathPrefix: true, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.updateChannel)},
@@ -139,6 +145,10 @@ func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAcc
 		{Method: http.MethodPatch, Path: socialPublicationsPath + "/", PathPrefix: true, Permission: "social.post.edit", Handler: http.HandlerFunc(api.editPublication)},
 		{Method: http.MethodDelete, Path: socialPublicationsPath + "/", PathPrefix: true, Permission: "social.post.delete", Handler: http.HandlerFunc(api.deletePublication)},
 	}
+	if len(dependencies) > 0 {
+		routes = append(routes, newSocialWebhookSubscriptionRoutes(accounts, dependencies[0].webhookControllerRuntime, dependencies[0].secrets, dependencies[0].configs, dependencies[0].operations, dependencies[0].audit)...)
+	}
+	return routes
 }
 
 func (api socialAPI) listChannels(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +465,7 @@ func (api socialAPI) editPublication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	const editCapability = sdk.Capability("social.post.edit")
-	if !api.runtime.SupportsCapability(account.ConnectorID, string(editCapability)) {
+	if !supportsSocialCapability(api.runtime, account, editCapability) {
 		writeProblem(w, http.StatusConflict, "Social publication editing is unavailable")
 		return
 	}
@@ -466,7 +476,7 @@ func (api socialAPI) editPublication(w http.ResponseWriter, r *http.Request) {
 	}
 	request := sdk.SocialEditRequest{RemotePublicationID: "", Kind: input.Kind, Text: input.Text, Media: input.Media, Buttons: input.Buttons}
 	remoteReceipt, err := api.receipts.Receipt(r.Context(), scope, publication.ID.String())
-	if err != nil || remoteReceipt.ConnectorAccountID != account.ID || remoteReceipt.RemotePublicationID == "" {
+	if err != nil || remoteReceipt.RemotePublicationID == "" || !socialReceiptMatches(remoteReceipt, account.ID, remoteReceipt.RemotePublicationID) {
 		writeProblem(w, http.StatusConflict, "Published remote receipt is unavailable")
 		return
 	}
@@ -609,7 +619,7 @@ func (api socialAPI) deletePublication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	const deleteCapability = sdk.Capability("social.post.delete")
-	if !api.runtime.SupportsCapability(account.ConnectorID, string(deleteCapability)) {
+	if !supportsSocialCapability(api.runtime, account, deleteCapability) {
 		writeProblem(w, http.StatusConflict, "Social publication deletion is unavailable")
 		return
 	}
@@ -619,7 +629,7 @@ func (api socialAPI) deletePublication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	remoteReceipt, err := api.receipts.Receipt(r.Context(), scope, publication.ID.String())
-	if err != nil || remoteReceipt.ConnectorAccountID != account.ID || remoteReceipt.RemotePublicationID == "" {
+	if err != nil || remoteReceipt.RemotePublicationID == "" || !socialReceiptMatches(remoteReceipt, account.ID, remoteReceipt.RemotePublicationID) {
 		writeProblem(w, http.StatusConflict, "Published remote receipt is unavailable")
 		return
 	}
@@ -698,6 +708,23 @@ func (api socialAPI) deletePublication(w http.ResponseWriter, r *http.Request) {
 
 func socialPublicationDeleteViewValid(view socialPublicationDeleteView) bool {
 	return view.RemotePublicationID != "" && view.Deleted && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func supportsSocialCapability(runtime connectorRuntimeAdmission, account sdk.Account, capability sdk.Capability) bool {
+	if runtime == nil {
+		return false
+	}
+	return runtime.SupportsCapability(account.ConnectorID, string(capability))
+}
+
+func socialReceiptMatches(receipt socialdispatchrepo.Receipt, accountID, remoteID string) bool {
+	return reflect.DeepEqual(struct {
+		AccountID string
+		RemoteID  string
+	}{AccountID: receipt.ConnectorAccountID, RemoteID: receipt.RemotePublicationID}, struct {
+		AccountID string
+		RemoteID  string
+	}{AccountID: accountID, RemoteID: remoteID})
 }
 
 func validSocialText(value string, maxRunes int) bool {

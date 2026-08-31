@@ -16,7 +16,8 @@ var (
 // Telegram channel identifiers are negative signed 64-bit values. Usernames are
 // deliberately not accepted because they can be renamed/reassigned.
 type Configuration struct {
-	ChatID int64
+	ChatID                 int64
+	WebhookSecretReference sdk.SecretReference
 }
 
 type ConfigurationSource interface {
@@ -24,7 +25,14 @@ type ConfigurationSource interface {
 }
 
 func (configuration Configuration) Validate() error {
-	if configuration.ChatID >= 0 {
+	if configuration.ChatID >= 0 || (configuration.WebhookSecretReference != "" && !configuration.WebhookSecretReference.Valid()) {
+		return ErrInvalidConfiguration
+	}
+	return nil
+}
+
+func (configuration Configuration) validateWebhook() error {
+	if configuration.Validate() != nil || configuration.WebhookSecretReference == "" {
 		return ErrInvalidConfiguration
 	}
 	return nil

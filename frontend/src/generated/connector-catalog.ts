@@ -993,12 +993,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#06448F",
     },
-    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["basic"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
       runtimeConfigTemplate: {"sender_warehouse_id":"replace-with-pek-warehouse-id","sender_legal_form":1,"sender_title":"ООО Пример","sender_inn":"7700000000","sender_kpp":"770001001"},
@@ -1262,12 +1262,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#229ED9",
     },
-    capabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"],
+    capabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
     authKinds: ["bearer"],
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"],
+      operationalCapabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"],
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-1001234567890},

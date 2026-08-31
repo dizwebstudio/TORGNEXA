@@ -75,7 +75,7 @@ func New(transport Transport, configs ConfigurationSource, now func() time.Time)
 func Manifest() sdk.Manifest {
 	return sdk.Manifest{
 		ID: "telegram", Name: "Telegram", Family: sdk.FamilySocial, Version: "1.0.0", SDKVersion: sdk.SDKMajor,
-		Capabilities: []sdk.Capability{"social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"},
+		Capabilities: []sdk.Capability{"social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video", "social.webhooks"},
 		Auth:         []sdk.AuthRequirement{{Kind: sdk.AuthBearer, SecretClass: "social.bot-token", Required: true}},
 		RateLimit: sdk.RateLimitPolicy{MaxConcurrency: 1, MinIntervalMS: 40, RequestTimeoutMS: 30000,
 			Retry: sdk.RetryPolicy{MaxAttempts: 5, BaseBackoffMS: 500, MaxBackoffMS: 60000}},

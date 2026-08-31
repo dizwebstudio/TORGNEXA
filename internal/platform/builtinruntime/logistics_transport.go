@@ -1128,6 +1128,11 @@ type pekCancellationResult struct {
 	Description string `json:"description"`
 }
 
+type pekCargoReturnResponse struct {
+	Success     bool   `json:"success"`
+	Description string `json:"description"`
+}
+
 type pekPrintResponse string
 
 const pekTrackingResponseLimit = 50
@@ -1539,6 +1544,47 @@ func (transport pekHTTP) Cancel(ctx context.Context, secret []byte, request sdk.
 		return sdk.ShipmentResult{}, errors.New("ПЭК cancellation response did not confirm the requested cargo")
 	}
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
+}
+
+// Return requests the official ПЭК return-to-sender operation for one cargo
+// already handed to the carrier. A false success flag is a confirmed
+// provider rejection; transport failures remain ordinary errors so the
+// durable worker can preserve an unknown outcome.
+func (transport pekHTTP) Return(ctx context.Context, secret []byte, request sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.OriginalRemoteID)
+	if transport.h == nil || request.Validate() != nil || remoteID != request.OriginalRemoteID || !pekRuntimeCargoCodePattern.MatchString(remoteID) || request.MailType != "pek_cargo_return" || request.TariffCode != 0 {
+		return sdk.ShipmentResult{}, errors.New("ПЭК cargo return request is unavailable")
+	}
+	credentials, err := readPekCredentials(secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	body, err := json.Marshal(struct {
+		Code string `json:"code"`
+	}{Code: remoteID})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json;charset=utf-8"}, "Accept": []string{"application/json"}}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "kabinet.pecom.ru", "/api/v1/cargos/cancelandreturncargo/", url.Values{}, body, headers, []byte(credentials.Username), []byte(credentials.Password))
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("ПЭК cargo return request rejected with status %d", status)
+	}
+	var response pekCargoReturnResponse
+	if json.Unmarshal(responseBody, &response) != nil {
+		return sdk.ShipmentResult{}, errors.New("ПЭК cargo return response rejected")
+	}
+	if !response.Success {
+		rejected, remoteErr := sdk.NewRemoteError(sdk.ErrorConflict, "return_rejected", "", 0)
+		if remoteErr != nil {
+			return sdk.ShipmentResult{}, remoteErr
+		}
+		return sdk.ShipmentResult{}, rejected
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
 }
 
 // Label requests the official single-cargo PDF label. The ПЭК endpoint

@@ -4,7 +4,7 @@ Task-064 admission uses the common 13-check Connector SDK v1 suite for provider 
 
 Provider-specific deterministic evidence additionally covers:
 
-- committed manifest equality and exactly six admitted social capabilities;
+- committed manifest equality and exactly seven admitted social capabilities;
 - strict negative numeric channel configuration and bot-token validation;
 - bot token retained behind `SecretAccessor` and absent from normalized params;
 - health `getMe -> getChatMember` exact-channel posting-right verification;
@@ -17,8 +17,13 @@ Provider-specific deterministic evidence additionally covers:
 - 10 MiB photo / 50 MiB video support ceilings;
 - channel-bound remote ID parsing before edit/delete egress;
 - approval-bound API edit of one published message with durable idempotency;
+- approval-bound API deletion of one published message with durable idempotency;
 - single-message text/media edit and explicit album-edit denial;
 - bounded single/album deletion;
+- Telegram secret-token verification, exact channel filtering and
+  channel-post/edited-channel-post canonical webhook claims;
+- Telegram webhook lifecycle: `setWebhook` update allowlist, exact-endpoint
+  `getWebhookInfo` guard before `deleteWebhook`, endpoint and secret bounds;
 - real HTTP 429 envelope normalization with `retry_after`;
 - ambiguous write transport/5xx -> non-retryable `write_outcome_unknown`;
 - nil/provider failure paths return controlled errors rather than panic.

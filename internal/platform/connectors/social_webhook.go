@@ -86,5 +86,17 @@ type SocialWebhookDeduplicator interface {
 // SocialWebhookReceiver is additive SDK-v1 surface for providers that support
 // verified inbound webhook events. It does not modify frozen Connector/Runtime.
 type SocialWebhookReceiver interface {
+	// VerificationHeader returns the provider header that carries the
+	// callback-scoped verification token. The host reads this header but does
+	// not contain provider-specific header dispatch.
+	VerificationHeader() string
 	ReceiveSocialWebhook(context.Context, Account, Runtime, SocialWebhookRequest, SocialWebhookDeduplicator) (SocialWebhookResult, error)
+}
+
+// SocialWebhookController is the provider-neutral lifecycle surface for an
+// outgoing webhook subscription. Implementations must keep credentials inside
+// the runtime callback and must not return provider payloads.
+type SocialWebhookController interface {
+	SubscribeSocialWebhook(context.Context, Account, Runtime, string) error
+	UnsubscribeSocialWebhook(context.Context, Account, Runtime, string) error
 }

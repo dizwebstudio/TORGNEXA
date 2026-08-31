@@ -1438,6 +1438,36 @@ func TestPEKShipmentCancellationAnnulsExactPreRegistration(t *testing.T) {
 	}
 }
 
+func TestPEKCargoReturnRequestsOneAcceptedCargo(t *testing.T) {
+	success := true
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/cargos/cancelandreturncargo/" || r.Header.Get("Authorization") != "Basic "+base64.StdEncoding.EncodeToString([]byte("synthetic-user:synthetic-key")) {
+			t.Fatalf("unexpected ПЭК cargo return request: method=%s path=%s authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"))
+		}
+		var request struct {
+			Code string `json:"code"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Code != "780339690775" {
+			t.Fatalf("unexpected ПЭК cargo return body: %+v err=%v", request, err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": success, "description": "Возврат заказа/ груза отправителю успешно оформлен"})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ReturnCreateRequest{OriginalRemoteID: "780339690775", ExternalID: "return-pek-1", MailType: "pek_cargo_return", IdempotencyKey: "return-pek-1"}
+	result, err := transport.Return(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), request)
+	if err != nil {
+		t.Fatalf("ПЭК cargo return request failed: %v", err)
+	}
+	if result.RemoteID != request.OriginalRemoteID || result.Status != "created" || result.TrackingNumber != request.OriginalRemoteID || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК cargo return: %+v", result)
+	}
+	success = false
+	if _, err := transport.Return(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), request); err == nil {
+		t.Fatal("ПЭК unsuccessful cargo return response accepted")
+	}
+}
+
 func TestPEKLabelRequestsOneCargoPDF(t *testing.T) {
 	pdf := []byte("%PDF-1.7\nfixture")
 	encoded := base64.StdEncoding.EncodeToString(pdf)

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-196",
+  "task": "196",
+  "change_class": "pillar_change",
+  "summary": "Admit one bounded, approval-bound PЭК return-to-sender operation for an accepted cargo.",
+  "scopes": [
+    "adr/0148-pek-cargo-return.md",
+    "architecture/reviews/196-pek-cargo-return.json",
+    "connectors/logistics/pek/candidate_transport.go",
+    "connectors/logistics/pek/connector_test.go",
+    "connectors/logistics/pek/manifest.json",
+    "connectors/logistics/pek/operations.go",
+    "connectors/logistics/pek/conformance-plan.md",
+    "connectors/logistics/pek/reconciliation.md",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/pek/README.md",
+    "docs/connectors/pek/capability-audit.md",
+    "docs/connectors/pek/spec.md",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/logistics_transport_test.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/196-pek-cargo-return.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "privacy-secrets-security-governance",
+    "workflow-approval-audit-lineage"
+  ],
+  "adr": "adr/0148-pek-cargo-return.md",
+  "existing_adrs": [
+    "adr/0009-transactional-outbox.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0143-pek-logistics-connector.md",
+    "adr/0170-wms-operator-workspace.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The existing return-logistics operation and account lookup remain organization/workspace scoped before provider egress."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Basic credentials and the provider description stay outside Core, operation receipts and audit records."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"The existing return-logistics API is reused without a breaking schema change; only the admitted provider capability expands."},
+    {"area":"event_compatibility", "status":"affected", "evidence":"The existing commerce.returns.logistics_requested.v1 worker event carries the new admitted adapter path."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"The existing LogisticsReturnCreator interface is implemented by the PEK connector and resolved only by the built-in registry."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"The existing return-logistics repository and operation receipt store the normalized result."},
+    {"area":"security", "status":"affected", "evidence":"Capability, active account, approval, callback-scoped SecretProvider and one numeric cargo code are independent gates."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The existing return-logistics create route and worker require the enabled write-sensitive return capability and approval policy."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"The existing returns mutation and worker audit lineage records the operation without provider payload."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"Existing durable operation state distinguishes success, confirmed rejection and unknown provider outcome; no automatic duplicate side effect is introduced."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The host calls only the documented fixed ПЭК endpoint and does not accept a caller-controlled provider URL."},
+    {"area":"slo_observability", "status":"affected", "evidence":"The existing worker error classification exposes bounded retryable, permanent and unknown outcomes."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Capability removal closes admission; a provider return is not silently reversed by the host."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic adapter, host transport, runtime admission and existing worker tests cover success, rejection and scope boundaries."}
+  ],
+  "provider": "pek",
+  "follow_up_tasks": ["Live qualification with a disposable accepted cargo and queued-result reconciliation"]
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,6 +99,21 @@ func (s testSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, cb func
 	return cb(v)
 }
 
+type webhookRuntime struct{}
+
+func (webhookRuntime) Secrets() sdk.SecretAccessor { return webhookSecrets{} }
+
+type webhookSecrets struct{}
+
+func (webhookSecrets) UseSecret(_ context.Context, reference sdk.SecretReference, cb func([]byte) error) error {
+	value := []byte("777000111:ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdef123456")
+	if reference != "sec:v1:0123456789abcdef0123456789abcdef" {
+		value = []byte("telegram-webhook-secret")
+	}
+	defer clear(value)
+	return cb(value)
+}
+
 type testMedia struct {
 	body  []byte
 	desc  sdk.MediaDescriptor
@@ -140,13 +156,78 @@ func TestManifestMatchesAndDeclaresTaskScope(t *testing.T) {
 	if !reflect.DeepEqual(got.Canonical(), Manifest().Canonical()) {
 		t.Fatal("manifest drift")
 	}
-	for _, c := range []sdk.Capability{"social.post.text", "social.post.media", "social.post.video", "social.post.buttons", "social.post.edit", "social.post.delete"} {
+	for _, c := range []sdk.Capability{"social.post.text", "social.post.media", "social.post.video", "social.post.buttons", "social.post.edit", "social.post.delete", "social.webhooks"} {
 		if !Manifest().Supports(c) {
 			t.Fatalf("missing %s", c)
 		}
 	}
 	if Manifest().Supports("social.comments.read") {
 		t.Fatal("undeclared comments")
+	}
+}
+
+type webhookDeduplicator struct {
+	claim sdk.SocialWebhookClaim
+}
+
+func (dedup *webhookDeduplicator) ClaimSocialWebhook(_ context.Context, _ sdk.Account, claim sdk.SocialWebhookClaim) (bool, error) {
+	dedup.claim = claim
+	return false, nil
+}
+
+func TestTelegramWebhookVerifiesSecretAndConfiguredChannel(t *testing.T) {
+	configuration := Configuration{ChatID: -1001234567890, WebhookSecretReference: "sec:v1:1123456789abcdef0123456789abcdef"}
+	body := []byte(`{"update_id":1,"channel_post":{"message_id":42,"date":1786442400,"chat":{"id":-1001234567890,"type":"channel"}}}`)
+	dedup := &webhookDeduplicator{}
+	result, err := New(&scriptedTransport{}, staticConfig{configuration}, now).ReceiveSocialWebhook(context.Background(), account(), testRuntime{[]byte("telegram-webhook-secret")}, sdk.SocialWebhookRequest{VerificationToken: []byte("telegram-webhook-secret"), Body: body, ReceivedAt: now()}, dedup)
+	if err != nil || result.EventType != "telegram.channel_post" || result.RemoteChannelID != "-1001234567890" || result.RemoteObjectID != "42" || result.Duplicate || string(dedup.claim.CanonicalPayload) != string(result.CanonicalPayload) {
+		t.Fatalf("result=%+v claim=%+v err=%v", result, dedup.claim, err)
+	}
+	if _, err := New(&scriptedTransport{}, staticConfig{configuration}, now).ReceiveSocialWebhook(context.Background(), account(), testRuntime{[]byte("wrong-secret")}, sdk.SocialWebhookRequest{VerificationToken: []byte("wrong-secret"), Body: body, ReceivedAt: now()}, &webhookDeduplicator{}); !errors.Is(err, ErrWebhookUnauthorized) {
+		t.Fatalf("wrong secret err=%v", err)
+	}
+	foreign := []byte(`{"update_id":2,"channel_post":{"message_id":43,"date":1786442400,"chat":{"id":-1009999999999,"type":"channel"}}}`)
+	if _, err := New(&scriptedTransport{}, staticConfig{configuration}, now).ReceiveSocialWebhook(context.Background(), account(), testRuntime{[]byte("telegram-webhook-secret")}, sdk.SocialWebhookRequest{VerificationToken: []byte("telegram-webhook-secret"), Body: foreign, ReceivedAt: now()}, &webhookDeduplicator{}); !errors.Is(err, ErrWebhookInvalid) {
+		t.Fatalf("foreign channel err=%v", err)
+	}
+}
+
+func TestTelegramWebhookSubscriptionUsesOfficialLifecycleMethods(t *testing.T) {
+	endpoint := "https://hooks.torgnexa.example/api/v1/webhooks/social/telegram"
+	configuration := Configuration{ChatID: -1001234567890, WebhookSecretReference: "sec:v1:1123456789abcdef0123456789abcdef"}
+	transport := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"ok":true,"result":true}`)},
+		{StatusCode: 200, Body: []byte(`{"ok":true,"result":{"url":"` + endpoint + `"}}`)},
+		{StatusCode: 200, Body: []byte(`{"ok":true,"result":true}`)},
+	}}
+	connector := New(transport, staticConfig{configuration}, now)
+	if err := connector.SubscribeSocialWebhook(context.Background(), account(), webhookRuntime{}, endpoint); err != nil {
+		t.Fatalf("subscribe err=%v", err)
+	}
+	if err := connector.UnsubscribeSocialWebhook(context.Background(), account(), webhookRuntime{}, endpoint); err != nil {
+		t.Fatalf("unsubscribe err=%v", err)
+	}
+	if len(transport.requests) != 3 || transport.requests[0].APIMethod != "setWebhook" || transport.requests[1].APIMethod != "getWebhookInfo" || transport.requests[2].APIMethod != "deleteWebhook" {
+		t.Fatalf("requests=%#v", transport.requests)
+	}
+	if value, ok := param(transport.requests[0].Params, "url"); !ok || value != endpoint {
+		t.Fatalf("endpoint param=%q present=%v", value, ok)
+	}
+	if value, ok := param(transport.requests[0].Params, "allowed_updates"); !ok || value != `["channel_post","edited_channel_post"]` {
+		t.Fatalf("allowed updates=%q present=%v", value, ok)
+	}
+}
+
+func TestTelegramWebhookSubscriptionRejectsEndpointMismatch(t *testing.T) {
+	configured := "https://hooks.torgnexa.example/current"
+	requested := "https://hooks.torgnexa.example/other"
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"ok":true,"result":{"url":"` + configured + `"}}`)}}}
+	err := New(transport, staticConfig{Configuration{ChatID: -1001234567890, WebhookSecretReference: "sec:v1:1123456789abcdef0123456789abcdef"}}, now).UnsubscribeSocialWebhook(context.Background(), account(), webhookRuntime{}, requested)
+	if err == nil || !strings.Contains(err.Error(), "endpoint mismatch") {
+		t.Fatalf("err=%v", err)
+	}
+	if err := New(&scriptedTransport{}, staticConfig{Configuration{ChatID: -1001234567890, WebhookSecretReference: "sec:v1:1123456789abcdef0123456789abcdef"}}, now).SubscribeSocialWebhook(context.Background(), account(), webhookRuntime{}, requested+"?token=secret"); !errors.Is(err, sdk.ErrInvalidSocialWebhook) {
+		t.Fatalf("query endpoint err=%v", err)
 	}
 }
 func TestConfigurationAndBotTokenStrict(t *testing.T) {

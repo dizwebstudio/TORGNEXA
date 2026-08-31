@@ -114,7 +114,12 @@ the released-upload bridge; remote receipts make crash recovery safe without
 duplicate-prone automatic resend. HTTPS URL buttons are also admitted for
 text, one-photo and one-video publications. Task 192 additionally admits
 approval-bound editing of one already published message through the Social
-Core API; deletion and webhooks remain outside the application runtime subset.
+Core API. Task 193 additionally admits approval-bound deletion of one already
+published message. Task 194 additionally admits verified `channel_post` and
+`edited_channel_post` webhooks through the tenant-bound Inbox/outbox route;
+Task 195 admits the bounded webhook subscription lifecycle through the
+authenticated host route, while callback updates remain outside the
+application runtime subset.
 
 MAX uses the same dedicated Social surface and receipt-safe worker. Its account
 stores the bot token in SecretProvider and a non-zero numeric `chat_id` as
@@ -173,7 +178,11 @@ bounded создание одной заявки самовывозом чере
 `POST /api/v1/order/cancellation/` с проверкой точного кода в ответе. Одиночная
 PDF-этикетка ПЭК доступна через официальный `/order/print/` с `type=simple`, а
 полная печатная форма заявки — через тот же маршрут с `type=big`; оба ответа
-проверяются как PDF и наружу возвращаются только digest-ссылки. Для СДЭК
+проверяются как PDF и наружу возвращаются только digest-ссылки. Возврат одного
+принятого груза отправителю ПЭК доступен через официальный
+`POST /api/v1/cargos/cancelandreturncargo/`: передаётся один `code`, а
+`success=true` нормализуется существующим worker-контуром как созданный
+возврат. Для СДЭК
 ограниченный возврат/отказ доступен через
 `POST /api/v1/returns/{return_id}/logistics`: для отказа используется
 `mail_type=refusal`, а для клиентского возврата — `mail_type=client_return` с

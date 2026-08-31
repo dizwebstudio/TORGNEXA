@@ -27,6 +27,10 @@ type WebhookController interface {
 	UnsubscribeSocialWebhook(context.Context, sdk.Account, sdk.Runtime, string) error
 }
 
+// VerificationHeader identifies the callback-scoped header consumed by the
+// host before the provider verifies the payload.
+func (connector *Connector) VerificationHeader() string { return "X-Max-Bot-Api-Secret" }
+
 func (connector *Connector) SubscribeSocialWebhook(ctx context.Context, account sdk.Account, runtime sdk.Runtime, endpoint string) error {
 	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "social.webhooks") != nil || !validWebhookEndpoint(endpoint) {
 		return sdk.ErrInvalidSocialWebhook
@@ -196,4 +200,5 @@ func validWebhookEndpoint(value string) bool {
 }
 
 var _ sdk.SocialWebhookReceiver = (*Connector)(nil)
+var _ sdk.SocialWebhookController = (*Connector)(nil)
 var _ WebhookController = (*Connector)(nil)

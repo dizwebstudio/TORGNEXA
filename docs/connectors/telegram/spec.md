@@ -19,19 +19,26 @@ Admitted capabilities:
 - `social.post.buttons` — HTTPS URL buttons only
 - `social.post.edit` — one remote message only
 - `social.post.delete` — one message or the 2–10 message set emitted for one album
+- `social.webhooks` — verified `channel_post` and `edited_channel_post` updates
 
 Production composition in Task 174 activates `social.post.text`,
 `social.post.media` and `social.post.video` through the worker's released-upload
 bridge. Task 181 additionally activates HTTPS URL buttons for text, single
 photo and single video publications. Task 192 activates an approval-bound API
-edit for one already published message; deletion and webhooks remain outside
-the reachable application workflow.
+edit, Task 193 activates an approval-bound API deletion for one already
+published message and Task 194 activates verified channel-post webhooks
+through the host-owned Inbox/outbox route. Task 195 activates the bounded
+subscription lifecycle: `setWebhook`, endpoint-checked `getWebhookInfo` and
+`deleteWebhook`, exposed through the authenticated host API with durable
+idempotency.
 
-Not admitted: provider scheduling, inbound updates/callback queries, comments, analytics, arbitrary files, live/video processing status reads or atomic album edit.
+Not admitted: provider scheduling, callback queries and non-channel updates,
+comments, analytics, arbitrary files,
+live/video processing status reads or atomic album edit.
 
 ## Authentication and channel isolation
 
-A connector account binds one negative numeric `ChatID`. Usernames are not accepted as configuration because rename/reassignment would weaken channel identity. Health resolves the bot with `getMe`, then calls `getChatMember` for the exact configured channel and requires administrator status plus `can_post_messages`.
+A connector account binds one negative numeric `ChatID`. Usernames are not accepted as configuration because rename/reassignment would weaken channel identity. A separate `WebhookSecretReference` is required only for webhook reception. Health resolves the bot with `getMe`, then calls `getChatMember` for the exact configured channel and requires administrator status plus `can_post_messages`.
 
 The bot token is available only inside a SecretAccessor callback. The provider request model keeps `BotToken` separate from method parameters so host transport can construct the provider-specific authorization path without placing the token in normalized params, logs or errors.
 
@@ -65,6 +72,21 @@ Task 041 adds additive SDK-v1 `SocialEditor` and `SocialDeleter` interfaces with
 - album receipt delete -> `deleteMessages`.
 
 Telegram deletion remains subject to provider restrictions such as its deletion time window and channel admin permissions. The connector never treats a provider refusal as deletion of canonical Task-020 evidence.
+
+## Webhooks
+
+Task 194 accepts only the Bot API `channel_post` and `edited_channel_post`
+update shapes. The host extracts
+`X-Telegram-Bot-Api-Secret-Token`; the connector compares it in constant time
+with the callback-scoped `WebhookSecretReference`, canonicalizes JSON, checks
+the exact configured channel and message identity, then derives a
+content-addressed delivery ID. The host claims that identity in the
+tenant-scoped Inbox and transactional outbox. Task 195 configures only those
+two update types and requires a deployment-owned HTTPS endpoint plus a
+callback-scoped secret reference. Unsubscribe first reads `getWebhookInfo` and
+deletes only when Telegram reports the exact requested endpoint; a different
+active endpoint fails closed. Callback queries, direct messages, groups and
+other update types remain fail-closed.
 
 The architecture review for Task 041 admits these remote mutations only as host-dispatched operations against a tenant-bound connector account. Task 020 remains the canonical authorization/audit/outbox boundary; the provider is not a public mutation API.
 

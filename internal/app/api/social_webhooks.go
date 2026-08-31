@@ -42,6 +42,7 @@ type socialWebhookConfigs interface {
 }
 
 type socialWebhookReceiverResolver interface {
+	SocialWebhookRouteMatches(sdk.Account, string) bool
 	SocialWebhookReceiver(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialWebhookReceiver, error)
 }
 
@@ -66,7 +67,7 @@ func newSocialWebhookRoutes(accounts socialWebhookAccounts, configs socialWebhoo
 // reach the durable Inbox/outbox transaction.
 func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	logger := slog.Default().With("event", "social.webhook_received", "path", r.URL.Path)
-	connectorID, organizationID, workspaceID, accountID, ok := parseSocialWebhookPath(r.URL.Path)
+	routeID, organizationID, workspaceID, accountID, ok := parseSocialWebhookPath(r.URL.Path)
 	if !ok {
 		logger.Warn("social webhook path malformed")
 		acknowledgeWebhook(w)
@@ -85,7 +86,7 @@ func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account, err := api.accounts.AccountByID(r.Context(), organizationID, workspaceID, accountID)
-	if err != nil || account.ConnectorID != connectorID || account.Family != sdk.FamilySocial || account.Status != sdk.AccountActive {
+	if err != nil || account.Family != sdk.FamilySocial || account.Status != sdk.AccountActive || !api.registry.SocialWebhookRouteMatches(account, routeID) {
 		logger.Warn("social webhook account unresolved or inactive")
 		acknowledgeWebhook(w)
 		return
@@ -97,7 +98,13 @@ func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		acknowledgeWebhook(w)
 		return
 	}
-	verificationToken, ok := socialWebhookVerificationToken(r, connectorID)
+	receiver, err := api.registry.SocialWebhookReceiver(account, api.configLoader(scope))
+	if err != nil {
+		logger.Warn("social webhook receiver unavailable", "error", err)
+		acknowledgeWebhook(w)
+		return
+	}
+	verificationToken, ok := socialWebhookVerificationToken(r, receiver.VerificationHeader())
 	if !ok {
 		logger.Warn("social webhook verification header missing or unsupported")
 		acknowledgeWebhook(w)
@@ -106,12 +113,6 @@ func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	runtime, err := connectorruntime.New(api.secrets, scope)
 	if err != nil {
 		logger.Warn("social webhook runtime unavailable", "error", err)
-		acknowledgeWebhook(w)
-		return
-	}
-	receiver, err := api.registry.SocialWebhookReceiver(account, api.configLoader(scope))
-	if err != nil {
-		logger.Warn("social webhook receiver unavailable", "error", err)
 		acknowledgeWebhook(w)
 		return
 	}
@@ -139,15 +140,15 @@ func (api socialWebhookAPI) configLoader(scope tenancy.Scope) builtinruntime.Con
 	}
 }
 
-func socialWebhookVerificationToken(r *http.Request, connectorID string) ([]byte, bool) {
-	if connectorID != "max-messenger" {
+func socialWebhookVerificationToken(r *http.Request, header string) ([]byte, bool) {
+	if strings.TrimSpace(header) == "" {
 		return nil, false
 	}
-	value := strings.TrimSpace(r.Header.Get("X-Max-Bot-Api-Secret"))
+	value := strings.TrimSpace(r.Header.Get(header))
 	return []byte(value), value != ""
 }
 
-func parseSocialWebhookPath(path string) (connectorID, organizationID, workspaceID, accountID string, ok bool) {
+func parseSocialWebhookPath(path string) (routeID, organizationID, workspaceID, accountID string, ok bool) {
 	rest := strings.TrimPrefix(path, socialWebhooksPathPrefix)
 	if rest == path {
 		return "", "", "", "", false
