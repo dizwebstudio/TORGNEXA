@@ -67,6 +67,14 @@ approval-bound `POST /api/v1/logistics/batches/archive/revert/{batch_id}` и
 отправлением; наружу возвращаются только ШПИ, статус и время наблюдения после
 проверки `position=0`/`return-barcode`. Адреса и имена не попадают в durable
 receipt.
+Удаление такой отправки доступно через approval-bound
+`DELETE /api/v1/logistics/returns/separate/{return_id}` и официальный
+`DELETE /1.0/returns/delete-separate-return?barcode={barcode}`. Host передаёт
+только ШПИ, принимает успешный `2xx` с пустым телом или пустым `code` и
+отклоняет любой код ошибки; наружу выходит только нормализованный статус
+`DELETED`. Повтор не вызывает второй внешний запрос благодаря
+tenant-scoped operation receipt. Это необратимое действие и допускается
+только для тестового возврата после approval.
 Возвратная этикетка для существующего RPO
 доступна отдельным форматом `return_pdf` через
 `GET /1.0/forms/{rpo}/easy-return-pdf`. Принимается domestic/S10 RPO-barcode;

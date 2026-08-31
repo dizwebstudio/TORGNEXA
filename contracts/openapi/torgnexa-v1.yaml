@@ -222,6 +222,26 @@ paths:
         '403': {description: Caller lacks logistics.return.separate.create}
         '409': {description: 'Return capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
+  /logistics/returns/separate/{return_id}:
+    delete:
+      operationId: deleteLogisticsSeparateReturn
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsSeparateReturnDeleteRequest'}
+      responses:
+        '201': {description: Standalone return shipment deleted, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsSeparateReturnDeletion'}}}}
+        '202': {description: Standalone return deletion is pending and must not be retried automatically}
+        '400': {description: Invalid return reference or idempotency key}
+        '403': {description: Caller lacks logistics.return.separate.delete}
+        '409': {description: 'Return capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
   /logistics/rates:
     post:
       operationId: calculateLogisticsRates
@@ -3244,6 +3264,21 @@ components:
         remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         status: {type: string, const: created}
         tracking_number: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsSeparateReturnDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+    LogisticsSeparateReturnDeletion:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, deleted, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: DELETED}
+        deleted: {type: boolean, const: true}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsAddress:
       type: object

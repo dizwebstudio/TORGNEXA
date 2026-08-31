@@ -103,6 +103,13 @@ func TestSeparateReturnUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestSeparateReturnDeletionUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).DeleteLogisticsSeparateReturn(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsSeparateReturnDeleteRequest{ReturnBarcode: "RA644000003RU", IdempotencyKey: "delete-return-001"})
+	if err != nil || result.RemoteID != "RA644000003RU" || result.Status != "DELETED" || !result.Deleted || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 func TestBatchCreationUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).CreateLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchCreateRequest{
 		OrderIDs: []string{"57565818", "57565819"}, SendingDate: "2026-08-31", UseOnlineBalance: true, IdempotencyKey: "batch-idem-001",

@@ -16,7 +16,7 @@
 bounded `logistics.batches.create`, `logistics.batches.read`,
 `logistics.batches.submit`, `logistics.batches.archive`, `logistics.batches.unarchive`, `pickup.points.read`, `logistics.rates.read`,
 `logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`,
-`logistics.return.separate.create`, `logistics.label.read`
+`logistics.return.separate.create`, `logistics.return.separate.delete`, `logistics.label.read`
 и `logistics.track.read`.
 Создание одного заказа
 выполняется через официальный `PUT /1.0/user/backlog`; адаптер принимает
@@ -56,6 +56,14 @@ approval-bound операцией `POST /api/v1/logistics/batches/archive/revert
 `position=0` и проверенным `return-barcode`. Сумма хранится в minor units и
 передаётся Почте в целых рублях. Адреса и имена не сохраняются в operation
 receipt, в receipt попадает только нормализованный ШПИ и статус. Отдельная
+отмена отдельной возвратной отправки выполняется через approval-bound
+`DELETE /api/v1/logistics/returns/separate/{return_id}` и официальный
+`DELETE /1.0/returns/delete-separate-return?barcode={barcode}`. Запрос не
+содержит тела; адаптер принимает `2xx` с пустым телом или пустым `code`,
+отклоняет любой provider error code и возвращает только `DELETED` с
+`deleted=true`. Операция необратима, требует approval и защищена
+tenant-scoped idempotency receipt.
+Отдельная
 возвратная этикетка запрашивается форматом `return_pdf`
 через `GET /1.0/forms/{rpo}/easy-return-pdf` с фиксированным
 `print-type=PAPER`; допускается только domestic/S10 RPO-barcode, а ответ

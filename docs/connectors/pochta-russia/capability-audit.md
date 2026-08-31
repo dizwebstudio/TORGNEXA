@@ -76,6 +76,15 @@ approval-bound `POST /api/v1/logistics/returns/separate`. Runtime вызывае
 принимает только ответ с `position=0` и валидным `return-barcode`; сырые
 адреса, имена и ответ провайдера не сохраняются.
 
+`logistics.return.separate.delete` удаляет отдельную возвратную отправку через
+approval-bound `DELETE /api/v1/logistics/returns/separate/{return_id}`. Runtime
+вызывает официальный `DELETE /1.0/returns/delete-separate-return?barcode=...`,
+передаёт только проверенный ШПИ и принимает `2xx` с пустым ответом или пустым
+`code`; ответ с любым кодом ошибки отклоняется. В host projection попадает
+только `DELETED`/`deleted=true`, а повтор контролируется tenant-scoped
+operation receipt. Операция необратима и требует тестового возврата,
+approval, capability и live qualification.
+
 Прочие документы и возвраты, не покрытые
 существующим RPO,
 требуют актуальных

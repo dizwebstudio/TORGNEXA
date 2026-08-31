@@ -1725,6 +1725,35 @@ func TestRussianPostSeparateReturnUsesOfficialEndpoint(t *testing.T) {
 	}
 }
 
+func TestRussianPostSeparateReturnDeletionUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/1.0/returns/delete-separate-return" || r.URL.Query().Get("barcode") != "RA644000003RU" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России separate return deletion request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if content, err := io.ReadAll(r.Body); err != nil || len(content) != 0 {
+			t.Fatalf("separate return deletion must not send a body: %q", content)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.DeleteSeparateReturn(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsSeparateReturnDeleteRequest{ReturnBarcode: "RA644000003RU", IdempotencyKey: "delete-return-1"})
+	if err != nil {
+		t.Fatalf("Почта России separate return deletion failed: %v", err)
+	}
+	if result.RemoteID != "RA644000003RU" || result.Status != "DELETED" || !result.Deleted || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized separate return deletion: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"code": "RETURN_SHIPMENT_NOT_FOUND", "description": "not found"})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).DeleteSeparateReturn(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsSeparateReturnDeleteRequest{ReturnBarcode: "RA644000003RU", IdempotencyKey: "delete-return-2"}); err == nil {
+		t.Fatal("separate return deletion provider error accepted")
+	}
+}
+
 func TestOzonPayCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/product/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {

@@ -55,3 +55,14 @@ revert-маршрут.
 нечисловые/отрицательные значения количества, невалидный статус и ответ,
 превышающий host-лимит 100 записей; строки заказов не должны пересекать
 границу коннектора.
+
+Для `logistics.return.separate.delete` fixture должен проверить `DELETE
+/1.0/returns/delete-separate-return?barcode=...`, отсутствие тела, заголовки
+`Authorization`/`X-User-Authorization` и точную передачу ШПИ. Успешным
+считается только `2xx` с пустым телом или JSON с пустым `code`; любой код
+ошибки (`RETURN_SHIPMENT_NOT_FOUND`, `ILLEGAL_RETURN_SHIPMENT_STATE` и др.)
+должен оставаться ошибкой. Host обязан отклонять невалидный barcode,
+сохранять только `DELETED`/`deleted=true` и не повторять внешний вызов при
+повторе того же tenant-scoped operation receipt. Live qualification должна
+использовать исключительно тестовый возврат и подтвердить необратимость,
+timeout/reconciliation и approval boundary.

@@ -235,7 +235,11 @@ which calls the official `POST /1.0/archive/revert` endpoint and accepts only an
 exact batch acknowledgement. Separate return shipments are available through
 the approval-bound `POST /api/v1/logistics/returns/separate` route, which calls
 the official `PUT /1.0/returns/return-without-direct` endpoint for one item and
-stores only the normalized barcode result. Dellin additionally
+stores only the normalized barcode result. A standalone return can be removed
+through the approval-bound `DELETE /api/v1/logistics/returns/separate/{return_id}`
+route, which calls the official
+`DELETE /1.0/returns/delete-separate-return?barcode={barcode}` endpoint and
+stores only the normalized deletion acknowledgement. Dellin additionally
 supports the bounded address-to-address shipment-create route with explicit
 counterparty runtime configuration. ПЭК также допускает аннулирование одной
 предварительной заявки через официальный `/order/cancellation/` с точным

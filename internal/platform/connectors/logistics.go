@@ -149,16 +149,16 @@ type LogisticsSeparateReturnRequest struct {
 // return shipment. The barcode remains a provider reference and the operation
 // is protected by the host-side idempotency boundary.
 type LogisticsSeparateReturnDeleteRequest struct {
-	ReturnBarcode string `json:"return_barcode"`
+	ReturnBarcode  string `json:"return_barcode"`
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
 // LogisticsSeparateReturnDeletion is the normalized acknowledgement of a
 // standalone return deletion.
 type LogisticsSeparateReturnDeletion struct {
-	RemoteID  string
-	Status    string
-	Deleted   bool
+	RemoteID   string
+	Status     string
+	Deleted    bool
 	ObservedAt time.Time
 }
 type LabelRequest struct{ RemoteID, Format string }

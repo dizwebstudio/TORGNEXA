@@ -41,6 +41,7 @@ type logisticsRuntimeStub struct {
 	archiver              sdk.LogisticsBatchArchiver
 	unarchiver            sdk.LogisticsBatchUnarchiver
 	separateReturnCreator sdk.LogisticsSeparateReturnCreator
+	separateReturnDeleter sdk.LogisticsSeparateReturnDeleter
 }
 
 type logisticsBatchRuntimeStub struct {
@@ -158,6 +159,13 @@ func (stub logisticsRuntimeStub) LogisticsSeparateReturnCreator(_ context.Contex
 		return nil, errors.New("runtime missing")
 	}
 	return stub.separateReturnCreator, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsSeparateReturnDeleter(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnDeleter, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.separateReturnDeleter, nil
 }
 
 type logisticsBatchCreatorStub struct {
@@ -538,6 +546,19 @@ type logisticsSeparateReturnCreatorStub struct {
 	called bool
 }
 
+type logisticsSeparateReturnDeleterStub struct {
+	deletion sdk.LogisticsSeparateReturnDeletion
+	called   bool
+}
+
+func (stub *logisticsSeparateReturnDeleterStub) DeleteLogisticsSeparateReturn(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error) {
+	stub.called = true
+	if stub.deletion.RemoteID == "" {
+		stub.deletion.RemoteID = request.ReturnBarcode
+	}
+	return stub.deletion, nil
+}
+
 func (stub *logisticsSeparateReturnCreatorStub) CreateLogisticsSeparateReturn(_ context.Context, _ sdk.Account, _ sdk.Runtime, _ sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error) {
 	stub.called = true
 	return stub.result, nil
@@ -584,6 +605,45 @@ func TestLogisticsSeparateReturnRouteRequiresApprovalAndStoresNormalizedResult(t
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusCreated || !creator.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"RA644000003RU"`) || !strings.Contains(response.Body.String(), `"tracking_number":"RA644000003RU"`) {
 		t.Fatalf("status=%d body=%s creator=%v operation=%+v", response.Code, response.Body.String(), creator.called, operations)
+	}
+}
+
+func TestLogisticsSeparateReturnDeleteRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsSeparateReturnDeleteInput{ConnectorAccountID: account.ID}
+	returnBarcode := "RA644000003RU"
+	digest, err := logisticsSeparateReturnDeleteDigest(input, returnBarcode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-separate-return-delete-1"
+	deleter := &logisticsSeparateReturnDeleterStub{deletion: sdk.LogisticsSeparateReturnDeletion{RemoteID: returnBarcode, Status: "DELETED", Deleted: true, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.return.separate.delete", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, separateReturnDeleter: deleter}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.return.separate.delete", ResourceType: "logistics_return", ResourceID: logisticsSeparateReturnDeleteApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodDelete && candidate.Path == logisticsSeparateReturnDeletePath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("separate return deletion route not registered")
+	}
+	request := httptest.NewRequest(http.MethodDelete, logisticsSeparateReturnDeletePath+returnBarcode, strings.NewReader(`{"connector_account_id":"cdek-account"}`))
+	request.Header.Set("Idempotency-Key", "separate-return-delete-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !deleter.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"RA644000003RU"`) || !strings.Contains(response.Body.String(), `"status":"DELETED"`) || !strings.Contains(response.Body.String(), `"deleted":true`) {
+		t.Fatalf("status=%d body=%s deleter=%v operation=%+v", response.Code, response.Body.String(), deleter.called, operations)
 	}
 }
 

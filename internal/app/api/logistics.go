@@ -23,18 +23,18 @@ import (
 )
 
 const (
-	logisticsPickupPointsPath    = "/api/v1/logistics/pickup-points"
-	logisticsBatchesPath         = "/api/v1/logistics/batches"
-	logisticsArchivedBatchesPath = "/api/v1/logistics/batches/archive"
-	logisticsBatchSubmitPath     = "/api/v1/logistics/batches/"
-	logisticsBatchArchivePath    = "/api/v1/logistics/batches/archive/"
-	logisticsBatchUnarchivePath  = "/api/v1/logistics/batches/archive/revert/"
-	logisticsRatesPath           = "/api/v1/logistics/rates"
-	logisticsTrackingPath        = "/api/v1/logistics/tracking"
-	logisticsLabelsPath          = "/api/v1/logistics/labels"
-	logisticsShipmentCreatePath  = "/api/v1/logistics/shipments"
-	logisticsShipmentsPath       = "/api/v1/logistics/shipments/"
-	logisticsSeparateReturnPath  = "/api/v1/logistics/returns/separate"
+	logisticsPickupPointsPath         = "/api/v1/logistics/pickup-points"
+	logisticsBatchesPath              = "/api/v1/logistics/batches"
+	logisticsArchivedBatchesPath      = "/api/v1/logistics/batches/archive"
+	logisticsBatchSubmitPath          = "/api/v1/logistics/batches/"
+	logisticsBatchArchivePath         = "/api/v1/logistics/batches/archive/"
+	logisticsBatchUnarchivePath       = "/api/v1/logistics/batches/archive/revert/"
+	logisticsRatesPath                = "/api/v1/logistics/rates"
+	logisticsTrackingPath             = "/api/v1/logistics/tracking"
+	logisticsLabelsPath               = "/api/v1/logistics/labels"
+	logisticsShipmentCreatePath       = "/api/v1/logistics/shipments"
+	logisticsShipmentsPath            = "/api/v1/logistics/shipments/"
+	logisticsSeparateReturnPath       = "/api/v1/logistics/returns/separate"
 	logisticsSeparateReturnDeletePath = "/api/v1/logistics/returns/separate/"
 )
 
@@ -258,9 +258,9 @@ type logisticsSeparateReturnDeleteInput struct {
 }
 
 type logisticsSeparateReturnDeleteView struct {
-	RemoteID  string    `json:"remote_id"`
-	Status    string    `json:"status"`
-	Deleted   bool      `json:"deleted"`
+	RemoteID   string    `json:"remote_id"`
+	Status     string    `json:"status"`
+	Deleted    bool      `json:"deleted"`
 	ObservedAt time.Time `json:"observed_at"`
 }
 
@@ -1601,6 +1601,10 @@ func (input logisticsSeparateReturnInput) toSDK(idempotencyKey string) sdk.Logis
 	}
 }
 
+func (input logisticsSeparateReturnDeleteInput) toSDK(returnBarcode, idempotencyKey string) sdk.LogisticsSeparateReturnDeleteRequest {
+	return sdk.LogisticsSeparateReturnDeleteRequest{ReturnBarcode: strings.TrimSpace(returnBarcode), IdempotencyKey: idempotencyKey}
+}
+
 func logisticsBatchCreateDigest(input logisticsBatchCreateInput) ([32]byte, error) {
 	orderIDs := make([]string, len(input.OrderIDs))
 	for index, orderID := range input.OrderIDs {
@@ -1699,6 +1703,22 @@ func logisticsSeparateReturnApprovalResourceID(digest [32]byte) string {
 	return "separate-return:" + hex.EncodeToString(digest[:])
 }
 
+func logisticsSeparateReturnDeleteDigest(input logisticsSeparateReturnDeleteInput, returnBarcode string) ([32]byte, error) {
+	canonical := struct {
+		ConnectorAccountID string `json:"connector_account_id"`
+		ReturnBarcode      string `json:"return_barcode"`
+	}{ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), ReturnBarcode: strings.TrimSpace(returnBarcode)}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsSeparateReturnDeleteApprovalResourceID(digest [32]byte) string {
+	return "separate-return-delete:" + hex.EncodeToString(digest[:])
+}
+
 func logisticsBatchViewValid(view logisticsBatchView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.ShipmentCount >= 0 && view.ShipmentCount <= 1000000 && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
@@ -1717,6 +1737,10 @@ func logisticsBatchUnarchiveViewValid(view logisticsBatchUnarchiveView) bool {
 
 func logisticsSeparateReturnViewValid(view logisticsSeparateReturnView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.Status == "created" && view.TrackingNumber == view.RemoteID && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func logisticsSeparateReturnDeleteViewValid(view logisticsSeparateReturnDeleteView) bool {
+	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && view.Status == "DELETED" && view.Deleted && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
 
 func safeLogisticsStatus(value string) bool {
