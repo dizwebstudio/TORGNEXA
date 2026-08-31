@@ -72,6 +72,9 @@ func testAccount() sdk.Account {
 	return sdk.Account{ID: "ozon-account", OrganizationID: "01890f4d-1e10-7cc0-9c4a-111111111111", WorkspaceID: "01890f4d-1e10-7cc0-9c4a-222222222222", ConnectorID: "ozon", Family: sdk.FamilyMarketplace, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: created, UpdatedAt: created}
 }
 func creds() []byte { return []byte("123456\nsynthetic-api-key-0123456789abcdef") }
+func advertisingCreds() []byte {
+	return []byte("123456\nsynthetic-api-key-0123456789abcdef\nsynthetic-performance-bearer-0123456789")
+}
 
 func TestManifestMatchesCommittedJSON(t *testing.T) {
 	var got sdk.Manifest
@@ -98,20 +101,20 @@ func TestAdvertisingReadsCampaignsAndPerformanceBySKU(t *testing.T) {
 		{StatusCode: 200, Body: stats},
 	}}
 	connector := New(transport, func() time.Time { return now })
-	campaigns, err := connector.ReadAdvertisingCampaigns(context.Background(), testAccount(), testRuntime{creds()}, sdk.PageRequest{Limit: 100})
+	campaigns, err := connector.ReadAdvertisingCampaigns(context.Background(), testAccount(), testRuntime{advertisingCreds()}, sdk.PageRequest{Limit: 100})
 	if err != nil || len(campaigns.Items) != 1 || campaigns.Items[0].RemoteID != "cmp-1" || campaigns.Items[0].Status != "active" || campaigns.Items[0].DailyBudgetMinor != 10000 {
 		t.Fatalf("campaigns=%+v err=%v", campaigns, err)
 	}
 	query := sdk.AdvertisingQuery{From: time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC), CampaignIDs: []string{"cmp-1"}, Limit: 100}
-	spend, err := connector.ReadAdvertisingSpend(context.Background(), testAccount(), testRuntime{creds()}, query)
+	spend, err := connector.ReadAdvertisingSpend(context.Background(), testAccount(), testRuntime{advertisingCreds()}, query)
 	if err != nil || len(spend.Items) != 1 || spend.Items[0].SKU != "offer-1" || spend.Items[0].AmountMinor != 1234 {
 		t.Fatalf("spend=%+v err=%v", spend, err)
 	}
-	performance, err := connector.ReadAdvertisingPerformance(context.Background(), testAccount(), testRuntime{creds()}, query)
+	performance, err := connector.ReadAdvertisingPerformance(context.Background(), testAccount(), testRuntime{advertisingCreds()}, query)
 	if err != nil || len(performance.Items) != 1 || performance.Items[0].SKU != "offer-1" || performance.Items[0].Orders != 3 || performance.Items[0].RevenueMinor != 50000 {
 		t.Fatalf("performance=%+v err=%v", performance, err)
 	}
-	if got := transport.requests[1]; got.Host != performanceHost || got.Path != "/api/client/statistics/campaign/media/json" || string(got.Bearer) != "synthetic-api-key-0123456789abcdef" || len(got.Query) != 3 {
+	if got := transport.requests[1]; got.Host != performanceHost || got.Path != "/api/client/statistics/campaign/media/json" || string(got.Bearer) != "synthetic-performance-bearer-0123456789" || len(got.Query) != 3 {
 		t.Fatalf("unexpected stats request: %+v", got)
 	}
 }

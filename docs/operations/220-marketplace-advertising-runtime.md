@@ -50,6 +50,12 @@ advertising spend, удаляя из расчётного input только с�
 разрешены scope IDs, длительность, статус и нормализованный error code. Raw
 HTTP bodies, Authorization headers, токены и credential bundles запрещены.
 
+Для Ozon advertising secret bundle содержит три ASCII-строки: Seller
+`Client-Id`, Seller `Api-Key`, затем отдельный Performance API Bearer token.
+Двухстрочный bundle достаточен для Seller API, но не для Ozon advertising;
+Seller API-Key нельзя использовать как Performance Bearer. Secret-контур
+обязан обновлять третью строку до истечения срока токена.
+
 При `partial` сначала проверяйте `/advertising/reconciliation`, затем health
 аккаунта и watermark в `/advertising/sync-runs`. Повтор запускает следующий
 безопасный daily pass; ручной backfill должен быть отдельным worker/API

@@ -61,6 +61,11 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   REST/OpenAPI, operator UI, idempotent actions, security/SLO/quotas and
   Compose/test/documentation qualification. GET performs no remote probe and
   manifest/health-only/SDK-only evidence never becomes executable green state.
+- Task `223` is in progress as the parent integration gate for user-facing
+  Epic 176 Marketplace Operations v1. It composes the existing product,
+  pricing/inventory, orders, WMS/fulfillment, returns, marking/EDO,
+  settlement, advertising and financial boundaries; it does not claim a
+  provider as fully qualified until the complete end-to-end gate passes.
 - Tasks `025`, `010`, `029`, and `064` are repository-complete; Connector SDK major v1, plugin security, dry-run/test sandbox, and mandatory conformance suite are closed. Task `011` is the later provider-admission change: repository policy now registers the first read-only provider after all four prerequisites; hosted trusted-base qualification still requires the prerequisite-status parser normalization to exist in the merge base before the protected admission PR.
 - Operational release qualification still blocked: `065` (`SC-OPS-01` protected OIDC prerelease evidence and current runtime-image findings). The repository license decision itself is resolved as Apache-2.0.
 - Operational architecture qualification still blocked: `080`
@@ -2277,3 +2282,34 @@ ROAS/ROMI/ДРР, quality and findings.
   disablement plus worker drain; no destructive down migration is used;
 - campaign launch/stop, budget, bid and product-link writes are not admitted
   in this gate and require a later approval-bound qualification.
+
+## Phase 89 — Epic 176: Marketplace Operations v1
+
+`223`
+
+Task 223 is the parent integration gate for the complete marketplace product,
+not a second domain implementation. It composes the canonical product,
+pricing/inventory, order, WMS/fulfillment, return, marking/EDO, settlement,
+advertising and financial boundaries. The user-facing Epic number is `176`;
+repository task key `223` is required because keys `176–222` already exist.
+
+### Gate RUNTIME-223
+
+- the end-to-end scenario is explicit:
+  account → product → publication → price/stock → order → reserve → pick/pack
+  → shipment → return → settlement → P&L;
+- every provider reports `read_only`, `partially_supported` or `qualified`
+  from actual capabilities and evidence; manifest, SDK types, health checks and
+  credentials do not imply full support;
+- cross-domain state uses existing PostgreSQL aggregates, EventBus/outbox,
+  Inbox/deduplication, tenant scope and reconciliation rather than a duplicate
+  marketplace ledger;
+- every write-sensitive operation is capability/policy/approval/idempotency
+  gated, timeout after remote acceptance becomes `unknown`, and stale or
+  partial results remain visible findings;
+- the gate covers duplicate/replay, crash before/after remote acceptance,
+  timeout/rate-limit, out-of-order status, partial return/refund, stale
+  price/stock, missing mapping, cross-tenant IDs and secret-leak checks;
+- account settings, operations center, UI, API/SDK changes and provider
+  qualification are admitted only in child slices with their own contracts,
+  migrations, tests and rollback evidence.

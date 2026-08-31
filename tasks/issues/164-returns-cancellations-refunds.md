@@ -27,6 +27,46 @@ reconciliation после timeout или webhook от внешнего пров�
 нижним уровнем; новая модель должна добавить связь с order/return и инварианты,
 не создавая второй путь изменения платёжного состояния.
 
+## Target end-to-end slice
+
+Полное закрытие задачи проверяется не по наличию отдельных endpoint или таблиц,
+а по одному воспроизводимому сценарию для заказа с одной или несколькими
+строками:
+
+1. **Заказ принят:** заказ импортирован с immutable snapshot цены, налога, SKU и
+   количества; повторный импорт не создаёт дубль.
+2. **Резерв создан:** доступное количество зарезервировано атомарно в рамках
+   tenant/workspace; повторная команда не уменьшает остаток второй раз.
+3. **Сборка выполнена:** WMS создаёт picking/packing task, оператор может
+   подтвердить частичную сборку, а остатки и статусы остаются согласованными.
+4. **Этикетка получена:** через заявленный logistics capability создаётся
+   shipment/label и сохраняется только безопасная проекция remote receipt;
+   timeout не превращается в ложный успех.
+5. **Отгрузка подтверждена:** order/shipment transitions, tracking и статус
+   канала обновляются через typed connector port; webhook и worker replay
+   идемпотентны.
+6. **Возврат обработан:** создаётся полный или частичный return, затем
+   `received -> inspecting -> accepted|partially_accepted|rejected`, после чего
+   disposition (`restock|quarantine|scrap|replace`) отражается отдельным WMS
+   ledger movement.
+7. **Деньги возвращены:** создаётся refund preview и allocation по строкам,
+   доставке и налогу; после policy/approval внешний refund проходит через
+   существующий payment aggregate, а settlement/fiscal evidence связывается с
+   исходным заказом.
+8. **Итог сверяем:** reconciliation подтверждает remote status или переводит
+   операцию в `unknown`/`manual_attention`; оператор видит timeline, причину,
+   retry-safe действие и audit evidence.
+
+### End-to-end acceptance gate
+
+Сценарий считается закрытым только если он проходит для полного и частичного
+возврата в Compose с synthetic marketplace/store, payment, carrier и WMS
+stub-ами. Обязательны проверки duplicate command/event/webhook, crash до и
+после remote acceptance, потеря lease, provider timeout/rate-limit,
+out-of-order webhook, over-refund, cross-tenant ID, mismatch валюты и
+недоступная capability. Ни один из этих случаев не должен создавать двойной
+резерв, двойной refund, лишнее движение склада или тихую перезапись факта.
+
 ## Architecture boundaries
 
 - `Order` и `OrderItem` остаются коммерческим snapshot: их прошлые цены,

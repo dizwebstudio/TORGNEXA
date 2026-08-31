@@ -421,7 +421,10 @@ unbounded loops and secret/payload persistence are explicitly excluded. See
 
 ## Возвраты, отмены и refunds
 
-Task 164 is the planned provider-neutral returns/cancellations/refunds contour.
+Task 164 is the in-progress provider-neutral returns/cancellations/refunds
+contour. Its completion gate is one synthetic end-to-end order flow:
+order → reservation → picking/packing → label → shipment → full/partial return
+→ inspection/disposition → refund → settlement/fiscal evidence → reconciliation.
 It extends the existing `payments.Refund` and refund API instead of creating a
 second payment state machine, and connects order cancellation, partial line
 returns, shipment/carrier operations, receipt/inspection, WMS ledger,
@@ -1065,3 +1068,39 @@ unattributed/delayed reconciliation findings, ROAS/ROMI/ДРР metrics, API,
 generated SDK and the «Реклама» UI are included. Migration 47 is expand-only
 and backup-gated. Campaign status, budget, bid and product writes remain
 explicitly deferred until a separate approval-bound qualification.
+
+## Epic 176 — Marketplace Operations v1
+
+Task 223 is in progress as the parent integration and release gate for the
+complete marketplace flow: account → product publication → price/stock → order
+→ reserve → pick/pack → shipment → return → settlement → P&L. It reuses the
+canonical domains and existing Tasks 164, 167, 171, 217, 218, 219 and 220;
+it does not create a second marketplace order, inventory or financial ledger.
+Each provider must expose a truthful `read_only`, `partially_supported` or
+`qualified` state backed by capability, idempotency, reconciliation and
+qualification evidence. See `tasks/issues/223-marketplace-operations-v1.md`.
+
+## Epic 177 — Массовые цены, repricing, Buy Box и продвижение
+
+Task 221 is planned to close the gap between price/unit-economics reporting and
+safe commercial action. It adds provider-neutral market observations, truthful
+Buy Box states, deterministic repricing previews, floor/margin guards, approval-
+bound price writes, promotion participation, advertising bids/budgets and
+reconciliation. The work is decomposed into thirteen subtasks covering policy
+and calculation contracts, observations, durable runs, connector qualification,
+OpenAPI/SDK/MCP, operator UI, quotas/operations and Compose/conformance. Missing
+official competitor or Buy Box data remains `not_available`; scraping and blind
+remote retries are forbidden. See
+`tasks/issues/221-marketplace-pricing-repricing-promotions.md`.
+
+## Epic 178 — Marketplace-карточки: атрибуты, контент и массовое редактирование
+
+Task 222 is planned to make channel product cards complete and consistent. It
+adds versioned marketplace taxonomy, typed required/conditional attributes,
+provider-neutral mappings, localized content, variants, channel media slots,
+quality preflight, deterministic 1,000-SKU batch preview/apply, approval,
+read-after-write, drift/reconciliation and connector qualification. PIM remains
+the canonical product source; channel projections are separate and append-only.
+AI may create drafts but cannot publish or bypass policy. Unsupported or stale
+channel capabilities remain visibly denied. See
+`tasks/issues/222-marketplace-listing-content-attributes.md`.

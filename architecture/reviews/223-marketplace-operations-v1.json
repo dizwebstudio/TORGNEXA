@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-223",
+  "task": "223",
+  "change_class": "pillar_change",
+  "summary": "Establish Epic 176 as the provider-neutral marketplace operations integration and release gate without duplicating domain truth.",
+  "scopes": [
+    "adr/0173-marketplace-operations-v1.md",
+    "architecture/reviews/223-marketplace-operations-v1.json",
+    "docs/operations/223-marketplace-operations-v1.md",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/223-marketplace-operations-v1.md"
+  ],
+  "frozen_pillars": [
+    "universal-commerce-content-fulfillment-models",
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "bidirectional-sync-reconciliation",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning"
+  ],
+  "adr": "adr/0173-marketplace-operations-v1.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0117-returns-cancellations-refunds.md",
+    "adr/0117-wms-operator-workspace-and-marketplace-fulfillment.md",
+    "adr/0120-channel-unit-economics.md",
+    "adr/0122-marking-execution-and-edo.md",
+    "adr/0169-marketplace-product-publication.md",
+    "adr/0170-supplier-procurement-operations.md",
+    "adr/0171-seller-financial-analytics.md",
+    "adr/0172-marketplace-advertising-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"Account, capability, operation, checkpoint and reconciliation state must use authenticated organization/workspace scope and forced RLS."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"The integration gate retains only bounded references, statuses, hashes and quality evidence; credentials, raw provider payloads and unnecessary PII remain excluded."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"Future child-slice routes are additive OpenAPI contracts with generated SDK parity; this parent ADR does not alter existing routes."},
+    {"area":"event_compatibility", "status":"affected", "evidence":"Cross-domain orchestration must use canonical envelope, Transactional Outbox and Inbox/deduplication; no unversioned event is admitted."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"Provider differences remain typed connector capabilities and runtime support states; Core does not branch on provider names."},
+    {"area":"database_migration", "status":"affected", "evidence":"The parent gate has no standalone migration; child slices retain expand-only, backup-gated and forced-RLS migration ownership."},
+    {"area":"security", "status":"affected", "evidence":"Default-deny capabilities, scoped SecretProvider access, approval/policy checks and fail-closed unknown outcomes apply to marketplace writes."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"Write-sensitive catalog, price, order, shipment, marking, advertising and finance actions require risk-aware approval and idempotency."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"Operation references, source refs, approvals, versions, checkpoints and reconciliation findings provide append-only lineage across domains."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The full gate explicitly tests duplicate commands/events/webhooks, stale updates, replay, partial results and remote unknown outcomes."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"Provider calls remain fixed connector transports with timeout, rate-limit and normalized error boundaries; caller-controlled hosts are not admitted."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Operations center must expose freshness, checkpoints, retries, DLQ, health, stale data and drift without leaking secrets."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Each child runtime can be rolled back by capability disablement and worker drain; append-only accepted facts are not destructively removed."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"The acceptance gate requires deterministic connector/API tests, Docker conformance, failure recovery and separate provider live qualification."}
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "164",
+    "167",
+    "171",
+    "217",
+    "218",
+    "219",
+    "220",
+    "221",
+    "222"
+  ]
+}

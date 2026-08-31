@@ -67,6 +67,12 @@ P&L order facts. Если провайдер не даёт однозначно�
 backup PostgreSQL; откат — отключение `ads.read` и drain worker, без
 destructive down migration.
 
+Для Ozon Seller API сохраняется двухстрочный bundle `Client-Id`/`Api-Key`;
+для Performance API reader требуется третий, отдельный Bearer access token.
+Он также выдаётся только внутри scoped callback и должен обновляться secret
+контуром до истечения срока действия. Seller API-Key не используется как
+Performance Bearer.
+
 Официальные исходные контуры: [WB Promotion API](https://dev.wildberries.ru/openapi//promotion)
 и [Ozon Performance API](https://docs.ozon.ru/api/performance/). Live
 credentialed qualification остаётся release gate, синтетические проверки

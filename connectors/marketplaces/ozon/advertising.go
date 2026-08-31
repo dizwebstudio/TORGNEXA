@@ -1,6 +1,7 @@
 package ozon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math/big"
@@ -33,7 +34,7 @@ func (connector *Connector) ReadAdvertisingCampaigns(ctx context.Context, accoun
 	}
 	var output sdk.AdvertisingCampaignPage
 	err := runtime.Secrets().UseSecret(ctx, account.SecretReference, func(secret []byte) error {
-		_, bearer, err := parseCredentialBundle(secret)
+		bearer, err := parseAdvertisingBearer(secret)
 		if err != nil {
 			return err
 		}
@@ -114,7 +115,7 @@ func (connector *Connector) readAdvertisingStats(ctx context.Context, account sd
 	var spends []sdk.RemoteAdSpendFact
 	var performance []sdk.RemoteAdPerformanceFact
 	err := runtime.Secrets().UseSecret(ctx, account.SecretReference, func(secret []byte) error {
-		_, bearer, err := parseCredentialBundle(secret)
+		bearer, err := parseAdvertisingBearer(secret)
 		if err != nil {
 			return err
 		}
@@ -182,6 +183,44 @@ func firstNumber(values ...json.Number) string {
 	}
 	return "0"
 }
+
+// parseAdvertisingBearer reads the Ozon Performance access token from the
+// third line of the account's scoped credential bundle. The first two lines
+// remain the Seller API Client-Id and Api-Key and are validated without being
+// copied into the advertising request. Performance tokens are deliberately
+// separate because Seller API keys are not valid Performance API Bearer
+// credentials.
+func parseAdvertisingBearer(secret []byte) ([]byte, error) {
+	if len(secret) < 12 || len(secret) > 6144 {
+		return nil, ErrInvalidCredentials
+	}
+	first := bytes.IndexByte(secret, '\n')
+	if first <= 0 {
+		return nil, ErrInvalidCredentials
+	}
+	relativeSecond := bytes.IndexByte(secret[first+1:], '\n')
+	if relativeSecond <= 0 {
+		return nil, ErrInvalidCredentials
+	}
+	second := first + 1 + relativeSecond
+	if bytes.IndexByte(secret[second+1:], '\n') >= 0 {
+		return nil, ErrInvalidCredentials
+	}
+	if _, _, err := parseCredentialBundle(secret[:second]); err != nil {
+		return nil, err
+	}
+	bearer := secret[second+1:]
+	if len(bearer) < 8 || len(bearer) > 4096 {
+		return nil, ErrInvalidCredentials
+	}
+	for _, b := range bearer {
+		if b < 0x21 || b > 0x7e {
+			return nil, ErrInvalidCredentials
+		}
+	}
+	return bearer, nil
+}
+
 func numberInt(value string) int64 {
 	n, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
