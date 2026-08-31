@@ -226,7 +226,8 @@ configuration; the provider acceptance remains asynchronous. Почта Росс
 returns the same neutral artifact reference after validating the official PDF
 response for both the regular and easy-return forms. Russian Post batch
 handoff is also available through the approval-bound check-in route and
-idempotent operation receipt; formed batches can also be moved to the provider
+idempotent operation receipt; active and archived batch directories are
+available through bounded read routes; formed batches can also be moved to the provider
 archive through the approval-bound `POST /api/v1/logistics/batches/archive/{batch_id}`
 route and idempotent operation receipt; archived batches can be returned through the
 approval-bound `POST /api/v1/logistics/batches/archive/revert/{batch_id}` route,

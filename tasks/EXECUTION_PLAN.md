@@ -1690,3 +1690,15 @@ the official `POST /1.0/archive/revert` endpoint and accepts only an exact
 `archived=false` is stored in the tenant-scoped operation receipt; completed
 replays do not call the provider and ambiguous results remain pending for
 reconciliation. Other archive operations remain outside this phase.
+
+## Phase 58 — Почта России — чтение партий из архива
+
+`189`
+
+Task 189 admits the Russian Post archived-batch directory read contract. The
+API requires an enabled `logistics.batches.archive.read` capability and a
+bounded `limit` up to 100; the host calls the official `GET /1.0/archive`
+endpoint over fixed HTTPS egress. The response is reduced to unique batch
+reference, status, shipment count and observation time, with no order rows or
+raw provider fields crossing the connector boundary. Archive writes and
+other archive operations remain separately gated.

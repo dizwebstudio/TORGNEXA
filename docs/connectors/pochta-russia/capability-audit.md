@@ -64,6 +64,12 @@ Runtime вызывает официальный `POST /1.0/archive/revert` с о
 именем партии и принимает только точное совпадение `batch-name`; результат
 фиксируется как `RESTORED` с `archived=false`, без сохранения сырого ответа.
 
+`logistics.batches.archive.read` читает архив партий через
+`GET /api/v1/logistics/batches/archive`, который вызывает официальный
+`GET /1.0/archive`. Host ограничивает ответ 100 записями, проверяет уникальные
+имена, статусы и неотрицательное количество отправлений и не пропускает
+состав заказов в нейтральную проекцию.
+
 `logistics.return.separate.create` теперь допускает standalone-возврат через
 approval-bound `POST /api/v1/logistics/returns/separate`. Runtime вызывает
 официальный `PUT /1.0/returns/return-without-direct` с одной записью и

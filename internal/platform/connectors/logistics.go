@@ -144,6 +144,23 @@ type LogisticsSeparateReturnRequest struct {
 	SenderName        string   `json:"sender_name"`
 	IdempotencyKey    string   `json:"idempotency_key"`
 }
+
+// LogisticsSeparateReturnDeleteRequest requests deletion of one standalone
+// return shipment. The barcode remains a provider reference and the operation
+// is protected by the host-side idempotency boundary.
+type LogisticsSeparateReturnDeleteRequest struct {
+	ReturnBarcode string `json:"return_barcode"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// LogisticsSeparateReturnDeletion is the normalized acknowledgement of a
+// standalone return deletion.
+type LogisticsSeparateReturnDeletion struct {
+	RemoteID  string
+	Status    string
+	Deleted   bool
+	ObservedAt time.Time
+}
 type LabelRequest struct{ RemoteID, Format string }
 type LabelResult struct {
 	ArtifactRef, MediaType string
@@ -157,6 +174,21 @@ type LogisticsBatchQuery struct {
 	MailCategory string
 	Limit        int
 	Page         int
+}
+
+// LogisticsArchiveBatchQuery bounds a read of the provider archive. The
+// archive endpoint has no client-side page parameter, so the host bounds the
+// returned collection after the fixed HTTPS request.
+type LogisticsArchiveBatchQuery struct {
+	Limit int
+}
+
+// Validate checks the bounded archive query.
+func (query LogisticsArchiveBatchQuery) Validate(maxLimit int) error {
+	if maxLimit < 1 || query.Limit < 1 || query.Limit > maxLimit {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
 }
 
 // Validate checks the bounded batch-directory query.
@@ -363,6 +395,22 @@ func (r LogisticsSeparateReturnRequest) Validate() error {
 	return nil
 }
 
+// Validate checks the bounded standalone-return deletion request.
+func (r LogisticsSeparateReturnDeleteRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(r.ReturnBarcode) || !logisticsRefPattern.MatchString(r.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the normalized standalone-return deletion acknowledgement.
+func (r LogisticsSeparateReturnDeletion) Validate() error {
+	if !logisticsRefPattern.MatchString(r.RemoteID) || r.Status != "DELETED" || !r.Deleted || r.ObservedAt.IsZero() || r.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 func validLogisticsText(value string, maxRunes int) bool {
 	value = strings.TrimSpace(value)
 	if value == "" || utf8.RuneCountInString(value) > maxRunes {
@@ -394,11 +442,17 @@ type LogisticsReturnCreator interface {
 type LogisticsSeparateReturnCreator interface {
 	CreateLogisticsSeparateReturn(context.Context, Account, Runtime, LogisticsSeparateReturnRequest) (ShipmentResult, error)
 }
+type LogisticsSeparateReturnDeleter interface {
+	DeleteLogisticsSeparateReturn(context.Context, Account, Runtime, LogisticsSeparateReturnDeleteRequest) (LogisticsSeparateReturnDeletion, error)
+}
 type LogisticsLabelReader interface {
 	ReadLogisticsLabel(context.Context, Account, Runtime, LabelRequest) (LabelResult, error)
 }
 type LogisticsBatchReader interface {
 	ReadLogisticsBatches(context.Context, Account, Runtime, LogisticsBatchQuery) ([]LogisticsBatch, error)
+}
+type LogisticsArchivedBatchReader interface {
+	ReadArchivedLogisticsBatches(context.Context, Account, Runtime, LogisticsArchiveBatchQuery) ([]LogisticsBatch, error)
 }
 type LogisticsBatchCreator interface {
 	CreateLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchCreateRequest) (LogisticsBatch, error)

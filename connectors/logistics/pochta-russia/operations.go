@@ -114,6 +114,27 @@ func (c *Connector) CreateLogisticsSeparateReturn(ctx context.Context, account s
 	return out, nil
 }
 
+// DeleteLogisticsSeparateReturn deletes one standalone Russian Post return
+// shipment through the provider's dedicated delete operation.
+func (c *Connector) DeleteLogisticsSeparateReturn(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsSeparateReturnDeletion{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsSeparateReturnDeletion
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.DeleteSeparateReturn(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsSeparateReturnDeletion{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.ReturnBarcode {
+		return sdk.LogisticsSeparateReturnDeletion{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 // ReadPickupPoints reads a bounded Russian Post office directory by city.
 // Provider postal indexes remain remote references and never become Core
 // warehouse identifiers.
@@ -192,6 +213,32 @@ func (c *Connector) ReadLogisticsBatches(ctx context.Context, account sdk.Accoun
 	err := useSecret(ctx, runtime, account, func(secret []byte) error {
 		var callErr error
 		out, callErr = c.transport.Batches(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > query.Limit {
+		return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	for _, batch := range out {
+		if batch.Validate() != nil {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+	}
+	return out, nil
+}
+
+// ReadArchivedLogisticsBatches reads a bounded page of Russian Post archived
+// batches without projecting the provider's individual order rows.
+func (c *Connector) ReadArchivedLogisticsBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate(100) != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out []sdk.LogisticsBatch
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.ArchivedBatches(ctx, secret, query)
 		return callErr
 	})
 	if err != nil {
@@ -306,9 +353,11 @@ var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
 var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsSeparateReturnCreator = (*Connector)(nil)
+var _ sdk.LogisticsSeparateReturnDeleter = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)
+var _ sdk.LogisticsArchivedBatchReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchCreator = (*Connector)(nil)
 var _ sdk.LogisticsBatchSubmitter = (*Connector)(nil)
 var _ sdk.LogisticsBatchArchiver = (*Connector)(nil)

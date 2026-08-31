@@ -45,7 +45,8 @@ type logisticsRuntimeStub struct {
 
 type logisticsBatchRuntimeStub struct {
 	logisticsRuntimeStub
-	batches []sdk.LogisticsBatch
+	batches         []sdk.LogisticsBatch
+	archivedBatches []sdk.LogisticsBatch
 }
 
 type logisticsShipmentStub struct {
@@ -115,6 +116,13 @@ func (stub logisticsBatchRuntimeStub) LogisticsBatches(_ context.Context, _ sdk.
 		return nil, errors.New("runtime or batch query missing")
 	}
 	return stub.batches, nil
+}
+
+func (stub logisticsBatchRuntimeStub) LogisticsArchivedBatches(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if runtime == nil || query.Validate(100) != nil {
+		return nil, errors.New("runtime or archived batch query missing")
+	}
+	return stub.archivedBatches, nil
 }
 
 func (stub logisticsRuntimeStub) LogisticsBatchCreator(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCreator, error) {
@@ -306,6 +314,32 @@ func TestLogisticsBatchesRouteReturnsBoundedPage(t *testing.T) {
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"batch-1"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsArchivedBatchesRouteReturnsBoundedPage(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.archive.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsBatchRuntimeStub{
+		logisticsRuntimeStub: logisticsRuntimeStub{supported: true},
+		archivedBatches:      []sdk.LogisticsBatch{{RemoteID: "batch-archive-1", Status: "ARCHIVED", ShipmentCount: 3, ObservedAt: now}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsArchivedBatchesPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("archived batch route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsArchivedBatchesPath+"?connector_account_id=cdek-account&limit=10")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"batch-archive-1"`) || !strings.Contains(response.Body.String(), `"status":"ARCHIVED"`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }

@@ -52,6 +52,10 @@ func (candidateTransport) CreateSeparateReturn(_ context.Context, _ []byte, requ
 	}, nil
 }
 
+func (candidateTransport) DeleteSeparateReturn(_ context.Context, _ []byte, request sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error) {
+	return sdk.LogisticsSeparateReturnDeletion{RemoteID: request.ReturnBarcode, Status: "DELETED", Deleted: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}
+
 func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{
 		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,
@@ -77,6 +81,14 @@ func (candidateTransport) Batches(_ context.Context, _ []byte, query sdk.Logisti
 	}
 	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
 	return []sdk.LogisticsBatch{{RemoteID: "batch-conformance-001", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}}, nil
+}
+
+func (candidateTransport) ArchivedBatches(_ context.Context, _ []byte, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if err := query.Validate(100); err != nil {
+		return nil, err
+	}
+	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
+	return []sdk.LogisticsBatch{{RemoteID: "batch-archive-conformance-001", Status: "ARCHIVED", ShipmentCount: 2, ObservedAt: now}}, nil
 }
 
 func (candidateTransport) CreateBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {

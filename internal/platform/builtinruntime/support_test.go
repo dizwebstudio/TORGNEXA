@@ -101,7 +101,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "pek" {
 				wantCapabilities = 6
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 13
+				wantCapabilities = 15
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -763,6 +763,27 @@ func TestLogisticsBatchUnarchiverAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestLogisticsArchivedBatchReaderAdmissionIsExact(t *testing.T) {
+	registry := New()
+	if !SupportsCapability("pochta-russia", "logistics.batches.archive.read") {
+		t.Fatal("Russian Post archive batch read capability is not admitted")
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if SupportsCapability(connectorID, "logistics.batches.archive.read") {
+			t.Fatalf("%s unexpectedly exposes archived batch reader", connectorID)
+		}
+	}
+	reader, ok := any(registry).(interface {
+		LogisticsArchivedBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error)
+	})
+	if !ok {
+		t.Fatal("registry does not expose archived batch reader")
+	}
+	if _, err := reader.LogisticsArchivedBatches(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{}, sdk.LogisticsArchiveBatchQuery{Limit: 10}); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unqualified archived batch reader returned err=%v", err)
+	}
+}
+
 func TestLogisticsCancelerAdmissionIsExact(t *testing.T) {
 	registry := New()
 	for _, connectorID := range []string{"cdek", "dellin", "pek", "pochta-russia"} {
@@ -804,6 +825,19 @@ func TestLogisticsSeparateReturnCreatorAdmissionIsExact(t *testing.T) {
 	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
 		if _, err := registry.LogisticsSeparateReturnCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified separate return creator resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsSeparateReturnDeleterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	deleter, err := registry.LogisticsSeparateReturnDeleter(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || deleter == nil {
+		t.Fatalf("Russian Post separate return deleter unavailable: deleter=%T err=%v", deleter, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsSeparateReturnDeleter(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified separate return deleter resolved: %v", connectorID, err)
 		}
 	}
 }

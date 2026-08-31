@@ -41,7 +41,10 @@ bounded `logistics.batches.create`, `logistics.batches.read`,
 доступен через approval-bound `POST /api/v1/logistics/batches/archive/{batch_id}`;
 адаптер вызывает официальный `PUT /1.0/archive` с массивом из одного
 числового имени партии и принимает только точное подтверждение `batch-name`.
-Результат нормализуется в `ARCHIVED`. Восстановление доступно отдельной
+Результат нормализуется в `ARCHIVED`. Чтение архивных партий доступно через
+`GET /api/v1/logistics/batches/archive` и официальный `GET /1.0/archive`;
+host ограничивает ответ 100 записями и возвращает только идентификатор,
+статус и количество отправлений. Восстановление доступно отдельной
 approval-bound операцией `POST /api/v1/logistics/batches/archive/revert/{batch_id}`:
 адаптер вызывает официальный `POST /1.0/archive/revert` с массивом из одного
 числового имени партии и принимает только точное подтверждение `batch-name`;

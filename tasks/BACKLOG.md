@@ -188,6 +188,16 @@ acknowledgement, normalizing it to `RESTORED` with `archived=false`. The
 tenant-scoped operation receipt prevents duplicate calls and keeps ambiguous
 outcomes pending; other archive operations remain fail-closed.
 
+## Почта России — чтение партий из архива
+
+Task 189 is repository-complete: the qualified
+`logistics.batches.archive.read` capability now calls the official
+`GET /1.0/archive` endpoint through an authenticated
+`GET /api/v1/logistics/batches/archive` route. The adapter enforces a maximum
+of 100 unique rows and projects only the batch reference, status, shipment
+count and observation time; provider order rows and raw fields remain behind
+the connector boundary.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official

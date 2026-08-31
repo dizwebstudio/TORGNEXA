@@ -1139,6 +1139,35 @@ func TestRussianPostBatchDirectoryRejectsDuplicateRows(t *testing.T) {
 	}
 }
 
+func TestRussianPostArchivedBatchDirectoryUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/archive" || r.URL.RawQuery != "" {
+			t.Fatalf("unexpected Почта России archive batch request: method=%s path=%s query=%q", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России archive credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"batch-name": "25", "batch-status": "ARCHIVED", "shipment-count": 2}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	batches, err := transport.ArchivedBatches(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsArchiveBatchQuery{Limit: 10})
+	if err != nil {
+		t.Fatalf("Почта России archive batch request failed: %v", err)
+	}
+	if len(batches) != 1 || batches[0].RemoteID != "25" || batches[0].Status != "ARCHIVED" || batches[0].ShipmentCount != 2 || batches[0].ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России archived batches: %+v", batches)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"batch-name": "25", "batch-status": "ARCHIVED", "shipment-count": -1}})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).ArchivedBatches(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsArchiveBatchQuery{Limit: 10}); err == nil {
+		t.Fatal("negative archived batch shipment count accepted")
+	}
+}
+
 func TestRussianPostBatchCreationRequest(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/1.0/user/shipment" || r.URL.Query().Get("sending-date") != "2026-08-31" || r.URL.Query().Get("use-online-balance") != "true" {

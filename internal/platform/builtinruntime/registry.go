@@ -179,6 +179,17 @@ func (r *Registry) LogisticsBatches(ctx context.Context, account sdk.Account, ru
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatches(ctx, account, runtime, query)
 }
 
+// LogisticsArchivedBatches resolves the bounded Russian Post archive reader.
+func (r *Registry) LogisticsArchivedBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.archive.read") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadArchivedLogisticsBatches(ctx, account, runtime, query)
+}
+
 // LogisticsBatchCreator resolves the qualified Russian Post batch-formation
 // surface.
 func (r *Registry) LogisticsBatchCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCreator, error) {
@@ -379,6 +390,18 @@ func (r *Registry) LogisticsReturnCreator(ctx context.Context, account sdk.Accou
 // shipment surface. It is currently admitted only for Russian Post.
 func (r *Registry) LogisticsSeparateReturnCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error) {
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.return.separate.create") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
+// LogisticsSeparateReturnDeleter resolves the qualified standalone-return
+// deletion surface. It is currently admitted only for Russian Post.
+func (r *Registry) LogisticsSeparateReturnDeleter(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnDeleter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.return.separate.delete") {
 		return nil, ErrUnavailable
 	}
 	if account.ConnectorID != "pochta-russia" {

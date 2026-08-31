@@ -23,17 +23,19 @@ import (
 )
 
 const (
-	logisticsPickupPointsPath   = "/api/v1/logistics/pickup-points"
-	logisticsBatchesPath        = "/api/v1/logistics/batches"
-	logisticsBatchSubmitPath    = "/api/v1/logistics/batches/"
-	logisticsBatchArchivePath   = "/api/v1/logistics/batches/archive/"
-	logisticsBatchUnarchivePath = "/api/v1/logistics/batches/archive/revert/"
-	logisticsRatesPath          = "/api/v1/logistics/rates"
-	logisticsTrackingPath       = "/api/v1/logistics/tracking"
-	logisticsLabelsPath         = "/api/v1/logistics/labels"
-	logisticsShipmentCreatePath = "/api/v1/logistics/shipments"
-	logisticsShipmentsPath      = "/api/v1/logistics/shipments/"
-	logisticsSeparateReturnPath = "/api/v1/logistics/returns/separate"
+	logisticsPickupPointsPath    = "/api/v1/logistics/pickup-points"
+	logisticsBatchesPath         = "/api/v1/logistics/batches"
+	logisticsArchivedBatchesPath = "/api/v1/logistics/batches/archive"
+	logisticsBatchSubmitPath     = "/api/v1/logistics/batches/"
+	logisticsBatchArchivePath    = "/api/v1/logistics/batches/archive/"
+	logisticsBatchUnarchivePath  = "/api/v1/logistics/batches/archive/revert/"
+	logisticsRatesPath           = "/api/v1/logistics/rates"
+	logisticsTrackingPath        = "/api/v1/logistics/tracking"
+	logisticsLabelsPath          = "/api/v1/logistics/labels"
+	logisticsShipmentCreatePath  = "/api/v1/logistics/shipments"
+	logisticsShipmentsPath       = "/api/v1/logistics/shipments/"
+	logisticsSeparateReturnPath  = "/api/v1/logistics/returns/separate"
+	logisticsSeparateReturnDeletePath = "/api/v1/logistics/returns/separate/"
 )
 
 var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
@@ -66,6 +68,10 @@ type logisticsBatchRuntime interface {
 	LogisticsBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)
 }
 
+type logisticsArchivedBatchRuntime interface {
+	LogisticsArchivedBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error)
+}
+
 type logisticsBatchCreateRuntime interface {
 	LogisticsBatchCreator(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchCreator, error)
 }
@@ -84,6 +90,10 @@ type logisticsBatchUnarchiveRuntime interface {
 
 type logisticsSeparateReturnRuntime interface {
 	LogisticsSeparateReturnCreator(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error)
+}
+
+type logisticsSeparateReturnDeleteRuntime interface {
+	LogisticsSeparateReturnDeleter(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsSeparateReturnDeleter, error)
 }
 
 type logisticsOperationStore interface {
@@ -243,6 +253,17 @@ type logisticsSeparateReturnView struct {
 	ObservedAt     time.Time `json:"observed_at"`
 }
 
+type logisticsSeparateReturnDeleteInput struct {
+	ConnectorAccountID string `json:"connector_account_id"`
+}
+
+type logisticsSeparateReturnDeleteView struct {
+	RemoteID  string    `json:"remote_id"`
+	Status    string    `json:"status"`
+	Deleted   bool      `json:"deleted"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime, dependencies ...logisticsRouteDependency) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
 	if len(dependencies) > 0 {
@@ -253,6 +274,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
 		{Method: http.MethodGet, Path: logisticsBatchesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listBatches)},
+		{Method: http.MethodGet, Path: logisticsArchivedBatchesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listArchivedBatches)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
 		{Method: http.MethodGet, Path: logisticsLabelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readLabel)},
@@ -263,6 +285,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchArchivePath, PathPrefix: true, Permission: "logistics.batches.archive", Handler: http.HandlerFunc(api.archiveBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchUnarchivePath, PathPrefix: true, Permission: "logistics.batches.unarchive", Handler: http.HandlerFunc(api.unarchiveBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsSeparateReturnPath, Permission: "logistics.return.separate.create", Handler: http.HandlerFunc(api.createSeparateReturn)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodDelete, Path: logisticsSeparateReturnDeletePath, PathPrefix: true, Permission: "logistics.return.separate.delete", Handler: http.HandlerFunc(api.deleteSeparateReturn)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
 	return routes
 }
@@ -318,6 +341,72 @@ func (api logisticsAPI) listBatches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	batches, err := batchRuntime.LogisticsBatches(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if len(batches) > query.Limit {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	views := make([]logisticsBatchView, 0, len(batches))
+	for _, batch := range batches {
+		if batch.Validate() != nil {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		views = append(views, logisticsBatchView{RemoteID: batch.RemoteID, Status: batch.Status, ShipmentCount: batch.ShipmentCount, ObservedAt: batch.ObservedAt})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+}
+
+func (api logisticsAPI) listArchivedBatches(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	archiveRuntime, runtimeOK := api.runtime.(logisticsArchivedBatchRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Archived batch operation is unavailable")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		limit = value
+	}
+	query := sdk.LogisticsArchiveBatchQuery{Limit: limit}
+	if accountID == "" || query.Validate(100) != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.archive.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Archived batch operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Archived batch capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	batches, err := archiveRuntime.LogisticsArchivedBatches(r.Context(), account, runtime, query)
 	if err != nil {
 		writeLogisticsError(w, err)
 		return
@@ -958,6 +1047,132 @@ func (api logisticsAPI) createSeparateReturn(w http.ResponseWriter, r *http.Requ
 	}
 	encoded, err := json.Marshal(view)
 	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.return.separate.create", key, encoded) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func (api logisticsAPI) deleteSeparateReturn(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, logisticsSeparateReturnDeletePath), "/"), "/")
+	if len(parts) != 1 || !logisticsRemoteIDPattern.MatchString(parts[0]) {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	returnBarcode := parts[0]
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsSeparateReturnDeleteInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(input.ConnectorAccountID)
+	input.ConnectorAccountID = accountID
+	request := input.toSDK(returnBarcode, key)
+	if accountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.return.separate.delete")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Separate return deletion is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Separate return deletion capability is not enabled")
+		return
+	}
+	digest, err := logisticsSeparateReturnDeleteDigest(input, returnBarcode)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.return.separate.delete" || requested.ResourceType != "logistics_return" || requested.ResourceID != logisticsSeparateReturnDeleteApprovalResourceID(digest) || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	deleteRuntime, runtimeOK := api.runtime.(logisticsSeparateReturnDeleteRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Separate return deletion is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	deleter, err := deleteRuntime.LogisticsSeparateReturnDeleter(r.Context(), account, runtime)
+	if err != nil || deleter == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.return.separate.delete", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsSeparateReturnDeleteView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsSeparateReturnDeleteViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	deletion, err := deleter.DeleteLogisticsSeparateReturn(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsSeparateReturnDeleteView{RemoteID: deletion.RemoteID, Status: deletion.Status, Deleted: deletion.Deleted, ObservedAt: deletion.ObservedAt}
+	if deletion.Validate() != nil || deletion.RemoteID != returnBarcode || !logisticsSeparateReturnDeleteViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.return.separate.delete", key, encoded) != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}

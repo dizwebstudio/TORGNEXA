@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "aebd4b5320d973403ebeeca541b7f0c0f3422a62bf2a95bde3169bf2316f10cf",
+    "sha256": "c54ec980edca25f997a73903ad46cca2610f1af511d8f8d0d8bae2bb047b33cd",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -593,6 +593,11 @@
       "operation_id": "listApprovals",
       "method": "GET",
       "path": "/approvals"
+    },
+    {
+      "operation_id": "listArchivedLogisticsBatches",
+      "method": "GET",
+      "path": "/logistics/batches/archive"
     },
     {
       "operation_id": "listAssistantSessions",

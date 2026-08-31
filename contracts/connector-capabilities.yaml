@@ -61,6 +61,7 @@ capabilities:
   logistics.batches.create: Form a provider batch from existing orders
   logistics.batches.submit: Hand a formed provider batch to carrier processing
   logistics.batches.archive: Move a formed provider batch to the provider archive
+  logistics.batches.archive.read: Read provider batches from the archive
   logistics.batches.unarchive: Restore a provider batch from the provider archive
   logistics.batches.read: Read provider batch directory
   logistics.rates.read: Calculate delivery rates/SLA
@@ -69,6 +70,7 @@ capabilities:
   logistics.webhooks.verify: Verify and normalize logistics webhook
   logistics.return.create: Create return
   logistics.return.separate.create: Create a return shipment without an existing carrier RPO
+  logistics.return.separate.delete: Delete a standalone return shipment
   pickup.points.read: Read pickup points
   pickup.capacity.read: Read PUDO capacity
   pickup.orders.write: Receive/issue/return PUDO orders

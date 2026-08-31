@@ -2899,6 +2899,36 @@ func (transport pochtarussiaHTTP) CreateSeparateReturn(ctx context.Context, secr
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
 }
 
+// DeleteSeparateReturn deletes one standalone Russian Post return shipment
+// through the provider's dedicated endpoint. A non-empty provider error code
+// is never treated as a successful deletion.
+func (transport pochtarussiaHTTP) DeleteSeparateReturn(ctx context.Context, secret []byte, request sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error) {
+	barcode := strings.TrimSpace(request.ReturnBarcode)
+	if transport.h == nil || request.Validate() != nil || !pochtarussiaTrackingBarcode(barcode) {
+		return sdk.LogisticsSeparateReturnDeletion{}, errors.New("Почта России separate return deletion request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsSeparateReturnDeletion{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodDelete, "otpravka-api.pochta.ru", "/1.0/returns/delete-separate-return", url.Values{"barcode": []string{barcode}}, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsSeparateReturnDeletion{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsSeparateReturnDeletion{}, fmt.Errorf("Почта России separate return deletion rejected with status %d", status)
+	}
+	if trimmed := bytes.TrimSpace(responseBody); len(trimmed) > 0 {
+		var response struct {
+			Code string `json:"code"`
+		}
+		if json.Unmarshal(trimmed, &response) != nil || strings.TrimSpace(response.Code) != "" {
+			return sdk.LogisticsSeparateReturnDeletion{}, errors.New("Почта России separate return deletion response rejected")
+		}
+	}
+	return sdk.LogisticsSeparateReturnDeletion{RemoteID: barcode, Status: "DELETED", Deleted: true, ObservedAt: time.Now().UTC()}, nil
+}
+
 func pochtarussiaReturnMailType(value string) bool {
 	switch value {
 	case "UNDEFINED", "POSTAL_PARCEL", "ONLINE_PARCEL", "EMS", "EMS_OPTIMAL", "FIRST_CLASS":
@@ -3386,6 +3416,51 @@ func (transport pochtarussiaHTTP) Batches(ctx context.Context, secret []byte, qu
 		count, countErr := pochtarussiaNonNegativeInt(item.ShipmentCount)
 		if countErr != nil || count > 1000000 {
 			return nil, errors.New("Почта России batch response has invalid shipment count")
+		}
+		result = append(result, sdk.LogisticsBatch{RemoteID: name, Status: batchStatus, ShipmentCount: int(count), ObservedAt: now})
+	}
+	return result, nil
+}
+
+// ArchivedBatches reads one bounded collection from the official Russian Post
+// archive endpoint. The provider response is reduced to the same neutral batch
+// projection as the active directory; order rows and raw provider fields stay
+// behind the host boundary.
+func (transport pochtarussiaHTTP) ArchivedBatches(ctx context.Context, secret []byte, query sdk.LogisticsArchiveBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if transport.h == nil || query.Validate(100) != nil {
+		return nil, errors.New("Почта России archive batch request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodGet, "otpravka-api.pochta.ru", "/1.0/archive", nil, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Почта России archive batch request rejected with status %d", status)
+	}
+	var response []pochtarussiaBatch
+	if json.Unmarshal(responseBody, &response) != nil || len(response) > query.Limit {
+		return nil, errors.New("Почта России archive batch response rejected")
+	}
+	now := time.Now().UTC()
+	result := make([]sdk.LogisticsBatch, 0, len(response))
+	seen := make(map[string]struct{}, len(response))
+	for _, item := range response {
+		name := strings.TrimSpace(item.Name)
+		batchStatus := strings.TrimSpace(item.Status)
+		if !logisticsBatchRemoteIDPattern.MatchString(name) || !safeCodePattern.MatchString(batchStatus) {
+			return nil, errors.New("Почта России archive batch response has invalid identity")
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return nil, errors.New("Почта России archive batch response has duplicate identity")
+		}
+		seen[name] = struct{}{}
+		count, countErr := pochtarussiaNonNegativeInt(item.ShipmentCount)
+		if countErr != nil || count > 1000000 {
+			return nil, errors.New("Почта России archive batch response has invalid shipment count")
 		}
 		result = append(result, sdk.LogisticsBatch{RemoteID: name, Status: batchStatus, ShipmentCount: int(count), ObservedAt: now})
 	}
