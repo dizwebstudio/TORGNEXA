@@ -75,6 +75,10 @@
       "kind": "application"
     },
     {
+      "path": "internal/core/advertising",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/catalog",
       "kind": "core_domain"
     },
@@ -333,6 +337,10 @@
     {
       "path": "internal/platform/pluginsecurity",
       "kind": "platform_capability"
+    },
+    {
+      "path": "internal/platform/postgres/advertisingrepo",
+      "kind": "infrastructure_adapter"
     },
     {
       "path": "internal/platform/postgres/agentgovernancerepo",

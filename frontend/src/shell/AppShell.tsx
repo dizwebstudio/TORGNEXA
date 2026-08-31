@@ -27,6 +27,8 @@ const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then
 const ProcurementPage = lazy(() => import("../pages/ProcurementPage").then(module => ({default: module.ProcurementPage})));
 const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
 const FinancialAnalyticsPage = lazy(() => import("../pages/FinancialAnalyticsPage").then(module => ({default: module.FinancialAnalyticsPage})));
+const AdvertisingPage = lazy(() => import("../pages/AdvertisingPage").then(module => ({default: module.AdvertisingPage})));
+const AdvertisingPage = lazy(() => import("../pages/AdvertisingPage").then(module => ({default: module.AdvertisingPage})));
 const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
 const ReportsPage = lazy(() => import("../pages/ReportsPage").then(module => ({default: module.ReportsPage})));
@@ -63,6 +65,7 @@ function content(path: string) {
   if (path === "/procurement") return <ProcurementPage />;
   if (path === "/finance") return <FinancePage />;
   if (path === "/finance/analytics") return <FinancialAnalyticsPage />;
+  if (path === "/advertising") return <AdvertisingPage />;
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/workflows") return <WorkflowsPage />;
   if (path === "/integrations") return <IntegrationsPage />;

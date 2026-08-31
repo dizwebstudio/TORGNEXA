@@ -27,6 +27,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/kafkatransport"
 	"github.com/torgnexa/torgnexa/internal/platform/notifications"
 	"github.com/torgnexa/torgnexa/internal/platform/outbox"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/advertisingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
@@ -225,6 +226,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_financial_repository_startup_failed", err)
 	}
+	advertisingRepository, err := advertisingrepo.New(db)
+	if err != nil {
+		return fail("worker_advertising_repository_startup_failed", err)
+	}
 	marketplacePublicationRepository, err := marketplacepublicationrepo.New(db)
 	if err != nil {
 		return fail("worker_marketplace_publication_repository_startup_failed", err)
@@ -375,6 +380,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	components = append(components, []component{
 		{name: "financial-analytics", run: func(componentCtx context.Context) error {
 			return runFinancialAnalytics(componentCtx, logger, dispatchRepository, financialRepository, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
+		}},
+		{name: "marketplace-advertising", run: func(componentCtx context.Context) error {
+			return runMarketplaceAdvertising(componentCtx, logger, dispatchRepository, advertisingRepository, marketplacePublicationAccounts, secretProvider, secretRepository, runtimeRegistry, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
 		}},
 		{name: "tenant-dispatch", run: func(componentCtx context.Context) error {
 			return runTenantDispatch(componentCtx, logger, dispatchRepository, relay, webhookDelivery, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)

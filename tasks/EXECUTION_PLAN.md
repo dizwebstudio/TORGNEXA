@@ -2249,3 +2249,31 @@ daily worker independent from transactional writes.
 - OpenAPI, generated SDKs, frontend, migration catalog, worker, tests and
   architecture review stay synchronized. Live bank and external provider
   adapters remain explicitly deferred for separate qualification.
+
+## Phase 88 — Marketplace Advertising Runtime для WB/Ozon
+
+`220`
+
+Task 220 closes the read-only MVP of Epic 175. WB and Ozon expose `ads.read`
+through the built-in Connector SDK; the host stores normalized campaigns,
+spend/performance facts, sync watermarks and reconciliation evidence in
+tenant-scoped PostgreSQL. The worker loads the previous UTC day, and P&L uses
+the API facts without adding the same advertising spend on top of older
+action/settlement copies. The frontend «Реклама» page shows campaign metrics,
+ROAS/ROMI/ДРР, quality and findings.
+
+### Gate RUNTIME-220
+
+- WB and Ozon official read adapters use fixed hosts, bounded periods, scoped
+  secrets, normalized errors and `ads.read`; provider fields do not cross the
+  adapter boundary;
+- campaign and fact identities are tenant-scoped, spend/performance facts are
+  immutable and repeated daily ingestion is idempotent;
+- advertising API facts participate in the existing P&L with explicit source
+  precedence, while unattributed SKU and delayed data remain visible findings;
+- API, sync-run evidence, generated Go/Python/TypeScript SDKs, frontend route,
+  permissions, migration catalog and forced-RLS checks stay synchronized;
+- migration 47 requires a PostgreSQL backup and rollback is capability
+  disablement plus worker drain; no destructive down migration is used;
+- campaign launch/stop, budget, bid and product-link writes are not admitted
+  in this gate and require a later approval-bound qualification.

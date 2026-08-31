@@ -87,6 +87,27 @@ type ProductReader interface {
 	Read(context.Context, sdk.PageRequest) (ProductPage, error)
 }
 
+// AdvertisingReader resolves the qualified read-only marketplace advertising
+// surface. Management writes are intentionally not exposed by this registry
+// until the second-stage qualification described by Epic 175.
+type AdvertisingReader = sdk.AdvertisingReader
+
+// AdvertisingReader returns a typed reader only for marketplace connectors
+// that explicitly advertise ads.read in their manifest.
+func (r *Registry) AdvertisingReader(account sdk.Account, runtime sdk.Runtime) (AdvertisingReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "ads.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 // PriceReader resolves an admitted provider-native price read surface. The
 // returned SDK reader keeps remote variant identities and exact money values;
 // no provider-specific shape crosses into the worker.

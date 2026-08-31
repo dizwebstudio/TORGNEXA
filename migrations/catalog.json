@@ -953,6 +953,26 @@
       },
       "backfill": null,
       "sha256": "d05b3587727cdec446a1002054d8283ff63f77e8076a11ad2fe8320cbfa9e0b7"
+    },
+    {
+      "version": 47,
+      "name": "marketplace_advertising_runtime",
+      "file": "000047_marketplace_advertising_runtime.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [34, 46],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "08e800e5ce5979b62468376e68644337344cf2857a8a87a3f56763f227ca54e1"
     }
   ]
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/entitlements"
 	"github.com/torgnexa/torgnexa/internal/platform/lineage"
 	"github.com/torgnexa/torgnexa/internal/platform/notifications"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/advertisingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
@@ -50,6 +51,7 @@ import (
 )
 
 type productionRouteDependencies struct {
+	advertising            *advertisingrepo.Repository
 	accounts               *connectorrepo.Repository
 	connectorConfigs       *connectorconfigrepo.Repository
 	auditRepository        auditReader
@@ -144,6 +146,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReturnsRoutes(deps.returns)...)
 	routes = append(routes, newFinancialReportRoutes(deps.financialReports, deps.auditService)...)
+	routes = append(routes, newAdvertisingRoutes(deps.advertising)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)

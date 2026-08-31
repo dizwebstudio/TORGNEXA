@@ -4,6 +4,8 @@ export const capabilityLabels: Readonly<Record<string, string>> = {
   "approvals.read": "Просмотр согласований",
   "approvals.write": "Управление согласованиями",
   "audit.read": "Просмотр аудита",
+  "ads.read": "Просмотр рекламы",
+  "ads.manage": "Управление рекламой",
   "cloud.subscription.read": "Просмотр подписки",
   "compliance.read": "Просмотр соответствия",
   "connectors.accounts.read": "Просмотр кабинетов интеграций",
@@ -316,7 +318,7 @@ export const roleLabels: Readonly<Record<string, string>> = {
 export type CapabilityGroupID = "commerce" | "integrations" | "control" | "workspace" | "other";
 
 export function capabilityGroupFor(value: string): CapabilityGroupID {
-  if (/^(products|orders|stock|settlements|fx|reports|profitability|counterparties)(\.|$)/.test(value)) return "commerce";
+  if (/^(products|orders|stock|settlements|fx|reports|profitability|counterparties|ads)(\.|$)/.test(value)) return "commerce";
   if (/^(connectors|sync|webhooks|operations|plugins|cloud)(\.|$)/.test(value)) return "integrations";
   if (/^(approvals|audit|compliance|privacy|notifications|lineage)(\.|$)/.test(value) || value.startsWith("settings.security")) return "control";
   if (value.startsWith("ai.") || /^settings\.(ai_|mcp_|identity_|members|read)/.test(value)) return "workspace";

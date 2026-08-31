@@ -2613,6 +2613,83 @@ paths:
         '201': {description: Calculation status and immutable snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/SellerFinancialRun'}}}}
         '400': {description: Invalid calculation request}
         '403': {description: Caller lacks finance.reports.write}
+  /advertising/campaigns:
+    get:
+      operationId: listAdvertisingCampaigns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: channel, in: query, required: false, schema: {type: string, maxLength: 64}}
+        - {name: campaign_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Normalized tenant-scoped campaign projections, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingCampaignPage'}}}}
+        '400': {description: Invalid advertising filter}
+        '403': {description: Caller lacks ads.read}
+  /advertising/spend:
+    get:
+      operationId: listAdvertisingSpend
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: channel, in: query, required: false, schema: {type: string, maxLength: 64}}
+        - {name: campaign_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: sku, in: query, required: false, schema: {type: string, maxLength: 200}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Immutable normalized advertising spend facts, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingSpendPage'}}}}
+        '400': {description: Invalid advertising filter}
+        '403': {description: Caller lacks ads.read}
+  /advertising/performance:
+    get:
+      operationId: listAdvertisingPerformance
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: channel, in: query, required: false, schema: {type: string, maxLength: 64}}
+        - {name: campaign_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: sku, in: query, required: false, schema: {type: string, maxLength: 200}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Immutable normalized advertising delivery and conversion facts, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingPerformancePage'}}}}
+        '400': {description: Invalid advertising filter}
+        '403': {description: Caller lacks ads.read}
+  /advertising/metrics:
+    get:
+      operationId: listAdvertisingMetrics
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: channel, in: query, required: false, schema: {type: string, maxLength: 64}}
+        - {name: campaign_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: sku, in: query, required: false, schema: {type: string, maxLength: 200}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Integer-rate advertising metrics including ROAS, ROMI and DRR in basis points, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingMetricPage'}}}}
+        '400': {description: Invalid advertising filter}
+        '403': {description: Caller lacks ads.read}
+  /advertising/reconciliation:
+    get:
+      operationId: listAdvertisingReconciliationFindings
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Advertising reconciliation evidence, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingFindingPage'}}}}
+        '403': {description: Caller lacks ads.read}
+  /advertising/sync-runs:
+    get:
+      operationId: listAdvertisingSyncRuns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: account_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Tenant-scoped advertising ingestion runs and watermarks, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingSyncRunPage'}}}}
+        '400': {description: Invalid advertising sync-run filter}
+        '403': {description: Caller lacks ads.read}
   /realtime:
     get:
       operationId: streamRealtimeInvalidations
@@ -3259,6 +3336,159 @@ components:
         created_at: {type: string, format: date-time}
         completed_at: {type: string, format: date-time}
         snapshot: {type: object, additionalProperties: true}
+    AdvertisingCampaign:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, channel, remote_id, name, status, currency, daily_budget_minor, total_budget_minor, observed_at, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        channel: {type: string, maxLength: 64}
+        remote_id: {type: string, maxLength: 192}
+        name: {type: string, minLength: 1, maxLength: 300}
+        status: {type: string, enum: [draft, active, paused, stopped, archived, unknown]}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        daily_budget_minor: {type: integer, format: int64, minimum: 0}
+        total_budget_minor: {type: integer, format: int64, minimum: 0}
+        observed_at: {type: string, format: date-time}
+        effective_from: {type: string, format: date-time}
+        effective_to: {type: string, format: date-time}
+        version: {type: integer, format: int64, minimum: 1}
+    AdvertisingCampaignPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingCampaign'}}
+    AdvertisingSpendFact:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, channel, campaign_id, remote_fact_id, period_start, period_end, amount_minor, currency, source, observed_at, effective_at, quality]
+      properties:
+        id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        channel: {type: string, maxLength: 64}
+        campaign_id: {type: string, maxLength: 192}
+        ad_id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 200}
+        remote_fact_id: {type: string, maxLength: 192}
+        period_start: {type: string, format: date-time}
+        period_end: {type: string, format: date-time}
+        amount_minor: {type: integer, format: int64, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        source: {type: string, maxLength: 64}
+        observed_at: {type: string, format: date-time}
+        effective_at: {type: string, format: date-time}
+        quality: {type: string, enum: [observed, confirmed, estimated, partial, delayed, unknown, conflict]}
+    AdvertisingSpendPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingSpendFact'}}
+    AdvertisingPerformanceFact:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, channel, campaign_id, remote_fact_id, period_start, period_end, impressions, clicks, orders, revenue_minor, currency, source, observed_at, effective_at, quality]
+      properties:
+        id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        channel: {type: string, maxLength: 64}
+        campaign_id: {type: string, maxLength: 192}
+        ad_id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 200}
+        remote_fact_id: {type: string, maxLength: 192}
+        period_start: {type: string, format: date-time}
+        period_end: {type: string, format: date-time}
+        impressions: {type: integer, format: int64, minimum: 0}
+        clicks: {type: integer, format: int64, minimum: 0}
+        orders: {type: integer, format: int64, minimum: 0}
+        revenue_minor: {type: integer, format: int64, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        source: {type: string, maxLength: 64}
+        observed_at: {type: string, format: date-time}
+        effective_at: {type: string, format: date-time}
+        quality: {type: string, enum: [observed, confirmed, estimated, partial, delayed, unknown, conflict]}
+    AdvertisingPerformancePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingPerformanceFact'}}
+    AdvertisingMetric:
+      type: object
+      additionalProperties: false
+      required: [channel, campaign_id, currency, spend_minor, impressions, clicks, orders, revenue_minor, roas_basis_points, romi_basis_points, drr_basis_points, order_cost_minor, quality]
+      properties:
+        channel: {type: string, maxLength: 64}
+        campaign_id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 200}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        spend_minor: {type: integer, format: int64, minimum: 0}
+        impressions: {type: integer, format: int64, minimum: 0}
+        clicks: {type: integer, format: int64, minimum: 0}
+        orders: {type: integer, format: int64, minimum: 0}
+        revenue_minor: {type: integer, format: int64, minimum: 0}
+        roas_basis_points: {type: integer, format: int64, minimum: 0}
+        romi_basis_points: {type: integer, format: int64}
+        drr_basis_points: {type: integer, format: int64, minimum: 0}
+        order_cost_minor: {type: integer, format: int64, minimum: 0}
+        quality: {type: string, enum: [observed, confirmed, estimated, partial, delayed, unknown, conflict]}
+    AdvertisingMetricPage:
+      type: object
+      additionalProperties: false
+      required: [items, generated_at, source]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingMetric'}}
+        generated_at: {type: string, format: date-time}
+        source: {type: string, const: postgresql}
+    AdvertisingFinding:
+      type: object
+      additionalProperties: false
+      required: [id, kind, expected_minor, actual_minor, severity, explanation, observed_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        kind: {type: string, maxLength: 64}
+        campaign_id: {type: string, maxLength: 192}
+        remote_reference: {type: string, maxLength: 192}
+        expected_minor: {type: integer, format: int64}
+        actual_minor: {type: integer, format: int64}
+        severity: {type: string, enum: [info, warn, block]}
+        explanation: {type: string, minLength: 1, maxLength: 500}
+        observed_at: {type: string, format: date-time}
+    AdvertisingFindingPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingFinding'}}
+    AdvertisingSyncRun:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, channel, from, to, mode, status, next_cursor, fetched_count, accepted_count, rejected_count, error_code, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        channel: {type: string, maxLength: 64}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        mode: {type: string, enum: [daily, incremental, backfill]}
+        status: {type: string, enum: [queued, running, completed, partial, failed, dead_letter]}
+        next_cursor: {type: string, maxLength: 4096}
+        watermark_at: {type: string, format: date-time}
+        fetched_count: {type: integer, minimum: 0}
+        accepted_count: {type: integer, minimum: 0}
+        rejected_count: {type: integer, minimum: 0}
+        error_code: {type: string, maxLength: 128}
+        evidence_digest: {type: string, maxLength: 64}
+        created_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+    AdvertisingSyncRunPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingSyncRun'}}
     ProcurementSupplier:
       type: object
       additionalProperties: false

@@ -77,7 +77,9 @@ function decodeClaims(token: string): TokenClaims {
 
 function capabilitiesFor(claims: TokenClaims): string[] {
   const roles = claims.realm_access?.roles ?? [];
-  return [...new Set(roles.flatMap((role) => roleCapabilities[role] ?? []))].sort();
+  const capabilities = roles.flatMap((role) => roleCapabilities[role] ?? []);
+  if (roles.some((role) => role === "admin" || role === "manager" || role === "operator" || role === "viewer")) capabilities.push("ads.read");
+  return [...new Set(capabilities)].sort();
 }
 
 function profileFor(claims: TokenClaims): UserProfile | undefined {

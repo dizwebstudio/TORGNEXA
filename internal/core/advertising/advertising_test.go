@@ -18,7 +18,9 @@ func performance(id string, orders, revenue int64) PerformanceFact {
 
 func TestAggregateUsesIntegerRates(t *testing.T) {
 	metrics, err := Aggregate([]SpendFact{spend("1", 2500)}, []PerformanceFact{performance("1", 2, 10000)})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(metrics) != 1 || metrics[0].ROASBasisPoints != 40000 || metrics[0].ROMIBasisPoints != 30000 || metrics[0].DRRBasisPoints != 2500 || metrics[0].OrderCostMinor != 1250 {
 		t.Fatalf("metrics=%+v", metrics)
 	}
@@ -37,5 +39,7 @@ func TestDeduplicateSpendRejectsConflictingRemoteFact(t *testing.T) {
 func TestValidateRejectsNonUTCFact(t *testing.T) {
 	fact := spend("1", 1)
 	fact.PeriodStart = fact.PeriodStart.In(time.FixedZone("MSK", 3*60*60))
-	if !errors.Is(fact.Validate(), ErrInvalid) { t.Fatal("non-UTC fact accepted") }
+	if !errors.Is(fact.Validate(), ErrInvalid) {
+		t.Fatal("non-UTC fact accepted")
+	}
 }

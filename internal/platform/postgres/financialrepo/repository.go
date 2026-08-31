@@ -232,6 +232,7 @@ func (r *Repository) loadInput(ctx context.Context, scope tenancy.Scope, request
 	if err != nil {
 		return core.FinancialInput{}, err
 	}
+	settlementAdvertisingIDs := map[string]struct{}{}
 	for settlementRows.Next() {
 		var id, system, account, ref, order, currency, kind, channel string
 		var amount int64
@@ -245,6 +246,9 @@ func (r *Repository) loadInput(ctx context.Context, scope tenancy.Scope, request
 		if mapped == "" {
 			continue
 		}
+		if mapped == core.FactAdvertising {
+			settlementAdvertisingIDs[id] = struct{}{}
+		}
 		input.Facts = append(input.Facts, core.FinancialFact{ID: id, SourceSystem: system, SourceAccount: account, SourceRef: ref, IdempotencyKey: ref, OrderID: order, ChannelRef: channel, Kind: mapped, AmountMinor: amount, Currency: currency, Basis: request.Basis, OccurredAt: occurred.UTC(), Confirmed: true, Quality: core.ValueObserved, Disputed: disputed})
 	}
 	if err := settlementRows.Err(); err != nil {
@@ -256,6 +260,7 @@ func (r *Repository) loadInput(ctx context.Context, scope tenancy.Scope, request
 	if err != nil {
 		return core.FinancialInput{}, err
 	}
+	legacyAdvertisingIDs := map[string]struct{}{}
 	for ads.Next() {
 		var id, currency string
 		var amount int64
@@ -265,12 +270,57 @@ func (r *Repository) loadInput(ctx context.Context, scope tenancy.Scope, request
 			return core.FinancialInput{}, err
 		}
 		input.Facts = append(input.Facts, core.FinancialFact{ID: id, SourceSystem: "advertising", SourceAccount: "campaign", SourceRef: id, IdempotencyKey: id, Kind: core.FactAdvertising, AmountMinor: -amount, Currency: currency, Basis: request.Basis, OccurredAt: at.UTC(), Expected: true, Confirmed: false, Quality: core.ValueEstimated})
+		legacyAdvertisingIDs[id] = struct{}{}
 	}
 	if err := ads.Err(); err != nil {
 		ads.Close()
 		return core.FinancialInput{}, err
 	}
 	ads.Close()
+	advertisingFacts, err := tx.QueryContext(ctx, `SELECT fact_id,account_id,channel,campaign_id,sku,amount_minor,currency,effective_at,quality FROM advertising_spend_facts WHERE organization_id=$1 AND workspace_id=$2 AND period_start >= $3 AND period_end <= $4 ORDER BY effective_at,fact_id`, org, ws, request.From, request.To)
+	if err != nil {
+		return core.FinancialInput{}, err
+	}
+	advertisingFactCount := 0
+	for advertisingFacts.Next() {
+		var id, account, channel, campaign, sku, currency, quality string
+		var amount int64
+		var at time.Time
+		if err := advertisingFacts.Scan(&id, &account, &channel, &campaign, &sku, &amount, &currency, &at, &quality); err != nil {
+			advertisingFacts.Close()
+			return core.FinancialInput{}, err
+		}
+		confirmed := quality == "confirmed" || quality == "observed"
+		valueStatus := core.ValueEstimated
+		if confirmed {
+			valueStatus = core.ValueObserved
+		}
+		input.Facts = append(input.Facts, core.FinancialFact{ID: id, SourceSystem: "advertising_api", SourceAccount: account, SourceRef: id, IdempotencyKey: id, SKU: sku, ChannelRef: channel, CampaignID: campaign, Kind: core.FactAdvertising, AmountMinor: -amount, Currency: currency, Basis: request.Basis, OccurredAt: at.UTC(), Expected: true, Confirmed: confirmed, Quality: valueStatus})
+		advertisingFactCount++
+	}
+	if err := advertisingFacts.Err(); err != nil {
+		advertisingFacts.Close()
+		return core.FinancialInput{}, err
+	}
+	advertisingFacts.Close()
+	if advertisingFactCount > 0 {
+		// A marketplace API fact is authoritative for the same window. Remove
+		// older action/settlement copies from this calculation input so the same
+		// spend is not counted twice; source rows remain available for review.
+		filtered := input.Facts[:0]
+		for _, fact := range input.Facts {
+			if fact.Kind == core.FactAdvertising {
+				if _, ok := settlementAdvertisingIDs[fact.ID]; ok {
+					continue
+				}
+				if _, ok := legacyAdvertisingIDs[fact.ID]; ok {
+					continue
+				}
+			}
+			filtered = append(filtered, fact)
+		}
+		input.Facts = filtered
+	}
 	logistics, err := tx.QueryContext(ctx, `SELECT shipment_id,provider_account_id,currency,cost_minor_units,updated_at FROM logistics_shipments WHERE organization_id=$1 AND workspace_id=$2 AND updated_at >= $3 AND updated_at < $4 AND cost_minor_units > 0 ORDER BY updated_at,shipment_id`, org, ws, request.From, request.To)
 	if err != nil {
 		return core.FinancialInput{}, err

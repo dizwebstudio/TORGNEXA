@@ -1055,3 +1055,13 @@ The report marks missing historical COGS, FX, bank receipts and unattributed
 advertising explicitly instead of zero-filling them. Live bank, advertising,
 marketplace-order, refund/return and external FX adapters remain deferred until
 their official connector qualification; no second financial ledger is created.
+
+## Epic 175 — Marketplace Advertising Runtime
+
+Task 220 is repository-complete for the read-only WB/Ozon MVP: `ads.read`,
+provider-neutral campaigns and immutable spend/performance facts, daily
+tenant-scoped sync runs, P&L integration without advertising double count,
+unattributed/delayed reconciliation findings, ROAS/ROMI/ДРР metrics, API,
+generated SDK and the «Реклама» UI are included. Migration 47 is expand-only
+and backup-gated. Campaign status, budget, bid and product writes remain
+explicitly deferred until a separate approval-bound qualification.

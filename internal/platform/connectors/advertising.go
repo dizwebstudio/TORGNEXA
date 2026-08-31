@@ -25,8 +25,13 @@ func (q AdvertisingQuery) Validate(maxCampaigns, maxLimit int) error {
 	}
 	seen := map[string]struct{}{}
 	for _, id := range q.CampaignIDs {
-		if !validRemoteReadID(id) { return ErrInvalidAdvertisingRequest }
-		if _, ok := seen[id]; ok { return ErrInvalidAdvertisingRequest }; seen[id] = struct{}{}
+		if !validRemoteReadID(id) {
+			return ErrInvalidAdvertisingRequest
+		}
+		if _, ok := seen[id]; ok {
+			return ErrInvalidAdvertisingRequest
+		}
+		seen[id] = struct{}{}
 	}
 	return nil
 }
@@ -76,9 +81,18 @@ type RemoteAdPerformanceFact struct {
 	Quality      string    `json:"quality"`
 }
 
-type AdvertisingCampaignPage struct { Items []RemoteCampaign `json:"items"`; NextCursor string `json:"next_cursor,omitempty"` }
-type AdvertisingSpendPage struct { Items []RemoteAdSpendFact `json:"items"`; NextCursor string `json:"next_cursor,omitempty"` }
-type AdvertisingPerformancePage struct { Items []RemoteAdPerformanceFact `json:"items"`; NextCursor string `json:"next_cursor,omitempty"` }
+type AdvertisingCampaignPage struct {
+	Items      []RemoteCampaign `json:"items"`
+	NextCursor string           `json:"next_cursor,omitempty"`
+}
+type AdvertisingSpendPage struct {
+	Items      []RemoteAdSpendFact `json:"items"`
+	NextCursor string              `json:"next_cursor,omitempty"`
+}
+type AdvertisingPerformancePage struct {
+	Items      []RemoteAdPerformanceFact `json:"items"`
+	NextCursor string                    `json:"next_cursor,omitempty"`
+}
 
 // AdvertisingReader is the read-only MVP surface for marketplace ads.
 type AdvertisingReader interface {
@@ -118,22 +132,30 @@ func (o AdvertisingOperation) Validate() error {
 	if !validName || !validRemoteReadID(o.CampaignID) || len(o.IdempotencyKey) < 1 || len(o.IdempotencyKey) > 128 || o.IdempotencyKey != strings.TrimSpace(o.IdempotencyKey) || o.AmountMinor < 0 || (o.AmountMinor > 0 && len(o.Currency) != 3) || len(o.ProductIDs) > 1000 {
 		return ErrInvalidAdvertisingRequest
 	}
-	for _, id := range o.ProductIDs { if !validRemoteReadID(id) { return ErrInvalidAdvertisingRequest } }
+	for _, id := range o.ProductIDs {
+		if !validRemoteReadID(id) {
+			return ErrInvalidAdvertisingRequest
+		}
+	}
 	return nil
 }
 
 type AdvertisingOperationState string
+
 const (
 	AdvertisingAccepted AdvertisingOperationState = "accepted"
 	AdvertisingRejected AdvertisingOperationState = "rejected"
 	AdvertisingUnknown  AdvertisingOperationState = "unknown"
 )
 
-type AdvertisingOperationResult struct { State AdvertisingOperationState `json:"state"`; RemoteOperationID string `json:"remote_operation_id,omitempty"`; ReadAfterWrite bool `json:"read_after_write"` }
+type AdvertisingOperationResult struct {
+	State             AdvertisingOperationState `json:"state"`
+	RemoteOperationID string                    `json:"remote_operation_id,omitempty"`
+	ReadAfterWrite    bool                      `json:"read_after_write"`
+}
 
 // AdvertisingManager is intentionally additive to Connector SDK v1. Providers
 // must implement it only after a separate capability qualification.
 type AdvertisingManager interface {
 	ApplyAdvertisingOperation(context.Context, Account, Runtime, AdvertisingOperation) (AdvertisingOperationResult, error)
 }
-
