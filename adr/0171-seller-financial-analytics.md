@@ -19,11 +19,10 @@ ledger, расчёт юнит-экономики из Task 167, историче
 ## Decision
 
 1. Ввести один provider-neutral calculation engine поверх нормализованных
-   `FinancialFact` и `SaleLineFact`. Каждый факт содержит bounded source
-   reference, basis, валюту, дату, idempotency/reference key, связь с
-   order/SKU/channel и quality state. Raw provider payload, токены и банковские
-   реквизиты в этот слой не попадают.
-2. В Task 174 v1 управленческий P&L считается по формуле:
+   `FinancialFact` и `SaleLineFact`. Факт содержит source ref, basis, валюту,
+   дату, idempotency key, связь с order/SKU/channel и quality state; raw
+   payload, токены и банковские реквизиты исключены.
+2. В Task 174 v1 P&L считается по формуле:
 
    ```text
    gross sales - discounts - cancellations - refunds = net sales
@@ -31,37 +30,26 @@ ledger, расчёт юнит-экономики из Task 167, историче
    - advertising - promotion - penalties + compensation = contribution profit
    ```
 
-   Все деньги — integer minor units с ISO-валютой. P&L использует явный
-   `order_accrual`, `settlement` или `cash` basis; в одном snapshot basis не
-   смешивается. Выплата (`payout`) не увеличивает выручку и используется в
-   cash/reconciliation view.
-3. Историческая себестоимость оценивается FIFO-движком на exact fixed-point
-   quantity. Поступления создают layers, продажи/списания/карантин потребляют
-   их в порядке FIFO, а перемещения переносят остаточные layers между
-   складами. Возврат создаёт новое поступление с явно переданной стоимостью.
-   При нехватке historical stock evidence результат содержит
-   `missing_cogs`/`historical_cogs_unavailable`, а не нулевую себестоимость.
-4. Расходы агрегируются детерминированно по доступной связи
-   `channel_ref`/`order_id`/`SKU`. Неразнесённые факты попадают в отдельное
-   `unattributed` ведро. Оценочный или спорный факт сохраняет quality reason и
-   не маскируется как подтверждённый расход.
-5. Cash view хранит payout, bank receipt и подтверждённые платежные категории
-   отдельно. Settlement-компоненты не прибавляются второй раз поверх payout;
-   unmatched/disputed данные видны в quality report. Начальный/конечный
-   остаток не выдумывается, если нет банковского источника.
-6. Каждый расчёт — immutable run и snapshot с версиями алгоритма, формулы,
-   allocation/valuation/attribution policies, input digest, coverage и
-   quality status. Повтор с тем же tenant-scoped idempotency key возвращает
-   исходный snapshot; поздние факты создают новый run.
-7. В API добавляются seller P&L, cash flow, unit economics, financial quality,
-   detail route и создание manual run. Ответы и CSV/PDF export читают уже
-   сохранённый snapshot и не запускают новый расчёт.
-8. Worker ежедневно материализует предыдущий UTC-день. Транзакционные
-   операции не зависят от успешности расчёта; ошибка расчёта логируется как
-   deferred и остаётся доступной для повторного запуска.
-9. Доступ к отчётам разделён на `finance.reports.read`,
-   `finance.reports.detail.read` и `finance.reports.write`. Все запросы
-   tenant-scoped, ограничены периодом/строками и проходят forced RLS.
+   Все деньги — integer minor units с ISO-валютой. В одном snapshot выбирается
+   только один basis: `order_accrual`, `settlement` или `cash`. `payout` не
+   увеличивает выручку и используется в cash/reconciliation view.
+3. FIFO использует exact fixed-point quantity: receipts создают layers,
+   продажи/списания/quarantine потребляют их по FIFO, transfers переносят
+   layers между складами, а возврат создаёт новое поступление с указанной
+   стоимостью. Нет evidence — `missing_cogs`, не ноль.
+4. Затраты детерминированно привязываются к `channel_ref`/`order_id`/SKU.
+   Неразнесённое получает `unattributed`, оценочное и спорное — quality
+   reason. Cash отдельно хранит payout, bank receipt и подтверждённые расходы;
+   settlement components повторно не прибавляются.
+5. Каждый расчёт — immutable run/snapshot с версиями формулы и политик,
+   input digest, coverage и quality. Тот же tenant-scoped idempotency key
+   возвращает исходный snapshot, поздний факт создаёт новый run.
+6. API даёт P&L, cash flow, unit economics, quality, detail и manual run;
+   CSV/PDF читает сохранённый snapshot. Worker ежедневно обрабатывает
+   предыдущий UTC-день, не блокируя транзакции.
+7. Доступ разделён на `finance.reports.read`,
+   `finance.reports.detail.read` и `finance.reports.write`; все запросы
+   tenant-scoped, bounded и проходят forced RLS.
 
 ## Consequences
 

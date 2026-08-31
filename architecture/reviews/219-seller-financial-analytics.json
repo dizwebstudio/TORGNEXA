@@ -19,6 +19,7 @@
     "frontend/test/ui-experience.test.mjs",
     "internal/app/api/api.go",
     "internal/app/api/financial_reports.go",
+    "internal/app/api/financial_reports_test.go",
     "internal/app/api/oidc_security.go",
     "internal/app/api/openapi_runtime_parity_test.go",
     "internal/app/api/production_routes.go",

@@ -70,7 +70,7 @@
       "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["inbound","outbound"]},{"entity_type":"inventory","directions":["inbound","outbound"]},{"entity_type":"orders","directions":["inbound","outbound"]}],
       "runtime_config_template":{"store_host":"shop.example.ru","base_path":"","store_currency":"RUB","order_statuses":{"pending":"1","confirmed":"2","processing":"3","fulfilled":"4","cancelled":"5"}}
     },
-    {"connector_id":"ozon","stage":"ready","surface":"integrations","operational_capabilities":["inventory.read","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"inventory","directions":["inbound"]}]},
+    {"connector_id":"ozon","stage":"ready","surface":"integrations","operational_capabilities":["ads.read","inventory.read","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"inventory","directions":["inbound"]}]},
     {"connector_id":"ozon-delivery","stage":"separate_surface","surface":"logistics","operational_capabilities":[],"sync":[]},
     {"connector_id":"ozon-pay","stage":"separate_surface","surface":"finance","operational_capabilities":[],"sync":[]},
     {"connector_id":"pek","stage":"separate_surface","surface":"logistics","operational_capabilities":["logistics.label.read","logistics.rates.read","logistics.return.create","logistics.shipment.cancel","logistics.shipment.create","logistics.track.read","pickup.points.read"],"sync":[],"runtime_config_template":{"sender_warehouse_id":"replace-with-pek-warehouse-id","sender_legal_form":1,"sender_title":"ООО Пример","sender_inn":"7700000000","sender_kpp":"770001001"}},
@@ -108,7 +108,7 @@
     {"connector_id":"threads","stage":"separate_surface","surface":"social","operational_capabilities":[],"sync":[],"health_only":true},
     {"connector_id":"vetis-mercury","stage":"separate_surface","surface":"government","operational_capabilities":[],"sync":[],"health_only":true,"runtime_config_template":{"probe_url":""}},
     {"connector_id":"vk","stage":"separate_surface","surface":"social","operational_capabilities":[],"sync":[],"health_only":true},
-    {"connector_id":"wildberries","stage":"ready","surface":"integrations","operational_capabilities":["inventory.read","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"inventory","directions":["inbound"]}]},
+    {"connector_id":"wildberries","stage":"ready","surface":"integrations","operational_capabilities":["ads.read","inventory.read","products.read","products.write"],"sync":[{"entity_type":"products","directions":["inbound"]},{"entity_type":"inventory","directions":["inbound"]}]},
     {
       "connector_id":"woocommerce","stage":"ready","surface":"integrations","operational_capabilities":["inventory.read","inventory.write","notifications.receive","orders.read","orders.status.write","prices.read","prices.write","products.read","products.write","returns.read"],
       "sync":[{"entity_type":"products","directions":["inbound","outbound"]},{"entity_type":"prices","directions":["inbound","outbound"]},{"entity_type":"inventory","directions":["inbound","outbound"]},{"entity_type":"orders","directions":["inbound","outbound"]}],

@@ -314,6 +314,9 @@ type wbHTTP struct{ h *httpTransport }
 
 func (t wbHTTP) Do(ctx context.Context, r wildberries.Request) (wildberries.Response, error) {
 	q := url.Values{}
+	for _, parameter := range r.Query {
+		q.Add(parameter.Name, parameter.Value)
+	}
 	hdr := http.Header{}
 	if len(r.Token) > 0 {
 		hdr.Set("Authorization", string(r.Token))
@@ -329,7 +332,13 @@ type ozonHTTP struct{ h *httpTransport }
 
 func (t ozonHTTP) Do(ctx context.Context, r ozon.Request) (ozon.Response, error) {
 	q := url.Values{}
+	for _, parameter := range r.Query {
+		q.Add(parameter.Name, parameter.Value)
+	}
 	hdr := http.Header{}
+	if len(r.Bearer) > 0 {
+		hdr.Set("Authorization", "Bearer "+string(r.Bearer))
+	}
 	if len(r.ClientID) > 0 {
 		hdr.Set("Client-Id", string(r.ClientID))
 	}

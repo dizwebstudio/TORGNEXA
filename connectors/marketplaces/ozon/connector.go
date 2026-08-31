@@ -24,11 +24,15 @@ type Request struct {
 	Method         string
 	Host           string
 	Path           string
+	Query          []QueryParam
 	Body           []byte
 	ClientID       []byte
 	APIKey         []byte
+	Bearer         []byte
 	IdempotencyKey string
 }
+
+type QueryParam struct{ Name, Value string }
 
 type Response struct {
 	StatusCode   int

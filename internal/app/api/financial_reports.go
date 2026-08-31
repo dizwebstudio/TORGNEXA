@@ -8,15 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/core/uniteconomics"
+	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
 )
 
 const financialReportsPath = ReportsPath + "/"
 
-func newFinancialReportRoutes(repository *financialrepo.Repository) []ProtectedRoute {
+func newFinancialReportRoutes(repository *financialrepo.Repository, auditor *audit.Service) []ProtectedRoute {
 	read := func(id string) ProtectedRoute {
-		return ProtectedRoute{Method: http.MethodGet, Path: financialReportsPath + id, Permission: "finance.reports.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveFinancialReport(w, r, repository, id) })}
+		return ProtectedRoute{Method: http.MethodGet, Path: financialReportsPath + id, Permission: "finance.reports.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveFinancialReport(w, r, repository, auditor, id) })}
 	}
 	return []ProtectedRoute{
 		read("seller_profit_and_loss"),
@@ -24,13 +26,13 @@ func newFinancialReportRoutes(repository *financialrepo.Repository) []ProtectedR
 		read("seller_unit_economics"),
 		read("seller_financial_quality"),
 		{Method: http.MethodGet, Path: financialReportsPath + "seller_profit_and_loss/details", Permission: "finance.reports.detail.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			serveFinancialReport(w, r, repository, "seller_profit_and_loss_details")
+			serveFinancialReport(w, r, repository, auditor, "seller_profit_and_loss_details")
 		})},
 		{Method: http.MethodPost, Path: ReportsPath + "/financial-runs", Permission: "finance.reports.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { createFinancialRun(w, r, repository) })},
 	}
 }
 
-func serveFinancialReport(w http.ResponseWriter, r *http.Request, repository *financialrepo.Repository, id string) {
+func serveFinancialReport(w http.ResponseWriter, r *http.Request, repository *financialrepo.Repository, auditor *audit.Service, id string) {
 	scope, ok := ScopeFromContext(r.Context())
 	if !ok || repository == nil {
 		writeProblem(w, http.StatusForbidden, "Forbidden")
@@ -52,14 +54,47 @@ func serveFinancialReport(w http.ResponseWriter, r *http.Request, repository *fi
 	}
 	switch r.URL.Query().Get("format") {
 	case "csv":
+		if !auditFinancialExport(r, scope, auditor, id, "csv", len(data.Rows)) {
+			writeProblem(w, http.StatusServiceUnavailable, "Financial export audit unavailable")
+			return
+		}
 		writeReportCSV(w, data)
 	case "pdf":
+		if !auditFinancialExport(r, scope, auditor, id, "pdf", len(data.Rows)) {
+			writeProblem(w, http.StatusServiceUnavailable, "Financial export audit unavailable")
+			return
+		}
 		if err := writeReportPDF(w, data); err != nil {
 			writeProblem(w, http.StatusInternalServerError, "PDF generation failed")
 		}
 	default:
 		writeJSON(w, http.StatusOK, data)
 	}
+}
+
+func auditFinancialExport(r *http.Request, scope tenancy.Scope, auditor *audit.Service, reportID, format string, rows int) bool {
+	if auditor == nil || r == nil || rows < 0 || rows > 200 {
+		return false
+	}
+	principal, ok := PrincipalFromContext(r.Context())
+	if !ok || principal.SubjectRef == "" {
+		return false
+	}
+	_, err := auditor.Capture(r.Context(), scope, audit.Entry{
+		ActorID:       principal.SubjectRef,
+		Source:        "api.financial_reports",
+		Action:        "financial_report.export",
+		ResourceType:  "financial_report",
+		ResourceID:    reportID,
+		CorrelationID: r.Header.Get("X-Request-ID"),
+		Risk:          audit.RiskRead,
+		Summary: audit.Summary{
+			"format": format,
+			"rows":   rows,
+			"run_id": strings.TrimSpace(r.URL.Query().Get("run_id")),
+		},
+	})
+	return err == nil
 }
 
 func parseFinancialFilter(r *http.Request) (financialrepo.Filter, error) {

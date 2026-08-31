@@ -143,7 +143,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, logisticsRoutes...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReturnsRoutes(deps.returns)...)
-	routes = append(routes, newFinancialReportRoutes(deps.financialReports)...)
+	routes = append(routes, newFinancialReportRoutes(deps.financialReports, deps.auditService)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)

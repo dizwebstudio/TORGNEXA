@@ -926,12 +926,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#005BFF",
     },
-    capabilities: ["inventory.read", "products.read", "products.write"],
+    capabilities: ["ads.read", "inventory.read", "products.read", "products.write"],
     authKinds: ["api_key"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "products.read", "products.write"],
+      operationalCapabilities: ["ads.read", "inventory.read", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "inventory", directions: ["inbound"]},
@@ -1359,12 +1359,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#A00086",
     },
-    capabilities: ["inventory.read", "products.read", "products.write"],
+    capabilities: ["ads.read", "inventory.read", "products.read", "products.write"],
     authKinds: ["bearer"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "products.read", "products.write"],
+      operationalCapabilities: ["ads.read", "inventory.read", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "inventory", directions: ["inbound"]},
