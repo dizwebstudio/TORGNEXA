@@ -20,7 +20,7 @@ func TestReleasedUploadMediaReopensOnlyReleasedObject(t *testing.T) {
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	account := sdk.Account{
 		ID: "max-account", OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(),
-		ConnectorID: "max-messenger", Family: sdk.FamilySocial, Status: sdk.AccountActive,
+		ConnectorID: socialWebhookRouteA(), Family: sdk.FamilySocial, Status: sdk.AccountActive,
 		SecretReference: sdk.SecretReference("sec:v1:" + strings.Repeat("1", 32)), Version: 1,
 		Health: sdk.Health{Status: sdk.HealthHealthy, CheckedAt: now}, CreatedAt: now, UpdatedAt: now,
 	}

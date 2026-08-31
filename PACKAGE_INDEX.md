@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 151
-- tasks: 201
+- adrs: 153
+- tasks: 203
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3238
+- total source files (excluding local secrets/build/dependency/cache trees): 3246
 
 
 ## Connector category layout
@@ -701,6 +701,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0149-pek-multiple-label-print.md`
 - `adr/0150-pochta-batch-f103-pdf.md`
 - `adr/0151-pochta-formed-order-pdf.md`
+- `adr/0152-max-message-edit-delete.md`
+- `adr/0153-max-webhook-subscription.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -889,6 +891,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/197-pek-multiple-label-print-runtime.json`
 - `architecture/reviews/198-pochta-batch-f103-pdf-runtime.json`
 - `architecture/reviews/199-pochta-formed-order-pdf-runtime.json`
+- `architecture/reviews/200-max-message-edit-delete-runtime.json`
+- `architecture/reviews/201-max-webhook-subscription-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -2776,6 +2780,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/settings_security.go`
 - `internal/app/api/settings_security_test.go`
 - `internal/app/api/social.go`
+- `internal/app/api/social_media.go`
+- `internal/app/api/social_media_test.go`
 - `internal/app/api/social_test.go`
 - `internal/app/api/social_webhook_subscription.go`
 - `internal/app/api/social_webhook_subscription_test.go`
@@ -3682,6 +3688,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/197-pek-multiple-label-print-runtime.md`
 - `tasks/issues/198-pochta-batch-f103-pdf-runtime.md`
 - `tasks/issues/199-pochta-formed-order-pdf-runtime.md`
+- `tasks/issues/200-max-message-edit-delete-runtime.md`
+- `tasks/issues/201-max-webhook-subscription-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`
