@@ -23,7 +23,8 @@
 - **175.7–175.8** — факты расходов подключены к существующему P&L. При наличии
   API-факта старые action/settlement-копии не суммируются повторно; источники
   остаются доступными для сверки. Для расхода или конверсии без SKU создаётся
-  видимый `unattributed_*` finding, задержка помечается `delayed_report`.
+  видимый `unattributed_*` finding, задержка помечается `delayed_report`, а
+  изменённый исторический spend/performance — `changed_historical_report`.
 - **175.10–175.11** — добавлены read-only API и generated SDK для кампаний,
   spend, performance, metrics, reconciliation и sync-runs. В интерфейсе
   появился раздел «Реклама» с периодом, каналом, кампанией, таблицей метрик,

@@ -235,10 +235,45 @@ func DeduplicateSpend(facts []SpendFact) ([]SpendFact, error) {
 	return result, nil
 }
 
+// DeduplicatePerformance keeps the first identical fact and rejects
+// conflicting payloads sharing the same provider identity and period.
+func DeduplicatePerformance(facts []PerformanceFact) ([]PerformanceFact, error) {
+	seen := make(map[string]PerformanceFact, len(facts))
+	for _, fact := range facts {
+		if err := fact.Validate(); err != nil {
+			return nil, err
+		}
+		key := fact.AccountID + "\x00" + fact.RemoteFactID + "\x00" + fact.PeriodStart.Format(time.RFC3339Nano) + "\x00" + fact.PeriodEnd.Format(time.RFC3339Nano)
+		if previous, ok := seen[key]; ok {
+			if FingerprintPerformance(previous) != FingerprintPerformance(fact) {
+				return nil, ErrConflict
+			}
+			continue
+		}
+		seen[key] = fact
+	}
+	result := make([]PerformanceFact, 0, len(seen))
+	for _, fact := range seen {
+		result = append(result, fact)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].PeriodStart.Before(result[j].PeriodStart) || (result[i].PeriodStart.Equal(result[j].PeriodStart) && result[i].ID < result[j].ID)
+	})
+	return result, nil
+}
+
 // FingerprintSpend creates a stable non-secret identity for deduplication and
 // evidence. It intentionally excludes raw provider payloads.
 func FingerprintSpend(f SpendFact) string {
 	value := strings.Join([]string{f.AccountID, f.Channel, f.CampaignID, f.AdID, f.SKU, f.RemoteFactID, f.PeriodStart.Format(time.RFC3339Nano), f.PeriodEnd.Format(time.RFC3339Nano), big.NewInt(f.AmountMinor).String(), f.Currency, f.Source, string(f.Quality)}, "\x00")
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
+// FingerprintPerformance creates a stable non-secret identity for
+// deduplication and evidence. It intentionally excludes raw provider payloads.
+func FingerprintPerformance(f PerformanceFact) string {
+	value := strings.Join([]string{f.AccountID, f.Channel, f.CampaignID, f.AdID, f.SKU, f.RemoteFactID, f.PeriodStart.Format(time.RFC3339Nano), f.PeriodEnd.Format(time.RFC3339Nano), big.NewInt(f.Impressions).String(), big.NewInt(f.Clicks).String(), big.NewInt(f.Orders).String(), big.NewInt(f.RevenueMinor).String(), f.Currency, f.Source, string(f.Quality)}, "\x00")
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }

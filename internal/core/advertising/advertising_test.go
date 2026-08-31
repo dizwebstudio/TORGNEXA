@@ -9,11 +9,11 @@ import (
 var advertisingTestTime = time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 
 func spend(id string, amount int64) SpendFact {
-	return SpendFact{ID: id, AccountID: "account", Channel: "wildberries", CampaignID: "campaign", RemoteFactID: "remote-" + id, PeriodStart: advertisingTestTime.Add(-24 * time.Hour), PeriodEnd: advertisingTestTime, AmountMinor: amount, Currency: "RUB", Source: "api", ObservedAt: advertisingTestTime, EffectiveAt: advertisingTestTime, Quality: QualityConfirmed}
+	return SpendFact{ID: id, AccountID: "account", Channel: "marketplace", CampaignID: "campaign", RemoteFactID: "remote-" + id, PeriodStart: advertisingTestTime.Add(-24 * time.Hour), PeriodEnd: advertisingTestTime, AmountMinor: amount, Currency: "RUB", Source: "api", ObservedAt: advertisingTestTime, EffectiveAt: advertisingTestTime, Quality: QualityConfirmed}
 }
 
 func performance(id string, orders, revenue int64) PerformanceFact {
-	return PerformanceFact{ID: id, AccountID: "account", Channel: "wildberries", CampaignID: "campaign", RemoteFactID: "remote-" + id, PeriodStart: advertisingTestTime.Add(-24 * time.Hour), PeriodEnd: advertisingTestTime, Impressions: 100, Clicks: 10, Orders: orders, RevenueMinor: revenue, Currency: "RUB", Source: "api", ObservedAt: advertisingTestTime, EffectiveAt: advertisingTestTime, Quality: QualityConfirmed}
+	return PerformanceFact{ID: id, AccountID: "account", Channel: "marketplace", CampaignID: "campaign", RemoteFactID: "remote-" + id, PeriodStart: advertisingTestTime.Add(-24 * time.Hour), PeriodEnd: advertisingTestTime, Impressions: 100, Clicks: 10, Orders: orders, RevenueMinor: revenue, Currency: "RUB", Source: "api", ObservedAt: advertisingTestTime, EffectiveAt: advertisingTestTime, Quality: QualityConfirmed}
 }
 
 func TestAggregateUsesIntegerRates(t *testing.T) {
@@ -32,6 +32,16 @@ func TestDeduplicateSpendRejectsConflictingRemoteFact(t *testing.T) {
 	second.ID = "2"
 	second.AmountMinor = 2600
 	if _, err := DeduplicateSpend([]SpendFact{first, second}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestDeduplicatePerformanceRejectsConflictingRemoteFact(t *testing.T) {
+	first := performance("1", 2, 2500)
+	second := first
+	second.ID = "2"
+	second.Orders = 3
+	if _, err := DeduplicatePerformance([]PerformanceFact{first, second}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("err=%v", err)
 	}
 }

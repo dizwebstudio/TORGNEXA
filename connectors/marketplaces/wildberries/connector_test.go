@@ -81,6 +81,33 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	}
 }
 
+func TestAdvertisingReadsCampaignsAndProductStatsWithoutDoubleCounting(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	stats := []byte(`[{"advertId":123,"days":[{"date":"2026-08-09","views":100,"clicks":20,"orders":3,"sum":999.99,"sum_price":5000.00,"apps":[{"nm":[{"nmId":456,"views":10,"clicks":2,"orders":1,"sum":12.34,"sum_price":100.00}]}]}]}]`)
+	transport := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"adverts":[{"status":9,"advert_list":[{"advertId":123,"changeTime":"2026-08-10T11:00:00Z"}]}]}`)},
+		{StatusCode: 200, Body: stats},
+		{StatusCode: 200, Body: stats},
+	}}
+	connector := New(transport, func() time.Time { return now })
+	campaigns, err := connector.ReadAdvertisingCampaigns(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.PageRequest{Limit: 100})
+	if err != nil || len(campaigns.Items) != 1 || campaigns.Items[0].RemoteID != "123" || campaigns.Items[0].Status != "active" {
+		t.Fatalf("campaigns=%+v err=%v", campaigns, err)
+	}
+	query := sdk.AdvertisingQuery{From: time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC), CampaignIDs: []string{"123"}, Limit: 100}
+	spend, err := connector.ReadAdvertisingSpend(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, query)
+	if err != nil || len(spend.Items) != 1 || spend.Items[0].SKU != "456" || spend.Items[0].AmountMinor != 1234 {
+		t.Fatalf("spend=%+v err=%v", spend, err)
+	}
+	performance, err := connector.ReadAdvertisingPerformance(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, query)
+	if err != nil || len(performance.Items) != 1 || performance.Items[0].SKU != "456" || performance.Items[0].RevenueMinor != 10000 {
+		t.Fatalf("performance=%+v err=%v", performance, err)
+	}
+	if got := transport.requests[1]; got.Host != advertisingHost || got.Path != "/adv/v3/fullstats" || len(got.Query) != 3 || got.Query[0].Name != "ids" || got.Query[0].Value != "123" {
+		t.Fatalf("unexpected stats request: %+v", got)
+	}
+}
+
 func TestHealthUsesPingAndNormalizesAuthFailure(t *testing.T) {
 	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
 	transport := &scriptedTransport{responses: []Response{{StatusCode: 200}, {StatusCode: 200}, {StatusCode: 401, RequestID: "req-1"}}}

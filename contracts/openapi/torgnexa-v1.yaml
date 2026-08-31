@@ -2667,7 +2667,7 @@ paths:
         - {name: sku, in: query, required: false, schema: {type: string, maxLength: 200}}
         - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
       responses:
-        '200': {description: Integer-rate advertising metrics including ROAS, ROMI and DRR in basis points, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingMetricPage'}}}}
+        '200': {description: "Integer-rate advertising metrics including ROAS, ROMI and DRR in basis points", content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingMetricPage'}}}}
         '400': {description: Invalid advertising filter}
         '403': {description: Caller lacks ads.read}
   /advertising/reconciliation:

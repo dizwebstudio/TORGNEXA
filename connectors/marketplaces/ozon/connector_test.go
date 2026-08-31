@@ -44,6 +44,7 @@ func (t *scriptedTransport) Do(_ context.Context, r Request) (Response, error) {
 	r.Body = append([]byte(nil), r.Body...)
 	r.ClientID = append([]byte(nil), r.ClientID...)
 	r.APIKey = append([]byte(nil), r.APIKey...)
+	r.Bearer = append([]byte(nil), r.Bearer...)
 	t.requests = append(t.requests, r)
 	i := len(t.requests) - 1
 	if i < len(t.errs) && t.errs[i] != nil {
@@ -87,6 +88,34 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 		t.Fatal("marketplace product publication capability is not declared exactly")
 	}
 }
+
+func TestAdvertisingReadsCampaignsAndPerformanceBySKU(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	stats := []byte(`[{"campaignId":"cmp-1","date":"2026-08-09","expense":12.34,"views":100,"clicks":20,"orders":3,"ordersSum":500,"sku":"offer-1"}]`)
+	transport := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"list":[{"id":"cmp-1","title":"Summer","state":"running","budget":100}]}`)},
+		{StatusCode: 200, Body: stats},
+		{StatusCode: 200, Body: stats},
+	}}
+	connector := New(transport, func() time.Time { return now })
+	campaigns, err := connector.ReadAdvertisingCampaigns(context.Background(), testAccount(), testRuntime{creds()}, sdk.PageRequest{Limit: 100})
+	if err != nil || len(campaigns.Items) != 1 || campaigns.Items[0].RemoteID != "cmp-1" || campaigns.Items[0].Status != "active" || campaigns.Items[0].DailyBudgetMinor != 10000 {
+		t.Fatalf("campaigns=%+v err=%v", campaigns, err)
+	}
+	query := sdk.AdvertisingQuery{From: time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC), CampaignIDs: []string{"cmp-1"}, Limit: 100}
+	spend, err := connector.ReadAdvertisingSpend(context.Background(), testAccount(), testRuntime{creds()}, query)
+	if err != nil || len(spend.Items) != 1 || spend.Items[0].SKU != "offer-1" || spend.Items[0].AmountMinor != 1234 {
+		t.Fatalf("spend=%+v err=%v", spend, err)
+	}
+	performance, err := connector.ReadAdvertisingPerformance(context.Background(), testAccount(), testRuntime{creds()}, query)
+	if err != nil || len(performance.Items) != 1 || performance.Items[0].SKU != "offer-1" || performance.Items[0].Orders != 3 || performance.Items[0].RevenueMinor != 50000 {
+		t.Fatalf("performance=%+v err=%v", performance, err)
+	}
+	if got := transport.requests[1]; got.Host != performanceHost || got.Path != "/api/client/statistics/campaign/media/json" || string(got.Bearer) != "synthetic-api-key-0123456789abcdef" || len(got.Query) != 3 {
+		t.Fatalf("unexpected stats request: %+v", got)
+	}
+}
+
 func TestCredentialBundleIsStrict(t *testing.T) {
 	good := creds()
 	cid, key, err := parseCredentialBundle(good)

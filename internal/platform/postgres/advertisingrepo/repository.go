@@ -112,8 +112,20 @@ func (r *Repository) AppendPerformance(ctx context.Context, scope tenancy.Scope,
 	if err := r.validate(ctx, scope); err != nil || fact.Validate() != nil {
 		return ErrInvalid
 	}
+	fingerprint := core.FingerprintPerformance(fact)
 	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO advertising_performance_facts(organization_id,workspace_id,fact_id,account_id,channel,campaign_id,ad_id,sku,remote_fact_id,period_start,period_end,impressions,clicks,orders,revenue_minor,currency,source,observed_at,effective_at,quality) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ON CONFLICT(organization_id,workspace_id,account_id,remote_fact_id,period_start,period_end) DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), fact.ID, fact.AccountID, fact.Channel, fact.CampaignID, fact.AdID, fact.SKU, fact.RemoteFactID, fact.PeriodStart, fact.PeriodEnd, fact.Impressions, fact.Clicks, fact.Orders, fact.RevenueMinor, fact.Currency, fact.Source, fact.ObservedAt, fact.EffectiveAt, fact.Quality)
+		var existing string
+		err := tx.QueryRowContext(ctx, `SELECT fingerprint FROM advertising_performance_facts WHERE organization_id=$1 AND workspace_id=$2 AND account_id=$3 AND remote_fact_id=$4 AND period_start=$5 AND period_end=$6`, scope.OrganizationID(), scope.WorkspaceID(), fact.AccountID, fact.RemoteFactID, fact.PeriodStart, fact.PeriodEnd).Scan(&existing)
+		if err == nil {
+			if existing != fingerprint {
+				return ErrConflict
+			}
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO advertising_performance_facts(organization_id,workspace_id,fact_id,account_id,channel,campaign_id,ad_id,sku,remote_fact_id,period_start,period_end,impressions,clicks,orders,revenue_minor,currency,source,observed_at,effective_at,quality,fingerprint) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`, scope.OrganizationID(), scope.WorkspaceID(), fact.ID, fact.AccountID, fact.Channel, fact.CampaignID, fact.AdID, fact.SKU, fact.RemoteFactID, fact.PeriodStart, fact.PeriodEnd, fact.Impressions, fact.Clicks, fact.Orders, fact.RevenueMinor, fact.Currency, fact.Source, fact.ObservedAt, fact.EffectiveAt, fact.Quality, fingerprint)
 		return err
 	})
 }

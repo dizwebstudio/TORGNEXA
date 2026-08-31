@@ -127,6 +127,13 @@ func syncAdvertisingAccount(ctx context.Context, repository *advertisingrepo.Rep
 				normalized.Quality = core.QualityUnknown
 			}
 			if err := repository.AppendSpend(ctx, scope, normalized); err != nil {
+				if errors.Is(err, advertisingrepo.ErrConflict) {
+					if findingErr := recordAdvertisingFinding(ctx, repository, scope, account.ID, normalized.CampaignID, normalized.RemoteFactID, "changed_historical_report", normalized.AmountMinor, "Провайдер изменил ранее загруженный расход; исходный факт сохранён, нужна сверка.", normalized.ObservedAt); findingErr != nil {
+						return run, findingErr
+					}
+					run.RejectedCount++
+					continue
+				}
 				return run, err
 			}
 			if normalized.SKU == "" {
@@ -147,6 +154,13 @@ func syncAdvertisingAccount(ctx context.Context, repository *advertisingrepo.Rep
 				normalized.Quality = core.QualityUnknown
 			}
 			if err := repository.AppendPerformance(ctx, scope, normalized); err != nil {
+				if errors.Is(err, advertisingrepo.ErrConflict) {
+					if findingErr := recordAdvertisingFinding(ctx, repository, scope, account.ID, normalized.CampaignID, normalized.RemoteFactID, "changed_historical_report", normalized.RevenueMinor, "Провайдер изменил ранее загруженную performance-статистику; исходный факт сохранён, нужна сверка.", normalized.ObservedAt); findingErr != nil {
+						return run, findingErr
+					}
+					run.RejectedCount++
+					continue
+				}
 				return run, err
 			}
 			if normalized.SKU == "" {

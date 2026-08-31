@@ -28,7 +28,6 @@ const ProcurementPage = lazy(() => import("../pages/ProcurementPage").then(modul
 const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
 const FinancialAnalyticsPage = lazy(() => import("../pages/FinancialAnalyticsPage").then(module => ({default: module.FinancialAnalyticsPage})));
 const AdvertisingPage = lazy(() => import("../pages/AdvertisingPage").then(module => ({default: module.AdvertisingPage})));
-const AdvertisingPage = lazy(() => import("../pages/AdvertisingPage").then(module => ({default: module.AdvertisingPage})));
 const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
 const ReportsPage = lazy(() => import("../pages/ReportsPage").then(module => ({default: module.ReportsPage})));

@@ -122,11 +122,12 @@ CREATE TABLE advertising_performance_facts (
   observed_at timestamptz NOT NULL,
   effective_at timestamptz NOT NULL,
   quality text NOT NULL,
+  fingerprint char(64) NOT NULL,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (organization_id,workspace_id,fact_id),
   UNIQUE (organization_id,workspace_id,account_id,remote_fact_id,period_start,period_end),
   FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
-  CONSTRAINT advertising_performance_fact_chk CHECK (fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND channel ~ '^[a-z][a-z0-9._-]{0,63}$' AND remote_fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND period_end > period_start AND impressions >= 0 AND clicks >= 0 AND orders >= 0 AND revenue_minor >= 0 AND currency ~ '^[A-Z]{3}$' AND source ~ '^[a-z][a-z0-9._-]{0,63}$' AND quality IN ('observed','confirmed','estimated','partial','delayed','unknown','conflict') AND char_length(ad_id) <= 192 AND char_length(sku) <= 200)
+  CONSTRAINT advertising_performance_fact_chk CHECK (fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND channel ~ '^[a-z][a-z0-9._-]{0,63}$' AND remote_fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND period_end > period_start AND impressions >= 0 AND clicks >= 0 AND orders >= 0 AND revenue_minor >= 0 AND currency ~ '^[A-Z]{3}$' AND source ~ '^[a-z][a-z0-9._-]{0,63}$' AND quality IN ('observed','confirmed','estimated','partial','delayed','unknown','conflict') AND fingerprint ~ '^[0-9a-f]{64}$' AND char_length(ad_id) <= 192 AND char_length(sku) <= 200)
 );
 CREATE INDEX advertising_performance_facts_period_idx ON advertising_performance_facts(organization_id,workspace_id,period_start,period_end,channel,campaign_id);
 
@@ -196,7 +197,33 @@ CREATE TRIGGER advertising_attribution_no_mutation BEFORE UPDATE OR DELETE OR TR
 CREATE TRIGGER advertising_findings_no_mutation BEFORE UPDATE OR DELETE OR TRUNCATE ON advertising_reconciliation_findings FOR EACH STATEMENT EXECUTE FUNCTION advertising_evidence_no_mutation();
 REVOKE UPDATE,DELETE,TRUNCATE ON advertising_spend_facts,advertising_performance_facts,advertising_attributions,advertising_reconciliation_findings FROM PUBLIC;
 
-DO $$ DECLARE table_name text; BEGIN FOR table_name IN SELECT unnest(ARRAY['advertising_campaigns','advertising_ad_groups','advertising_ads','advertising_campaign_products','advertising_spend_facts','advertising_performance_facts','advertising_attributions','advertising_sync_runs','advertising_reconciliation_findings']) LOOP EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name); EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name); EXECUTE format('CREATE POLICY %I ON %I FOR ALL USING (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true)) WITH CHECK (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true))', table_name || '_tenant_all', table_name); END LOOP; END $$;
+ALTER TABLE advertising_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_campaigns FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_campaigns_tenant_all ON advertising_campaigns FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_ad_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_ad_groups FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_ad_groups_tenant_all ON advertising_ad_groups FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_ads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_ads FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_ads_tenant_all ON advertising_ads FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_campaign_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_campaign_products FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_campaign_products_tenant_all ON advertising_campaign_products FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_spend_facts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_spend_facts FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_spend_facts_tenant_all ON advertising_spend_facts FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_performance_facts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_performance_facts FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_performance_facts_tenant_all ON advertising_performance_facts FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_attributions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_attributions FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_attributions_tenant_all ON advertising_attributions FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_sync_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_sync_runs FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_sync_runs_tenant_all ON advertising_sync_runs FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE advertising_reconciliation_findings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advertising_reconciliation_findings FORCE ROW LEVEL SECURITY;
+CREATE POLICY advertising_reconciliation_findings_tenant_all ON advertising_reconciliation_findings FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
 
 COMMENT ON TABLE advertising_spend_facts IS 'Normalized immutable advertising spend facts; raw provider payloads and secrets are forbidden.';
 COMMENT ON TABLE advertising_performance_facts IS 'Normalized immutable advertising delivery/conversion facts.';
