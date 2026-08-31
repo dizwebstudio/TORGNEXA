@@ -56,6 +56,10 @@ func (candidateTransport) DeleteSeparateReturn(_ context.Context, _ []byte, requ
 	return sdk.LogisticsSeparateReturnDeletion{RemoteID: request.ReturnBarcode, Status: "DELETED", Deleted: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
 }
 
+func (candidateTransport) EditSeparateReturn(_ context.Context, _ []byte, request sdk.LogisticsSeparateReturnUpdateRequest) (sdk.LogisticsSeparateReturnUpdate, error) {
+	return sdk.LogisticsSeparateReturnUpdate{RemoteID: request.ReturnBarcode, Status: "UPDATED", Updated: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}
+
 func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{
 		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,

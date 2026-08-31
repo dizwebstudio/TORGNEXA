@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 141
-- tasks: 191
+- adrs: 144
+- tasks: 194
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3205
+- total source files (excluding local secrets/build/dependency/cache trees): 3214
 
 
 ## Connector category layout
@@ -691,6 +691,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0139-pochta-batch-archive.md`
 - `adr/0140-pochta-batch-unarchive.md`
 - `adr/0141-pochta-archive-batch-read.md`
+- `adr/0142-pochta-separate-return-delete.md`
+- `adr/0143-pochta-separate-return-edit.md`
+- `adr/0144-telegram-publication-edit.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -869,6 +872,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/187-pochta-batch-archive.json`
 - `architecture/reviews/188-pochta-batch-unarchive.json`
 - `architecture/reviews/189-pochta-archive-batch-read.json`
+- `architecture/reviews/190-pochta-separate-return-delete.json`
+- `architecture/reviews/191-pochta-separate-return-edit.json`
+- `architecture/reviews/192-telegram-publication-edit.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -3649,6 +3655,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/187-pochta-batch-archive.md`
 - `tasks/issues/188-pochta-batch-unarchive.md`
 - `tasks/issues/189-pochta-archive-batch-read.md`
+- `tasks/issues/190-pochta-separate-return-delete.md`
+- `tasks/issues/191-pochta-separate-return-edit.md`
+- `tasks/issues/192-telegram-publication-edit.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

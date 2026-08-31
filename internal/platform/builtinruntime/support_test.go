@@ -65,7 +65,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("CBR FX separate-surface support is inaccurate: %+v", cbr)
 	}
 	telegram, ok := SupportFor("telegram")
-	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || !SupportsCapability("telegram", "social.post.media") || !SupportsCapability("telegram", "social.post.video") || !SupportsCapability("telegram", "social.post.buttons") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
+	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || !SupportsCapability("telegram", "social.post.media") || !SupportsCapability("telegram", "social.post.video") || !SupportsCapability("telegram", "social.post.buttons") || !SupportsCapability("telegram", "social.post.edit") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
 		t.Fatalf("Telegram social runtime support is inaccurate: %+v", telegram)
 	}
 	max, ok := SupportFor("max-messenger")
@@ -101,7 +101,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "pek" {
 				wantCapabilities = 6
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 15
+				wantCapabilities = 16
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -137,6 +137,9 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			}
 			if (connectorID == "cdek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.return.create") {
 				t.Fatalf("%s return support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "pochta-russia" && (!SupportsCapability(connectorID, "logistics.return.separate.create") || !SupportsCapability(connectorID, "logistics.return.separate.delete") || !SupportsCapability(connectorID, "logistics.return.separate.edit")) {
+				t.Fatalf("%s separate-return support is inaccurate: %+v", connectorID, carrier)
 			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
 			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)
@@ -205,6 +208,19 @@ func TestSocialPublisherAdmissionIsExact(t *testing.T) {
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "avito"), load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted social publisher resolved: %v", err)
+	}
+}
+
+func TestSocialEditorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"chat_id":-70801090403050}`), nil
+	}
+	if editor, err := registry.SocialEditor(supportTestAccount(t, "telegram"), load); err != nil || editor == nil {
+		t.Fatalf("Telegram editor unavailable: editor=%T err=%v", editor, err)
+	}
+	if _, err := registry.SocialEditor(supportTestAccount(t, "max-messenger"), load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted MAX social editor resolved: %v", err)
 	}
 }
 
@@ -838,6 +854,19 @@ func TestLogisticsSeparateReturnDeleterAdmissionIsExact(t *testing.T) {
 	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
 		if _, err := registry.LogisticsSeparateReturnDeleter(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified separate return deleter resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsSeparateReturnEditorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	editor, err := registry.LogisticsSeparateReturnEditor(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || editor == nil {
+		t.Fatalf("Russian Post separate return editor unavailable: editor=%T err=%v", editor, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsSeparateReturnEditor(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified separate return editor resolved: %v", connectorID, err)
 		}
 	}
 }

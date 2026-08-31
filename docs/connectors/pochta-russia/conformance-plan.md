@@ -66,3 +66,12 @@ revert-маршрут.
 повторе того же tenant-scoped operation receipt. Live qualification должна
 использовать исключительно тестовый возврат и подтвердить необратимость,
 timeout/reconciliation и approval boundary.
+
+Для `logistics.return.separate.edit` fixture должен проверить `POST
+/1.0/returns/{barcode}`, заголовки авторизации, отсутствие caller-controlled
+URL и полный ограниченный JSON payload. Успешным считается только ответ с
+тем же `return-barcode` (в объекте или единственном элементе массива) без
+`errors`; пустой ответ, другой ШПИ или код ошибки должны оставаться ошибкой.
+Host сохраняет только `UPDATED`/`updated=true`, а live qualification
+выполняется на disposable-тестовом возврате с проверкой idempotency,
+approval и timeout/reconciliation.

@@ -153,12 +153,37 @@ type LogisticsSeparateReturnDeleteRequest struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
+// LogisticsSeparateReturnUpdateRequest describes the editable fields of one
+// standalone return shipment. The barcode is the provider-owned identity and
+// is never replaced by the update operation.
+type LogisticsSeparateReturnUpdateRequest struct {
+	ReturnBarcode     string   `json:"return_barcode"`
+	From              Address  `json:"from"`
+	To                *Address `json:"to,omitempty"`
+	InsuredValueMinor int64    `json:"insured_value_minor"`
+	MailType          string   `json:"mail_type"`
+	OrderNumber       string   `json:"order_number,omitempty"`
+	PostOfficeCode    string   `json:"postoffice_code,omitempty"`
+	RecipientName     string   `json:"recipient_name"`
+	SenderName        string   `json:"sender_name"`
+	IdempotencyKey    string   `json:"idempotency_key"`
+}
+
 // LogisticsSeparateReturnDeletion is the normalized acknowledgement of a
 // standalone return deletion.
 type LogisticsSeparateReturnDeletion struct {
 	RemoteID   string
 	Status     string
 	Deleted    bool
+	ObservedAt time.Time
+}
+
+// LogisticsSeparateReturnUpdate is the normalized acknowledgement of a
+// standalone return edit.
+type LogisticsSeparateReturnUpdate struct {
+	RemoteID   string
+	Status     string
+	Updated    bool
 	ObservedAt time.Time
 }
 type LabelRequest struct{ RemoteID, Format string }
@@ -383,16 +408,7 @@ func (r ReturnCreateRequest) Validate() error {
 
 // Validate checks the bounded, provider-neutral separate-return request.
 func (r LogisticsSeparateReturnRequest) Validate() error {
-	if r.From.Validate() != nil || (r.To != nil && r.To.Validate() != nil) || r.InsuredValueMinor < 0 || r.InsuredValueMinor%100 != 0 || !logisticsReturnCodePattern.MatchString(strings.ToUpper(strings.TrimSpace(r.MailType))) || !logisticsRefPattern.MatchString(r.IdempotencyKey) || !validLogisticsText(r.RecipientName, 300) || !validLogisticsText(r.SenderName, 300) {
-		return ErrInvalidLogisticsRequest
-	}
-	if r.OrderNumber != "" && !logisticsRefPattern.MatchString(r.OrderNumber) {
-		return ErrInvalidLogisticsRequest
-	}
-	if r.PostOfficeCode != "" && !logisticsRefPattern.MatchString(r.PostOfficeCode) {
-		return ErrInvalidLogisticsRequest
-	}
-	return nil
+	return validateLogisticsSeparateReturnFields(r.From, r.To, r.InsuredValueMinor, r.MailType, r.OrderNumber, r.PostOfficeCode, r.RecipientName, r.SenderName, r.IdempotencyKey)
 }
 
 // Validate checks the bounded standalone-return deletion request.
@@ -403,9 +419,38 @@ func (r LogisticsSeparateReturnDeleteRequest) Validate() error {
 	return nil
 }
 
+// Validate checks the bounded standalone-return edit request.
+func (r LogisticsSeparateReturnUpdateRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(r.ReturnBarcode) {
+		return ErrInvalidLogisticsRequest
+	}
+	return validateLogisticsSeparateReturnFields(r.From, r.To, r.InsuredValueMinor, r.MailType, r.OrderNumber, r.PostOfficeCode, r.RecipientName, r.SenderName, r.IdempotencyKey)
+}
+
 // Validate checks the normalized standalone-return deletion acknowledgement.
 func (r LogisticsSeparateReturnDeletion) Validate() error {
 	if !logisticsRefPattern.MatchString(r.RemoteID) || r.Status != "DELETED" || !r.Deleted || r.ObservedAt.IsZero() || r.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the normalized standalone-return edit acknowledgement.
+func (r LogisticsSeparateReturnUpdate) Validate() error {
+	if !logisticsRefPattern.MatchString(r.RemoteID) || r.Status != "UPDATED" || !r.Updated || r.ObservedAt.IsZero() || r.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+func validateLogisticsSeparateReturnFields(from Address, to *Address, insuredValueMinor int64, mailType, orderNumber, postOfficeCode, recipientName, senderName, idempotencyKey string) error {
+	if from.Validate() != nil || (to != nil && to.Validate() != nil) || insuredValueMinor < 0 || insuredValueMinor%100 != 0 || !logisticsReturnCodePattern.MatchString(strings.ToUpper(strings.TrimSpace(mailType))) || !logisticsRefPattern.MatchString(idempotencyKey) || !validLogisticsText(recipientName, 300) || !validLogisticsText(senderName, 300) {
+		return ErrInvalidLogisticsRequest
+	}
+	if orderNumber != "" && !logisticsRefPattern.MatchString(orderNumber) {
+		return ErrInvalidLogisticsRequest
+	}
+	if postOfficeCode != "" && !logisticsRefPattern.MatchString(postOfficeCode) {
 		return ErrInvalidLogisticsRequest
 	}
 	return nil
@@ -444,6 +489,9 @@ type LogisticsSeparateReturnCreator interface {
 }
 type LogisticsSeparateReturnDeleter interface {
 	DeleteLogisticsSeparateReturn(context.Context, Account, Runtime, LogisticsSeparateReturnDeleteRequest) (LogisticsSeparateReturnDeletion, error)
+}
+type LogisticsSeparateReturnEditor interface {
+	EditLogisticsSeparateReturn(context.Context, Account, Runtime, LogisticsSeparateReturnUpdateRequest) (LogisticsSeparateReturnUpdate, error)
 }
 type LogisticsLabelReader interface {
 	ReadLogisticsLabel(context.Context, Account, Runtime, LabelRequest) (LabelResult, error)

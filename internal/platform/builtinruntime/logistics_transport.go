@@ -2929,6 +2929,81 @@ func (transport pochtarussiaHTTP) DeleteSeparateReturn(ctx context.Context, secr
 	return sdk.LogisticsSeparateReturnDeletion{RemoteID: barcode, Status: "DELETED", Deleted: true, ObservedAt: time.Now().UTC()}, nil
 }
 
+// EditSeparateReturn updates one standalone Russian Post return shipment
+// through the provider's official POST /1.0/returns/{barcode} endpoint. The
+// response must carry the same barcode; a successful HTTP status alone is not
+// enough to claim that the remote record was changed.
+func (transport pochtarussiaHTTP) EditSeparateReturn(ctx context.Context, secret []byte, request sdk.LogisticsSeparateReturnUpdateRequest) (sdk.LogisticsSeparateReturnUpdate, error) {
+	barcode := strings.TrimSpace(request.ReturnBarcode)
+	mailType := strings.ToUpper(strings.TrimSpace(request.MailType))
+	if transport.h == nil || request.Validate() != nil || !pochtarussiaTrackingBarcode(barcode) || !strings.EqualFold(request.From.Country, "RU") || !pochtarussiaReturnMailType(mailType) || request.InsuredValueMinor%100 != 0 {
+		return sdk.LogisticsSeparateReturnUpdate{}, errors.New("Почта России separate return edit request rejected")
+	}
+	from, err := pochtarussiaSeparateReturnAddressFromSDK(request.From)
+	if err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	var to *pochtarussiaSeparateReturnAddress
+	if request.To != nil {
+		if !strings.EqualFold(request.To.Country, "RU") {
+			return sdk.LogisticsSeparateReturnUpdate{}, errors.New("Почта России separate return edit destination country is unsupported")
+		}
+		address, addressErr := pochtarussiaSeparateReturnAddressFromSDK(*request.To)
+		if addressErr != nil {
+			return sdk.LogisticsSeparateReturnUpdate{}, addressErr
+		}
+		to = &address
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	payload, err := json.Marshal(pochtarussiaSeparateReturnPayload{
+		AddressFrom: from, AddressTo: to, InsuredValue: request.InsuredValueMinor / 100,
+		MailType: mailType, OrderNumber: strings.TrimSpace(request.OrderNumber), PostOfficeCode: strings.TrimSpace(request.PostOfficeCode),
+		RecipientName: strings.TrimSpace(request.RecipientName), SenderName: strings.TrimSpace(request.SenderName),
+	})
+	if err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", "/1.0/returns/"+url.PathEscape(barcode), url.Values{}, payload, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsSeparateReturnUpdate{}, fmt.Errorf("Почта России separate return edit rejected with status %d", status)
+	}
+	if err := pochtarussiaEditedReturnResponse(responseBody, barcode); err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	return sdk.LogisticsSeparateReturnUpdate{RemoteID: barcode, Status: "UPDATED", Updated: true, ObservedAt: time.Now().UTC()}, nil
+}
+
+func pochtarussiaEditedReturnResponse(responseBody []byte, expectedBarcode string) error {
+	trimmed := bytes.TrimSpace(responseBody)
+	if len(trimmed) == 0 {
+		return errors.New("Почта России separate return edit response rejected")
+	}
+	var response pochtarussiaSeparateReturnResponse
+	if trimmed[0] == '[' {
+		var responses []pochtarussiaSeparateReturnResponse
+		if json.Unmarshal(trimmed, &responses) != nil || len(responses) != 1 {
+			return errors.New("Почта России separate return edit response rejected")
+		}
+		response = responses[0]
+	} else if json.Unmarshal(trimmed, &response) != nil {
+		return errors.New("Почта России separate return edit response rejected")
+	}
+	if response.Position != 0 || len(response.Errors) != 0 || len(response.ReturnBarcode) == 0 {
+		return errors.New("Почта России separate return edit response rejected")
+	}
+	barcode, err := pochtarussiaReturnID(response.ReturnBarcode)
+	if err != nil || barcode != expectedBarcode {
+		return errors.New("Почта России separate return edit response rejected")
+	}
+	return nil
+}
+
 func pochtarussiaReturnMailType(value string) bool {
 	switch value {
 	case "UNDEFINED", "POSTAL_PARCEL", "ONLINE_PARCEL", "EMS", "EMS_OPTIMAL", "FIRST_CLASS":

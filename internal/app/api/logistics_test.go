@@ -42,6 +42,7 @@ type logisticsRuntimeStub struct {
 	unarchiver            sdk.LogisticsBatchUnarchiver
 	separateReturnCreator sdk.LogisticsSeparateReturnCreator
 	separateReturnDeleter sdk.LogisticsSeparateReturnDeleter
+	separateReturnEditor  sdk.LogisticsSeparateReturnEditor
 }
 
 type logisticsBatchRuntimeStub struct {
@@ -166,6 +167,13 @@ func (stub logisticsRuntimeStub) LogisticsSeparateReturnDeleter(_ context.Contex
 		return nil, errors.New("runtime missing")
 	}
 	return stub.separateReturnDeleter, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsSeparateReturnEditor(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnEditor, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.separateReturnEditor, nil
 }
 
 type logisticsBatchCreatorStub struct {
@@ -551,6 +559,11 @@ type logisticsSeparateReturnDeleterStub struct {
 	called   bool
 }
 
+type logisticsSeparateReturnEditorStub struct {
+	update sdk.LogisticsSeparateReturnUpdate
+	called bool
+}
+
 func (stub *logisticsSeparateReturnDeleterStub) DeleteLogisticsSeparateReturn(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error) {
 	stub.called = true
 	if stub.deletion.RemoteID == "" {
@@ -562,6 +575,14 @@ func (stub *logisticsSeparateReturnDeleterStub) DeleteLogisticsSeparateReturn(_ 
 func (stub *logisticsSeparateReturnCreatorStub) CreateLogisticsSeparateReturn(_ context.Context, _ sdk.Account, _ sdk.Runtime, _ sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error) {
 	stub.called = true
 	return stub.result, nil
+}
+
+func (stub *logisticsSeparateReturnEditorStub) EditLogisticsSeparateReturn(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsSeparateReturnUpdateRequest) (sdk.LogisticsSeparateReturnUpdate, error) {
+	stub.called = true
+	if stub.update.RemoteID == "" {
+		stub.update.RemoteID = request.ReturnBarcode
+	}
+	return stub.update, nil
 }
 
 func TestLogisticsSeparateReturnRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
@@ -644,6 +665,51 @@ func TestLogisticsSeparateReturnDeleteRouteRequiresApprovalAndStoresNormalizedRe
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusCreated || !deleter.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"RA644000003RU"`) || !strings.Contains(response.Body.String(), `"status":"DELETED"`) || !strings.Contains(response.Body.String(), `"deleted":true`) {
 		t.Fatalf("status=%d body=%s deleter=%v operation=%+v", response.Code, response.Body.String(), deleter.called, operations)
+	}
+}
+
+func TestLogisticsSeparateReturnEditRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsSeparateReturnEditInput{
+		ConnectorAccountID: account.ID,
+		From:               logisticsAddressInput{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
+		To:                 &logisticsAddressInput{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		InsuredValueMinor:  129900, MailType: "ONLINE_PARCEL", OrderNumber: "return-001", PostOfficeCode: "101000", RecipientName: "Пётр Петров", SenderName: "Иван Иванов",
+	}
+	returnBarcode := "RA644000003RU"
+	digest, err := logisticsSeparateReturnEditDigest(input, returnBarcode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-separate-return-edit-1"
+	editor := &logisticsSeparateReturnEditorStub{update: sdk.LogisticsSeparateReturnUpdate{RemoteID: returnBarcode, Status: "UPDATED", Updated: true, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.return.separate.edit", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, separateReturnEditor: editor}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.return.separate.edit", ResourceType: "logistics_return", ResourceID: logisticsSeparateReturnEditApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsSeparateReturnEditPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("separate return edit route not registered")
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","from":{"country":"RU","postal_code":"101000","city":"Москва","line1":"Мясницкая, 1"},"to":{"country":"RU","postal_code":"190000","city":"Санкт-Петербург","line1":"Невский, 1"},"insured_value_minor":129900,"mail_type":"ONLINE_PARCEL","order_number":"return-001","postoffice_code":"101000","recipient_name":"Пётр Петров","sender_name":"Иван Иванов"}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsSeparateReturnEditPath+returnBarcode, body)
+	request.Header.Set("Idempotency-Key", "separate-return-edit-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !editor.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"RA644000003RU"`) || !strings.Contains(response.Body.String(), `"status":"UPDATED"`) || !strings.Contains(response.Body.String(), `"updated":true`) {
+		t.Fatalf("status=%d body=%s editor=%v operation=%+v", response.Code, response.Body.String(), editor.called, operations)
 	}
 }
 

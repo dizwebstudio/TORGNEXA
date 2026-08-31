@@ -71,6 +71,7 @@ capabilities:
   logistics.return.create: Create return
   logistics.return.separate.create: Create a return shipment without an existing carrier RPO
   logistics.return.separate.delete: Delete a standalone return shipment
+  logistics.return.separate.edit: Edit a standalone return shipment
   pickup.points.read: Read pickup points
   pickup.capacity.read: Read PUDO capacity
   pickup.orders.write: Receive/issue/return PUDO orders

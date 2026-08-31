@@ -81,6 +81,32 @@ paths:
       responses:
         '202': {description: Canonical publication accepted for asynchronous delivery, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublication'}}}}
         '409': {description: 'Channel, content or idempotent replay conflict'}
+  /social/publications/{publication_id}:
+    patch:
+      operationId: editSocialPublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: publication_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationEdit'}}}}
+      responses:
+        '201': {description: Remote social publication edited, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationEditResult'}}}}
+        '202': {description: Previous edit is still pending and will not be repeated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationEditPending'}}}}
+        '409': {description: 'Approval, capability, receipt or idempotent replay conflict'}
+        '502': {description: Social provider returned no confirmed result}
+    delete:
+      operationId: deleteSocialPublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: publication_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192}}
+      responses:
+        '201': {description: Remote social publication deleted, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationDeleteResult'}}}}
+        '202': {description: Previous deletion is still pending and will not be repeated, content: {application/json: {schema: {$ref: '#/components/schemas/SocialPublicationDeletePending'}}}}
+        '409': {description: 'Approval, capability, receipt or idempotent replay conflict'}
+        '502': {description: Social provider returned no confirmed result}
   /logistics/pickup-points:
     get:
       operationId: listLogisticsPickupPoints
@@ -223,6 +249,25 @@ paths:
         '409': {description: 'Return capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
   /logistics/returns/separate/{return_id}:
+    post:
+      operationId: editLogisticsSeparateReturn
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsSeparateReturnEditRequest'}
+      responses:
+        '201': {description: Standalone return shipment updated, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsSeparateReturnUpdate'}}}}
+        '202': {description: Standalone return edit is pending and must not be retried automatically}
+        '400': {description: Invalid return data or idempotency key}
+        '403': {description: Caller lacks logistics.return.separate.edit}
+        '409': {description: 'Return capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
     delete:
       operationId: deleteLogisticsSeparateReturn
       security: [{bearerAuth: []}]
@@ -3280,6 +3325,29 @@ components:
         status: {type: string, const: DELETED}
         deleted: {type: boolean, const: true}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsSeparateReturnEditRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, from, insured_value_minor, mail_type, recipient_name, sender_name]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        from: {$ref: '#/components/schemas/LogisticsAddress'}
+        to: {$ref: '#/components/schemas/LogisticsAddress'}
+        insured_value_minor: {type: integer, minimum: 0, multipleOf: 100, default: 0}
+        mail_type: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        order_number: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        postoffice_code: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        recipient_name: {type: string, minLength: 1, maxLength: 300}
+        sender_name: {type: string, minLength: 1, maxLength: 300}
+    LogisticsSeparateReturnUpdate:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, updated, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: UPDATED}
+        updated: {type: boolean, const: true}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsAddress:
       type: object
       additionalProperties: false
@@ -3649,6 +3717,67 @@ components:
               text: {type: string, minLength: 1, maxLength: 64}
               url: {type: string, maxLength: 2048, pattern: '^https://[^\\s]+$'}
         publish_at: {type: string, format: date-time}
+    SocialPublicationEdit:
+      type: object
+      additionalProperties: false
+      required: [kind, text]
+      properties:
+        kind: {type: string, enum: [text, media, video]}
+        text: {type: string, minLength: 1, maxLength: 4096}
+        media:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [upload_id, kind]
+            properties:
+              upload_id: {type: string, pattern: '^upl_[0-9a-f]{32}$'}
+              kind: {type: string, enum: [image, video]}
+              alt_text: {type: string, maxLength: 1000}
+        buttons:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required: [text, url]
+            properties:
+              text: {type: string, minLength: 1, maxLength: 64}
+              url: {type: string, maxLength: 2048, pattern: '^https://[^\s]+$'}
+    SocialPublicationEditResult:
+      type: object
+      additionalProperties: false
+      required: [remote_publication_id, status, updated, observed_at]
+      properties:
+        remote_publication_id: {type: string, minLength: 1, maxLength: 192}
+        status: {type: string, const: published}
+        updated: {type: boolean, const: true}
+        observed_at: {type: string, format: date-time}
+    SocialPublicationEditPending:
+      type: object
+      additionalProperties: false
+      required: [accepted, pending, fresh]
+      properties:
+        accepted: {type: boolean, const: true}
+        pending: {type: boolean, const: true}
+        fresh: {type: boolean, const: false}
+    SocialPublicationDeleteResult:
+      type: object
+      additionalProperties: false
+      required: [remote_publication_id, deleted, observed_at]
+      properties:
+        remote_publication_id: {type: string, minLength: 1, maxLength: 192}
+        deleted: {type: boolean, const: true}
+        observed_at: {type: string, format: date-time}
+    SocialPublicationDeletePending:
+      type: object
+      additionalProperties: false
+      required: [accepted, pending, fresh]
+      properties:
+        accepted: {type: boolean, const: true}
+        pending: {type: boolean, const: true}
+        fresh: {type: boolean, const: false}
     WarehouseWrite:
       type: object
       properties:
@@ -3874,8 +4003,8 @@ components:
       properties:
         id: {type: string, minLength: 36, maxLength: 36}
         name: {type: string, minLength: 1, maxLength: 160}
-        action: {type: string, enum: [demo.dataset.delete]}
-        resource_type: {type: string, enum: [demo_dataset]}
+        action: {type: string, enum: [demo.dataset.delete, social.publication.edit, social.publication.delete]}
+        resource_type: {type: string, enum: [demo_dataset, social_publication]}
         minimum_risk: {type: string, enum: [write_sensitive, legally_significant]}
         version: {type: integer, minimum: 1}
         request_ttl_minutes: {type: integer, minimum: 1, maximum: 43200}
@@ -3888,8 +4017,8 @@ components:
       additionalProperties: false
       required: [action, resource_type, resource_id, risk]
       properties:
-        action: {type: string, enum: [demo.dataset.delete]}
-        resource_type: {type: string, enum: [demo_dataset]}
+        action: {type: string, enum: [demo.dataset.delete, social.publication.edit, social.publication.delete]}
+        resource_type: {type: string, enum: [demo_dataset, social_publication]}
         resource_id: {type: string, maxLength: 128}
         risk: {type: string, enum: [write_sensitive]}
     SyncPolicyStatus:

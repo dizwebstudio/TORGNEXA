@@ -143,6 +143,7 @@ var capabilityDefinitions = map[Capability]CapabilityDefinition{
 	"logistics.return.create":          writeSensitive("logistics.return.create", families(FamilyLogistics)),
 	"logistics.return.separate.create": writeSensitive("logistics.return.separate.create", families(FamilyLogistics)),
 	"logistics.return.separate.delete": writeSensitive("logistics.return.separate.delete", families(FamilyLogistics)),
+	"logistics.return.separate.edit":   writeSensitive("logistics.return.separate.edit", families(FamilyLogistics)),
 	"logistics.label.read":             readable("logistics.label.read", families(FamilyLogistics)),
 	"pickup.points.read":               readable("pickup.points.read", families(FamilyPickup, FamilyLogistics)),
 	"pickup.capacity.read":             readable("pickup.capacity.read", families(FamilyPickup)),

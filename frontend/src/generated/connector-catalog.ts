@@ -1016,12 +1016,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#003B73",
     },
-    capabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.batches.archive", "logistics.batches.archive.read", "logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.batches.unarchive", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.return.separate.create", "logistics.return.separate.delete", "logistics.return.separate.edit", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
     },
@@ -1267,7 +1267,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video"],
+      operationalCapabilities: ["social.post.buttons", "social.post.delete", "social.post.edit", "social.post.media", "social.post.text", "social.post.video"],
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-1001234567890},

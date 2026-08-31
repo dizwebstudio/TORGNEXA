@@ -1702,3 +1702,45 @@ endpoint over fixed HTTPS egress. The response is reduced to unique batch
 reference, status, shipment count and observation time, with no order rows or
 raw provider fields crossing the connector boundary. Archive writes and
 other archive operations remain separately gated.
+
+## Phase 59 — Почта России — удаление отдельной возвратной отправки
+
+`190`
+
+Task 190 admits the Russian Post standalone-return deletion contract. The API
+requires an enabled `logistics.return.separate.delete` capability, matching
+approval and an `Idempotency-Key`; the host calls the official
+`DELETE /1.0/returns/delete-separate-return?barcode=...` endpoint with no
+request body. Only a `2xx` response with an empty body or empty `code` is
+accepted and normalized to `DELETED`/`deleted=true`; provider error codes and
+invalid barcodes are rejected. The tenant-scoped operation receipt prevents
+duplicate calls, while ambiguous results remain pending for reconciliation.
+Live qualification must use a disposable test return because provider
+deletion is irreversible.
+
+## Phase 60 — Почта России — редактирование отдельной возвратной отправки
+
+`191`
+
+Task 191 admits the Russian Post standalone-return edit contract. The API
+requires an enabled `logistics.return.separate.edit` capability, matching
+approval and an `Idempotency-Key`; the host calls the official
+`POST /1.0/returns/{barcode}` endpoint with the bounded editable payload.
+Only a response without errors that confirms the exact same `return-barcode`
+is accepted and normalized to `UPDATED`/`updated=true`; empty, malformed or
+mismatched responses remain failures. The tenant-scoped operation receipt
+prevents duplicate calls, while ambiguous results remain pending for
+reconciliation. Live qualification must use a disposable test return.
+
+## Phase 61 — Telegram — редактирование опубликованного сообщения
+
+`192`
+
+Task 192 admits approval-bound editing of one already published Telegram
+message through `PATCH /api/v1/social/publications/{publication_id}`. The API
+requires the enabled `social.post.edit` capability, the matching approved
+write-sensitive request, an immutable remote publication receipt and an
+`Idempotency-Key`; the runtime accepts only the Telegram editor and a confirmed
+same-message result. A tenant-scoped operation receipt prevents duplicate
+provider calls and leaves ambiguous outcomes pending. Telegram deletion and
+webhooks remain fail-closed.

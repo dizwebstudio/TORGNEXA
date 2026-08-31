@@ -23,8 +23,9 @@ Admitted capabilities:
 Production composition in Task 174 activates `social.post.text`,
 `social.post.media` and `social.post.video` through the worker's released-upload
 bridge. Task 181 additionally activates HTTPS URL buttons for text, single
-photo and single video publications. Edit/delete and webhooks remain qualified
-SDK ceilings, not claims about currently reachable application workflows.
+photo and single video publications. Task 192 activates an approval-bound API
+edit for one already published message; deletion and webhooks remain outside
+the reachable application workflow.
 
 Not admitted: provider scheduling, inbound updates/callback queries, comments, analytics, arbitrary files, live/video processing status reads or atomic album edit.
 

@@ -33,6 +33,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
@@ -84,6 +85,7 @@ type productionRouteDependencies struct {
 	profiles           *userprofilerepo.Repository
 	settlements        *settlementrepo.Repository
 	social             *socialrepo.Repository
+	socialReceipts     *socialdispatchrepo.Repository
 	payments           *paymentsrepo.Repository
 	privacy            privacyWorkflow
 	fxRates            *fxrepo.Repository
@@ -128,7 +130,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
-	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry)...)
+	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry, socialRouteDependency{secrets: deps.secretProvider, configs: deps.connectorConfigs, receipts: deps.socialReceipts, approvals: deps.approvals, operations: deps.logistics})...)
 	logisticsRoutes := newLogisticsRoutes(deps.accounts, deps.secretProvider, deps.aiRegistry, logisticsRouteDependency{shipments: deps.logistics, approvals: deps.approvals, operations: deps.logistics})
 	routes = append(routes, logisticsRoutes...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)

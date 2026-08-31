@@ -410,6 +410,18 @@ func (r *Registry) LogisticsSeparateReturnDeleter(ctx context.Context, account s
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 }
 
+// LogisticsSeparateReturnEditor resolves the qualified standalone-return
+// edit surface. It is currently admitted only for Russian Post.
+func (r *Registry) LogisticsSeparateReturnEditor(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnEditor, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.return.separate.edit") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 type Registry struct {
 	http    *httpTransport
 	localAI *localAIHTTP
@@ -1271,6 +1283,26 @@ func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.
 	default:
 		return nil, ErrUnavailable
 	}
+}
+
+// SocialEditor resolves the qualified remote-message edit surface. Telegram
+// is admitted here only after the host has checked the publication receipt,
+// account capability and approval boundary.
+func (r *Registry) SocialEditor(account sdk.Account, load ConfigLoader) (sdk.SocialEditor, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || load == nil || account.ConnectorID != "telegram" || !SupportsCapability(account.ConnectorID, "social.post.edit") {
+		return nil, ErrUnavailable
+	}
+	return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
+}
+
+// SocialDeleter resolves the qualified remote-message deletion surface.
+// Telegram is admitted here only after the host has checked the publication
+// receipt, account capability and approval boundary.
+func (r *Registry) SocialDeleter(account sdk.Account, load ConfigLoader) (sdk.SocialDeleter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || load == nil || account.ConnectorID != "telegram" || !SupportsCapability(account.ConnectorID, "social.post.delete") {
+		return nil, ErrUnavailable
+	}
+	return telegram.New(telegramHTTP{r.http}, telegramConfigSource{load: load}, nil), nil
 }
 
 // SocialWebhookReceiver resolves an admitted inbound social webhook receiver.

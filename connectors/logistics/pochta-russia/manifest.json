@@ -16,6 +16,7 @@
 	"logistics.return.create",
 	"logistics.return.separate.create",
 	"logistics.return.separate.delete",
+	"logistics.return.separate.edit",
     "logistics.shipment.cancel",
     "logistics.shipment.create",
     "logistics.track.read",

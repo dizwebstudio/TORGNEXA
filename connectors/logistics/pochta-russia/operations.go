@@ -135,6 +135,27 @@ func (c *Connector) DeleteLogisticsSeparateReturn(ctx context.Context, account s
 	return out, nil
 }
 
+// EditLogisticsSeparateReturn updates one standalone Russian Post return
+// shipment. The adapter must confirm the same provider barcode.
+func (c *Connector) EditLogisticsSeparateReturn(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsSeparateReturnUpdateRequest) (sdk.LogisticsSeparateReturnUpdate, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsSeparateReturnUpdate
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.EditSeparateReturn(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsSeparateReturnUpdate{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.ReturnBarcode {
+		return sdk.LogisticsSeparateReturnUpdate{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 // ReadPickupPoints reads a bounded Russian Post office directory by city.
 // Provider postal indexes remain remote references and never become Core
 // warehouse identifiers.
@@ -354,6 +375,7 @@ var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
 var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsSeparateReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsSeparateReturnDeleter = (*Connector)(nil)
+var _ sdk.LogisticsSeparateReturnEditor = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)

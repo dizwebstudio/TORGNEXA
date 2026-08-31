@@ -112,8 +112,9 @@ account control plane stores the bot token in SecretProvider and the negative
 execute text, one-photo/2–10-photo album and one-MP4-video publication through
 the released-upload bridge; remote receipts make crash recovery safe without
 duplicate-prone automatic resend. HTTPS URL buttons are also admitted for
-text, one-photo and one-video publications; edit/delete and webhooks remain
-outside the application runtime subset.
+text, one-photo and one-video publications. Task 192 additionally admits
+approval-bound editing of one already published message through the Social
+Core API; deletion and webhooks remain outside the application runtime subset.
 
 MAX uses the same dedicated Social surface and receipt-safe worker. Its account
 stores the bot token in SecretProvider and a non-zero numeric `chat_id` as
@@ -239,7 +240,11 @@ stores only the normalized barcode result. A standalone return can be removed
 through the approval-bound `DELETE /api/v1/logistics/returns/separate/{return_id}`
 route, which calls the official
 `DELETE /1.0/returns/delete-separate-return?barcode={barcode}` endpoint and
-stores only the normalized deletion acknowledgement. Dellin additionally
+stores only the normalized deletion acknowledgement. Редактирование доступно
+через approval-bound `POST /api/v1/logistics/returns/separate/{return_id}` и
+официальный `POST /1.0/returns/{barcode}`; runtime принимает только
+подтверждение того же ШПИ и сохраняет нормализованный `UPDATED` результат.
+Dellin additionally
 supports the bounded address-to-address shipment-create route with explicit
 counterparty runtime configuration. ПЭК также допускает аннулирование одной
 предварительной заявки через официальный `/order/cancellation/` с точным

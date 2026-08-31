@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/social"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 )
@@ -145,14 +146,18 @@ func newApprovalRoutes(repository approvalWorkflow, executors ...approvalSensiti
 			ResourceID   string             `json:"resource_id"`
 			Risk         approval.RiskClass `json:"risk"`
 		}
-		if !ok || !principalOK || correlation == "" || decodeStrictJSON(r, &input) != nil || input.Action != "demo.dataset.delete" || input.ResourceType != "demo_dataset" {
+		if !ok || !principalOK || correlation == "" || decodeStrictJSON(r, &input) != nil || !validApprovalRequestInput(input.Action, input.ResourceType) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		if input.ResourceID == "" {
+		if approvalRequestNeedsPublication(input.Action) {
+			if _, err := social.ParsePublicationID(input.ResourceID); err != nil {
+				writeProblem(w, http.StatusBadRequest, "Bad Request")
+				return
+			}
+		} else if input.ResourceID == "" {
 			input.ResourceID = scope.WorkspaceID().String()
-		}
-		if input.ResourceID != scope.WorkspaceID().String() {
+		} else if input.ResourceID != scope.WorkspaceID().String() {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
@@ -265,6 +270,15 @@ func newApprovalRoutes(repository approvalWorkflow, executors ...approvalSensiti
 
 func toApprovalView(v approval.Request) approvalView {
 	return approvalView{v.ID, v.RequesterID, v.Action, v.ResourceType, v.ResourceID, v.Risk, v.State, v.CurrentStage, v.ExpiresAt, v.RequestedAt, v.Version}
+}
+
+func validApprovalRequestInput(action, resourceType string) bool {
+	return (action == "demo.dataset.delete" && resourceType == "demo_dataset") ||
+		((action == "social.publication.edit" || action == "social.publication.delete") && resourceType == "social_publication")
+}
+
+func approvalRequestNeedsPublication(action string) bool {
+	return action == "social.publication.edit" || action == "social.publication.delete"
 }
 func toApprovalPolicyView(v approval.Policy) approvalPolicyView {
 	view := approvalPolicyView{ID: v.ID, Name: v.Name, Action: v.Action, ResourceType: v.ResourceType, MinimumRisk: v.MinimumRisk, RequestTTLMinutes: int64(v.RequestTTL / time.Minute), EscalateAfterMinutes: int64(v.EscalateAfter / time.Minute), SeparationOfDuties: v.SeparationOfDuties, Active: v.Active, Version: v.Version}

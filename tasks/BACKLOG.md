@@ -198,6 +198,42 @@ of 100 unique rows and projects only the batch reference, status, shipment
 count and observation time; provider order rows and raw fields remain behind
 the connector boundary.
 
+## Почта России — удаление отдельной возвратной отправки
+
+Task 190 is repository-complete: the qualified
+`logistics.return.separate.delete` capability now calls the official
+`DELETE /1.0/returns/delete-separate-return?barcode=...` endpoint through an
+approval-bound `DELETE /api/v1/logistics/returns/separate/{return_id}` route.
+The adapter sends only the validated barcode and accepts a successful response
+only when it is empty or has an empty `code`; provider error codes remain
+failures. The normalized `DELETED` acknowledgement is protected by a
+tenant-scoped operation receipt, and the integration settings surface exposes
+the action with retryable errors. Live qualification remains limited to a
+disposable test return.
+
+## Почта России — редактирование отдельной возвратной отправки
+
+Task 191 is repository-complete: the qualified
+`logistics.return.separate.edit` capability now calls the official
+`POST /1.0/returns/{barcode}` endpoint through an approval-bound
+`POST /api/v1/logistics/returns/separate/{return_id}` route. The adapter sends
+only the bounded editable fields and accepts a result only when the provider
+confirms the exact same barcode without errors. The normalized `UPDATED`
+acknowledgement is protected by a tenant-scoped operation receipt, and the
+integration settings surface exposes the action with retryable errors. Live
+qualification remains limited to a disposable test return.
+
+## Telegram — редактирование опубликованного сообщения
+
+Task 192 is repository-complete: the qualified `social.post.edit` capability
+now exposes approval-bound `PATCH /api/v1/social/publications/{publication_id}`
+for one already published Telegram message. The route requires the matching
+approved write-sensitive request, an active Telegram account with the enabled
+capability, the immutable publication receipt and a tenant-scoped idempotency
+receipt. The adapter accepts only a confirmed update for the same remote
+message and completed retries do not call Telegram again; unknown outcomes
+remain pending. Telegram deletion and webhooks remain fail-closed.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official

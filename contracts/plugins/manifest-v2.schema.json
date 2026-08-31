@@ -106,6 +106,7 @@
           "logistics.return.create",
           "logistics.return.separate.create",
           "logistics.return.separate.delete",
+          "logistics.return.separate.edit",
           "pickup.points.read",
           "pickup.capacity.read",
           "pickup.orders.write",

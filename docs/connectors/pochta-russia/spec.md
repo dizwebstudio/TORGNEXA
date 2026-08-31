@@ -63,6 +63,11 @@ receipt, в receipt попадает только нормализованный
 отклоняет любой provider error code и возвращает только `DELETED` с
 `deleted=true`. Операция необратима, требует approval и защищена
 tenant-scoped idempotency receipt.
+Редактирование отдельной возвратной отправки выполняется через
+approval-bound `POST /api/v1/logistics/returns/separate/{return_id}` и
+официальный `POST /1.0/returns/{barcode}`. Запрос повторяет только
+разрешённые поля standalone-отправки; runtime принимает ответ лишь при
+точном совпадении `return-barcode` и нормализует его в `UPDATED`.
 Отдельная
 возвратная этикетка запрашивается форматом `return_pdf`
 через `GET /1.0/forms/{rpo}/easy-return-pdf` с фиксированным

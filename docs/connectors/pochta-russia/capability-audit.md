@@ -85,6 +85,13 @@ approval-bound `DELETE /api/v1/logistics/returns/separate/{return_id}`. Runtime
 operation receipt. Операция необратима и требует тестового возврата,
 approval, capability и live qualification.
 
+`logistics.return.separate.edit` редактирует отдельную возвратную отправку
+через approval-bound `POST /api/v1/logistics/returns/separate/{return_id}`.
+Runtime вызывает официальный `POST /1.0/returns/{barcode}`, передаёт только
+разрешённые адреса, ценность, вид отправления и имена и принимает только
+ответ с тем же ШПИ. Нормализованный результат — `UPDATED`/`updated=true`;
+сырой ответ, адреса и имена не попадают в receipt.
+
 Прочие документы и возвраты, не покрытые
 существующим RPO,
 требуют актуальных

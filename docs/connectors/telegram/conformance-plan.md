@@ -16,6 +16,7 @@ Provider-specific deterministic evidence additionally covers:
   SocialPublishRequest and receipt-safe publication lifecycle;
 - 10 MiB photo / 50 MiB video support ceilings;
 - channel-bound remote ID parsing before edit/delete egress;
+- approval-bound API edit of one published message with durable idempotency;
 - single-message text/media edit and explicit album-edit denial;
 - bounded single/album deletion;
 - real HTTP 429 envelope normalization with `retry_after`;

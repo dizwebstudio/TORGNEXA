@@ -16,6 +16,7 @@ type Transport interface {
 	Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error)
 	CreateSeparateReturn(context.Context, []byte, sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error)
 	DeleteSeparateReturn(context.Context, []byte, sdk.LogisticsSeparateReturnDeleteRequest) (sdk.LogisticsSeparateReturnDeletion, error)
+	EditSeparateReturn(context.Context, []byte, sdk.LogisticsSeparateReturnUpdateRequest) (sdk.LogisticsSeparateReturnUpdate, error)
 	Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
 	Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error)
 	Batches(context.Context, []byte, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)

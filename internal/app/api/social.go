@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"reflect"
@@ -11,9 +13,15 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/torgnexa/torgnexa/internal/core/logistics"
 	"github.com/torgnexa/torgnexa/internal/core/social"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/approval"
+	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
 
 const (
@@ -36,10 +44,44 @@ type socialTextRuntime interface {
 	SocialTextLimit(string) int
 }
 
+type socialEditorRuntime interface {
+	SocialEditor(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialEditor, error)
+}
+
+type socialDeleterRuntime interface {
+	SocialDeleter(sdk.Account, builtinruntime.ConfigLoader) (sdk.SocialDeleter, error)
+}
+
+type socialRemoteReceiptStore interface {
+	Receipt(context.Context, tenancy.Scope, string) (socialdispatchrepo.Receipt, error)
+}
+
+type socialOperationStore interface {
+	BeginOperation(context.Context, tenancy.Scope, string, string, [32]byte) (logistics.OperationReceipt, bool, error)
+	CompleteOperation(context.Context, tenancy.Scope, string, string, json.RawMessage) error
+}
+
+type socialApprovalStore interface {
+	Request(context.Context, tenancy.Scope, string) (approval.Request, error)
+}
+
+type socialRouteDependency struct {
+	secrets    secrets.SecretProvider
+	configs    connectorRuntimeConfigRepository
+	receipts   socialRemoteReceiptStore
+	approvals  socialApprovalStore
+	operations socialOperationStore
+}
+
 type socialAPI struct {
 	repository socialAPIRepository
 	accounts   socialConnectorAccounts
 	runtime    connectorRuntimeAdmission
+	secrets    secrets.SecretProvider
+	configs    connectorRuntimeConfigRepository
+	receipts   socialRemoteReceiptStore
+	approvals  socialApprovalStore
+	operations socialOperationStore
 }
 
 type socialChannelView struct {
@@ -66,14 +108,36 @@ type socialPublicationView struct {
 	CreatedAt        time.Time       `json:"created_at"`
 }
 
-func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAccounts, runtime connectorRuntimeAdmission) []ProtectedRoute {
+type socialPublicationEditView struct {
+	RemotePublicationID string                 `json:"remote_publication_id"`
+	Status              sdk.SocialRemoteStatus `json:"status"`
+	Updated             bool                   `json:"updated"`
+	ObservedAt          time.Time              `json:"observed_at"`
+}
+
+type socialPublicationDeleteView struct {
+	RemotePublicationID string    `json:"remote_publication_id"`
+	Deleted             bool      `json:"deleted"`
+	ObservedAt          time.Time `json:"observed_at"`
+}
+
+func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAccounts, runtime connectorRuntimeAdmission, dependencies ...socialRouteDependency) []ProtectedRoute {
 	api := socialAPI{repository: repository, accounts: accounts, runtime: runtime}
+	if len(dependencies) > 0 {
+		api.secrets = dependencies[0].secrets
+		api.configs = dependencies[0].configs
+		api.receipts = dependencies[0].receipts
+		api.approvals = dependencies[0].approvals
+		api.operations = dependencies[0].operations
+	}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: socialChannelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listChannels)},
 		{Method: http.MethodPost, Path: socialChannelsPath, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.createChannel)},
 		{Method: http.MethodPut, Path: socialChannelsPath + "/", PathPrefix: true, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.updateChannel)},
 		{Method: http.MethodGet, Path: socialPublicationsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPublications)},
 		{Method: http.MethodPost, Path: socialPublicationsPath, Permission: "connectors.accounts.write", Handler: http.HandlerFunc(api.createPublication)},
+		{Method: http.MethodPatch, Path: socialPublicationsPath + "/", PathPrefix: true, Permission: "social.post.edit", Handler: http.HandlerFunc(api.editPublication)},
+		{Method: http.MethodDelete, Path: socialPublicationsPath + "/", PathPrefix: true, Permission: "social.post.delete", Handler: http.HandlerFunc(api.deletePublication)},
 	}
 }
 
@@ -332,6 +396,308 @@ func (api socialAPI) createPublication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, view)
+}
+
+func (api socialAPI) editPublication(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.repository == nil || api.accounts == nil || api.runtime == nil || api.secrets == nil || api.configs == nil || api.receipts == nil || api.approvals == nil || api.operations == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	publicationID, err := social.ParsePublicationID(strings.Trim(strings.TrimPrefix(r.URL.Path, socialPublicationsPath+"/"), "/"))
+	if err != nil || strings.Contains(strings.Trim(strings.TrimPrefix(r.URL.Path, socialPublicationsPath+"/"), "/"), "/") {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if !validIdempotencyKey(key) || approvalID == "" {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input struct {
+		Kind    sdk.SocialPostKind   `json:"kind"`
+		Text    string               `json:"text"`
+		Media   []sdk.SocialMediaRef `json:"media"`
+		Buttons []sdk.SocialButton   `json:"buttons"`
+	}
+	if decodeStrictJSON(r, &input) != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	publication, err := api.repository.Publication(r.Context(), socialScopeFromTenant(scope), publicationID)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	if publication.Status != social.PublicationPublished {
+		writeProblem(w, http.StatusConflict, "Only a published publication can be edited")
+		return
+	}
+	variant, err := api.repository.Variant(r.Context(), socialScopeFromTenant(scope), publication.VariantID)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	channel, err := api.repository.ChannelAccount(r.Context(), socialScopeFromTenant(scope), publication.ChannelAccountID)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), channel.ConnectorAccountID)
+	if err != nil || account.Family != sdk.FamilySocial || account.Status != sdk.AccountActive || account.Health.Status != sdk.HealthHealthy {
+		writeProblem(w, http.StatusConflict, "Social connector account unavailable")
+		return
+	}
+	const editCapability = sdk.Capability("social.post.edit")
+	if !api.runtime.SupportsCapability(account.ConnectorID, string(editCapability)) {
+		writeProblem(w, http.StatusConflict, "Social publication editing is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, editCapability) {
+		writeProblem(w, http.StatusConflict, "Social publication editing capability is not enabled")
+		return
+	}
+	request := sdk.SocialEditRequest{RemotePublicationID: "", Kind: input.Kind, Text: input.Text, Media: input.Media, Buttons: input.Buttons}
+	remoteReceipt, err := api.receipts.Receipt(r.Context(), scope, publication.ID.String())
+	if err != nil || remoteReceipt.ConnectorAccountID != account.ID || remoteReceipt.RemotePublicationID == "" {
+		writeProblem(w, http.StatusConflict, "Published remote receipt is unavailable")
+		return
+	}
+	request.RemotePublicationID = remoteReceipt.RemotePublicationID
+	if request.Validate() != nil || input.Kind == "" {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	if required, requiredErr := sdk.RequiredSocialPublishCapability(request.Kind); requiredErr != nil || !sdk.CapabilityEnabled(settings, required) {
+		writeProblem(w, http.StatusConflict, "Social publication capability is not enabled")
+		return
+	}
+	if len(request.Buttons) > 0 && !sdk.CapabilityEnabled(settings, sdk.Capability("social.post.buttons")) {
+		writeProblem(w, http.StatusConflict, "Social button capability is not enabled")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "social.publication.edit" || requested.ResourceType != "social_publication" || requested.ResourceID != publication.ID.String() || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	digestPayload, err := json.Marshal(struct {
+		PublicationID string                `json:"publication_id"`
+		AccountID     string                `json:"account_id"`
+		Variant       social.VariantFormat  `json:"variant"`
+		Request       sdk.SocialEditRequest `json:"request"`
+	}{PublicationID: publication.ID.String(), AccountID: account.ID, Variant: variant.Format, Request: request})
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	digest := sha256.Sum256(digestPayload)
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "social.publication.edit", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view socialPublicationEditView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !socialPublicationEditViewValid(view) || view.RemotePublicationID != request.RemotePublicationID {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	editorRuntime, runtimeOK := api.runtime.(socialEditorRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Social publication editing is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	editor, err := editorRuntime.SocialEditor(account, func(ctx context.Context, accountID string) (json.RawMessage, error) {
+		raw, _, loadErr := api.configs.Config(ctx, scope, accountID)
+		return raw, loadErr
+	})
+	if err != nil || editor == nil {
+		writeProblem(w, http.StatusConflict, "Social publication editing is unavailable")
+		return
+	}
+	updated, err := editor.EditSocial(r.Context(), account, runtime, request, nil)
+	if err != nil {
+		writeProblem(w, http.StatusBadGateway, "Social provider unavailable")
+		return
+	}
+	view := socialPublicationEditView{RemotePublicationID: updated.RemotePublicationID, Status: updated.Status, Updated: updated.Status == sdk.SocialRemotePublished, ObservedAt: updated.ObservedAt}
+	if updated.Validate() != nil || !view.Updated || view.RemotePublicationID != request.RemotePublicationID || !socialPublicationEditViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Social provider returned an invalid result")
+		return
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "social.publication.edit", key, encoded) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func socialScopeFromTenant(scope tenancy.Scope) social.Scope {
+	value, _ := social.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	return value
+}
+
+func socialPublicationEditViewValid(view socialPublicationEditView) bool {
+	return view.RemotePublicationID != "" && view.Status == sdk.SocialRemotePublished && view.Updated && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func (api socialAPI) deletePublication(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.repository == nil || api.accounts == nil || api.runtime == nil || api.secrets == nil || api.configs == nil || api.receipts == nil || api.approvals == nil || api.operations == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	pathID := strings.Trim(strings.TrimPrefix(r.URL.Path, socialPublicationsPath+"/"), "/")
+	publicationID, err := social.ParsePublicationID(pathID)
+	if err != nil || strings.Contains(pathID, "/") {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if !validIdempotencyKey(key) || approvalID == "" {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	publication, err := api.repository.Publication(r.Context(), socialScopeFromTenant(scope), publicationID)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	if publication.Status != social.PublicationPublished {
+		writeProblem(w, http.StatusConflict, "Only a published publication can be deleted")
+		return
+	}
+	channel, err := api.repository.ChannelAccount(r.Context(), socialScopeFromTenant(scope), publication.ChannelAccountID)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), channel.ConnectorAccountID)
+	if err != nil || account.Family != sdk.FamilySocial || account.Status != sdk.AccountActive || account.Health.Status != sdk.HealthHealthy {
+		writeProblem(w, http.StatusConflict, "Social connector account unavailable")
+		return
+	}
+	const deleteCapability = sdk.Capability("social.post.delete")
+	if !api.runtime.SupportsCapability(account.ConnectorID, string(deleteCapability)) {
+		writeProblem(w, http.StatusConflict, "Social publication deletion is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, deleteCapability) {
+		writeProblem(w, http.StatusConflict, "Social publication deletion capability is not enabled")
+		return
+	}
+	remoteReceipt, err := api.receipts.Receipt(r.Context(), scope, publication.ID.String())
+	if err != nil || remoteReceipt.ConnectorAccountID != account.ID || remoteReceipt.RemotePublicationID == "" {
+		writeProblem(w, http.StatusConflict, "Published remote receipt is unavailable")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "social.publication.delete" || requested.ResourceType != "social_publication" || requested.ResourceID != publication.ID.String() || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	digestPayload, err := json.Marshal(struct {
+		PublicationID       string `json:"publication_id"`
+		AccountID           string `json:"account_id"`
+		RemotePublicationID string `json:"remote_publication_id"`
+	}{PublicationID: publication.ID.String(), AccountID: account.ID, RemotePublicationID: remoteReceipt.RemotePublicationID})
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	digest := sha256.Sum256(digestPayload)
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "social.publication.delete", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view socialPublicationDeleteView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !socialPublicationDeleteViewValid(view) || view.RemotePublicationID != remoteReceipt.RemotePublicationID {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	deleterRuntime, runtimeOK := api.runtime.(socialDeleterRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Social publication deletion is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	deleter, err := deleterRuntime.SocialDeleter(account, func(ctx context.Context, accountID string) (json.RawMessage, error) {
+		raw, _, loadErr := api.configs.Config(ctx, scope, accountID)
+		return raw, loadErr
+	})
+	if err != nil || deleter == nil {
+		writeProblem(w, http.StatusConflict, "Social publication deletion is unavailable")
+		return
+	}
+	deleted, err := deleter.DeleteSocial(r.Context(), account, runtime, remoteReceipt.RemotePublicationID)
+	if err != nil {
+		writeProblem(w, http.StatusBadGateway, "Social provider unavailable")
+		return
+	}
+	view := socialPublicationDeleteView{RemotePublicationID: deleted.RemotePublicationID, Deleted: deleted.Deleted, ObservedAt: deleted.ObservedAt}
+	if deleted.Validate() != nil || !view.Deleted || view.RemotePublicationID != remoteReceipt.RemotePublicationID || !socialPublicationDeleteViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Social provider returned an invalid result")
+		return
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "social.publication.delete", key, encoded) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func socialPublicationDeleteViewValid(view socialPublicationDeleteView) bool {
+	return view.RemotePublicationID != "" && view.Deleted && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
 
 func validSocialText(value string, maxRunes int) bool {

@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "a386f8b3fe715e37a953c65f7efd8d32644ca59b6dea4c846827650b4c972348",
+    "sha256": "6c601fa7de8df6bc3fcfc28f7da961834edaaad4bfb483743e2734b3ac2a4169",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -310,6 +310,11 @@
       "path": "/products/{product_id}/images/{image_id}"
     },
     {
+      "operation_id": "deleteSocialPublication",
+      "method": "DELETE",
+      "path": "/social/publications/{publication_id}"
+    },
+    {
       "operation_id": "disableAIProviderAccount",
       "method": "POST",
       "path": "/settings/ai-providers:disable"
@@ -333,6 +338,16 @@
       "operation_id": "disableWebhookSubscription",
       "method": "DELETE",
       "path": "/webhook-subscriptions/{subscription_id}"
+    },
+    {
+      "operation_id": "editLogisticsSeparateReturn",
+      "method": "POST",
+      "path": "/logistics/returns/separate/{return_id}"
+    },
+    {
+      "operation_id": "editSocialPublication",
+      "method": "PATCH",
+      "path": "/social/publications/{publication_id}"
     },
     {
       "operation_id": "enableConnectorAccount",
