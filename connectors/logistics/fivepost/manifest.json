@@ -18,14 +18,6 @@
       "required": true
     }
   ],
-  "connection_test": {
-    "url": "https://api.5post.ru/api/v1/auth/token",
-    "method": "POST",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": "{\"apiKey\":\"${secret}\"}"
-  },
   "rate_limit": {
     "max_concurrency": 2,
     "min_interval_ms": 300,

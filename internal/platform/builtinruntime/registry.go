@@ -158,6 +158,8 @@ func (r *Registry) PickupPoints(ctx context.Context, account sdk.Account, runtim
 		return cdek.New(cdekHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
 	case "dellin":
 		return dellin.New(dellinHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
 	case "pek":
 		return pek.New(pekHTTP{r.http}, nil).ReadPickupPoints(ctx, account, runtime, query)
 	case "pochta-russia":
@@ -277,6 +279,8 @@ func (r *Registry) LogisticsTracking(ctx context.Context, account sdk.Account, r
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
 	case "dellin":
 		return dellin.New(dellinHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil).ReadLogisticsTracking(ctx, account, runtime, request)
 	default:
 		return sdk.ShipmentResult{}, ErrUnavailable
 	}
@@ -300,6 +304,8 @@ func (r *Registry) LogisticsLabel(ctx context.Context, account sdk.Account, runt
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
 	case "pek":
 		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
 	default:
 		return sdk.LabelResult{}, ErrUnavailable
 	}
@@ -336,6 +342,8 @@ func (r *Registry) LogisticsCanceler(ctx context.Context, account sdk.Account, r
 		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 	case "pek":
 		return pek.New(pekHTTP{r.http}, nil), nil
+	case "fivepost":
+		return fivepost.New(fivepostHTTP{r.http}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}

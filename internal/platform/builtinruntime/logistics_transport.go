@@ -37,48 +37,246 @@ var pochtarussiaOrderIDPattern = regexp.MustCompile(`^[0-9]{1,18}$`)
 var logisticsBatchRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 var pochtarussiaHousePattern = regexp.MustCompile(`^[0-9]{1,6}[[:alnum:]А-Яа-я/-]{0,8}$`)
 var dellinDocumentUIDPattern = regexp.MustCompile(`^0x[0-9A-Fa-f]{8,64}$`)
+var fivepostOrderIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
-// fivepostHTTP is the reviewed host-side credential probe. The partner API
-// publishes the token endpoint, while shipment payload mappings remain behind
-// the SDK until a current partner contract is qualified. Keeping those calls
-// fail-closed prevents a guessed write shape from creating a real shipment.
+const fivepostAPIHost = "api-omni.x5.ru"
+
+// fivepostHTTP is the reviewed host-side transport for the 5Post partner API.
+// API keys are exchanged for a short-lived JWT inside the callback scope and
+// the JWT is never returned to Core or written to an operation receipt.
 type fivepostHTTP struct{ h *httpTransport }
 
-func (transport fivepostHTTP) Ping(ctx context.Context, secret []byte) error {
+type fivepostTokenResponse struct {
+	Status string `json:"status"`
+	JWT    string `json:"jwt"`
+}
+
+func (transport fivepostHTTP) token(ctx context.Context, secret []byte) (string, error) {
 	if len(secret) == 0 || transport.h == nil {
-		return errors.New("5post credential probe unavailable")
+		return "", errors.New("5post token request unavailable")
 	}
-	body, err := json.Marshal(struct {
-		APIKey string `json:"apiKey"`
-	}{APIKey: string(secret)})
+	form := url.Values{"subject": []string{"OpenAPI"}, "audience": []string{"A122019!"}}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/jwt-generate-claims/rs256/1", url.Values{"apikey": []string{string(secret)}}, []byte(form.Encode()), http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}, "Accept": []string{"application/json"}}, nil, nil)
 	if err != nil {
-		return err
-	}
-	headers := http.Header{"Content-Type": []string{"application/json"}}
-	status, _, _, _, _, err := transport.h.do(ctx, http.MethodPost, "api.5post.ru", "/api/v1/auth/token", url.Values{}, body, headers, nil, nil)
-	if err != nil {
-		return err
+		return "", err
 	}
 	if status < http.StatusOK || status >= http.StatusMultipleChoices {
-		return fmt.Errorf("5post credential probe rejected with status %d", status)
+		return "", fmt.Errorf("5post token request rejected with status %d", status)
 	}
-	return nil
+	var response fivepostTokenResponse
+	if json.Unmarshal(responseBody, &response) != nil || response.Status != "ok" || strings.TrimSpace(response.JWT) == "" {
+		return "", errors.New("5post token response rejected")
+	}
+	return strings.TrimSpace(response.JWT), nil
+}
+
+func (transport fivepostHTTP) Ping(ctx context.Context, secret []byte) error {
+	_, err := transport.token(ctx, secret)
+	return err
+}
+
+type fivepostPickupResponse struct {
+	Content []fivepostPickupPoint `json:"content"`
+}
+
+type fivepostPickupPoint struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	FullAddress string `json:"fullAddress"`
+	ExtStatus   string `json:"extStatus"`
+	Address     struct {
+		Country string `json:"country"`
+		City    string `json:"city"`
+	} `json:"address"`
+}
+
+// Pickup reads one bounded page from the official 5Post pickup-point
+// directory. The provider does not accept a city filter, so the neutral
+// country/city filter is applied after normalization to avoid leaking remote
+// provider fields into Core.
+func (transport fivepostHTTP) Pickup(ctx context.Context, secret []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
+	if transport.h == nil || query.Validate(500) != nil {
+		return nil, errors.New("5post pickup-point request is unavailable")
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(struct {
+		PageSize   int `json:"pageSize"`
+		PageNumber int `json:"pageNumber"`
+	}{PageSize: min(query.Limit, 1000), PageNumber: 0})
+	if err != nil {
+		return nil, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/api/v1/pickuppoints/query", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("5post pickup-point request rejected with status %d", status)
+	}
+	var response fivepostPickupResponse
+	if json.Unmarshal(responseBody, &response) != nil {
+		return nil, errors.New("5post pickup-point response rejected")
+	}
+	observedAt := time.Now().UTC()
+	result := make([]sdk.PickupPoint, 0, min(len(response.Content), query.Limit))
+	for _, point := range response.Content {
+		country := fivepostCountryCode(point.Address.Country)
+		city := strings.TrimSpace(point.Address.City)
+		if country != query.Country || !strings.EqualFold(city, strings.TrimSpace(query.City)) {
+			continue
+		}
+		if strings.TrimSpace(point.ID) == "" || strings.TrimSpace(point.Name) == "" || strings.TrimSpace(point.FullAddress) == "" || country == "" || city == "" {
+			return nil, errors.New("5post pickup-point response has incomplete point")
+		}
+		result = append(result, sdk.PickupPoint{RemoteID: strings.TrimSpace(point.ID), Name: strings.TrimSpace(point.Name), Country: country, City: city, Address: strings.TrimSpace(point.FullAddress), Active: strings.EqualFold(strings.TrimSpace(point.ExtStatus), "ACTIVE"), UpdatedAt: observedAt})
+		if len(result) == query.Limit {
+			break
+		}
+	}
+	return result, nil
+}
+
+func fivepostCountryCode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "ru", "россия", "russia", "российская федерация":
+		return "RU"
+	default:
+		value = strings.TrimSpace(value)
+		if len(value) == 2 {
+			return strings.ToUpper(value)
+		}
+		return ""
+	}
 }
 
 func (fivepostHTTP) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
 }
-func (fivepostHTTP) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+
+type fivepostTrackingRecord struct {
+	Status          string `json:"status"`
+	OrderID         string `json:"orderId"`
+	SenderOrderID   string `json:"senderOrderId"`
+	ExecutionStatus string `json:"executionStatus"`
+	ChangeDate      string `json:"changeDate"`
 }
-func (fivepostHTTP) Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
-	return sdk.ShipmentResult{}, errLogisticsOperationNotAdmitted
+
+// Track reads one current order status from the official 5Post status API.
+// The provider accepts an array, but this bounded adapter deliberately sends
+// and accepts exactly one order to keep the neutral SDK operation atomic.
+func (transport fivepostHTTP) Track(ctx context.Context, secret []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || !fivepostOrderIDPattern.MatchString(remoteID) {
+		return sdk.ShipmentResult{}, errors.New("5post tracking request is unavailable")
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	body, err := json.Marshal([]struct {
+		OrderID string `json:"orderId"`
+	}{{OrderID: remoteID}})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/api/v1/getOrderStatus", url.Values{}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/json"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("5post tracking request rejected with status %d", status)
+	}
+	var response []fivepostTrackingRecord
+	if json.Unmarshal(responseBody, &response) != nil || len(response) != 1 {
+		return sdk.ShipmentResult{}, errors.New("5post tracking response rejected")
+	}
+	record := response[0]
+	if strings.TrimSpace(record.OrderID) != remoteID || strings.TrimSpace(record.Status) == "" || strings.TrimSpace(record.ChangeDate) == "" {
+		return sdk.ShipmentResult{}, errors.New("5post tracking response has mismatched order")
+	}
+	observedAt, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(record.ChangeDate))
+	if err != nil {
+		return sdk.ShipmentResult{}, errors.New("5post tracking response has invalid change date")
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: fivepostStatus(record.Status), Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: strings.TrimSpace(record.SenderOrderID), ObservedAt: observedAt.UTC()}, nil
 }
-func (fivepostHTTP) Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error) {
-	return sdk.LabelResult{}, errLogisticsOperationNotAdmitted
+
+func fivepostStatus(value string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(value), "-", "_"))
 }
-func (fivepostHTTP) Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
-	return nil, errLogisticsOperationNotAdmitted
+
+type fivepostCancelResponse struct {
+	Error             bool   `json:"error"`
+	ErrorMessage      string `json:"errorMessage"`
+	ErrorCode         int    `json:"errorCode"`
+	CanBeRetriedLater bool   `json:"canBeRetriedLater"`
+}
+
+// Cancel submits the official 5Post cancellation request by provider order
+// UUID. A successful HTTP response is not sufficient: only error=false is a
+// successful business acknowledgement.
+func (transport fivepostHTTP) Cancel(ctx context.Context, secret []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || !fivepostOrderIDPattern.MatchString(remoteID) || strings.TrimSpace(request.IdempotencyKey) == "" {
+		return sdk.ShipmentResult{}, errors.New("5post cancellation request is unavailable")
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodDelete, fivepostAPIHost, "/api/v2/cancelOrder/byOrderId/"+remoteID, url.Values{}, nil, http.Header{"Authorization": []string{"Bearer " + token}, "Accept": []string{"application/json"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("5post cancellation request rejected with status %d", status)
+	}
+	var response fivepostCancelResponse
+	if json.Unmarshal(responseBody, &response) != nil {
+		return sdk.ShipmentResult{}, errors.New("5post cancellation response rejected")
+	}
+	if response.Error {
+		if response.CanBeRetriedLater {
+			return sdk.ShipmentResult{}, fmt.Errorf("5post cancellation is not ready for retry (provider code %d)", response.ErrorCode)
+		}
+		return sdk.ShipmentResult{}, fmt.Errorf("5post cancellation rejected (provider code %d)", response.ErrorCode)
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
+}
+
+// Label requests one PDF label from the official 5Post asynchronous label
+// endpoint. The host validates the returned bytes and exposes only a
+// content-addressed opaque reference to the caller.
+func (transport fivepostHTTP) Label(ctx context.Context, secret []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	remoteID := strings.TrimSpace(request.RemoteID)
+	if transport.h == nil || !fivepostOrderIDPattern.MatchString(remoteID) || strings.ToLower(strings.TrimSpace(request.Format)) != "pdf" {
+		return sdk.LabelResult{}, errors.New("5post label request is unavailable")
+	}
+	token, err := transport.token(ctx, secret)
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	body, err := json.Marshal(struct {
+		OrderIDs []string `json:"orderIds"`
+	}{OrderIDs: []string{remoteID}})
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	status, responseBody, _, _, responseHeaders, err := transport.h.do(ctx, http.MethodPost, fivepostAPIHost, "/api/v1/orderLabels/byOrderId", url.Values{"format": []string{"PDF"}}, body, http.Header{"Authorization": []string{"Bearer " + token}, "Content-Type": []string{"application/json"}, "Accept": []string{"application/pdf"}, "Accept-Language": []string{"ru"}}, nil, nil)
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LabelResult{}, fmt.Errorf("5post label request rejected with status %d", status)
+	}
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(responseHeaders.Get("Content-Type"))), "application/pdf") || !bytes.HasPrefix(bytes.TrimSpace(responseBody), []byte("%PDF-")) {
+		return sdk.LabelResult{}, errors.New("5post label response is not a PDF")
+	}
+	digest := sha256.Sum256(responseBody)
+	return sdk.LabelResult{ArtifactRef: "fivepost:label:order:" + remoteID + ":" + hex.EncodeToString(digest[:]), MediaType: "application/pdf", ObservedAt: time.Now().UTC()}, nil
 }
 
 var _ fivepost.Transport = fivepostHTTP{}

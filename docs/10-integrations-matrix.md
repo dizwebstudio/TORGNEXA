@@ -227,11 +227,11 @@ therefore has zero `planned` entries while retaining fail-closed domain
 capabilities.
 
 The logistics family now includes CDEK, 5Post, ПЭК, «Деловые Линии», «Почта России»
-and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Линии» and «Почта России»
+and Ozon Доставка SDK adapters. CDEK, 5Post, ПЭК, «Деловые Линии» and «Почта России»
 expose a bounded, read-only `pickup.points.read` application route for their
-official ПВЗ/terminal directories; CDEK, ПЭК, «Деловые Линии» and «Почта России»
+official ПВЗ/terminal directories; CDEK, 5Post, ПЭК, «Деловые Линии» and «Почта России»
 additionally expose a bounded read-only rate preview, while CDEK, ПЭК, «Деловые Линии» and
-«Почта России» expose a bounded `logistics.track.read` status lookup and a
+5Post, CDEK, ПЭК, «Деловые Линии» and «Почта России» expose a bounded `logistics.track.read` status lookup and a
 bounded `logistics.batches.read` directory projection. CDEK
 shipment creation also runs only through the approval-bound worker, while its
 transport-label read returns an opaque PDF artifact reference for a single cargo,
@@ -267,8 +267,10 @@ counterparty runtime configuration. ПЭК также допускает анн�
 подтверждением кода. CDEK `ORDER_STATUS` webhooks are verified
 by an OAuth re-fetch and stored as append-only evidence; client-return creation
 with an explicit tariff is admitted, while other carrier operations remain
-fail-closed until provider qualification. 5Post and Ozon
-Доставка expose only the separately reviewed credential-check surface.
+fail-closed until provider qualification. 5Post additionally exposes the
+bounded official pickup-point directory read and single-order status lookup;
+Ozon Доставка remains limited to the separately reviewed credential-check
+surface.
 
 The exact write qualification boundary and next host-side steps are recorded in
 the [logistics write qualification matrix](connectors/logistics-write-qualification.md).

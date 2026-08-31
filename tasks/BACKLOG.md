@@ -883,3 +883,27 @@ Task 201 is repository-complete: существующие MAX `POST/DELETE /subs
 теперь допущены через reviewed runtime и authenticated host route. Адаптер
 фиксирует три квалифицированных update-типа, отдельный verification secret и
 HTTPS endpoint; host сохраняет tenant-scoped idempotency и audit evidence.
+
+Task 202 is repository-complete: 5Post теперь допускает bounded
+`pickup.points.read` через официальный JWT exchange и `POST
+/api/v1/pickuppoints/query`. Нормализация ограничена идентификатором, именем,
+адресом, страной/городом, активностью и временем наблюдения; тарифы, создание,
+отмена, tracking и этикетки остаются fail-closed.
+
+Task 203 is repository-complete: 5Post теперь допускает bounded
+`logistics.track.read` через официальный `POST /api/v1/getOrderStatus` для
+одного remote order ID. Host принимает только один совпавший результат,
+нормализует статус и дату изменения; создание, отмена и этикетки остаются
+fail-closed.
+
+Task 204 is repository-complete: 5Post теперь допускает approval-bound
+`logistics.shipment.cancel` через официальный `DELETE
+/api/v2/cancelOrder/byOrderId/{orderId}`. Host принимает только явное
+`error=false`; ошибки повторной отправки и терминального отказа не маскируются
+под успешную отмену.
+
+Task 205 is repository-complete: 5Post теперь допускает bounded
+`logistics.label.read` для одного UUID через официальный
+`POST /api/v1/orderLabels/byOrderId?format=PDF`. Host проверяет PDF MIME/signature
+и возвращает только content-addressed digest reference; создание заказа
+остаётся fail-closed.

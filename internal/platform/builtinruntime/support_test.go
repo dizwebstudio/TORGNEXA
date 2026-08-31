@@ -92,12 +92,14 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && connectorID != "dellin" && connectorID != "pek" && connectorID != "pochta-russia" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
-		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
+		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia" {
 			wantCapabilities := 1
 			if connectorID == "cdek" {
 				wantCapabilities = 8
 			} else if connectorID == "dellin" {
 				wantCapabilities = 6
+			} else if connectorID == "fivepost" {
+				wantCapabilities = 4
 			} else if connectorID == "pek" {
 				wantCapabilities = 7
 			} else if connectorID == "pochta-russia" {
@@ -106,13 +108,13 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
 			}
-			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.track.read") {
+			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.track.read") {
 				t.Fatalf("%s tracking support is inaccurate: %+v", connectorID, carrier)
 			}
 			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
-			if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
+			if connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia" {
 				if !SupportsCapability(connectorID, "logistics.shipment.cancel") {
 					t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
 				}
@@ -132,7 +134,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if connectorID == "pochta-russia" && !SupportsCapability(connectorID, "logistics.shipment.create") {
 				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
 			}
-			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.label.read") {
+			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "fivepost" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.label.read") {
 				t.Fatalf("%s label support is inaccurate: %+v", connectorID, carrier)
 			}
 			if (connectorID == "cdek" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.return.create") {
@@ -756,7 +758,7 @@ func TestLogisticsCreatorAdmissionIsExact(t *testing.T) {
 			t.Fatalf("%s shipment creator unavailable: creator=%T err=%v", connectorID, creator, err)
 		}
 	}
-	for _, connectorID := range []string{"fivepost", "ozon-delivery"} {
+	for _, connectorID := range []string{"ozon-delivery"} {
 		if _, err := registry.LogisticsCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified shipment creator resolved: %v", connectorID, err)
 		}
@@ -838,13 +840,13 @@ func TestLogisticsArchivedBatchReaderAdmissionIsExact(t *testing.T) {
 
 func TestLogisticsCancelerAdmissionIsExact(t *testing.T) {
 	registry := New()
-	for _, connectorID := range []string{"cdek", "dellin", "pek", "pochta-russia"} {
+	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "pek", "pochta-russia"} {
 		canceler, err := registry.LogisticsCanceler(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{})
 		if err != nil || canceler == nil {
 			t.Fatalf("%s shipment canceler unavailable: canceler=%T err=%v", connectorID, canceler, err)
 		}
 	}
-	for _, connectorID := range []string{"fivepost", "ozon-delivery"} {
+	for _, connectorID := range []string{"ozon-delivery"} {
 		if _, err := registry.LogisticsCanceler(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified shipment canceler resolved: %v", connectorID, err)
 		}

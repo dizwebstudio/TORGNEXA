@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-204",
+  "task": "204",
+  "change_class": "mixed",
+  "summary": "Admit the official bounded 5Post cancellation request through the reviewed runtime.",
+  "scopes": [
+    "adr/0156-fivepost-cancel.md",
+    "architecture/reviews/204-fivepost-cancel-runtime.json",
+    "connectors/logistics/fivepost/operations.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/fivepost/README.md",
+    "docs/connectors/fivepost/capability-audit.md",
+    "docs/connectors/fivepost/conformance-plan.md",
+    "docs/connectors/fivepost/spec.md",
+    "docs/connectors/logistics-write-qualification.md",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/logistics_transport_test.go",
+    "internal/platform/builtinruntime/registry.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/204-fivepost-cancel-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "event-platform-outbox-inbox",
+    "workflow-approval-audit-lineage",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0156-fivepost-cancel.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0155-fivepost-tracking.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The existing cancel worker and registry resolve the shipment account in authenticated tenant scope."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Only the provider UUID and normalized cancellation acknowledgement cross the host boundary."},
+    {"area":"api_compatibility", "status":"affected", "evidence":"The existing generic cancellation route now admits 5Post through the registry."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope or event payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"The existing fivepost LogisticsShipmentCanceler is composed into the builtin runtime."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"Existing shipment, approval, operation receipt and audit records are sufficient."},
+    {"area":"security", "status":"affected", "evidence":"Fixed-host HTTPS, callback-scoped secret, UUID path validation and exact business acknowledgement remain mandatory."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The existing approval-bound worker and idempotency key are retained for the provider write."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"The existing cancellation audit and operation receipt remain authoritative."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The host idempotency boundary prevents duplicate external calls after a known acknowledgement; ambiguous writes remain non-retryable."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The transport uses only the official 5Post API host and does not admit callbacks."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Shared HTTP timeout, response-size and error mapping cover the cancellation request."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the fivepost registry branch or support capability immediately closes cancellation."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic exact-success and business-error tests verify the official route and boundary."}
+  ],
+  "provider": {
+    "id": "fivepost",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/fivepost/manifest.json",
+    "connector_spec": "docs/connectors/fivepost/spec.md",
+    "capability_audit": "docs/connectors/fivepost/capability-audit.md",
+    "conformance_plan": "docs/connectors/fivepost/conformance-plan.md"
+  },
+  "follow_up_tasks": [
+    "205"
+  ]
+}

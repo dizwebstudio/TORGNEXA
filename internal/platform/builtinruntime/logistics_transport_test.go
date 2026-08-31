@@ -2,7 +2,9 @@ package builtinruntime
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +17,153 @@ import (
 	pek "github.com/torgnexa/torgnexa/connectors/logistics/pek"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
+
+func TestFivePostPickupPointsUseOfficialJWTAndNormalizeDirectory(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			if r.Method != http.MethodPost || r.URL.Query().Get("apikey") != "fivepost-key" || r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
+				t.Fatalf("unexpected 5Post token request: method=%s query=%s content-type=%q", r.Method, r.URL.RawQuery, r.Header.Get("Content-Type"))
+			}
+			if err := r.ParseForm(); err != nil || r.Form.Get("subject") != "OpenAPI" || r.Form.Get("audience") != "A122019!" {
+				t.Fatalf("unexpected 5Post token form: %v", r.Form)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v1/pickuppoints/query":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer fivepost-jwt" || r.Header.Get("Accept-Language") != "ru" {
+				t.Fatalf("unexpected 5Post pickup request: method=%s authorization=%q language=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Accept-Language"))
+			}
+			var request struct {
+				PageSize   int `json:"pageSize"`
+				PageNumber int `json:"pageNumber"`
+			}
+			if json.NewDecoder(r.Body).Decode(&request) != nil || request.PageSize != 2 || request.PageNumber != 0 {
+				t.Fatalf("unexpected 5Post pickup body: %+v", request)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"content": []map[string]any{
+				{"id": "5post-pvz-1", "name": "5Post на Тверской", "fullAddress": "Москва, Тверская, 1", "extStatus": "ACTIVE", "address": map[string]string{"country": "Россия", "city": "Москва"}},
+				{"id": "5post-pvz-2", "name": "5Post в Казани", "fullAddress": "Казань, Баумана, 2", "extStatus": "ACTIVE", "address": map[string]string{"country": "Россия", "city": "Казань"}},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	points, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Pickup(context.Background(), []byte("fivepost-key"), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 2})
+	if err != nil {
+		t.Fatalf("5Post pickup request failed: %v", err)
+	}
+	if len(points) != 1 || points[0].RemoteID != "5post-pvz-1" || points[0].Name != "5Post на Тверской" || points[0].Country != "RU" || points[0].City != "Москва" || points[0].Address != "Москва, Тверская, 1" || !points[0].Active || points[0].UpdatedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized 5Post pickup points: %+v", points)
+	}
+}
+
+func TestFivePostTrackingUsesSingleOrderStatusLookup(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v1/getOrderStatus":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer fivepost-jwt" {
+				t.Fatalf("unexpected 5Post tracking request: method=%s authorization=%q", r.Method, r.Header.Get("Authorization"))
+			}
+			var request []struct {
+				OrderID string `json:"orderId"`
+			}
+			if json.NewDecoder(r.Body).Decode(&request) != nil || len(request) != 1 || request[0].OrderID != "5f575bef-4e14-47d8-84c4-62629075dbb4" {
+				t.Fatalf("unexpected 5Post tracking body: %+v", request)
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]string{{"status": "IN_PROCESS", "orderId": "5f575bef-4e14-47d8-84c4-62629075dbb4", "senderOrderId": "shop-order-1", "executionStatus": "RECEIVED_IN_WAREHOUSE_IN_DETAILS", "changeDate": "2026-08-31T10:20:30.123+03:00"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	result, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Track(context.Background(), []byte("fivepost-key"), sdk.ShipmentStatusRequest{RemoteID: "5f575bef-4e14-47d8-84c4-62629075dbb4"})
+	if err != nil {
+		t.Fatalf("5Post tracking request failed: %v", err)
+	}
+	if result.RemoteID != "5f575bef-4e14-47d8-84c4-62629075dbb4" || result.Status != "in_process" || result.TrackingNumber != "shop-order-1" || !result.ObservedAt.Equal(time.Date(2026, 8, 31, 7, 20, 30, 123000000, time.UTC)) || result.Cost.Currency != "RUB" {
+		t.Fatalf("unexpected normalized 5Post tracking result: %+v", result)
+	}
+}
+
+func TestFivePostCancellationRequiresExplicitBusinessSuccess(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v2/cancelOrder/byOrderId/5f575bef-4e14-47d8-84c4-62629075dbb4":
+			if r.Method != http.MethodDelete || r.Header.Get("Authorization") != "Bearer fivepost-jwt" {
+				t.Fatalf("unexpected 5Post cancellation request: method=%s authorization=%q", r.Method, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": false})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	result, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Cancel(context.Background(), []byte("fivepost-key"), sdk.ShipmentCancelRequest{RemoteID: "5f575bef-4e14-47d8-84c4-62629075dbb4", IdempotencyKey: "cancel-5post-1"})
+	if err != nil {
+		t.Fatalf("5Post cancellation request failed: %v", err)
+	}
+	if result.RemoteID == "" || result.Status != "cancelled" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized 5Post cancellation result: %+v", result)
+	}
+}
+
+func TestFivePostCancellationRejectsRetryableBusinessError(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/jwt-generate-claims/rs256/1" {
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": true, "errorCode": 610, "canBeRetriedLater": true})
+	}))
+	defer server.Close()
+
+	if _, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Cancel(context.Background(), []byte("fivepost-key"), sdk.ShipmentCancelRequest{RemoteID: "5f575bef-4e14-47d8-84c4-62629075dbb4", IdempotencyKey: "cancel-5post-retry"}); err == nil || !strings.Contains(err.Error(), "retry") {
+		t.Fatalf("retryable 5Post cancellation error was not preserved: %v", err)
+	}
+}
+
+func TestFivePostLabelRequestsOnePDFAndReturnsDigestReference(t *testing.T) {
+	pdf := []byte("%PDF-1.7\n5post-label\n")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/jwt-generate-claims/rs256/1":
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "jwt": "fivepost-jwt"})
+		case "/api/v1/orderLabels/byOrderId":
+			if r.Method != http.MethodPost || r.URL.Query().Get("format") != "PDF" || r.Header.Get("Authorization") != "Bearer fivepost-jwt" {
+				t.Fatalf("unexpected 5Post label request: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			var request struct {
+				OrderIDs []string `json:"orderIds"`
+			}
+			if json.NewDecoder(r.Body).Decode(&request) != nil || len(request.OrderIDs) != 1 || request.OrderIDs[0] != "5f575bef-4e14-47d8-84c4-62629075dbb4" {
+				t.Fatalf("unexpected 5Post label body: %+v", request)
+			}
+			w.Header().Set("Content-Type", "application/pdf")
+			_, _ = w.Write(pdf)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	result, err := (fivepostHTTP{h: testTLSTransport(t, server)}).Label(context.Background(), []byte("fivepost-key"), sdk.LabelRequest{RemoteID: "5f575bef-4e14-47d8-84c4-62629075dbb4", Format: "pdf"})
+	if err != nil {
+		t.Fatalf("5Post label request failed: %v", err)
+	}
+	digest := sha256.Sum256(pdf)
+	wantRef := "fivepost:label:order:5f575bef-4e14-47d8-84c4-62629075dbb4:" + hex.EncodeToString(digest[:])
+	if result.ArtifactRef != wantRef || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized 5Post label result: %+v", result)
+	}
+}
 
 func TestCDEKCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

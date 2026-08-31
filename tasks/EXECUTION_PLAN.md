@@ -1849,3 +1849,82 @@ existing authenticated host route and tenant-scoped operation receipt. The
 adapter calls the official `POST/DELETE /subscriptions`, fixes the accepted
 update types and verification secret boundary, validates HTTPS endpoints and
 does not retry ambiguous writes.
+
+## Phase 71 — 5Post pickup-point directory
+
+`202`
+
+Task 202 admits only the bounded 5Post pickup-point directory read. The host
+uses the official v7.32 JWT exchange, requests one bounded page from
+`/api/v1/pickuppoints/query`, filters and normalizes the response into the
+provider-neutral `PickupPoint` contract, and never returns the JWT or raw
+provider payload. Shipment create/cancel, tracking and labels remain
+qualification-gated pending separate deterministic fixtures and write-boundary
+review.
+
+### Gate RUNTIME-202
+
+- the API key is exchanged through the callback-scoped SecretProvider secret;
+- the provider's documented page limit and the host's 500-point result bound
+  are enforced;
+- only official fixed-host HTTPS requests are used and `accept-language: ru`
+  is sent for deterministic error text;
+- runtime support, frontend catalog, tests, architecture review and docs are
+  synchronized before deployment.
+
+## Phase 72 — 5Post single-order status read
+
+`203`
+
+Task 203 admits one-order 5Post status lookup through the official
+`POST /api/v1/getOrderStatus` route. The host exchanges the callback-scoped API
+key for a JWT, sends exactly one provider order ID, requires exactly one
+matching response and normalizes only the provider status, partner tracking
+reference and UTC change date. Shipment create/cancel and label operations
+remain qualification-gated.
+
+### Gate RUNTIME-203
+
+- provider order identity is matched before any normalized result is returned;
+- provider-local `executionStatus` and rejection text do not enter the Core
+  shipment projection;
+- malformed dates, duplicate/missing results and mismatched IDs fail closed;
+- runtime support, frontend catalog, tests, architecture review and docs stay
+  synchronized.
+
+## Phase 73 — 5Post order cancellation
+
+`204`
+
+Task 204 admits the bounded approval-bound 5Post cancellation request through
+`DELETE /api/v2/cancelOrder/byOrderId/{orderId}`. The host exchanges the
+callback-scoped API key for a JWT, validates the provider UUID and treats only
+the documented `error=false` business response as cancellation success.
+
+### Gate RUNTIME-204
+
+- cancellation remains behind the existing authenticated worker approval,
+  tenant, secret and idempotency boundaries;
+- provider retryable and terminal business errors remain visible and are not
+  projected as cancelled;
+- ambiguous transport results are not retried by the connector;
+- runtime support, frontend catalog, tests, architecture review and docs stay
+  synchronized.
+
+## Phase 74 — 5Post PDF label
+
+`205`
+
+Task 205 admits one 5Post PDF label read through the official
+`POST /api/v1/orderLabels/byOrderId?format=PDF` route. The host sends one
+provider order UUID, validates the PDF media type and `%PDF-` signature, and
+returns only a content-addressed opaque artifact reference. Shipment creation
+remains qualification-gated.
+
+### Gate RUNTIME-205
+
+- the label request remains bounded to one provider order and `format=PDF`;
+- asynchronous/not-ready and non-PDF responses fail closed;
+- the PDF body, API key and JWT never cross the host boundary;
+- runtime support, frontend catalog, tests, architecture review and docs stay
+  synchronized.

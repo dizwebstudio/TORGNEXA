@@ -7,7 +7,8 @@
 - family: `logistics`
 - SDK: v1
 - authentication: partner API key, exchanged by the host for a short-lived JWT
-- runtime surface: separate «Доставка» account and credential check
+- runtime surface: separate «Доставка» account, credential check, bounded
+  pickup-point directory read and single-order status read
 
 The adapter admits only operations documented for the 5Post partner API:
 shipment creation, shipment cancellation, current status lookup, label
@@ -27,8 +28,10 @@ database or environment authority.
 
 Remote shipment and pickup-point identifiers remain inside the adapter. The
 host maps them to canonical shipment/PUDO identities; Core never branches on
-the provider name. The current application exposes only the credential probe;
-shipment calls remain qualification-gated until the partner API fixtures are
+the provider name. The current application exposes the credential probe, one
+bounded pickup directory page, one-order status lookup, cancellation by
+provider order UUID and one PDF label read. Shipment creation remains
+qualification-gated until its fixtures and host-side write bridge are
 reviewed.
 
 ## Authentication and privacy

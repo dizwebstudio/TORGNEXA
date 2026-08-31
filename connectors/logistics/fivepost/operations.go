@@ -42,7 +42,7 @@ func (c *Connector) CreateLogisticsShipment(ctx context.Context, account sdk.Acc
 
 // ReadLogisticsTracking reads the current remote shipment status.
 func (c *Connector) ReadLogisticsTracking(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
-	if request.RemoteID == "" {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.RemoteID == "" {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var result sdk.ShipmentResult
@@ -59,7 +59,7 @@ func (c *Connector) ReadLogisticsTracking(ctx context.Context, account sdk.Accou
 
 // CancelLogisticsShipment cancels a remote shipment with an idempotency key.
 func (c *Connector) CancelLogisticsShipment(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
-	if request.RemoteID == "" || request.IdempotencyKey == "" {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.RemoteID == "" || request.IdempotencyKey == "" {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var result sdk.ShipmentResult
@@ -96,7 +96,7 @@ func (c *Connector) ReadLogisticsLabel(ctx context.Context, account sdk.Account,
 
 // ReadPickupPoints reads the bounded 5Post pickup-point directory.
 func (c *Connector) ReadPickupPoints(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
-	if query.Validate(500) != nil {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate(500) != nil {
 		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var result []sdk.PickupPoint

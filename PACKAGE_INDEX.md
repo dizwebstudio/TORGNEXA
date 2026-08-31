@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 153
-- tasks: 203
+- adrs: 157
+- tasks: 207
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3246
+- total source files (excluding local secrets/build/dependency/cache trees): 3258
 
 
 ## Connector category layout
@@ -703,6 +703,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0151-pochta-formed-order-pdf.md`
 - `adr/0152-max-message-edit-delete.md`
 - `adr/0153-max-webhook-subscription.md`
+- `adr/0154-fivepost-pickup-points.md`
+- `adr/0155-fivepost-tracking.md`
+- `adr/0156-fivepost-cancel.md`
+- `adr/0157-fivepost-label.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -893,6 +897,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/199-pochta-formed-order-pdf-runtime.json`
 - `architecture/reviews/200-max-message-edit-delete-runtime.json`
 - `architecture/reviews/201-max-webhook-subscription-runtime.json`
+- `architecture/reviews/202-fivepost-pickup-points-runtime.json`
+- `architecture/reviews/203-fivepost-tracking-runtime.json`
+- `architecture/reviews/204-fivepost-cancel-runtime.json`
+- `architecture/reviews/205-fivepost-label-runtime.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -3690,6 +3698,10 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/199-pochta-formed-order-pdf-runtime.md`
 - `tasks/issues/200-max-message-edit-delete-runtime.md`
 - `tasks/issues/201-max-webhook-subscription-runtime.md`
+- `tasks/issues/202-fivepost-pickup-points-runtime.md`
+- `tasks/issues/203-fivepost-tracking-runtime.md`
+- `tasks/issues/204-fivepost-cancel-runtime.md`
+- `tasks/issues/205-fivepost-label-runtime.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

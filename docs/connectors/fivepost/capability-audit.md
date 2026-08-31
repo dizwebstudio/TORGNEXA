@@ -7,14 +7,19 @@ the current API downloads; the partner portal contract remains the authority
 for exact endpoint paths and field requirements:
 
 - https://fivepost.ru/become-partner/
+- https://fivepost.ru/files/public/API_5post.docx (v7.32, 20.08.2026)
 - https://test-omni.x5.ru/files/public/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D0%9F%D0%BE%D1%80%D1%82%D0%B0%D0%BB_%D0%BF%D0%B0%D1%80%D1%82%D0%BD%D1%91%D1%80%D0%B0_5Post.pdf
 
 The SDK adapter therefore claims only the five capabilities that can be
 normalized without guessing a tenant's tariff, warehouse, payment or PII
-contract. Rates, returns, webhooks and courier pickup are explicit follow-up
-qualification items, not hidden promises in the manifest.
+contract. The first admitted application operations are the bounded pickup-point
+directory read, single-order status lookup, cancellation by provider order UUID
+and one PDF label read; rates, returns, webhooks and courier pickup are explicit
+follow-up qualification items, not hidden promises in the manifest.
 
 The connector is admitted to the separate logistics surface for tenant account
-configuration and an authenticated credential probe. Shipment operations
-remain fail-closed until a host-side write bridge is reviewed and a
-non-production 5Post partner account is available.
+configuration, an authenticated credential probe, a bounded pickup-point
+directory read, a single-order status lookup, cancellation by provider order
+UUID and one PDF label read. Shipment creation remains fail-closed until its
+host-side bridge is reviewed and a non-production 5Post partner account is
+available.
