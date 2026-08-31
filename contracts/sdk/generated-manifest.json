@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "1c07a3fc58175018c30de2023d9becc609b436a6c779f81060adc2a38523b6d1",
+    "sha256": "aebd4b5320d973403ebeeca541b7f0c0f3422a62bf2a95bde3169bf2316f10cf",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -28,6 +28,11 @@
       "operation_id": "approveAssistantActionPreview",
       "method": "POST",
       "path": "/assistant/action-previews/{preview_id}:approve"
+    },
+    {
+      "operation_id": "archiveLogisticsBatch",
+      "method": "POST",
+      "path": "/logistics/batches/archive/{batch_id}"
     },
     {
       "operation_id": "archiveWorkflow",
@@ -998,6 +1003,11 @@
       "operation_id": "syncConnectorAccount",
       "method": "POST",
       "path": "/connector-accounts:sync"
+    },
+    {
+      "operation_id": "unarchiveLogisticsBatch",
+      "method": "POST",
+      "path": "/logistics/batches/archive/revert/{batch_id}"
     },
     {
       "operation_id": "updateCurrentUserProfile",

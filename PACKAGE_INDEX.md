@@ -55,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 138
-- tasks: 188
+- adrs: 139
+- tasks: 189
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3196
+- total source files (excluding local secrets/build/dependency/cache trees): 3199
 
 
 ## Connector category layout
@@ -688,6 +688,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0136-pochta-batch-formation.md`
 - `adr/0137-pochta-batch-handoff.md`
 - `adr/0138-pochta-separate-return.md`
+- `adr/0139-pochta-batch-archive.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -863,6 +864,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/184-pochta-batch-formation.json`
 - `architecture/reviews/185-pochta-batch-handoff.json`
 - `architecture/reviews/186-pochta-separate-return.json`
+- `architecture/reviews/187-pochta-batch-archive.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -3640,6 +3642,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/184-pochta-batch-formation.md`
 - `tasks/issues/185-pochta-batch-handoff.md`
 - `tasks/issues/186-pochta-separate-return.md`
+- `tasks/issues/187-pochta-batch-archive.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

@@ -3515,4 +3515,47 @@ func (transport pochtarussiaHTTP) ArchiveBatch(ctx context.Context, secret []byt
 	return sdk.LogisticsBatchArchive{RemoteID: remoteID, Status: "ARCHIVED", Archived: true, ObservedAt: time.Now().UTC()}, nil
 }
 
+// UnarchiveBatch restores one formed Russian Post batch from the provider
+// archive. The provider accepts the same one-item numeric batch-name array
+// and returns the restored name in a one-item result array.
+func (transport pochtarussiaHTTP) UnarchiveBatch(ctx context.Context, secret []byte, request sdk.LogisticsBatchUnarchiveRequest) (sdk.LogisticsBatchUnarchive, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch restore request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatchUnarchive{}, err
+	}
+	if !pochtarussiaOrderIDPattern.MatchString(request.BatchID) {
+		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch name is invalid")
+	}
+	batchID, err := strconv.ParseInt(request.BatchID, 10, 64)
+	if err != nil || batchID <= 0 {
+		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch name is invalid")
+	}
+	payload, err := json.Marshal([]int64{batchID})
+	if err != nil {
+		return sdk.LogisticsBatchUnarchive{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", "/1.0/archive/revert", url.Values{}, payload, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatchUnarchive{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatchUnarchive{}, fmt.Errorf("Почта России batch restore rejected with status %d", status)
+	}
+	var response []struct {
+		BatchName json.RawMessage `json:"batch-name"`
+		ErrorCode string          `json:"error-code"`
+	}
+	if json.Unmarshal(responseBody, &response) != nil || len(response) != 1 || strings.TrimSpace(response[0].ErrorCode) != "" {
+		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch restore response rejected")
+	}
+	remoteID, err := pochtarussiaBacklogID(response[0].BatchName)
+	if err != nil || remoteID != request.BatchID {
+		return sdk.LogisticsBatchUnarchive{}, errors.New("Почта России batch restore response rejected")
+	}
+	return sdk.LogisticsBatchUnarchive{RemoteID: remoteID, Status: "RESTORED", Archived: false, ObservedAt: time.Now().UTC()}, nil
+}
+
 var _ pochtarussia.Transport = pochtarussiaHTTP{}

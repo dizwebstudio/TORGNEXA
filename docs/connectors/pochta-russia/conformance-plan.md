@@ -32,3 +32,19 @@ type/signature, content-addressed artifact reference и отказ на
 адресов/объявленной ценности, `position=0`, `return-barcode`, заголовки
 авторизации и отказ на ошибки/невалидный штрихкод. Live qualification должна
 подтвердить, что повтор того же operation receipt не вызывает вторую заявку.
+
+Для `logistics.batches.archive` fixture должен проверить `PUT /1.0/archive`,
+массив с одним числовым именем партии, заголовки авторизации и точное
+совпадение единственного `batch-name` в ответе. Harness обязан отклонять
+нечисловой или другой номер партии, пустой/ошибочный ответ и любой
+`error-code`. Live qualification должна подтвердить повторяемость через
+tenant-scoped operation receipt и обратимость операции через отдельный
+revert-маршрут.
+
+Для `logistics.batches.unarchive` fixture должен проверить `POST
+/1.0/archive/revert`, массив с одним числовым именем партии, заголовки
+авторизации и точное совпадение единственного `batch-name` в ответе с
+`RESTORED`/`archived=false`. Harness обязан отклонять нечисловой или другой
+номер партии, пустой/ошибочный ответ и любой `error-code`. Live qualification
+должна подтвердить повторяемость через tenant-scoped operation receipt и
+согласованную пару archive/revert на тестовой партии.

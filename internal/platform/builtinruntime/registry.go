@@ -216,6 +216,19 @@ func (r *Registry) LogisticsBatchArchiver(ctx context.Context, account sdk.Accou
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
 }
 
+// LogisticsBatchUnarchiver resolves the qualified Russian Post batch-restore
+// surface. Restore is independently capability- and approval-gated by the
+// application route.
+func (r *Registry) LogisticsBatchUnarchiver(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchUnarchiver, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.unarchive") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 // LogisticsRates calculates bounded provider rates through the reviewed
 // logistics composition. Provider service identifiers remain inside the
 // adapter; the application exposes only its neutral rate preview.

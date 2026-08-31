@@ -644,6 +644,10 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
 .logistics-shipment-create .drawer-inline .field { min-width:0; }
 .logistics-separate-return .drawer-inline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; margin-bottom:12px; }
 .logistics-separate-return .drawer-inline .field { min-width:0; }
+.logistics-batch-archive .drawer-inline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; margin-bottom:12px; }
+.logistics-batch-archive .drawer-inline .field { min-width:0; }
+.logistics-batch-unarchive .drawer-inline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; margin-bottom:12px; }
+.logistics-batch-unarchive .drawer-inline .field { min-width:0; }
 .logistics-shipment-create > .button { width:100%; }
 .drawer-inline input { flex:1; min-width:0; }
 .detail-list { display:grid; gap:0; margin:0; }

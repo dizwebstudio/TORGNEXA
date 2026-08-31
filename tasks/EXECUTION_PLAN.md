@@ -1664,3 +1664,29 @@ validated `return-barcode`. Names and addresses are request-scoped and are not
 stored in operation receipts; completed replays do not call the provider and
 ambiguous outcomes remain pending for reconciliation. Cancellation of an
 already formed batch remains outside this phase.
+
+## Phase 56 — Почта России — архивирование сформированной партии
+
+`187`
+
+Task 187 admits the Russian Post formed-batch archive contract. The API
+requires an enabled `logistics.batches.archive` capability, matching approval
+and an `Idempotency-Key`; the host sends one numeric batch name to the official
+`PUT /1.0/archive` endpoint and accepts only an exact `batch-name` response.
+The normalized `ARCHIVED` result is stored in the tenant-scoped operation
+receipt; completed replays do not call the provider and ambiguous outcomes
+remain pending for reconciliation. Restoring an archived batch remains outside
+this phase.
+
+## Phase 57 — Почта России — возврат партии из архива
+
+`188`
+
+Task 188 admits the Russian Post formed-batch archive-restore contract. The
+API requires an enabled `logistics.batches.unarchive` capability, matching
+approval and an `Idempotency-Key`; the host sends one numeric batch name to
+the official `POST /1.0/archive/revert` endpoint and accepts only an exact
+`batch-name` response. The normalized `RESTORED` result with
+`archived=false` is stored in the tenant-scoped operation receipt; completed
+replays do not call the provider and ambiguous results remain pending for
+reconciliation. Other archive operations remain outside this phase.

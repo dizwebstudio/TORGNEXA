@@ -39,6 +39,8 @@ export const capabilityLabels: Readonly<Record<string, string>> = {
   "inventory.write": "Управление остатками",
 	"logistics.batches.create": "Формирование партий доставки",
 	"logistics.batches.submit": "Передача партий в работу",
+	"logistics.batches.archive": "Перемещение партий в архив",
+	"logistics.batches.unarchive": "Возврат партий из архива",
 	"logistics.label.read": "Просмотр транспортных этикеток",
   "logistics.rates.read": "Просмотр тарифов доставки",
   "logistics.return.create": "Создание возвратов доставки",

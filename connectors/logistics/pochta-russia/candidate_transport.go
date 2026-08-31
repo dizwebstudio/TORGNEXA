@@ -90,3 +90,7 @@ func (candidateTransport) SubmitBatch(_ context.Context, _ []byte, request sdk.L
 func (candidateTransport) ArchiveBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchArchiveRequest) (sdk.LogisticsBatchArchive, error) {
 	return sdk.LogisticsBatchArchive{RemoteID: request.BatchID, Status: "ARCHIVED", Archived: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
 }
+
+func (candidateTransport) UnarchiveBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchUnarchiveRequest) (sdk.LogisticsBatchUnarchive, error) {
+	return sdk.LogisticsBatchUnarchive{RemoteID: request.BatchID, Status: "RESTORED", Archived: false, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}

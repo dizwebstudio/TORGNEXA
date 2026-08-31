@@ -130,6 +130,15 @@ func TestBatchArchiveUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestBatchUnarchiveUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).UnarchiveLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchUnarchiveRequest{
+		BatchID: "batch-conformance-001", IdempotencyKey: "restore-idem-001",
+	})
+	if err != nil || result.RemoteID != "batch-conformance-001" || result.Status != "RESTORED" || result.Archived || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 func TestReturnCreationUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).CreateLogisticsReturn(context.Background(), testAccount(), testRuntime{}, sdk.ReturnCreateRequest{
 		OriginalRemoteID: "RA644000001RU", ExternalID: "return-001", MailType: "POSTAL_PARCEL", IdempotencyKey: "return-idem-001",

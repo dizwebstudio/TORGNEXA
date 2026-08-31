@@ -167,6 +167,27 @@ request-scoped; the operation receipt prevents duplicate calls and blocks
 blind retry after an ambiguous result. Cancellation of already formed batches
 remains a separate qualification task.
 
+## Почта России — архивирование сформированной партии
+
+Task 187 is repository-complete: the qualified `logistics.batches.archive`
+capability now calls the official `PUT /1.0/archive` endpoint through an
+approval-bound `POST /api/v1/logistics/batches/archive/{batch_id}` route. The
+adapter sends one numeric batch name and accepts only an exact `batch-name`
+acknowledgement. The tenant-scoped operation receipt prevents duplicate calls
+and keeps ambiguous outcomes pending; restoring an archived batch remains a
+separate qualification task.
+
+## Почта России — возврат партии из архива
+
+Task 188 is repository-complete: the qualified
+`logistics.batches.unarchive` capability now calls the official
+`POST /1.0/archive/revert` endpoint through an approval-bound
+`POST /api/v1/logistics/batches/archive/revert/{batch_id}` route. The adapter
+sends one numeric batch name and accepts only an exact `batch-name`
+acknowledgement, normalizing it to `RESTORED` with `archived=false`. The
+tenant-scoped operation receipt prevents duplicate calls and keeps ambiguous
+outcomes pending; other archive operations remain fail-closed.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official

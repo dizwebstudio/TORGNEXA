@@ -14,7 +14,7 @@
 Манифест перечисляет нормализуемые операции расчёта, партий, отправлений,
 отмены, возврата, этикетки, трекинга и пунктов выдачи. В runtime включены
 bounded `logistics.batches.create`, `logistics.batches.read`,
-`logistics.batches.submit`, `pickup.points.read`, `logistics.rates.read`,
+`logistics.batches.submit`, `logistics.batches.archive`, `logistics.batches.unarchive`, `pickup.points.read`, `logistics.rates.read`,
 `logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`,
 `logistics.return.separate.create`, `logistics.label.read`
 и `logistics.track.read`.
@@ -37,7 +37,15 @@ bounded `logistics.batches.create`, `logistics.batches.read`,
 `POST /api/v1/logistics/batches/{batch_id}/submit` и официальный
 `POST /1.0/batch/{batch-name}/checkin`; при необходимости передаётся
 `useOnlineBalance=true`, а ответ принимается только при `f103-sent`. Операция
-требует approval и idempotency receipt. Отдельное возвратное отправление
+требует approval и idempotency receipt. Перевод сформированной партии в архив
+доступен через approval-bound `POST /api/v1/logistics/batches/archive/{batch_id}`;
+адаптер вызывает официальный `PUT /1.0/archive` с массивом из одного
+числового имени партии и принимает только точное подтверждение `batch-name`.
+Результат нормализуется в `ARCHIVED`. Восстановление доступно отдельной
+approval-bound операцией `POST /api/v1/logistics/batches/archive/revert/{batch_id}`:
+адаптер вызывает официальный `POST /1.0/archive/revert` с массивом из одного
+числового имени партии и принимает только точное подтверждение `batch-name`;
+результат нормализуется в `RESTORED` с `archived=false`. Отдельное возвратное отправление
 создаётся через approval-bound `POST /api/v1/logistics/returns/separate`, который
 вызывает официальный `PUT /1.0/returns/return-without-direct` ровно для одного
 отправления. Адаптер передаёт адреса, вид отправления, объявленную ценность,

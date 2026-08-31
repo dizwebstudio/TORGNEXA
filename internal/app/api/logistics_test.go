@@ -39,6 +39,7 @@ type logisticsRuntimeStub struct {
 	creator               sdk.LogisticsBatchCreator
 	submitter             sdk.LogisticsBatchSubmitter
 	archiver              sdk.LogisticsBatchArchiver
+	unarchiver            sdk.LogisticsBatchUnarchiver
 	separateReturnCreator sdk.LogisticsSeparateReturnCreator
 }
 
@@ -137,6 +138,13 @@ func (stub logisticsRuntimeStub) LogisticsBatchArchiver(_ context.Context, _ sdk
 	return stub.archiver, nil
 }
 
+func (stub logisticsRuntimeStub) LogisticsBatchUnarchiver(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchUnarchiver, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.unarchiver, nil
+}
+
 func (stub logisticsRuntimeStub) LogisticsSeparateReturnCreator(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error) {
 	if runtime == nil {
 		return nil, errors.New("runtime missing")
@@ -159,6 +167,11 @@ type logisticsBatchArchiverStub struct {
 	called  bool
 }
 
+type logisticsBatchUnarchiverStub struct {
+	restore sdk.LogisticsBatchUnarchive
+	called  bool
+}
+
 func (stub *logisticsBatchSubmitterStub) SubmitLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
 	stub.called = true
 	if stub.submission.RemoteID == "" {
@@ -173,6 +186,14 @@ func (stub *logisticsBatchArchiverStub) ArchiveLogisticsBatch(_ context.Context,
 		stub.archive.RemoteID = request.BatchID
 	}
 	return stub.archive, nil
+}
+
+func (stub *logisticsBatchUnarchiverStub) UnarchiveLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchUnarchiveRequest) (sdk.LogisticsBatchUnarchive, error) {
+	stub.called = true
+	if stub.restore.RemoteID == "" {
+		stub.restore.RemoteID = request.BatchID
+	}
+	return stub.restore, nil
 }
 
 func (stub *logisticsBatchCreatorStub) CreateLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
@@ -437,6 +458,44 @@ func TestLogisticsBatchArchiveRouteRequiresApprovalAndStoresNormalizedResult(t *
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusCreated || !archiver.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"archived":true`) {
 		t.Fatalf("status=%d body=%s archiver=%v operation=%+v", response.Code, response.Body.String(), archiver.called, operations)
+	}
+}
+
+func TestLogisticsBatchUnarchiveRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchUnarchiveInput{ConnectorAccountID: account.ID}
+	digest, err := logisticsBatchUnarchiveDigest(input, "batch-2026-003")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-unarchive-1"
+	unarchiver := &logisticsBatchUnarchiverStub{restore: sdk.LogisticsBatchUnarchive{Status: "RESTORED", Archived: false, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.unarchive", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, unarchiver: unarchiver}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.unarchive", ResourceType: "logistics_batch", ResourceID: logisticsBatchUnarchiveApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchUnarchivePath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("batch restore route not registered")
+	}
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchUnarchivePath+"batch-2026-003", strings.NewReader(`{"connector_account_id":"cdek-account"}`))
+	request.Header.Set("Idempotency-Key", "unarchive-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !unarchiver.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"status":"RESTORED"`) {
+		t.Fatalf("status=%d body=%s unarchiver=%v operation=%+v", response.Code, response.Body.String(), unarchiver.called, operations)
 	}
 }
 

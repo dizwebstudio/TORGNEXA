@@ -52,6 +52,18 @@ host проверяет PDF и возвращает только content-address
 `POST /api/v1/logistics/batches/{batch_id}/submit`, который вызывает официальный
 `POST /1.0/batch/{batch-name}/checkin` и принимает только ответ с `f103-sent`.
 
+`logistics.batches.archive` переводит сформированную партию в архив через
+approval-bound `POST /api/v1/logistics/batches/archive/{batch_id}`. Runtime
+вызывает официальный `PUT /1.0/archive` с одним числовым именем партии и
+принимает только точное совпадение `batch-name`; результат фиксируется как
+`ARCHIVED`, без сохранения сырого ответа.
+
+`logistics.batches.unarchive` возвращает партию из архива через
+approval-bound `POST /api/v1/logistics/batches/archive/revert/{batch_id}`.
+Runtime вызывает официальный `POST /1.0/archive/revert` с одним числовым
+именем партии и принимает только точное совпадение `batch-name`; результат
+фиксируется как `RESTORED` с `archived=false`, без сохранения сырого ответа.
+
 `logistics.return.separate.create` теперь допускает standalone-возврат через
 approval-bound `POST /api/v1/logistics/returns/separate`. Runtime вызывает
 официальный `PUT /1.0/returns/return-without-direct` с одной записью и

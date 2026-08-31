@@ -150,6 +150,46 @@ paths:
         '403': {description: Caller lacks logistics.batches.submit}
         '409': {description: 'Batch capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
+  /logistics/batches/archive/{batch_id}:
+    post:
+      operationId: archiveLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchArchiveRequest'}
+      responses:
+        '201': {description: Batch moved to provider archive, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchArchive'}}}}
+        '202': {description: Batch archive outcome is pending and must not be retried automatically}
+        '400': {description: Invalid batch or idempotency key}
+        '403': {description: Caller lacks logistics.batches.archive}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
+  /logistics/batches/archive/revert/{batch_id}:
+    post:
+      operationId: unarchiveLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchUnarchiveRequest'}
+      responses:
+        '201': {description: Batch restored from provider archive, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchUnarchive'}}}}
+        '202': {description: Batch restore outcome is pending and must not be retried automatically}
+        '400': {description: Invalid batch or idempotency key}
+        '403': {description: Caller lacks logistics.batches.unarchive}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
   /logistics/returns/separate:
     post:
       operationId: createLogisticsSeparateReturn
@@ -165,7 +205,7 @@ paths:
       responses:
         '201': {description: Standalone return shipment created, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsSeparateReturn'}}}}
         '202': {description: Standalone return operation is pending and must not be retried automatically}
-        '400': {description: Invalid return address, value or idempotency key}
+        '400': {description: 'Invalid return address, value or idempotency key'}
         '403': {description: Caller lacks logistics.return.separate.create}
         '409': {description: 'Return capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
@@ -3130,6 +3170,12 @@ components:
       properties:
         connector_account_id: {type: string, minLength: 1, maxLength: 128}
         use_online_balance: {type: boolean, default: false}
+    LogisticsBatchArchiveRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
     LogisticsBatchSubmission:
       type: object
       additionalProperties: false
@@ -3138,6 +3184,30 @@ components:
         remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
         accepted: {type: boolean}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsBatchArchive:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, archived, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: ARCHIVED}
+        archived: {type: boolean, const: true}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsBatchUnarchiveRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+    LogisticsBatchUnarchive:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, archived, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: RESTORED}
+        archived: {type: boolean, const: false}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsSeparateReturnRequest:
       type: object

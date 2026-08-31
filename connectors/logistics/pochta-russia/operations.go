@@ -271,6 +271,28 @@ func (c *Connector) ArchiveLogisticsBatch(ctx context.Context, account sdk.Accou
 	return out, nil
 }
 
+// UnarchiveLogisticsBatch restores one Russian Post batch from the provider
+// archive. Restoring is separate from archiving so approval can be scoped to
+// the exact lifecycle transition.
+func (c *Connector) UnarchiveLogisticsBatch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchUnarchiveRequest) (sdk.LogisticsBatchUnarchive, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatchUnarchive{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatchUnarchive
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.UnarchiveBatch(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchUnarchive{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.BatchID {
+		return sdk.LogisticsBatchUnarchive{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -290,3 +312,4 @@ var _ sdk.LogisticsBatchReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchCreator = (*Connector)(nil)
 var _ sdk.LogisticsBatchSubmitter = (*Connector)(nil)
 var _ sdk.LogisticsBatchArchiver = (*Connector)(nil)
+var _ sdk.LogisticsBatchUnarchiver = (*Connector)(nil)
