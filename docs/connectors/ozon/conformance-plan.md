@@ -10,7 +10,8 @@ The provider adapter runs all thirteen Task-064 checks through the shared `confo
 
 ## Semantic fixture coverage
 
-- executable manifest equals committed JSON and remains read-only;
+- executable manifest equals committed JSON and declares the bounded
+  `products.write` import/status slice;
 - strict two-part `Client-Id`/`Api-Key` credential bundle;
 - health uses current `/v3/product/list` and normalizes auth/rate/service failures;
 - product list + info composition validates one-to-one product/offer identity;
@@ -19,6 +20,8 @@ The provider adapter runs all thirteen Task-064 checks through the shared `confo
 - warehouse list rejects duplicates and partial pagination;
 - stock selection uses bounded `offer_id`, subtracts reserved from present, represents missing warehouse stock as zero and rejects unsafe/partial rows;
 - raw remote bodies and raw transport errors never escape normalized errors;
+- product import sends only snapshot fields, returns a bounded task ID and
+  resolves success through import-info status rather than a partial response;
 - provider imports remain inside the Connector SDK boundary.
 
 ## Live qualification

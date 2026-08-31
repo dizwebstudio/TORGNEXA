@@ -65,7 +65,7 @@ func (r *Repository) SaveSnapshot(ctx context.Context, scope tenancy.Scope, snap
 		case !errors.Is(err, sql.ErrNoRows):
 			return fmt.Errorf("marketplace publication repository: snapshot lookup: %w", err)
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO marketplace_publication_snapshots(organization_id,workspace_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,snapshot_version,snapshot_digest,snapshot_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`, scope.OrganizationID(), scope.WorkspaceID(), snapshot.ID, snapshot.Target.ProductID, snapshot.Target.OfferID, snapshot.Target.ConnectorAccountID, snapshot.Target.ConnectorID, snapshot.Version, digest, document)
+		_, err = tx.ExecContext(ctx, `INSERT INTO marketplace_publication_snapshots(organization_id,workspace_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,snapshot_version,snapshot_digest,snapshot_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`, scope.OrganizationID(), scope.WorkspaceID(), snapshot.ID, snapshot.Target.ProductID, snapshot.Target.OfferID, snapshot.Target.ConnectorAccountID, snapshot.Target.ConnectorID, snapshot.Target.Locale, snapshot.Target.Jurisdiction, snapshot.Version, digest, document)
 		if err != nil {
 			return fmt.Errorf("marketplace publication repository: insert snapshot: %w", err)
 		}
@@ -84,7 +84,7 @@ func (r *Repository) Enqueue(ctx context.Context, scope tenancy.Scope, operation
 		if err := tx.QueryRowContext(ctx, `SELECT operation_id,snapshot_id,connector_account_id,connector_id,operation_kind,state,idempotency_key,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND idempotency_key=$4`, scope.OrganizationID(), scope.WorkspaceID(), operation.Target.ConnectorAccountID, operation.IdempotencyKey).Scan(&result.ID, &result.SnapshotID, &result.Target.ConnectorAccountID, &result.Target.ConnectorID, &result.Kind, &result.State, &result.IdempotencyKey, &result.RemoteID, &result.RemoteOperationID, &result.Attempt, &result.DryRun, &result.ApprovalRef, &result.QualityReceiptRef, &result.ErrorCode, &result.Version, &result.CreatedAt, &result.UpdatedAt); err == nil {
 			result.Target.OrganizationID, result.Target.WorkspaceID, result.Target.ProductID, result.Target.OfferID, result.Target.Locale, result.Target.Jurisdiction = scope.OrganizationID().String(), scope.WorkspaceID().String(), operation.Target.ProductID, operation.Target.OfferID, operation.Target.Locale, operation.Target.Jurisdiction
 			result.SnapshotDigest = operation.SnapshotDigest
-			if result.SnapshotID != operation.SnapshotID || result.Kind != operation.Kind || result.Target.ConnectorID != operation.Target.ConnectorID || result.DryRun != operation.DryRun {
+			if result.SnapshotID != operation.SnapshotID || result.Kind != operation.Kind || !result.Target.SameAccount(operation.Target) || result.DryRun != operation.DryRun {
 				return ErrConflict
 			}
 			return nil
@@ -137,7 +137,7 @@ func (r *Repository) ClaimQueued(ctx context.Context, scope tenancy.Scope, now t
 	}
 	var operation marketplacepublication.Operation
 	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
-		row := tx.QueryRowContext(ctx, `SELECT o.operation_id,o.snapshot_id,s.product_id,s.offer_id,o.connector_account_id,o.connector_id,s.locale,s.jurisdiction,o.operation_kind,o.state,o.idempotency_key,o.snapshot_digest,o.remote_id,o.remote_operation_id,o.attempt,o.dry_run,o.approval_request_id,o.quality_receipt_id,o.error_code,o.version,o.created_at,o.updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 AND o.state='queued' ORDER BY o.updated_at,o.operation_id FOR UPDATE OF o SKIP LOCKED LIMIT 1`, scope.OrganizationID(), scope.WorkspaceID())
+		row := tx.QueryRowContext(ctx, `SELECT o.operation_id,o.snapshot_id,s.product_id,s.offer_id,o.connector_account_id,o.connector_id,s.locale,s.jurisdiction,o.operation_kind,o.state,o.idempotency_key,s.snapshot_digest,o.remote_id,o.remote_operation_id,o.attempt,o.dry_run,o.approval_request_id,o.quality_receipt_id,o.error_code,o.version,o.created_at,o.updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 AND o.state='queued' ORDER BY o.updated_at,o.operation_id FOR UPDATE OF o SKIP LOCKED LIMIT 1`, scope.OrganizationID(), scope.WorkspaceID())
 		if err := scanOperation(row, scope, &operation); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
@@ -172,7 +172,7 @@ func (r *Repository) Operation(ctx context.Context, scope tenancy.Scope, id stri
 	}
 	var result marketplacepublication.Operation
 	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
-		err := scanOperation(tx.QueryRowContext(ctx, `SELECT operation_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,operation_kind,state,idempotency_key,snapshot_digest,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 AND o.operation_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), id), scope, &result)
+		err := scanOperation(tx.QueryRowContext(ctx, `SELECT operation_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,operation_kind,state,idempotency_key,s.snapshot_digest,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 AND o.operation_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), id), scope, &result)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -191,7 +191,33 @@ func (r *Repository) ListOperations(ctx context.Context, scope tenancy.Scope, li
 	}
 	items := make([]marketplacepublication.Operation, 0, limit)
 	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT operation_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,operation_kind,state,idempotency_key,snapshot_digest,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 ORDER BY o.updated_at DESC,o.operation_id DESC LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), limit)
+		rows, err := tx.QueryContext(ctx, `SELECT operation_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,operation_kind,state,idempotency_key,s.snapshot_digest,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 ORDER BY o.updated_at DESC,o.operation_id DESC LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item marketplacepublication.Operation
+			if err := scanOperation(rows, scope, &item); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
+// ListPending returns operations whose remote result still needs a bounded
+// status read. It is intentionally a read-only projection; the subsequent
+// compare-and-swap transition remains the authority for local state.
+func (r *Repository) ListPending(ctx context.Context, scope tenancy.Scope, limit int) ([]marketplacepublication.Operation, error) {
+	if err := r.validate(ctx, scope); err != nil || limit < 1 || limit > 100 {
+		return nil, marketplacepublication.ErrInvalid
+	}
+	items := make([]marketplacepublication.Operation, 0, limit)
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT operation_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,operation_kind,state,idempotency_key,s.snapshot_digest,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations o JOIN marketplace_publication_snapshots s USING (organization_id,workspace_id,snapshot_id) WHERE o.organization_id=$1 AND o.workspace_id=$2 AND o.state IN ('accepted','processing','unknown') ORDER BY o.updated_at,o.operation_id LIMIT $3`, scope.OrganizationID(), scope.WorkspaceID(), limit)
 		if err != nil {
 			return err
 		}
@@ -261,6 +287,34 @@ func (r *Repository) RecordDrift(ctx context.Context, scope tenancy.Scope, drift
 	})
 }
 
+// ListDrifts returns redacted reconciliation findings for one operation.
+func (r *Repository) ListDrifts(ctx context.Context, scope tenancy.Scope, operationID string, limit int) ([]marketplacepublication.Drift, error) {
+	if err := r.validate(ctx, scope); err != nil || operationID == "" || strings.ContainsAny(operationID, "/\x00\r\n") || limit < 1 || limit > 100 {
+		return nil, marketplacepublication.ErrInvalid
+	}
+	items := make([]marketplacepublication.Drift, 0, limit)
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT drift_type,snapshot_id,remote_id,expected_digest,observed_digest,observed_state,detected_at FROM marketplace_publication_drifts WHERE organization_id=$1 AND workspace_id=$2 AND operation_id=$3 ORDER BY detected_at DESC,drift_id DESC LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), operationID, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item marketplacepublication.Drift
+			if err := rows.Scan(&item.Type, &item.SnapshotID, &item.RemoteID, &item.ExpectedDigest, &item.ObservedDigest, &item.ObservedState, &item.DetectedAt); err != nil {
+				return err
+			}
+			item.DetectedAt = item.DetectedAt.UTC()
+			if item.Validate() != nil {
+				return marketplacepublication.ErrInvalid
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
 func scanOperation(row interface{ Scan(...any) error }, scope tenancy.Scope, operation *marketplacepublication.Operation) error {
 	if err := row.Scan(&operation.ID, &operation.SnapshotID, &operation.Target.ProductID, &operation.Target.OfferID, &operation.Target.ConnectorAccountID, &operation.Target.ConnectorID, &operation.Target.Locale, &operation.Target.Jurisdiction, &operation.Kind, &operation.State, &operation.IdempotencyKey, &operation.SnapshotDigest, &operation.RemoteID, &operation.RemoteOperationID, &operation.Attempt, &operation.DryRun, &operation.ApprovalRef, &operation.QualityReceiptRef, &operation.ErrorCode, &operation.Version, &operation.CreatedAt, &operation.UpdatedAt); err != nil {
 		return err
@@ -298,5 +352,3 @@ func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly b
 	}
 	return nil
 }
-
-var _ = time.Time{}

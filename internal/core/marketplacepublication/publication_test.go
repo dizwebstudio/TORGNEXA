@@ -9,7 +9,7 @@ func testSnapshot(t *testing.T) Snapshot {
 	t.Helper()
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	return Snapshot{
-		ID: "mps_01", Target: Target{OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ProductID: "product-1", ConnectorAccountID: "account-1", ConnectorID: "ozon", Locale: "ru-RU", Jurisdiction: "RU"},
+		ID: "mps_01", Target: Target{OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ProductID: "product-1", ConnectorAccountID: "account-1", ConnectorID: "marketplace", Locale: "ru-RU", Jurisdiction: "RU"},
 		Version: 1, SKU: "SKU-1", Title: "Тестовый товар", CategoryCode: "category-1", PriceMinor: 10000, Currency: "RUB", ProductStatus: "active", CatalogVersion: 1, AssembledAt: now,
 	}
 }

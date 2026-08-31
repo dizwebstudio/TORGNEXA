@@ -229,3 +229,29 @@ func TestOversizedAndTransportFailuresNormalize(t *testing.T) {
 		t.Fatalf("transport error not normalized: %#v", err)
 	}
 }
+
+func TestProductPublicationUsesSnapshotAndBoundedIdempotency(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, RequestID: "wb-request-1"}}}
+	connector := New(transport, func() time.Time { return time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC) })
+	request := publicationRequest(t, "WB-SKU-1", "wildberries")
+	receipt, err := connector.WriteProductPublication(context.Background(), testAccount(), testRuntime{secret: []byte("synthetic-token")}, request)
+	if err != nil || receipt.Status != sdk.PublicationAccepted || len(transport.requests) != 1 {
+		t.Fatalf("receipt=%+v err=%v requests=%d", receipt, err, len(transport.requests))
+	}
+	remoteRequest := transport.requests[0]
+	if remoteRequest.Path != "/content/v2/cards/upload" || remoteRequest.IdempotencyKey != "publication-1" || strings.Contains(string(remoteRequest.Body), "https://") || strings.Contains(string(remoteRequest.Body), "synthetic-token") {
+		t.Fatalf("unsafe or unexpected request: %+v body=%s", remoteRequest, remoteRequest.Body)
+	}
+}
+
+func publicationRequest(t *testing.T, sku, connectorID string) sdk.ProductPublicationRequest {
+	t.Helper()
+	var request sdk.ProductPublicationRequest
+	data := []byte(`{"operation":"create_product","snapshot":{"id":"snapshot-1","target":{"organization_id":"01890f4d-1e10-7cc0-9c4a-111111111111","workspace_id":"01890f4d-1e10-7cc0-9c4a-222222222222","product_id":"product-1","connector_account_id":"wb-account","connector_id":"wildberries","locale":"ru-RU","jurisdiction":"RU"},"version":1,"sku":"WB-SKU-1","title":"Synthetic card","category_code":"123","dimension":{"length_mm":10,"width_mm":10,"height_mm":10,"weight_g":100},"price_minor":199900,"currency":"RUB","product_status":"active","catalog_version":1,"pim_version":1,"price_version":1,"media_version":1,"mapping_version":1,"capability_version":1,"assembled_at":"2026-08-10T11:00:00Z"},"idempotency_key":"publication-1","approval_request_id":"approval-1","quality_receipt_id":"receipt-1"}`)
+	if err := json.Unmarshal(data, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.Snapshot.SKU = sku
+	request.Snapshot.Target.ConnectorID = connectorID
+	return request
+}

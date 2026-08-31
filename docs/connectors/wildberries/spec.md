@@ -1,7 +1,7 @@
 # Wildberries Connector Spec v1
 
-Status: repository-qualified read-only reference connector  
-Snapshot date: 2026-08-10  
+Status: repository-qualified read and bounded product-publication connector
+Snapshot date: 2026-08-31
 Connector ID: `wildberries`  
 Connector SDK: v1
 
@@ -81,4 +81,15 @@ The connector maps status classes into SDK `RemoteError` categories only. Respon
 
 ## Writes
 
-Task 011 intentionally has no `products.write`, `inventory.write`, order-status write or other mutation capability. Any future WB write must be a separate risk-reviewed change using Task 017 approval/risk policy where applicable, Task 082 compliance guards, Task 013 idempotency/loop rules, Task 029 dry-run and Task 064 conformance.
+Task 217 admits card create and update through the official Content API
+`POST /content/v2/cards/upload` and `POST /content/v2/cards/update`. The
+adapter maps title, description, brand, seller SKU, numeric subject/category,
+variants and barcodes from a validated snapshot. The host-supplied
+`Idempotency-Key` is forwarded as retry metadata.
+
+WB card writes are asynchronous from the operator's point of view. The receipt
+is `accepted`; a later bounded cards read is required before local state becomes
+`published`. The adapter deliberately rejects snapshot media and
+provider-specific characteristic/category bridges until a released-upload
+bridge and current category fixtures are qualified. Inventory, order-status
+and other mutation capabilities remain unchanged.

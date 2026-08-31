@@ -211,6 +211,32 @@ func TestInventoryRejectsPartialPaginationAndUnsafeRows(t *testing.T) {
 		}
 	}
 }
+
+func TestProductPublicationUsesImportTaskAndDoesNotLeakCredentials(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, RequestID: "ozon-request-1", Body: []byte(`{"result":{"task_id":12345}}`)}}}
+	connector := New(transport, func() time.Time { return time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC) })
+	request := publicationRequest(t, "OZ-SKU-1", "ozon")
+	receipt, err := connector.WriteProductPublication(context.Background(), testAccount(), testRuntime{creds()}, request)
+	if err != nil || receipt.Status != sdk.PublicationAccepted || receipt.RemoteOperationID != "12345" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	remoteRequest := transport.requests[0]
+	if remoteRequest.Path != "/v2/product/import" || remoteRequest.IdempotencyKey != "publication-1" || strings.Contains(string(remoteRequest.Body), "synthetic-api-key") || strings.Contains(string(remoteRequest.Body), "https://") {
+		t.Fatalf("unsafe or unexpected request: %+v body=%s", remoteRequest, remoteRequest.Body)
+	}
+}
+
+func publicationRequest(t *testing.T, sku, connectorID string) sdk.ProductPublicationRequest {
+	t.Helper()
+	var request sdk.ProductPublicationRequest
+	data := []byte(`{"operation":"create_product","snapshot":{"id":"snapshot-1","target":{"organization_id":"01890f4d-1e10-7cc0-9c4a-111111111111","workspace_id":"01890f4d-1e10-7cc0-9c4a-222222222222","product_id":"product-1","connector_account_id":"ozon-account","connector_id":"ozon","locale":"ru-RU","jurisdiction":"RU"},"version":1,"sku":"OZ-SKU-1","title":"Synthetic card","category_code":"123","dimension":{"length_mm":10,"width_mm":10,"height_mm":10,"weight_g":100},"price_minor":199900,"currency":"RUB","product_status":"active","catalog_version":1,"pim_version":1,"price_version":1,"media_version":1,"mapping_version":1,"capability_version":1,"assembled_at":"2026-08-10T11:00:00Z"},"idempotency_key":"publication-1","approval_request_id":"approval-1","quality_receipt_id":"receipt-1"}`)
+	if err := json.Unmarshal(data, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.Snapshot.SKU = sku
+	request.Snapshot.Target.ConnectorID = connectorID
+	return request
+}
 func TestErrorsAreBounded(t *testing.T) {
 	tr := &scriptedTransport{responses: []Response{{StatusCode: 429, RequestID: "oz-req", RetryAfterMS: 1500, Body: []byte(`{"error":"api-key=secret"}`)}}}
 	_, err := New(tr, nil).ListInventoryLocations(context.Background(), testAccount(), testRuntime{creds()})

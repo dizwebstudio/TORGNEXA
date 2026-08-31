@@ -1,7 +1,7 @@
 # Ozon Connector Spec v1
 
-Status: repository-qualified read-only second reference connector  
-Snapshot date: 2026-08-10  
+Status: repository-qualified read and bounded product-publication connector
+Snapshot date: 2026-08-31
 Connector ID: `ozon`  
 Connector SDK: v1
 
@@ -60,4 +60,16 @@ Stock uses `/v2/product/info/stocks-by-warehouse/fbs`, selecting by seller `offe
 
 Product `last_id` is opaque and bounded. Reusing the same continuation value for a non-empty page is rejected. Collection sizes and bodies are bounded. The manifest provides conservative host scheduling guidance (concurrency 2, 250 ms minimum interval, 15 s timeout, five bounded attempts); endpoint-specific Ozon limits and normalized retry metadata take precedence.
 
-Unknown additive response fields are ignored, while identity/type/boundedness mismatches are treated as remote-contract failure. Task 012 intentionally declares no write capability.
+Unknown additive response fields are ignored, while identity/type/boundedness mismatches are treated as remote-contract failure.
+
+## `products.write`
+
+Task 217 admits a bounded import slice through `POST /v2/product/import` and
+status lookup through `POST /v1/product/import/info`. The request contains
+validated offer/SKU, name, description, numeric category, barcode, exact minor
+unit price, VAT and integer dimensions. Ozon's task ID is returned as
+`remote_operation_id`; only a later status response can produce `published`.
+
+The adapter rejects media and non-empty canonical attributes until their
+provider-specific mapping and released-upload bridge pass qualification. Raw
+Ozon responses, credentials and arbitrary URLs never enter the host receipt.

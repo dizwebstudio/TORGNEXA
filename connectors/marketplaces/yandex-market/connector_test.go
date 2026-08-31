@@ -235,6 +235,32 @@ func TestWriteInventoryUsesPartnerWarehouseEndpoint(t *testing.T) {
 	}
 }
 
+func TestProductPublicationUsesBusinessOfferMappings(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, RequestID: "ym-request-1", Body: []byte(`{"status":"OK"}`)}}}
+	connector := New(transport, staticConfig{partnerConfig()}, func() time.Time { return time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC) })
+	request := publicationRequest(t, "YM-SKU-1", "yandex-market")
+	receipt, err := connector.WriteProductPublication(context.Background(), testAccount(), testRuntime{apiKey()}, request)
+	if err != nil || receipt.Status != sdk.PublicationAccepted || receipt.RemoteID != "YM-SKU-1" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	remoteRequest := transport.requests[0]
+	if remoteRequest.Path != "/v2/businesses/10001/offer-mappings/update" || remoteRequest.IdempotencyKey != "publication-1" || strings.Contains(string(remoteRequest.Body), "synthetic-yandex-market-api-key") || strings.Contains(string(remoteRequest.Body), "https://") {
+		t.Fatalf("unsafe or unexpected request: %+v body=%s", remoteRequest, remoteRequest.Body)
+	}
+}
+
+func publicationRequest(t *testing.T, sku, connectorID string) sdk.ProductPublicationRequest {
+	t.Helper()
+	var request sdk.ProductPublicationRequest
+	data := []byte(`{"operation":"create_product","snapshot":{"id":"snapshot-1","target":{"organization_id":"01890f4d-1e10-7cc0-9c4a-111111111111","workspace_id":"01890f4d-1e10-7cc0-9c4a-222222222222","product_id":"product-1","connector_account_id":"ym-account","connector_id":"yandex-market","locale":"ru-RU","jurisdiction":"RU"},"version":1,"sku":"YM-SKU-1","title":"Synthetic card","category_code":"123","dimension":{"length_mm":10,"width_mm":10,"height_mm":10,"weight_g":100},"price_minor":199900,"currency":"RUB","product_status":"active","catalog_version":1,"pim_version":1,"price_version":1,"media_version":1,"mapping_version":1,"capability_version":1,"assembled_at":"2026-08-10T11:00:00Z"},"idempotency_key":"publication-1","approval_request_id":"approval-1","quality_receipt_id":"receipt-1"}`)
+	if err := json.Unmarshal(data, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.Snapshot.SKU = sku
+	request.Snapshot.Target.ConnectorID = connectorID
+	return request
+}
+
 func TestWriteInventoryUsesConfiguredCampaignWarehouseEndpoint(t *testing.T) {
 	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"status":"OK"}`)}}}
 	connector := New(transport, staticConfig{campaignConfig()}, func() time.Time {

@@ -1,14 +1,14 @@
-# Ozon capability audit — 2026-08-10
+# Ozon capability audit — 2026-08-31
 
 ## Decision
 
-Admit Ozon as the second read-only marketplace reference provider and reuse the same additive Connector SDK v1 interfaces already proven by Wildberries.
+Admit Ozon as the second marketplace reference provider and reuse the same additive Connector SDK v1 interfaces already proven by Wildberries.
 
 | SDK capability | Ozon Seller API | Task 012 |
 |---|---|---|
 | `products.read` | `/v3/product/list`; `/v3/product/info/list` | enabled |
 | `inventory.read` | `/v2/warehouse/list`; `/v2/product/info/stocks-by-warehouse/fbs` | enabled |
-| product/price/inventory writes | Seller API mutation surfaces | denied |
+| `products.write` | `/v2/product/import`; `/v1/product/import/info` | enabled for bounded import/status slice; media and field-level attributes deferred |
 | orders/returns/finance/ads/chats | additional Seller API surfaces | deferred |
 
 ## Provider-neutral proof
@@ -16,6 +16,11 @@ Admit Ozon as the second read-only marketplace reference provider and reuse the 
 Task 012 adds no new Connector SDK read interface and no Ozon branch to Core, Sync or Reconciliation. Ozon product ID, `offer_id`, warehouse ID and SKU remain remote observations. Task 010 owns mapping, Task 013 owns propagation receipts/checkpoints and Task 014 owns drift/remediation.
 
 The different identity/pagination model versus Wildberries is intentional proof: WB uses `nmID/chrtID` and an `updatedAt+nmID` cursor, while Ozon uses product ID/`offer_id` and `last_id`; both fit the same `ProductReader`/`InventoryReader` host contracts.
+
+Task 217 adds a separate `ProductPublicationWriter`. It returns the Ozon import
+task ID as an asynchronous receipt and never interprets a partial import as a
+published product. Media upload and category-specific attribute mapping remain
+explicitly unsupported until the current provider contracts are qualified.
 
 ## Current compatibility notes
 

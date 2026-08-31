@@ -14,6 +14,8 @@ CREATE TABLE marketplace_publication_snapshots (
   offer_id text NOT NULL DEFAULT '',
   connector_account_id text NOT NULL,
   connector_id text NOT NULL,
+  locale text NOT NULL,
+  jurisdiction text NOT NULL,
   snapshot_version bigint NOT NULL,
   snapshot_digest char(64) NOT NULL,
   snapshot_document jsonb NOT NULL,
@@ -26,6 +28,7 @@ CREATE TABLE marketplace_publication_snapshots (
     (offer_id = '' OR offer_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$') AND
     connector_account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND
     connector_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND snapshot_version >= 1 AND
+    locale ~ '^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$' AND jurisdiction ~ '^[A-Z]{2}$' AND
     snapshot_digest ~ '^[0-9a-f]{64}$' AND jsonb_typeof(snapshot_document) = 'object' AND
     pg_column_size(snapshot_document) <= 1048576 AND snapshot_document::text !~* 'https?://'
   )
@@ -144,15 +147,21 @@ CREATE TRIGGER marketplace_publication_observations_no_update_delete BEFORE UPDA
 CREATE TRIGGER marketplace_publication_drifts_no_update_delete BEFORE UPDATE OR DELETE OR TRUNCATE ON marketplace_publication_drifts FOR EACH STATEMENT EXECUTE FUNCTION marketplace_publication_evidence_no_mutation();
 REVOKE DELETE,TRUNCATE ON marketplace_publication_operation_events,marketplace_publication_observations,marketplace_publication_drifts FROM PUBLIC;
 
-DO $$
-DECLARE table_name text;
-BEGIN
-  FOREACH table_name IN ARRAY ARRAY['marketplace_publication_snapshots','marketplace_publication_operations','marketplace_publication_operation_events','marketplace_publication_observations','marketplace_publication_drifts'] LOOP
-    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name);
-    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name);
-    EXECUTE format('CREATE POLICY %I ON %I FOR ALL USING (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true)) WITH CHECK (organization_id=current_setting(''app.organization_id'',true) AND workspace_id=current_setting(''app.workspace_id'',true))', table_name || '_tenant_policy', table_name);
-  END LOOP;
-END $$;
+ALTER TABLE marketplace_publication_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_snapshots FORCE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_operations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_operations FORCE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_operation_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_operation_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_observations FORCE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_drifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_publication_drifts FORCE ROW LEVEL SECURITY;
+CREATE POLICY marketplace_publication_snapshots_tenant_all ON marketplace_publication_snapshots FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+CREATE POLICY marketplace_publication_operations_tenant_all ON marketplace_publication_operations FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+CREATE POLICY marketplace_publication_events_tenant_all ON marketplace_publication_operation_events FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+CREATE POLICY marketplace_publication_observations_tenant_all ON marketplace_publication_observations FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+CREATE POLICY marketplace_publication_drifts_tenant_all ON marketplace_publication_drifts FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
 
 INSERT INTO migration_history(version,name,file_name,phase,risk,checksum_sha256,application_version,execution_id,duration_ms)
 VALUES(current_setting('torgnexa.migration_version')::integer,current_setting('torgnexa.migration_name'),current_setting('torgnexa.migration_file'),current_setting('torgnexa.migration_phase'),current_setting('torgnexa.migration_risk'),current_setting('torgnexa.migration_checksum'),current_setting('torgnexa.application_version'),current_setting('torgnexa.migration_execution_id'),current_setting('torgnexa.migration_duration_ms')::bigint);

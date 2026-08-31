@@ -1016,3 +1016,15 @@ Task 216 is repository-complete: добавлена approval-bound capability
 `CANCELLED`/`cancelled=true`. Операция расформировывает Pre-Alert пакетную
 заявку, но не отменяет отдельную терминальную перевозку и не является ручным
 возвратом; остальные эти границы остаются fail-closed.
+
+## Epic 172 — Marketplace Product Publication
+
+Task 217 is repository-complete: Epic 172 закрывает публикацию товаров через
+versioned provider-neutral snapshot, Product Quality gate, approval,
+tenant-scoped idempotency и durable worker. Для WB, Ozon и Yandex Market
+добавлен typed `products.write` runtime-контур с нормализованными
+accepted/processing/published/rejected/unknown результатами, API preflight,
+операциями, retry и reconciliation evidence. Остальные marketplace
+коннекторы, а также неподключённые media/attribute bridges, остаются явно
+denied/deferred до отдельной официальной qualification и не маскируются под
+успешную публикацию.

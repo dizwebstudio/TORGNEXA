@@ -12,11 +12,13 @@
 
 Read/receive: `products.read`, `prices.read`, `inventory.read`, `orders.read`, `notifications.receive`.
 
+`products.write` is admitted by Task 217 for the bounded business
+offer-mappings update surface.
+
 Write: `prices.write` for an exact desired price and `inventory.write` for one
 exact non-negative available quantity, admitted by Tasks 116 and 172.
 
-No product, order-status, campaign or notification-setting write capability is
-granted.
+No order-status, campaign or notification-setting write capability is granted.
 
 ## Configuration and remote identities
 

@@ -1892,6 +1892,32 @@ remain qualification-gated.
 - runtime support, frontend catalog, tests, architecture review and docs stay
   synchronized.
 
+## Phase 86 — Epic 172: Marketplace Product Publication
+
+`217`
+
+Task 217 closes the marketplace product publication contour under the original
+Epic 172 title. A versioned provider-neutral snapshot passes Product Quality,
+approval and account capability checks before a tenant-scoped idempotent
+PostgreSQL worker sends it through the typed connector surface. WB, Ozon and
+Yandex Market return normalized asynchronous receipts; unverified providers and
+unsupported media/attribute bridges remain fail-closed.
+
+### Gate RUNTIME-217
+
+- Product data crosses the connector boundary only as a validated immutable
+  snapshot; provider tokens, raw responses, arbitrary URLs and quarantined
+  media do not cross it;
+- live writes require an active marketplace account, enabled `products.write`,
+  a matching non-stale quality receipt and an approved publication request;
+- repeated idempotency keys cannot create a second remote card, while timeout
+  outcomes remain `unknown` until read-after-write/reconciliation;
+- migration 44 is cataloged with a verified checksum, high-risk rollout backup
+  and forced tenant RLS on publication evidence;
+- OpenAPI, generated SDKs, connector manifests/support, API/worker/UI,
+  deterministic provider fixtures, architecture review and Docker qualification
+  remain synchronized.
+
 ## Phase 73 — 5Post order cancellation
 
 `204`

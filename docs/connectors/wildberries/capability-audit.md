@@ -1,14 +1,14 @@
-# Wildberries capability audit — 2026-08-10
+# Wildberries capability audit — 2026-08-31
 
 ## Decision
 
-Admit only the minimum read-only reference capabilities needed to prove the marketplace SDK against a real official API:
+Admit the read baseline and the bounded marketplace publication slice needed to prove the marketplace SDK against the official API:
 
 | SDK capability | WB surface | Task 011 |
 |---|---|---|
 | `products.read` | Content `POST /content/v2/get/cards/list` | enabled |
 | `inventory.read` | Marketplace `GET /api/v3/warehouses`; `POST /api/v3/stocks/{warehouseId}` | enabled |
-| `products.write` | Content card mutation methods | denied |
+| `products.write` | Content `/content/v2/cards/upload` and `/content/v2/cards/update` | enabled for bounded snapshot card create/update |
 | `prices.read/write` | Prices/discounts APIs | deferred |
 | `inventory.write` | `PUT/DELETE /api/v3/stocks/{warehouseId}` | denied |
 | `orders.read` | FBS/DBS/DBW order APIs | deferred |
@@ -26,6 +26,15 @@ Admit only the minimum read-only reference capabilities needed to prove the mark
 ## Reconciliation mapping
 
 `nmID`, `chrtID`, warehouse ID and seller SKU remain remote observations. Persistent local/remote identity is represented only by Task-010 `EntityMapping`; Task-013 Sync Engine owns propagation state/receipts and Task-014 owns drift/remediation evidence.
+
+## Marketplace publication slice
+
+Task 217 adds a separate `ProductPublicationWriter`. It sends only a validated
+provider-neutral snapshot, forwards the host idempotency key, and returns an
+accepted receipt without treating HTTP 200 as final publication. The bounded
+status reader uses the existing cards projection. Released media and
+provider-specific characteristic/category bridges are rejected explicitly until
+their official fixtures and upload pipeline are qualified.
 
 ## Release rule
 

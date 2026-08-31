@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 
-	"github.com/torgnexa/torgnexa/internal/core/marketplacepublication"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -49,7 +47,7 @@ func (connector *Connector) WriteProductPublication(ctx context.Context, account
 	if request.DryRun {
 		return sdk.ProductPublicationReceipt{Status: sdk.PublicationDryRun, ObservedAt: connector.now().UTC()}, nil
 	}
-	if request.Operation != marketplacepublication.OperationCreateProduct && request.Operation != marketplacepublication.OperationUpdateProduct && request.Operation != marketplacepublication.OperationUpdateVariant && request.Operation != marketplacepublication.OperationUpdateAttributes {
+	if request.Operation != "create_product" && request.Operation != "update_product" && request.Operation != "update_variant" && request.Operation != "update_attributes" {
 		return sdk.ProductPublicationReceipt{}, publicationUnsupported("operation_not_qualified")
 	}
 	if len(request.Snapshot.Media) > 0 {
@@ -64,13 +62,13 @@ func (connector *Connector) WriteProductPublication(ctx context.Context, account
 		return sdk.ProductPublicationReceipt{}, sdk.ErrInvalidProductPublication
 	}
 	path := "/content/v2/cards/upload"
-	if request.Operation != marketplacepublication.OperationCreateProduct {
+	if request.Operation != "create_product" {
 		path = "/content/v2/cards/update"
 	}
 	var response Response
 	err = runtime.Secrets().UseSecret(ctx, account.SecretReference, func(secret []byte) error {
 		var callErr error
-		response, callErr = connector.transport.Do(ctx, Request{Method: http.MethodPost, Host: contentHost, Path: path, Body: body, Token: secret, IdempotencyKey: request.IdempotencyKey})
+		response, callErr = connector.transport.Do(ctx, Request{Method: "POST", Host: contentHost, Path: path, Body: body, Token: secret, IdempotencyKey: request.IdempotencyKey})
 		if callErr != nil {
 			return normalizedTransportError()
 		}

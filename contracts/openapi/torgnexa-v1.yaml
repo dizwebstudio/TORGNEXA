@@ -41,7 +41,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflight'}}}}
       responses:
         '200': {description: Snapshot and quality receipt passed the local publication gate, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflightResult'}}}}
-        '422': {description: Quality receipt is missing, stale or does not match the snapshot}
+        '422': {description: 'Quality receipt is missing, stale or does not match the snapshot'}
   /marketplace-publications:
     get:
       operationId: listMarketplacePublications
@@ -57,8 +57,8 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationRequest'}}}}
       responses:
         '202': {description: Publication snapshot durably queued after preflight, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublication'}}}}
-        '409': {description: Account capability or approved publication request is unavailable}
-        '422': {description: Quality receipt is missing, stale or does not match the snapshot}
+        '409': {description: 'Account capability or approved publication request is unavailable'}
+        '422': {description: 'Quality receipt is missing, stale or does not match the snapshot'}
   /marketplace-publications/{operation_id}:
     get:
       operationId: getMarketplacePublication
@@ -78,6 +78,15 @@ paths:
       responses:
         '202': {description: Unresolved publication operation returned to the durable queue, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublication'}}}}
         '409': {description: Only an unknown or needs-attention operation can be retried}
+  /marketplace-publications/{operation_id}/drifts:
+    get:
+      operationId: listMarketplacePublicationDrifts
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: operation_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Redacted reconciliation findings for the operation, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationDriftPage'}}}}
+        '404': {description: Publication operation not found}
   /social/channels:
     get:
       operationId: listSocialChannels
@@ -3329,6 +3338,24 @@ components:
         decision: {type: string, enum: [ready, ready_with_warnings]}
         quality_receipt_id: {type: string, maxLength: 192}
         valid_until: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplacePublicationDrift:
+      type: object
+      additionalProperties: false
+      required: [type, snapshot_id, detected_at]
+      properties:
+        type: {type: string, enum: [missing_remote_product, duplicate_remote_product, content_mismatch, attribute_mismatch, media_mismatch, mapping_conflict, moderation_rejected, publication_status_mismatch, unknown_write_outcome]}
+        snapshot_id: {type: string, maxLength: 192}
+        remote_id: {type: string, maxLength: 192}
+        expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observed_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observed_state: {type: string, enum: [draft, preflight, queued, sending, accepted, processing, published, rejected, unknown, needs_attention, cancelled]}
+        detected_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplacePublicationDriftPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplacePublicationDrift'}}
     SortableID:
       type: string
       pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'

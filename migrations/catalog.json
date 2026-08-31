@@ -893,6 +893,26 @@
       },
       "backfill": null,
       "sha256": "45b177e81bfe51b38b408a7a63bafd5c455ee9abbf2ac428e5b935ef2e424584"
+    },
+    {
+      "version": 44,
+      "name": "marketplace_product_publication",
+      "file": "000044_marketplace_product_publication.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [33, 37, 43],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+    "sha256": "78804b419ddfeec13af06e7cfb7ce70f0a2375ef39981cdca5d4a746da9fe092"
     }
   ]
 }

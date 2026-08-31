@@ -4,6 +4,7 @@
 package marketplacepublication
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -110,6 +111,12 @@ type Target struct {
 	ConnectorID        string `json:"connector_id"`
 	Locale             string `json:"locale"`
 	Jurisdiction       string `json:"jurisdiction"`
+}
+
+// SameAccount reports whether two targets point at the same tenant-scoped
+// connector account. It is an identity comparison, not provider dispatch.
+func (t Target) SameAccount(other Target) bool {
+	return bytes.Equal([]byte(strings.Join([]string{t.OrganizationID, t.WorkspaceID, t.ConnectorAccountID, t.ConnectorID}, "\x00")), []byte(strings.Join([]string{other.OrganizationID, other.WorkspaceID, other.ConnectorAccountID, other.ConnectorID}, "\x00")))
 }
 
 func (target Target) Validate() error {
@@ -332,7 +339,7 @@ func CanTransition(from, to State) bool {
 	case StateProcessing:
 		return to == StatePublished || to == StateRejected || to == StateUnknown || to == StateNeedsAttention
 	case StateUnknown:
-		return to == StateProcessing || to == StatePublished || to == StateRejected || to == StateNeedsAttention || to == StateCancelled
+		return to == StateProcessing || to == StatePublished || to == StateRejected || to == StateNeedsAttention || to == StateQueued || to == StateCancelled
 	case StateNeedsAttention:
 		return to == StateQueued || to == StateCancelled
 	}

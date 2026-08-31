@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "3feac5ceed5df1b268a616d33e83cdc67c28102d94392edd0faee947d371c8e9",
+    "sha256": "a50c2dc65a8642a750c832908e031a55ecef11b95c5af806772a52b4cf2cde13",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -360,6 +360,11 @@
       "path": "/connector-accounts:enable"
     },
     {
+      "operation_id": "enqueueMarketplacePublication",
+      "method": "POST",
+      "path": "/marketplace-publications"
+    },
+    {
       "operation_id": "enrollConnectorCredentials",
       "method": "POST",
       "path": "/connector-accounts:credentials"
@@ -468,6 +473,11 @@
       "operation_id": "getMCPAgentKillSwitch",
       "method": "GET",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "getMarketplacePublication",
+      "method": "GET",
+      "path": "/marketplace-publications/{operation_id}"
     },
     {
       "operation_id": "getMarkingOverview",
@@ -715,6 +725,16 @@
       "path": "/settings/mcp-accounts"
     },
     {
+      "operation_id": "listMarketplacePublicationDrifts",
+      "method": "GET",
+      "path": "/marketplace-publications/{operation_id}/drifts"
+    },
+    {
+      "operation_id": "listMarketplacePublications",
+      "method": "GET",
+      "path": "/marketplace-publications"
+    },
+    {
       "operation_id": "listNotificationDeliveries",
       "method": "GET",
       "path": "/notifications/{notification_id}/deliveries"
@@ -855,6 +875,11 @@
       "path": "/workflow-commands/pause"
     },
     {
+      "operation_id": "preflightMarketplacePublication",
+      "method": "POST",
+      "path": "/marketplace-publications/preflight"
+    },
+    {
       "operation_id": "previewAIEgress",
       "method": "POST",
       "path": "/settings/ai-egress-policy:preview"
@@ -963,6 +988,11 @@
       "operation_id": "retireApprovalPolicy",
       "method": "DELETE",
       "path": "/approval-policies/{policy_id}"
+    },
+    {
+      "operation_id": "retryMarketplacePublication",
+      "method": "POST",
+      "path": "/marketplace-publications/{operation_id}/retry"
     },
     {
       "operation_id": "retryWorkflowRun",

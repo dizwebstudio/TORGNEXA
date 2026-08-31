@@ -25,7 +25,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 ]);
 
 export const navigationSections = [
-  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "returns", "incidents", "marking"]},
+  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "returns", "incidents", "marking"]},
   {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "social"]},
   {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "finance", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
@@ -35,6 +35,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "dashboard", label: "Обзор", path: "/", risk: "READ", icon: "dashboard", shortcut: "G D"},
   {id: "catalog", label: "Каталог", path: "/catalog", capability: "products.read", risk: "READ", icon: "catalog", shortcut: "G C"},
   {id: "publication-quality", label: "Качество публикации", path: "/publication-quality", capability: "products.read", risk: "READ", icon: "compliance", shortcut: "G Q"},
+  {id: "marketplace-publication", label: "Публикация товаров", path: "/marketplace-publications", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "sync"},
   {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G O"},
   {id: "returns", label: "Возвраты", path: "/returns", capability: "orders.returns.read", risk: "WRITE_SENSITIVE", icon: "orders"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},

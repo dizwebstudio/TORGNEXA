@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -99,7 +100,9 @@ func (api marketplacePublicationAPI) enqueue(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), request.Snapshot.Target.ConnectorAccountID)
-	if err != nil || account.Status != sdk.AccountActive || account.ConnectorID != request.Snapshot.Target.ConnectorID || account.Family != sdk.FamilyMarketplace || !api.runtime.SupportsCapability(account.ConnectorID, "products.write") {
+	accountTarget := marketplacepublication.Target{OrganizationID: account.OrganizationID, WorkspaceID: account.WorkspaceID, ConnectorAccountID: account.ID, ConnectorID: account.ConnectorID}
+	supportsProductsWrite := api.runtime.SupportsCapability(account.ConnectorID, "products.write")
+	if err != nil || account.Status != sdk.AccountActive || !request.Snapshot.Target.SameAccount(accountTarget) || account.Family != sdk.FamilyMarketplace || !supportsProductsWrite {
 		writeProblem(w, http.StatusConflict, "Marketplace product publication is not enabled for this account")
 		return
 	}
@@ -131,7 +134,7 @@ func (api marketplacePublicationAPI) enqueue(w http.ResponseWriter, r *http.Requ
 	}
 	digest, _ := request.Snapshot.ComputeDigest()
 	now := api.now()
-	operation := marketplacepublication.Operation{ID: stableID("mpo_", 32, scope, key), Target: request.Snapshot.Target, SnapshotID: request.Snapshot.ID, SnapshotDigest: digest, Kind: request.Operation, State: marketplacepublication.StatePreflight, IdempotencyKey: key, DryRun: request.DryRun, ApprovalRef: approvalID, QualityReceiptRef: request.QualityReceiptID, Version: 1, CreatedAt: now, UpdatedAt: now}
+	operation := marketplacepublication.Operation{ID: stableID("mpo_", 32, scope, key), Target: request.Snapshot.Target, SnapshotID: request.Snapshot.ID, SnapshotDigest: digest, Kind: request.Operation, State: marketplacepublication.StateQueued, IdempotencyKey: key, RemoteID: request.RemoteID, DryRun: request.DryRun, ApprovalRef: approvalID, QualityReceiptRef: request.QualityReceiptID, Version: 1, CreatedAt: now, UpdatedAt: now}
 	if err := api.repository.SaveSnapshot(r.Context(), scope, request.Snapshot); err != nil {
 		writeMarketplacePublicationError(w, err)
 		return
@@ -160,6 +163,10 @@ func (api marketplacePublicationAPI) list(w http.ResponseWriter, r *http.Request
 
 func (api marketplacePublicationAPI) item(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, MarketplacePublicationsPath+"/")
+	if strings.HasSuffix(path, "/drifts") && r.Method == http.MethodGet {
+		api.drifts(w, r, strings.TrimSuffix(path, "/drifts"))
+		return
+	}
 	if strings.HasSuffix(path, "/retry") && r.Method == http.MethodPost {
 		api.retry(w, r, strings.TrimSuffix(path, "/retry"))
 		return
@@ -179,6 +186,24 @@ func (api marketplacePublicationAPI) item(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, operation)
+}
+
+func (api marketplacePublicationAPI) drifts(w http.ResponseWriter, r *http.Request, id string) {
+	if !safePublicationID(id) || api.repository == nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok {
+		writeProblem(w, http.StatusForbidden, "Forbidden")
+		return
+	}
+	items, err := api.repository.ListDrifts(r.Context(), scope, id, 100)
+	if err != nil {
+		writeMarketplacePublicationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (api marketplacePublicationAPI) retry(w http.ResponseWriter, r *http.Request, id string) {
@@ -206,7 +231,16 @@ func (api marketplacePublicationAPI) retry(w http.ResponseWriter, r *http.Reques
 }
 
 func qualityReceiptMatches(receipt publicationquality.PublicationGateReceipt, snapshot marketplacepublication.Snapshot, now time.Time) bool {
-	return receipt.Target.OrganizationID == snapshot.Target.OrganizationID && receipt.Target.WorkspaceID == snapshot.Target.WorkspaceID && receipt.Target.ProductID == snapshot.Target.ProductID && receipt.Target.OfferID == snapshot.Target.OfferID && receipt.Target.ConnectorAccountID == snapshot.Target.ConnectorAccountID && receipt.Target.ConnectorID == snapshot.Target.ConnectorID && receipt.Target.Locale == snapshot.Target.Locale && receipt.Target.Jurisdiction == snapshot.Target.Jurisdiction && receipt.ProductVersion == snapshot.CatalogVersion && receipt.PriceVersion == snapshot.PriceVersion && receipt.MediaVersion == snapshot.MediaVersion && receipt.MappingVersion == snapshot.MappingVersion && receipt.CapabilityVersion == snapshot.CapabilityVersion && receipt.Decision.AllowsPublication() && receipt.ValidUntil.After(now)
+	if receipt.Target.ChannelFamily != "marketplace" || !sameQualityTarget(receipt.Target, snapshot.Target) {
+		return false
+	}
+	return receipt.ProductVersion == snapshot.CatalogVersion && receipt.PriceVersion == snapshot.PriceVersion && receipt.MediaVersion == snapshot.MediaVersion && receipt.MappingVersion == snapshot.MappingVersion && receipt.CapabilityVersion == snapshot.CapabilityVersion && receipt.Decision.AllowsPublication() && receipt.ValidUntil.After(now)
+}
+
+func sameQualityTarget(receipt publicationquality.Target, target marketplacepublication.Target) bool {
+	left := strings.Join([]string{receipt.OrganizationID, receipt.WorkspaceID, receipt.ProductID, receipt.OfferID, receipt.ConnectorAccountID, receipt.ConnectorID, receipt.ChannelFamily, receipt.Locale, receipt.Jurisdiction}, "\x00")
+	right := strings.Join([]string{target.OrganizationID, target.WorkspaceID, target.ProductID, target.OfferID, target.ConnectorAccountID, target.ConnectorID, target.Locale, target.Jurisdiction}, "\x00")
+	return bytes.Equal([]byte(left), []byte(right))
 }
 
 func writeMarketplacePublicationError(w http.ResponseWriter, err error) {

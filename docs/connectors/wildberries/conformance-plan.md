@@ -10,7 +10,8 @@ The provider adapter runs all thirteen Task-064 checks. Its sandbox portion uses
 
 ## Semantic fixture coverage
 
-- manifest JSON equals executable manifest and has no write capability;
+- manifest JSON equals executable manifest and declares the bounded
+  `products.write` slice in addition to the read capabilities;
 - `/ping` health covers both required API domains;
 - rejected auth is bounded and normalized;
 - product card response maps `nmID`, `chrtID`, SKUs and UTC update time;
@@ -19,6 +20,9 @@ The provider adapter runs all thirteen Task-064 checks. Its sandbox portion uses
 - stock requests send `chrtIds` and reject unexpected/duplicate IDs or negative quantities;
 - 429 retry metadata is bounded and raw remote body is never surfaced;
 - transport failure does not propagate a raw error string;
+- product snapshot create/update uses the documented Content API path, forwards
+  idempotency metadata, never sends an arbitrary media URL and keeps accepted
+  distinct from published;
 - provider package imports only the Connector SDK prefix and approved standard library.
 
 ## Sandbox / network qualification
