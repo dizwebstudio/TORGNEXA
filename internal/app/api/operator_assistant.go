@@ -257,7 +257,7 @@ func answerView(value *operatorassistant.Answer) *assistantAnswerView {
 	if value == nil {
 		return nil
 	}
-	out := &assistantAnswerView{Summary: value.Summary, Text: operatorassistant.SafeMarkdown(value.Text), GroundingState: string(value.GroundingState), Coverage: value.Coverage, Limitations: append([]string(nil), value.Limitations...), Provider: value.Provider, Model: value.Model, AIGenerated: value.AIGenerated, OutputKind: string(value.OutputKind), AnswerDigest: value.AnswerDigest}
+	out := &assistantAnswerView{Summary: value.Summary, Text: operatorassistant.SafeMarkdown(value.Text), GroundingState: string(value.GroundingState), Coverage: value.Coverage, Limitations: append([]string(nil), value.Limitations...), Provider: value.TransportRef, Model: value.Model, AIGenerated: value.AIGenerated, OutputKind: string(value.OutputKind), AnswerDigest: value.AnswerDigest}
 	out.Evidence = make([]assistantEvidenceView, 0, len(value.Evidence))
 	for _, item := range value.Evidence {
 		out.Evidence = append(out.Evidence, evidenceView(item))

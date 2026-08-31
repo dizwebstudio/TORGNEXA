@@ -1,6 +1,14 @@
 # ADR-0123: AI-помощник оператора как grounded read/preview контур
 
-## Решение
+Status: Accepted
+
+## Context
+
+Оператору нужен безопасный способ получить объяснение текущего состояния
+магазина без превращения модели в источник истины или привилегированный
+исполнитель.
+
+## Decision
 
 Добавить provider-neutral модуль `internal/core/operatorassistant` и
 tenant-scoped PostgreSQL read model для сессий/runs/evidence metadata. Сервер
@@ -18,7 +26,7 @@ caller-assembled prompt не обеспечивает citations, freshness, acto
 run lifecycle и policy boundary. Новый путь отделён от legacy API и не
 создаёт второго источника истины.
 
-## Безопасность и эксплуатация
+## Security and privacy impact
 
 Raw prompt/provider payload/chain-of-thought/credentials/лишняя PII не
 персистируются. FORCE RLS, bounded JSON, optimistic version, idempotency,
@@ -27,7 +35,30 @@ Raw prompt/provider payload/chain-of-thought/credentials/лишняя PII не
 только существующей egress/secret policy. Kill switch и retention используют
 общие operational контуры.
 
-## Последствия
+## Migration and data impact
+
+Миграция 000038 добавляет только новые tenant-scoped таблицы; существующие
+доменные записи не переписываются. Таблицы можно отключить и пересобрать без
+остановки commerce writes.
+
+## Operational impact
+
+Детерминированный baseline не требует AI-провайдера. Состояния run монотонны,
+lease/retry ограничены, а source outage виден оператору как partial/stale.
+
+## Alternatives considered
+
+- Оставить только legacy completion endpoint: отклонено из-за отсутствия
+  server-side grounding, citations и lifecycle.
+- Дать модели прямую запись: отклонено, потому что это обходит policy,
+  approval, idempotency и audit.
+
+## Compatibility impact
+
+Legacy `/settings/ai-providers:analyze` остаётся совместимым; новые пути
+`/assistant/*` добавляются аддитивно и используют отдельные permission.
+
+## Consequences
 
 Первые ответы могут быть `insufficient_data` для источников, не подключённых к
 adapter registry. Это намеренное fail-closed поведение. Полная live-provider

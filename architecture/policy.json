@@ -103,6 +103,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/operatorassistant",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/orders",
       "kind": "core_domain"
     },
@@ -420,6 +424,10 @@
     },
     {
       "path": "internal/platform/postgres/notificationrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/operatorassistantrepo",
       "kind": "infrastructure_adapter"
     },
     {
