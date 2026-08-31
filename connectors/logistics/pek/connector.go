@@ -11,16 +11,27 @@ import (
 
 // Connector is the provider-neutral ПЭК logistics adapter.
 type Connector struct {
-	transport Transport
-	now       func() time.Time
+	transport     Transport
+	now           func() time.Time
+	configuration ConfigurationSource
 }
 
 // New constructs a ПЭК connector with a host-owned transport.
 func New(transport Transport, now func() time.Time) *Connector {
+	return newConnector(transport, nil, now)
+}
+
+// NewWithConfiguration constructs a ПЭК connector with tenant-scoped
+// non-secret sender configuration for preregistration writes.
+func NewWithConfiguration(transport Transport, configuration ConfigurationSource, now func() time.Time) *Connector {
+	return newConnector(transport, configuration, now)
+}
+
+func newConnector(transport Transport, configuration ConfigurationSource, now func() time.Time) *Connector {
 	if now == nil {
 		now = time.Now
 	}
-	return &Connector{transport: transport, now: now}
+	return &Connector{transport: transport, now: now, configuration: configuration}
 }
 
 // Manifest returns the canonical ПЭК connector manifest.

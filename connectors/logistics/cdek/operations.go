@@ -2,6 +2,7 @@ package cdek
 
 import (
 	"context"
+
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -68,7 +69,9 @@ func (c *Connector) CancelLogisticsShipment(ctx context.Context, a sdk.Account, 
 	return validateShipment(out)
 }
 func (c *Connector) CreateLogisticsReturn(ctx context.Context, a sdk.Account, r sdk.Runtime, q sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
-	if q.OriginalRemoteID == "" || q.ExternalID == "" || q.IdempotencyKey == "" {
+	// CDEK exposes two distinct return operations: refusal (no body) and
+	// clientReturn (the selected return tariff is required).
+	if q.Validate() != nil || (q.MailType != "refusal" && (q.MailType != "client_return" || q.TariffCode < 1)) {
 		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var out sdk.ShipmentResult
@@ -124,7 +127,7 @@ var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.PickupPointReader = (*Connector)(nil)
 
 func (c *Connector) VerifyLogisticsWebhook(ctx context.Context, a sdk.Account, r sdk.Runtime, body, signature []byte) (sdk.LogisticsWebhook, error) {
-	if len(body) == 0 || len(body) > 2<<20 || len(signature) == 0 {
+	if len(body) == 0 || len(body) > 2<<20 {
 		return sdk.LogisticsWebhook{}, remote(sdk.ErrorInvalidRequest, "webhook_rejected", 0)
 	}
 	var out sdk.LogisticsWebhook

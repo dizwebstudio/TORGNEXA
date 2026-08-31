@@ -36,7 +36,7 @@ type socialReceiptStore interface {
 	Record(context.Context, tenancy.Scope, socialdispatchrepo.Receipt) (socialdispatchrepo.Receipt, error)
 }
 
-func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *workerrepo.Repository, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, workerID string, poll time.Duration, batch int, lease time.Duration) error {
+func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *workerrepo.Repository, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, workerID string, poll time.Duration, batch int, lease time.Duration, media sdk.MediaAccessor) error {
 	return pollLoop(ctx, poll, func() error {
 		jobs, err := dispatch.Claim(ctx, workerrepo.KindSocialPublication, workerID, batch, lease)
 		if errors.Is(err, workerrepo.ErrSchemaUnavailable) {
@@ -46,7 +46,7 @@ func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *w
 			return err
 		}
 		for _, job := range jobs {
-			if err := processSocialPublication(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job); err != nil {
+			if err := processSocialPublication(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job, media); err != nil {
 				if releaseErr := dispatch.Release(ctx, job, retryDelay(job.AttemptCount), "social_publication_failed"); releaseErr != nil {
 					return releaseErr
 				}
@@ -61,7 +61,7 @@ func runSocialPublications(ctx context.Context, logger *slog.Logger, dispatch *w
 	})
 }
 
-func processSocialPublication(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, job workerrepo.Job) error {
+func processSocialPublication(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, job workerrepo.Job, media sdk.MediaAccessor) error {
 	secretReady := dependencyReady(secretProvider)
 	refreshReady := dependencyReady(refreshCoordinator)
 	if ctx == nil || publications == nil || accounts == nil || receipts == nil || !secretReady || !refreshReady || registry == nil || !job.Scope.Valid() {
@@ -86,7 +86,7 @@ func processSocialPublication(ctx context.Context, publications socialPublicatio
 	case social.PublicationPublishing:
 		return recoverSocialPublication(ctx, publications, receipts, job.Scope, scope, publication)
 	case social.PublicationReady:
-		return publishSocialText(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job.Scope, scope, publication)
+		return publishSocial(ctx, publications, accounts, receipts, secretProvider, refreshCoordinator, registry, job.Scope, scope, publication, media)
 	case social.PublicationPublished, social.PublicationFailed, social.PublicationCancelled:
 		return nil
 	default:
@@ -98,7 +98,7 @@ func dependencyReady(value any) bool {
 	return value != nil
 }
 
-func publishSocialText(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, tenantScope tenancy.Scope, scope social.Scope, publication social.Publication) error {
+func publishSocial(ctx context.Context, publications socialPublicationStore, accounts socialAccountStore, receipts socialReceiptStore, secretProvider secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, tenantScope tenancy.Scope, scope social.Scope, publication social.Publication, media sdk.MediaAccessor) error {
 	variant, err := publications.Variant(ctx, scope, publication.VariantID)
 	if err != nil {
 		return err
@@ -107,8 +107,15 @@ func publishSocialText(ctx context.Context, publications socialPublicationStore,
 	if err != nil {
 		return err
 	}
-	if variant.Format != social.FormatText || channel.Status != social.ChannelActive || !channel.Supports(social.CapabilityPostText) {
+	request, capability, err := socialPublishRequest(publication, variant)
+	if err != nil || channel.Status != social.ChannelActive || !channel.Supports(capability) {
 		return failSocialPublication(ctx, publications, scope, publication, "capability_unavailable")
+	}
+	if len(request.Buttons) > 0 && !channel.Supports(social.CapabilityPostButtons) {
+		return failSocialPublication(ctx, publications, scope, publication, "capability_unavailable")
+	}
+	if request.Kind != sdk.SocialPostText && media == nil {
+		return failSocialPublication(ctx, publications, scope, publication, "media_unavailable")
 	}
 	account, err := accounts.AccountByID(ctx, tenantScope.OrganizationID().String(), tenantScope.WorkspaceID().String(), channel.ConnectorAccountID)
 	if err != nil {
@@ -123,9 +130,12 @@ func publishSocialText(ctx context.Context, publications socialPublicationStore,
 	}
 	allowed := false
 	for _, setting := range settings {
-		allowed = allowed || (setting.Capability == sdk.Capability("social.post.text") && setting.Enabled)
+		allowed = allowed || (setting.Capability == sdk.Capability(capability) && setting.Enabled)
 	}
 	if !allowed {
+		return failSocialPublication(ctx, publications, scope, publication, "capability_unavailable")
+	}
+	if len(request.Buttons) > 0 && !socialAccountCapabilityEnabled(settings, social.CapabilityPostButtons) {
 		return failSocialPublication(ctx, publications, scope, publication, "capability_unavailable")
 	}
 	publisher, err := registry.socialPublisher(tenantScope, account)
@@ -140,7 +150,7 @@ func publishSocialText(ctx context.Context, publications socialPublicationStore,
 	if err != nil {
 		return err
 	}
-	result, publishErr := publisher.PublishSocial(ctx, account, runtime, sdk.SocialPublishRequest{PublicationID: publication.ID.String(), Kind: sdk.SocialPostText, Text: variant.Body}, nil)
+	result, publishErr := publisher.PublishSocial(ctx, account, runtime, request, media)
 	if publishErr != nil {
 		reason := "remote_rejected"
 		var remote *sdk.RemoteError
@@ -159,6 +169,48 @@ func publishSocialText(ctx context.Context, publications socialPublicationStore,
 	}
 	_, err = changeSocialPublication(ctx, publications, scope, publishing, social.PublicationPublished, "")
 	return err
+}
+
+func socialPublishRequest(publication social.Publication, variant social.ContentVariant) (sdk.SocialPublishRequest, social.Capability, error) {
+	if !publication.ID.Valid() || variant.Validate() != nil {
+		return sdk.SocialPublishRequest{}, "", social.ErrInvalidRecord
+	}
+	request := sdk.SocialPublishRequest{PublicationID: publication.ID.String(), Text: variant.Body}
+	request.Buttons = make([]sdk.SocialButton, 0, len(variant.Buttons))
+	for _, button := range variant.Buttons {
+		request.Buttons = append(request.Buttons, sdk.SocialButton{Text: button.Text, URL: button.URL})
+	}
+	var capability social.Capability
+	switch variant.Format {
+	case social.FormatText:
+		request.Kind = sdk.SocialPostText
+		capability = social.CapabilityPostText
+	case social.FormatImage, social.FormatGallery:
+		request.Kind = sdk.SocialPostMedia
+		capability = social.CapabilityPostMedia
+	case social.FormatVideo:
+		request.Kind = sdk.SocialPostVideo
+		capability = social.CapabilityPostVideo
+	default:
+		return sdk.SocialPublishRequest{}, "", social.ErrCapabilityMissing
+	}
+	request.Media = make([]sdk.SocialMediaRef, 0, len(variant.Media))
+	for _, ref := range variant.Media {
+		request.Media = append(request.Media, sdk.SocialMediaRef{UploadID: ref.UploadID, Kind: sdk.SocialMediaKind(ref.Kind), AltText: ref.AltText})
+	}
+	if request.Validate() != nil {
+		return sdk.SocialPublishRequest{}, "", social.ErrInvalidRecord
+	}
+	return request, capability, nil
+}
+
+func socialAccountCapabilityEnabled(settings []sdk.AccountCapabilitySetting, wanted social.Capability) bool {
+	for _, setting := range settings {
+		if setting.Capability == sdk.Capability(wanted) && setting.Enabled {
+			return true
+		}
+	}
+	return false
 }
 
 func socialReasonCode(value string) string {

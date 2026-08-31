@@ -18,6 +18,11 @@ test("shell exposes icon navigation, command search, theme and activity center",
   assert.match(shell, /Страница не найдена/);
   assert.match(shell, /Не удалось загрузить часть активности/);
   assert.match(shell, /Повторить/);
+  assert.match(shell, /Все разделы/);
+  assert.match(shell, /secondary-navigation/);
+  assert.match(shell, /primaryNavigation/);
+  assert.match(read("shell/navigation.ts"), /navigationSections/);
+  assert.match(read("styles.css"), /\.nav-more-panel/);
 });
 
 test("dashboard is operational, permission-aware and loads metrics independently", () => {
@@ -127,8 +132,8 @@ test("integration catalog groups every connector by an explicit runtime surface"
   assert.match(generated, /surface: "marketplace"/);
   assert.match(generated, /healthOnly: true/);
   const docs = read("pages/PublicDocumentationPage.tsx");
-  for (const token of ["Lamoda", "Долями", "Google Gemini", "Grok (xAI)", "operations.realtime.read", "Профиль пользователя", "Фото профиля", "make community-e2e"]) assert.ok(docs.includes(token), token);
-  for (const token of ["docsTitle", "docsDescription", "application/ld+json", "canonical", "docs-reading-paths", "docs-details", "Автоматизация и расширения"]) assert.ok(docs.includes(token), token);
+  for (const token of ["Lamoda", "Долями", "Google Gemini", "Grok (xAI)", "operations.realtime.read", "Профиль пользователя", "Фото профиля", "make community-e2e", "gtin_mismatch", "health history", "grounding_state"]) assert.ok(docs.includes(token), token);
+  for (const token of ["docsTitle", "docsDescription", "application/ld+json", "canonical", "docs-reading-paths", "docs-details", "Автоматизация и расширения", "Маркировка и УПД", "Состояние интеграций", "AI-помощник оператора"]) assert.ok(docs.includes(token), token);
 });
 
 test("AI provider settings keep form controls aligned and separated", () => {
@@ -357,12 +362,13 @@ test("public documentation follows current navigation, settings and sign-in beha
   const navigation = read("shell/navigation.ts");
   const settings = read("features/settings/settings-tabs.ts");
   const envExample = readRoot(".env.example");
-  const navigationLabels = [...navigation.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
+  const navigationItems = navigation.slice(navigation.indexOf("export const navigationItems"));
+  const navigationLabels = [...navigationItems.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   const settingsLabels = [...settings.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
-  assert.equal(navigationLabels.length, 22);
+  assert.equal(navigationLabels.length, 23);
   assert.equal(settingsLabels.length, 7);
   for (const label of [...navigationLabels, ...settingsLabels]) assert.ok(docs.includes(label), label);
-  for (const route of ["/catalog", "/publication-quality", "/orders", "/returns", "/inventory", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/audit", "/settings"]) {
+  for (const route of ["/catalog", "/publication-quality", "/orders", "/returns", "/inventory", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/security", "/audit", "/settings"]) {
     assert.ok(docs.includes(route), route);
   }
   assert.match(docs, /oidc\/silent-callback\.html/);

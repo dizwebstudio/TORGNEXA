@@ -23,10 +23,10 @@ Merchants who already hold a Robokassa contract cannot connect it.
   - `ReadPaymentStatus` / webhook re-verification via the legacy XML
     OpStateExt API.
   - `ReconcilePayments` via the JSON GetInvoiceInformationList API.
-  - `RefundPayment` fails closed with a normalized `unsupported` remote
-    error and no network call: Robokassa has no merchant-level refund API,
-    only a Partner/aggregator `RefundOperation` requiring a distinct
-    business relationship.
+  - At the time of Task 140, `RefundPayment` failed closed because the
+    then-audited material covered only the Partner/aggregator
+    `RefundOperation`. Task 176 supersedes this exclusion with the current
+    official merchant Refund API and Password3 flow.
   - `VerifyPaymentWebhook` verifies the ResultURL's MD5 signature
     (`OutSum:InvId:Password2`) and then re-fetches state via OpStateExt
     before accepting any status change, matching the same
@@ -59,8 +59,8 @@ Merchants who already hold a Robokassa contract cannot connect it.
 
 ## Explicit exclusions
 
-- Refunds: not implemented, by design (see Scope) — Robokassa has no
-  merchant-level refund API.
+- Refunds were not implemented in the original Task 140 scope. Task 176
+  subsequently admits the current official merchant Refund API.
 - Real bank/merchant qualification: unverifiable without a live Robokassa
   merchant contract, same limitation already documented for SBP.
 - The Task-064 conformance suite's `sandbox_isolation` check could not be

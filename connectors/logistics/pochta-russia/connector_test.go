@@ -69,3 +69,40 @@ func TestTrackingUsesCandidateTransport(t *testing.T) {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
+
+func TestShipmentCreationUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCreateRequest{
+		ExternalID: "order-001", ServiceCode: "pochta_parcel_online", IdempotencyKey: "idem-001",
+		From:      sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
+		To:        sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels:   []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+		Sender:    sdk.LogisticsContact{Name: "Иван Иванов", Phone: "+79990000000"},
+		Recipient: sdk.LogisticsContact{Name: "Пётр Петров", Phone: "+79990000001"},
+	})
+	if err != nil || result.RemoteID != "57565818" || result.Status != "created" || result.Cost.Currency != "RUB" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestShipmentCancellationUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CancelLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCancelRequest{RemoteID: "57565818", IdempotencyKey: "idem-cancel-001"})
+	if err != nil || result.RemoteID != "57565818" || result.Status != "cancelled" || result.Cost.Currency != "RUB" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestReturnCreationUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CreateLogisticsReturn(context.Background(), testAccount(), testRuntime{}, sdk.ReturnCreateRequest{
+		OriginalRemoteID: "RA644000001RU", ExternalID: "return-001", MailType: "POSTAL_PARCEL", IdempotencyKey: "return-idem-001",
+	})
+	if err != nil || result.RemoteID != "RA644000002RU" || result.Status != "created" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestLabelUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "310115153", Format: "pdf"})
+	if err != nil || result.ArtifactRef != "pochta-russia:form:backlog:310115153" || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}

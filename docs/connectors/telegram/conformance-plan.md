@@ -8,9 +8,12 @@ Provider-specific deterministic evidence additionally covers:
 - strict negative numeric channel configuration and bot-token validation;
 - bot token retained behind `SecretAccessor` and absent from normalized params;
 - health `getMe -> getChatMember` exact-channel posting-right verification;
-- text plus HTTPS URL-button encoding;
+- text plus HTTPS URL-button encoding through the application publication route;
+- single-photo and single-video URL-button bounds; album buttons remain rejected;
 - one-photo, 2–10 photo album and one-MP4-video publish paths;
 - Task-088 media re-open immediately before every upload;
+- worker mapping from Core image/gallery/video variants to the provider-neutral
+  SocialPublishRequest and receipt-safe publication lifecycle;
 - 10 MiB photo / 50 MiB video support ceilings;
 - channel-bound remote ID parsing before edit/delete egress;
 - single-message text/media edit and explicit album-edit denial;

@@ -44,7 +44,8 @@ The first two event-type segments form the event family and the final version
 segment becomes the topic version. Examples include
 `commerce.catalog.events.v1`, `commerce.orders.events.v1`,
 `commerce.inventory.events.v1`, `commerce.social.events.v1`,
-`commerce.integration.events.v1`, and `commerce.compliance.events.v1`.
+`commerce.integration.events.v1`, `commerce.storefront.events.v1`, and
+`commerce.compliance.events.v1`.
 
 The Kafka partition key is a SHA-256 digest over organization, workspace,
 entity type, and entity ID. Therefore one tenant aggregate is stable on one

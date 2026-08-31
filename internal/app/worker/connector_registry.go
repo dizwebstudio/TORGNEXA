@@ -221,7 +221,18 @@ func (registry *runtimeRegistry) logisticsCreator(ctx context.Context, scope ten
 	if registry == nil || registry.builtins == nil || !scope.Valid() {
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
-	creator, err := registry.builtins.LogisticsCreator(ctx, account, runtime)
+	creator, err := registry.builtins.LogisticsCreator(ctx, account, runtime, registry.configLoader(scope))
+	if errors.Is(err, builtins.ErrUnavailable) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	return creator, err
+}
+
+func (registry *runtimeRegistry) logisticsReturnCreator(ctx context.Context, scope tenancy.Scope, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsReturnCreator, error) {
+	if registry == nil || registry.builtins == nil || !scope.Valid() {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
+	creator, err := registry.builtins.LogisticsReturnCreator(ctx, account, runtime)
 	if errors.Is(err, builtins.ErrUnavailable) {
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}

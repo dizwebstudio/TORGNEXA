@@ -60,16 +60,116 @@ Task 143 adds the ПЭК SDK adapter, official Basic credential probe and
 deterministic conformance candidate. ПЭК is available in the same Delivery
 surface for tenant account setup, health checks and bounded read-only
 `pickup.points.read`, `logistics.rates.read` and `logistics.track.read` routes;
-shipment writes and product synchronization remain closed until a
-non-production API qualification.
+one-code `logistics.shipment.cancel` annuls a previously created
+pre-registration through the official order endpoint, `logistics.label.read`
+returns one validated PDF label, and `logistics.shipment.create` submits one
+bounded self-delivery preregistration with explicit tenant sender settings.
+Cancellation of a formed cargo, returns and application print forms remain
+closed until a separate non-production API qualification.
+
+## Yandex Market inventory write
+
+Task 172 adds the provider-neutral `inventory.write` runtime path for Yandex
+Market. It preserves the provider's distinction between partner-warehouse
+`POST` and grouped-warehouse `PUT`, validates warehouse scope and quantity
+bounds, and records the provider's asynchronous `OK` as acceptance rather than
+reconciliation.
+
+## ПЭК bounded shipment create
+
+Task 173 admits the existing ПЭК `/preregistration/submit/` operation through
+the approval-bound logistics shipment route. The runtime accepts only one
+Russian self-delivery order (`orderType=0`, `pek_type_3`, up to 50 parcels),
+requires tenant-scoped sender warehouse/legal data, verifies `documentId` and
+one numeric `cargoCode`, and leaves formed-cargo cancellation, returns and
+batch print forms fail-closed.
+
+## Telegram media publication worker route
+
+Task 174 is repository-complete: the existing Telegram photo, 2–10 photo
+album and MP4-video adapter is now composed through the Social worker. Core
+image/gallery/video variants are mapped to the provider-neutral request and
+released uploads are revalidated through the Task-088 gate before each read.
+The host transport supports bounded multipart egress. URL buttons, edit/delete,
+inbound webhooks and arbitrary file types remain fail-closed; credentialed live
+Telegram qualification remains a separate release gate.
+
+## Telegram HTTPS publication buttons
+
+Task 181 is repository-complete: `social.post.buttons` now crosses the
+provider-neutral Core variant, tenant-scoped PostgreSQL snapshot, Social API
+and leased worker into Telegram's existing URL-only Bot API markup adapter.
+The UI exposes up to eight HTTPS link buttons, validates them before submit and
+shows them in publication history. Callback-data buttons, edit/delete and
+inbound webhooks remain fail-closed because they need separate authorization
+and inbound lifecycle contracts. Credentialed live Telegram qualification is
+still a release gate.
+
+## MAX media publication worker route
+
+Task 175 is repository-complete: the existing MAX image/gallery and supported
+video adapter is now composed through the Social worker. The host admits the
+documented `/uploads?type=image|video` flow, restricts upload URLs to the exact
+official hosts and sends bounded multipart `data` bodies with the callback-
+scoped bot token. Buttons, webhooks, status reads, destructive mutations and
+arbitrary files remain outside the application runtime subset; credentialed
+live MAX qualification remains a separate release gate.
+
+## Robokassa merchant refund runtime
+
+Task 176 is repository-complete: Robokassa refunds now use the official
+merchant Refund API. The runtime obtains `Info.OpKey` from the authenticated
+OpStateExt response, signs full/partial refund JWTs with the separately
+configured Password3 and stores the asynchronous provider `requestId` as an
+accepted refund result. Three-line legacy secrets remain valid for payment,
+status, reconciliation and webhooks; the fourth Password3 line is required
+only to execute refunds. Live merchant credentials and fiscal receipt
+qualification remain deployment-specific gates.
+
+## Почта России — возвратная этикетка
+
+Task 177 is repository-complete: the existing `logistics.label.read` route now
+accepts explicit `return_pdf` requests for domestic/S10 RPO barcodes and calls
+the one-page easy-return PDF form. The host validates the response as a PDF and
+returns only a content-addressed opaque reference. Separate return shipments,
+batch formation and hand-off remain qualification-gated.
+
+## ПЭК — печатная форма заявки
+
+Task 178 is repository-complete: the existing `logistics.label.read` route now
+accepts explicit `request_pdf` requests and calls the official PEK
+`/api/v1/order/print/` endpoint with `type=big`. The bounded base64 response is
+validated as a PDF and exposed only as an opaque digest reference; the UI offers
+the document type next to the existing single-cargo label (`type=simple`).
+Batch printing (`type=multiple`), formed-cargo cancellation, returns and other
+write operations remain qualification-gated.
+
+## Почта России — чтение партий
+
+Task 179 is repository-complete: the bounded `logistics.batches.read` route
+reads the official `GET /1.0/batch` directory with page, size and optional
+mail-type/category filters. The adapter exposes only validated batch identity,
+status, shipment count and observation time; order rows and raw provider
+payloads stay behind the host boundary. Batch formation and hand-off remain
+qualification-gated.
+
+## СБП — admission payment webhook
+
+Task 180 is repository-complete: the existing SBP verifier is admitted through
+the shared public payment webhook receiver. It re-fetches the authoritative
+status over the account's mTLS gateway, records replay-deduped evidence and
+uses the canonical payment transition path. Live acquiring-bank callback
+delivery and its current contract remain a separate qualification gate.
 
 ## CDEK and Деловые Линии delivery verification
 
 Task 145 admits the existing CDEK SDK on the Delivery surface with an OAuth
 client-credentials probe and adds the Деловые Линии adapter with appkey/PAT
 session verification. CDEK, ПЭК and Деловые Линии expose bounded read-only rate
-previews, and CDEK and Деловые Линии expose bounded tracking reads; shipment writes, labels and product
-synchronization remain closed until current
+previews, and CDEK and Деловые Линии expose bounded tracking reads. Деловые Линии
+также допускает ограниченное address-to-address создание отправления с явной
+runtime-конфигурацией, а также PDF-форму накладной по UID документа; отмена и
+product synchronization remain closed until current
 provider fixtures and an idempotent host bridge are qualified. At that point the runtime inventory was
 12 generic integrations, 18 separate-surface providers and 15 planned entries.
 
@@ -109,9 +209,10 @@ Task 153 adds CS-Cart as a self-hosted internet-store card using the official
 REST API 2.0 and HTTP Basic Auth (administrator e-mail plus API key). Product
 catalog reads, creates and updates are admitted with cursor pagination,
 idempotent SKU lookup and read-after-write reconciliation; base price and
-inventory reads/writes, plus order reads, are admitted through the product
-projection and order detail endpoints with inbound/outbound reconciliation;
-order status writes and webhooks remain fail-closed. The runtime inventory is now 17
+inventory reads/writes, plus order reads and standard order-status writes, are
+admitted through the product projection and order detail/update endpoints with
+inbound/outbound reconciliation; custom status codes and webhooks remain
+fail-closed. The runtime inventory is now 17
 generic integrations, 23 separate-surface providers and 14 planned entries.
 
 ## Saleor storefront runtime
@@ -148,10 +249,11 @@ are supplied. See `docs/connectors/shopware/docker-live-qualification.md` and
 
 Task 155 adds «Почта России» to the separate Delivery surface with encrypted
 application-token/user-key enrollment and a bounded
-`otpravka-api.pochta.ru/1.0/settings` probe. Rates, pickup points and a
-single-barcode tracking read are available; shipment creation, labels and
-returns remain qualification-gated until a current non-production carrier
-account and fixtures are available.
+`otpravka-api.pochta.ru/1.0/settings` probe. Rates, pickup points, a PDF order
+form read, a single-barcode tracking read and one strict backlog-order create
+are available; batch formation, hand-off, cancellation and returns remain
+qualification-gated until current non-production carrier fixtures are
+available.
 
 ## Connector package layout
 
@@ -448,11 +550,13 @@ RUNTIME-132 live gate.
 
 Repository implementation complete: the Task-042 MAX adapter is composed
 through the existing provider-neutral Social API, leased worker and append-only
-receipt recovery. Production admission is deliberately `social.post.text` only
-with the exact 4000-code-point ceiling and fixed `platform-api2.max.ru` egress;
-media, buttons, status reads and webhooks remain SDK ceilings rather than
-application claims. Live-provider qualification remains pending because this
-environment has no MAX bot token or dedicated test channel.
+receipt recovery. At the completion of Task 133, production admission was
+deliberately `social.post.text` only with the exact 4000-code-point ceiling and
+fixed `platform-api2.max.ru` egress. Task 175 subsequently adds released image,
+gallery and supported-video publication through the host upload bridge; buttons,
+status reads and webhooks remain SDK ceilings rather than application claims.
+Live-provider qualification remains pending because this environment has no MAX
+bot token or dedicated test channel.
 
 Follow-up discovered during Task 133: OAuth-based connectors such as VK and
 Avito must remain planned until the host refreshes expiring OAuth bundles and
@@ -560,3 +664,14 @@ execution tasks, standalone inventory work, bounded local pack handoff and the
 operator UI. Marketplace write APIs, labels, Честный знак, external
 shipment/status writes, automatic on-hand consumption and live production
 qualification remain separately scoped gates.
+
+## Task 172 — Yandex Market inventory write
+
+Repository-complete: Yandex Market's provider-neutral `inventory.write`
+capability is admitted through the generic commerce-sync worker. The adapter
+selects the documented partner-warehouse or grouped-warehouse endpoint from
+explicit host configuration, validates numeric warehouse scope and the
+provider quantity bound, returns asynchronous acceptance as
+`Applied=true, Reconciled=false`, and is covered by deterministic request and
+failure tests. Product, order-status and other provider writes remain closed;
+credentialed staging qualification is still a release-topology gate.

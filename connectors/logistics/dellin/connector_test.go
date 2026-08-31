@@ -41,8 +41,8 @@ func TestPickupPointsUseCandidateTransport(t *testing.T) {
 
 func TestRatesUseCandidateTransport(t *testing.T) {
 	rates, err := New(candidateTransport{}, nil).ReadLogisticsRates(context.Background(), testAccount(), testRuntime{}, sdk.RateRequest{
-		From: sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"},
-		To: sdk.Address{Country: "RU", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		From:    sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", City: "Санкт-Петербург", Line1: "Невский, 1"},
 		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
 	})
 	if err != nil || len(rates) != 1 || rates[0].ServiceCode != "dellin_auto" {
@@ -53,6 +53,55 @@ func TestRatesUseCandidateTransport(t *testing.T) {
 func TestTrackingUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).ReadLogisticsTracking(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentStatusRequest{RemoteID: "400267443"})
 	if err != nil || result.RemoteID != "400267443" || result.Status != "in_transit" || result.TrackingNumber != "400267443" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestLabelUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).ReadLogisticsLabel(context.Background(), testAccount(), testRuntime{}, sdk.LabelRequest{RemoteID: "0xad339ac31247666145816f2aeb4935ab", Format: "pdf"})
+	if err != nil || result.MediaType != "application/pdf" || result.ArtifactRef == "" || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+type testConfigurationSource struct{ configuration Configuration }
+
+func (source testConfigurationSource) Resolve(context.Context, sdk.Account) (Configuration, error) {
+	return source.configuration, nil
+}
+
+func testShipmentRequest() sdk.ShipmentCreateRequest {
+	return sdk.ShipmentCreateRequest{
+		ExternalID: "order-17", ServiceCode: "dellin_auto", IdempotencyKey: "create-17",
+		From:      sdk.Address{Country: "RU", City: "Москва", Line1: "Тверская, 1"},
+		To:        sdk.Address{Country: "RU", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels:   []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+		Sender:    sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"},
+		Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567"},
+	}
+}
+
+func TestShipmentCreationRequiresExplicitConfiguration(t *testing.T) {
+	_, err := New(candidateTransport{}, nil).CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, testShipmentRequest())
+	if err != ErrConfigurationMissing {
+		t.Fatalf("expected missing configuration, got %v", err)
+	}
+}
+
+func TestShipmentCreationUsesConfiguredRuntime(t *testing.T) {
+	connector := New(candidateTransport{}, nil, testConfigurationSource{configuration: Configuration{
+		RequesterUID: "requester-1", SenderCounteragentID: 123, FreightUID: "freight-1",
+		ProduceDate: "2026-09-15", DerivalWorktimeStart: "09:00", DerivalWorktimeEnd: "18:00", PaymentType: "cash",
+	}})
+	result, err := connector.CreateLogisticsShipment(context.Background(), testAccount(), testRuntime{}, testShipmentRequest())
+	if err != nil || result.RemoteID != "3954004" || result.Status != "created" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestShipmentCancellationReturnsPendingUntilCarrierConfirms(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CancelLogisticsShipment(context.Background(), testAccount(), testRuntime{}, sdk.ShipmentCancelRequest{RemoteID: "3954004", IdempotencyKey: "cancel-17"})
+	if err != nil || result.RemoteID != "3954004" || result.Status != "cancellation_pending" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }

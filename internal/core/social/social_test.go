@@ -65,6 +65,24 @@ func TestCapabilityValidationIsFormatSpecific(t *testing.T) {
 	}
 }
 
+func TestHTTPSButtonsRequireTheChannelCapability(t *testing.T) {
+	now := time.Date(2026, 8, 11, 8, 0, 0, 0, time.UTC)
+	variant := ContentVariant{ID: VariantID(tVariant), OrganizationID: tOrg, WorkspaceID: tWS, ContentID: ContentID(tContent), Format: FormatText, Body: "hello", Buttons: []Button{{Text: "Open", URL: "https://example.test/product"}}, Version: 1, CreatedAt: now}
+	account := ChannelAccount{ID: ChannelAccountID(tChannel), OrganizationID: tOrg, WorkspaceID: tWS, ConnectorAccountID: "social-account-1", DisplayName: "Channel", Capabilities: []Capability{CapabilityPostText}, Status: ChannelActive, Version: 1, CreatedAt: now, UpdatedAt: now}
+	if err := ValidatePublicationPlan(account, variant); !errors.Is(err, ErrCapabilityMissing) {
+		t.Fatalf("button publication without capability error=%v", err)
+	}
+	account.Capabilities = []Capability{CapabilityPostButtons, CapabilityPostText}
+	if err := ValidatePublicationPlan(account, variant); err != nil {
+		t.Fatalf("button publication rejected: %v", err)
+	}
+	bad := variant
+	bad.Buttons = []Button{{Text: "Open", URL: "http://example.test"}}
+	if err := bad.Validate(); err == nil {
+		t.Fatal("non-HTTPS button accepted")
+	}
+}
+
 func TestCapabilitiesMustBeCanonicalAndUnique(t *testing.T) {
 	if _, err := CanonicalCapabilities([]Capability{CapabilityPostText, CapabilityPostMedia}); err != nil {
 		t.Fatal(err)

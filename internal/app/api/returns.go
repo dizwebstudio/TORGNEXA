@@ -16,6 +16,7 @@ import (
 const (
 	orderCancellationsPath = "/api/v1/order-cancellations"
 	returnsPath            = "/api/v1/returns"
+	returnLogisticsPath    = "/api/v1/return-logistics/"
 	refundAllocationsPath  = "/api/v1/refund-allocations"
 )
 
@@ -32,6 +33,7 @@ func newReturnsRoutes(repository returnsAPIRepository) []ProtectedRoute {
 		{Method: http.MethodGet, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.read", Handler: http.HandlerFunc(api.returnRoute)},
 		{Method: http.MethodPatch, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.returnRoute)},
 		{Method: http.MethodPost, Path: returnsPath + "/", PathPrefix: true, Permission: "orders.returns.write", Handler: http.HandlerFunc(api.returnRoute)},
+		{Method: http.MethodGet, Path: returnLogisticsPath, PathPrefix: true, Permission: "orders.returns.read", Handler: http.HandlerFunc(api.returnLogisticsRoute)},
 		{Method: http.MethodPost, Path: refundAllocationsPath, Permission: "payments.refunds.write", Handler: http.HandlerFunc(api.createRefundAllocation)},
 	}
 }
@@ -77,6 +79,24 @@ type returnItemView struct {
 	Version     int64        `json:"version"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
+}
+
+type returnLogisticsView struct {
+	ID                 string    `json:"id"`
+	ReturnID           string    `json:"return_id"`
+	ConnectorAccountID string    `json:"connector_account_id"`
+	OriginalRemoteID   string    `json:"original_remote_id"`
+	ExternalID         string    `json:"external_id"`
+	MailType           string    `json:"mail_type"`
+	TariffCode         int       `json:"tariff_code,omitempty"`
+	Status             string    `json:"status"`
+	RemoteID           string    `json:"remote_id,omitempty"`
+	TrackingNumber     string    `json:"tracking_number,omitempty"`
+	FailureCode        string    `json:"failure_code,omitempty"`
+	IdempotencyKey     string    `json:"idempotency_key"`
+	Version            int64     `json:"version"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type quantityView struct {
@@ -277,6 +297,33 @@ func (a returnsAPI) returnRoute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"return": returnResponse(result), "items": views})
 		return
 	}
+	if r.Method == http.MethodPost && len(parts) == 2 && parts[1] == "logistics" {
+		var input struct {
+			ID                 string `json:"id"`
+			ConnectorAccountID string `json:"connector_account_id"`
+			OriginalRemoteID   string `json:"original_remote_id"`
+			ExternalID         string `json:"external_id"`
+			MailType           string `json:"mail_type"`
+			TariffCode         int    `json:"tariff_code"`
+		}
+		key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+		if !validIdempotencyKey(key) || decodeStrictJSON(r, &input) != nil || input.ID == "" || input.ConnectorAccountID == "" || input.OriginalRemoteID == "" || input.ExternalID == "" || input.MailType == "" || input.TariffCode < 0 {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		operationID, idErr := core.ParseReturnLogisticsOperationID(input.ID)
+		if idErr != nil {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		result, operationErr := a.repository.CreateReturnLogistics(r.Context(), scopeToReturns(scope), core.ReturnLogisticsCommand{ID: operationID, OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ReturnID: id, ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), OriginalRemoteID: strings.TrimSpace(input.OriginalRemoteID), ExternalID: strings.TrimSpace(input.ExternalID), MailType: strings.TrimSpace(input.MailType), TariffCode: input.TariffCode, IdempotencyKey: key}, returnsMutation(principal.Subject, key))
+		if operationErr != nil {
+			writeReturnsError(w, operationErr)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, returnLogisticsResponse(result))
+		return
+	}
 	if r.Method == http.MethodPatch && len(parts) == 2 && parts[1] == "status" {
 		var input struct {
 			Status  core.ReturnStatus `json:"status"`
@@ -359,6 +406,29 @@ func (a returnsAPI) returnRoute(w http.ResponseWriter, r *http.Request) {
 	writeProblem(w, http.StatusNotFound, "Not Found")
 }
 
+func (a returnsAPI) returnLogisticsRoute(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, returnLogisticsPath), "/"), "/")
+	if r.Method != http.MethodGet || len(parts) != 1 || parts[0] == "" {
+		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	id, err := core.ParseReturnLogisticsOperationID(parts[0])
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	scope, _, ok := returnsContext(w, r)
+	if !ok || a.repository == nil {
+		return
+	}
+	result, err := a.repository.ReturnLogistics(r.Context(), scopeToReturns(scope), id)
+	if err != nil {
+		writeReturnsError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, returnLogisticsResponse(result))
+}
+
 func (a returnsAPI) createRefundAllocation(w http.ResponseWriter, r *http.Request) {
 	scope, principal, ok := returnsContext(w, r)
 	if !ok || a.repository == nil {
@@ -427,6 +497,9 @@ func returnResponse(value core.ReturnRequest) returnView {
 }
 func returnItemResponse(value core.ReturnItem) returnItemView {
 	return returnItemView{ID: value.ID.String(), ReturnID: value.ReturnID.String(), OrderItemID: value.OrderItemID, Unit: value.Requested.Unit, Disposition: string(value.Disposition), Requested: quantityResponse(value.Requested), Received: quantityResponse(value.Received), Accepted: quantityResponse(value.Accepted), Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt}
+}
+func returnLogisticsResponse(value core.ReturnLogisticsOperation) returnLogisticsView {
+	return returnLogisticsView{ID: value.ID.String(), ReturnID: value.ReturnID.String(), ConnectorAccountID: value.ConnectorAccountID, OriginalRemoteID: value.OriginalRemoteID, ExternalID: value.ExternalID, MailType: value.MailType, TariffCode: value.TariffCode, Status: string(value.Status), RemoteID: value.RemoteID, TrackingNumber: value.TrackingNumber, FailureCode: value.FailureCode, IdempotencyKey: value.IdempotencyKey, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt}
 }
 func quantityResponse(value core.Quantity) quantityView {
 	return quantityView{Coefficient: value.Coefficient, Scale: value.Scale, Unit: value.Unit}

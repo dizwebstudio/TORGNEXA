@@ -45,6 +45,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo"
@@ -221,6 +222,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_logistics_repository_startup_failed", err)
 	}
+	returnRepository, err := returnsrepo.New(db)
+	if err != nil {
+		return fail("worker_returns_repository_startup_failed", err)
+	}
 	workflowApprovalRepository, err := approvalrepo.New(db)
 	if err != nil {
 		return fail("worker_workflow_approval_repository_startup_failed", err)
@@ -241,6 +246,12 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if createRouteErr != nil {
 		return fail("worker_logistics_create_route_startup_failed", createRouteErr)
 	}
+	returnLogisticsRoute, returnRouteErr := newReturnLogisticsRoute(returnRepository, logisticsAccountRepository, runtimeRegistry, func(runtimeCtx context.Context, runtimeScope tenancy.Scope, account sdk.Account) (sdk.Runtime, error) {
+		return connectorruntime.NewForAccount(secretProvider, secretRepository, runtimeScope, account)
+	})
+	if returnRouteErr != nil {
+		return fail("worker_return_logistics_route_startup_failed", returnRouteErr)
+	}
 	logisticsReader, readerErr := kafkatransport.NewReader(cfg.Worker.KafkaBrokers, workerID+".logistics-consumer", logisticsKafkaConsumerGroup, consumerTopics)
 	if readerErr != nil {
 		return fail("worker_logistics_kafka_reader_startup_failed", readerErr)
@@ -255,7 +266,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			if err := logisticsCreateRoute.Handle(deliveryCtx, delivery); err != nil {
 				return err
 			}
-			return logisticsCancelRoute.Handle(deliveryCtx, delivery)
+			if err := logisticsCancelRoute.Handle(deliveryCtx, delivery); err != nil {
+				return err
+			}
+			return returnLogisticsRoute.Handle(deliveryCtx, delivery)
 		})
 	}})
 
@@ -419,8 +433,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 			return handler(eventCtx, delivery)
 		})
 	}})
+	var socialMedia sdk.MediaAccessor
 	components = append(components, component{name: "social-publications", run: func(componentCtx context.Context) error {
-		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, secretRepository, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease)
+		return runSocialPublications(componentCtx, logger, dispatchRepository, socialRepository, socialAccountRepository, socialDispatchRepository, secretProvider, secretRepository, runtimeRegistry, workerID, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch, cfg.Worker.Lease, socialMedia)
 	}})
 
 	fxReferenceResolver, err := newFXReferenceResolver(db, runtimeRegistry.builtins)
@@ -564,6 +579,11 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 		if scannerErr != nil {
 			return fail("worker_upload_scanner_startup_failed", scannerErr)
 		}
+		accessGate, gateErr := uploads.NewAccessGate(uploadRepository, policy)
+		if gateErr != nil {
+			return fail("worker_upload_access_gate_startup_failed", gateErr)
+		}
+		socialMedia = releasedUploadMedia{gate: accessGate, content: storage}
 		pipeline, pipelineErr := uploads.NewPipeline(uploadRepository, storage, storage, scanner, nil, policy)
 		if pipelineErr != nil {
 			return fail("worker_upload_pipeline_startup_failed", pipelineErr)

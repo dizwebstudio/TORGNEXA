@@ -6,8 +6,8 @@ The admitted baseline publishes text, images/galleries, one video and HTTPS URL 
 
 Task 020 remains owner of Content, immutable ContentVariant, Publication state, scheduling, audit and outbox evidence. Task 009 remains the intended durable Inbox/dedup owner for webhook delivery claims. The provider owns only MAX protocol adaptation and bounded remote identifiers.
 
-Task 133 composes the deliberately smaller production application subset:
-`social.post.text` only, up to 4000 Unicode code points, through the existing
-Social API, leased worker and append-only remote receipts. Media, buttons,
-status reads and webhook methods remain implemented SDK capabilities but are
-not presented as end-to-end application functionality yet.
+Task 175 composes the production application subset for text, released
+image/gallery and video publication through the existing Social API, leased
+worker and append-only remote receipts. Buttons, destructive edits/deletes,
+status reads and webhook methods remain outside the connected application
+workflow.

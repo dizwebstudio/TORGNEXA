@@ -19,11 +19,28 @@ capability в runtime-support и возвращает нормализованн
 калькулятор `POST https://api.dellin.ru/v2/calculator.json`. В запрос передаются
 текстовые адреса и агрегированные габариты/вес не более 50 мест; денежная сумма
 нормализуется в целые копейки RUB, а наружу возвращается один нейтральный
-вариант. Оформление, отмена, этикетки и остальные операции отправлений остаются
-закрытыми до отдельной qualification.
+вариант. `logistics.shipment.create` оформляет только address-to-address заявку
+через официальный `POST https://api.dellin.ru/v2/request.json`. Для
+авторизованного запроса в runtime-конфигурации должны быть явно заданы UID
+заказчика, `sender_counteragent_id`, UID характера груза, дата передачи, окно
+времени и тип оплаты. Получатель передаётся как официальный анонимный
+физический получатель; запрос ограничен 50 местами. Неоднозначный сетевой
+результат не повторяется автоматически. Отмена адресной доставки доступна
+через `POST https://api.dellin.ru/v3/orders/cancel_delivery.json`; ответ
+`data.status=success` означает приём заявки, поэтому локально показывается
+`cancellation_pending` до подтверждения истории статусов. Terminal/pickup-
+отмена и возвраты остаются закрытыми.
+
+`logistics.label.read` получает PDF-форму накладной через официальный `POST
+https://api.dellin.ru/v1/printable.json`. В `remote_id` передаётся UID
+накладной из журнала заказов (`docUID`), а режим формы фиксирован как `order`.
+Ответ принимается только при совпадении UID и валидном PDF; наружу выходит
+контентно-адресуемая ссылка без тела документа и URL Деловых Линий.
 
 Источники: [авторизация пользователя](https://dev.dellin.ru/api/auth/login/),
+[оформление сборного груза](https://dev.dellin.ru/api/ordering/ltl-request/),
 [калькулятор](https://dev.dellin.ru/api/calculation/calculator/),
 [журнал заказов](https://dev.dellin.ru/api/orders/search/),
-[история статусов заказа](https://dev.dellin.ru/api/orders/statuses-history/) и
+[история статусов заказа](https://dev.dellin.ru/api/orders/statuses-history/),
+[печатные формы документов](https://dev.dellin.ru/api/orders/print/) и
 [справочник терминалов](https://dev.dellin.ru/api/terminals/directory/).

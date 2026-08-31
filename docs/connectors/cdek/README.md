@@ -25,6 +25,15 @@ Host transport также умеет bounded read-only запрос списка
 номер отслеживания и время наблюдения. История статусов ограничена 100
 записями, а OAuth-токен живёт только внутри callback.
 
+Для уже зарегистрированного заказа доступна ограниченная операция возврата:
+`POST /api/v1/returns/{return_id}/logistics` с `mail_type=refusal` вызывает
+официальный `POST /v2/orders/{uuid}/refusal`. Если передан номер отправления,
+адаптер сначала разрешает его в UUID и проверяет совпадение номера. В Core
+сохраняется нормализованный номер заказа как remote reference; ответ с другим
+UUID или без подтверждённой сущности отклоняется. Клиентский возврат через
+`clientReturn` требует отдельного `tariff_code`; он передаётся в
+provider-neutral запросе как `tariff_code` и проверяется до вызова API.
+
 Отмена уже оформленного отправления доступна как асинхронная операция через
 `POST /api/v1/logistics/shipments/{shipment_id}/cancel`. Она требует
 `Idempotency-Key` и отдельный `Approval-Request-ID`; сначала создаётся
@@ -42,9 +51,10 @@ capability, approval и версии. Ошибка после отправки �
 отправление переводится в `unknown` для reconciliation. Транспортная этикетка
 доступна через `GET /api/v1/logistics/labels`: адаптер отправляет официальный
 `POST /v2/print/barcodes` и возвращает нейтральную ссылку на асинхронную
-печатную форму в PDF. Returns и webhooks остаются закрытыми до отдельной
-квалификации актуальных контрактов, read-after-write/reconciliation и
-непродакшен-проверки. Для таймаута DELETE
+печатную форму в PDF. Входящий `ORDER_STATUS` webhook подключён через
+`POST /api/v1/webhooks/logistics/{connector_id}/{organization_id}/{workspace_id}/{account_id}`:
+host перепроверяет отправление через OAuth API СДЭК и сохраняет только хэш
+тела и append-only доказательство с дедупликацией. Для таймаута DELETE
 не следует автоматически повторять запрос: результат должен быть проверен
 через tracking/reconciliation.
 

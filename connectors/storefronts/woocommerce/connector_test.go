@@ -135,9 +135,9 @@ func TestWebhookSignatureAndReplay(t *testing.T) {
 
 type memoryDedup struct{ seen map[string]bool }
 
-func (d *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, id, _ string, _ time.Time) (bool, error) {
-	duplicate := d.seen[id]
-	d.seen[id] = true
+func (d *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, claim sdk.CommerceWebhookClaim) (bool, error) {
+	duplicate := d.seen[claim.DeliveryID]
+	d.seen[claim.DeliveryID] = true
 	return duplicate, nil
 }
 

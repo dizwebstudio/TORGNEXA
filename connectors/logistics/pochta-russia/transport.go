@@ -11,6 +11,11 @@ import (
 type Transport interface {
 	Ping(context.Context, []byte) error
 	Rates(context.Context, []byte, sdk.RateRequest) ([]sdk.RateQuote, error)
+	Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error)
+	Cancel(context.Context, []byte, sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error)
+	Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error)
 	Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
+	Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error)
+	Batches(context.Context, []byte, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)
 	Pickup(context.Context, []byte, sdk.PickupPointQuery) ([]sdk.PickupPoint, error)
 }

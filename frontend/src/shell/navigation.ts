@@ -12,6 +12,25 @@ export interface NavigationItem {
   readonly shortcut?: string;
 }
 
+export const primaryNavigationIDs: ReadonlySet<string> = new Set([
+  "dashboard",
+  "catalog",
+  "orders",
+  "inventory",
+  "connectors",
+  "sync",
+  "notifications",
+  "security",
+  "settings",
+]);
+
+export const navigationSections = [
+  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "returns", "incidents", "marking"]},
+  {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "social"]},
+  {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "finance", "approvals", "compliance", "reports", "audit"]},
+  {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
+] as const;
+
 export const navigationItems: readonly NavigationItem[] = [
   {id: "dashboard", label: "Обзор", path: "/", risk: "READ", icon: "dashboard", shortcut: "G D"},
   {id: "catalog", label: "Каталог", path: "/catalog", capability: "products.read", risk: "READ", icon: "catalog", shortcut: "G C"},
@@ -33,6 +52,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "notifications", label: "Уведомления", path: "/notifications", capability: "notifications.read", risk: "READ", icon: "notifications", shortcut: "G N"},
   {id: "reports", label: "Отчёты", path: "/reports", capability: "reports.read", risk: "READ", icon: "reports", shortcut: "G R"},
   {id: "operator-assistant", label: "AI-помощник", path: "/assistant", capability: "assistant.read", risk: "READ", icon: "reports"},
+  {id: "security", label: "Безопасность", path: "/security", capability: "settings.security.read", risk: "READ", icon: "security", shortcut: "G Y"},
   {id: "audit", label: "Аудит", path: "/audit", capability: "audit.read", risk: "READ", icon: "audit", shortcut: "G U"},
   {id: "settings", label: "Настройки", path: "/settings", capability: "settings.read", risk: "WRITE_SAFE", icon: "settings", shortcut: "G T"}
 ] as const;

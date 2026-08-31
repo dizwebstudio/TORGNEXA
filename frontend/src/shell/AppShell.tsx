@@ -2,7 +2,7 @@ import {lazy,Suspense,useEffect,useMemo,useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "../auth/AuthProvider";
 import {useApi} from "../api/ApiProvider";
-import {allowedNavigation, canOpenPath, isKnownPath, routeForPath} from "./navigation";
+import {allowedNavigation, canOpenPath, isKnownPath, navigationSections, primaryNavigationIDs, routeForPath, type NavigationItem} from "./navigation";
 import {navigate, useLocationPath} from "./useLocationPath";
 import {useRealtimeInvalidation} from "../app/useRealtime";
 import {Icon} from "../components/Icon";
@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => (
 const ReportsPage = lazy(() => import("../pages/ReportsPage").then(module => ({default: module.ReportsPage})));
 const OperatorAssistantPage = lazy(() => import("../pages/OperatorAssistantPage").then(module => ({default: module.OperatorAssistantPage})));
 const AuditPage = lazy(() => import("../pages/AuditPage").then(module => ({default: module.AuditPage})));
+const SecurityPage = lazy(() => import("../pages/SecurityPage").then(module => ({default: module.SecurityPage})));
 const SyncPage = lazy(() => import("../pages/SyncPage").then(module => ({default: module.SyncPage})));
 const ApprovalsPage = lazy(() => import("../pages/ApprovalsPage").then(module => ({default: module.ApprovalsPage})));
 const WorkflowsPage = lazy(() => import("../pages/WorkflowsPage").then(module => ({default: module.WorkflowsPage})));
@@ -63,6 +64,7 @@ function content(path: string) {
   if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
   if (path === "/assistant") return <OperatorAssistantPage />;
+  if (path === "/security") return <SecurityPage />;
   if (path === "/audit") return <AuditPage />;
   if (path === "/settings") return <SettingsPage />;
   if (path === "/oauth/connectors/callback") return <ConnectorOAuthCallbackPage />;
@@ -72,6 +74,10 @@ function content(path: string) {
 
 function ActivityCenter({open,onClose}:{open:boolean;onClose:()=>void}){const api=useApi();const notifications=useQuery({queryKey:["shell","activity","notifications"],queryFn:async()=>((await api.listNotifications({limit:8})).body as {items?:any[]}).items??[],enabled:open});const approvals=useQuery({queryKey:["shell","activity","approvals"],queryFn:async()=>((await api.listApprovals()).body as {items?:any[]}).items??[],enabled:open});const unread=(notifications.data??[]).filter(v=>!v.read_at);const pending=(approvals.data??[]).filter(v=>v.state==="pending");const failed=notifications.isError||approvals.isError;const retry=()=>{void Promise.all([notifications.refetch(),approvals.refetch()])};return <Drawer open={open} title="Центр активности" subtitle="События, требующие внимания" onClose={onClose}><div className="activity-summary"><div><strong>{unread.length}</strong><span>непрочитанных</span></div><div><strong>{pending.length}</strong><span>согласований</span></div></div>{failed?<div className="activity-error"><div className="panel alert error" role="alert"><Icon name="error"/><span>Не удалось загрузить часть активности.</span></div><button className="button ghost" onClick={retry}>Повторить</button></div>:<div className="activity-section"><div className="drawer-section-heading"><h3>Сейчас важно</h3><button className="button ghost" onClick={()=>{navigate("/notifications");onClose()}}>Все события</button></div>{[...pending.map(v=>({id:v.id,title:"Требуется согласование",body:v.action,severity:"warning"})),...unread.map(v=>({id:v.id,title:v.title,body:v.body,severity:v.severity}))].slice(0,8).map(item=><button className="activity-item" key={item.id} onClick={()=>{navigate(item.title==="Требуется согласование"?"/approvals":"/notifications");onClose()}}><StatusBadge value={item.severity}/><span><strong>{item.title}</strong><small>{item.body}</small></span><Icon name="chevron"/></button>)}</div>}</Drawer>}
 
+function NavigationLink({item,path,secondary=false}:{item:NavigationItem;path:string;secondary?:boolean}) {
+  return <button aria-current={path===item.path?"page":undefined} title={item.label} className={`nav-item ${secondary?"nav-item-secondary ":""}${path===item.path?"active":""}`} onClick={()=>navigate(item.path)}><span className="nav-icon"><Icon name={item.icon}/></span><span className="nav-label">{item.label}</span></button>;
+}
+
 export function AppShell() {
   const auth = useAuth();
   const path = useLocationPath();
@@ -80,16 +86,21 @@ export function AppShell() {
   const [commandOpen,setCommandOpen]=useState(false),[activityOpen,setActivityOpen]=useState(false),[mobileOpen,setMobileOpen]=useState(false);
   const capabilities = auth.session?.capabilities ?? [];
   const navigation = useMemo(() => allowedNavigation(capabilities), [capabilities]);
+  const primaryNavigation = useMemo(() => navigation.filter((item) => primaryNavigationIDs.has(item.id)), [navigation]);
+  const secondaryNavigation = useMemo(() => navigationSections.map((section) => ({...section, items: navigation.filter((item) => section.itemIds.some((id) => id === item.id))})).filter((section) => section.items.length > 0), [navigation]);
+  const secondaryRouteActive = secondaryNavigation.some((section) => section.items.some((item) => path === item.path || path.startsWith(`${item.path}/`)));
+  const [sectionsOpen,setSectionsOpen]=useState(false);
   const knownPath = isKnownPath(path);
   const allowed = knownPath && (path === "/oauth/connectors/callback" ? capabilities.includes("connectors.accounts.write") : canOpenPath(path, capabilities));
   const current = routeForPath(path);
   useEffect(()=>{let prefix=false;let timer=0;const handler=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;const key=event.key.toLowerCase();if((event.metaKey||event.ctrlKey)&&key==="k"){event.preventDefault();setCommandOpen(true);return}if(event.key==="Escape"){setCommandOpen(false);setMobileOpen(false);prefix=false;return}if(key==="g"){prefix=true;window.clearTimeout(timer);timer=window.setTimeout(()=>{prefix=false},900);return}if(prefix){prefix=false;const item=navigation.find(value=>value.shortcut?.toLowerCase()===`g ${key}`);if(item){event.preventDefault();navigate(item.path)}}};window.addEventListener("keydown",handler);return()=>{window.removeEventListener("keydown",handler);window.clearTimeout(timer)}},[navigation]);
   useEffect(()=>setMobileOpen(false),[path]);
+  useEffect(()=>setSectionsOpen(secondaryRouteActive),[secondaryRouteActive]);
 
   return <div className={`app-shell ${mobileOpen?"nav-open":""}`}>
     <aside className="sidebar">
       <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-logo-frame"><img className="brand-logo-full" src="/brand/torgnexa-logo.png" alt="TORGNEXA"/><img className="brand-logo-symbol" src="/brand/torgnexa-symbol.png" alt="" aria-hidden="true"/></span><span className="brand-copy"><small>Управление торговлей</small></span></button>
-      <nav aria-label="Основная навигация">{navigation.map((item) => <button key={item.id} aria-current={path===item.path?"page":undefined} title={item.label} className={`nav-item ${path === item.path ? "active" : ""}`} onClick={() => navigate(item.path)}><span className="nav-icon"><Icon name={item.icon}/></span><span className="nav-label">{item.label}</span></button>)}</nav>
+      <nav aria-label="Основная навигация">{primaryNavigation.map((item) => <NavigationLink item={item} path={path} key={item.id}/>)}{secondaryNavigation.length ? <div className={`nav-more ${sectionsOpen?"open":""}`}><button type="button" className={`nav-item nav-more-toggle ${secondaryRouteActive?"active":""}`} aria-expanded={sectionsOpen} aria-controls="secondary-navigation" onClick={()=>setSectionsOpen((value)=>!value)}><span className="nav-icon"><Icon name="more"/></span><span className="nav-label">Все разделы</span><Icon className="nav-more-chevron" name="chevron" size={15}/></button>{sectionsOpen ? <div id="secondary-navigation" className="nav-more-panel">{secondaryNavigation.map((section)=><section className="nav-more-group" key={section.id}><p>{section.label}</p>{section.items.map((item)=><NavigationLink item={item} path={path} secondary key={item.id}/>)}</section>)}</div> : null}</div> : null}</nav>
       <div className="sidebar-footer"><div className="profile"><UserAvatar session={auth.session!}/><span className="profile-copy"><strong>{auth.session?.displayName}</strong><small>Защищённая сессия</small></span></div><button className="icon-button" onClick={() => void auth.logout()} title="Выйти" aria-label="Выйти"><Icon name="logout"/></button></div>
     </aside>
     <main className="main-column">

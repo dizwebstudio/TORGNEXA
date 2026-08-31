@@ -9,14 +9,23 @@ check. CDEK and Деловые Линии additionally expose the bounded read-o
 `pickup.points.read` route; Деловые Линии also exposes bounded
 `logistics.rates.read` and `logistics.track.read` reads, while CDEK also exposes
 the bounded read-only `logistics.rates.read` preview and the bounded read-only
-`logistics.track.read` status lookup. Shipment operations remain
-qualification-gated.
+`logistics.track.read` status lookup. Деловые Линии также допускает ограниченное
+address-to-address создание отправления через официальный LTL endpoint при
+явной runtime-конфигурации; PDF-этикетка накладной доступна по `docUID`, а
+address-delivery отмена теперь принимает асинхронную заявку и сохраняет
+`cancellation_pending`; terminal-сценарий остаётся qualification-gated. CDEK `ORDER_STATUS` webhook verification is now admitted
+through an OAuth re-fetch and append-only replay evidence. Почта России также
+допускает создание одного заказа через `PUT /1.0/user/backlog` с ограниченным
+маппингом; формирование партии, передача в работу и возвраты остаются
+qualification-gated, а удаление одного нового заказа доступно через
+`DELETE /1.0/backlog`.
 
 ## Objective
 
 Make the existing CDEK reference visible and honest in the frontend, and add
-Деловые Линии with a bounded terminal/PUDO read route without claiming
-unqualified shipment, label or product-sync routes. The tracking lookup is
+Деловые Линии with bounded terminal/PUDO, rate, tracking and address-to-address
+shipment-create and label routes without claiming unqualified product-sync
+routes. The tracking lookup is
 read-only and accepts an existing CDEK remote reference.
 
 ## Acceptance
@@ -39,15 +48,17 @@ read-only and accepts an existing CDEK remote reference.
   identifier;
 - credentials stay callback-scoped and session/access tokens are discarded;
 - runtime support is `separate_surface/logistics` with CDEK's bounded read
-  capabilities and the approval-bound `logistics.shipment.cancel` route
-  admitted; Деловые Линии remains pickup/rate/tracking read-only and CDEK shipment
-  creation, labels, returns and webhooks remain closed;
+  capabilities, approval-bound shipment cancellation/creation, refusal return
+  and client-return creation with an explicit tariff code admitted; Деловые
+  Линии admits pickup/rate/tracking and bounded shipment creation, PDF label
+  and address-delivery cancellation request, while terminal cancellation and
+  returns remain closed;
 - deterministic SDK/conformance evidence and documentation are synchronized.
 
 ## Qualification boundary
 
-Live shipment creation, labels, returns and the final carrier qualification of
-write operations need current provider fixtures and tenant-scoped
+Live shipment creation, CDEK refusal/client returns and the final carrier
+qualification of write operations need current provider fixtures and tenant-scoped
 non-production credentials. The cancellation route already has the durable
 host bridge, approval gate, idempotency receipt and unknown-outcome handling;
 the UI exposes it only when the account capability and a matching approval are

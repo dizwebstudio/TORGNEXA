@@ -167,6 +167,18 @@ func (r *Registry) PickupPoints(ctx context.Context, account sdk.Account, runtim
 	}
 }
 
+// LogisticsBatches resolves the bounded provider batch-directory reader.
+// Only Russian Post currently exposes this admitted capability.
+func (r *Registry) LogisticsBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.read") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatches(ctx, account, runtime, query)
+}
+
 // LogisticsRates calculates bounded provider rates through the reviewed
 // logistics composition. Provider service identifiers remain inside the
 // adapter; the application exposes only its neutral rate preview.
@@ -209,35 +221,108 @@ func (r *Registry) LogisticsTracking(ctx context.Context, account sdk.Account, r
 	}
 }
 
-// LogisticsLabel reads a qualified CDEK transport-label artifact reference.
+// LogisticsLabel reads a qualified transport-label artifact reference for
+// carriers whose document response has a reviewed host-side adapter.
 // The carrier returns a host-neutral reference to its asynchronous print
 // request; downloading or storing the binary remains outside this connector
 // operation.
 func (r *Registry) LogisticsLabel(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LabelRequest) (sdk.LabelResult, error) {
-	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "cdek" || !SupportsCapability(account.ConnectorID, "logistics.label.read") {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.label.read") {
 		return sdk.LabelResult{}, ErrUnavailable
 	}
-	return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil).ReadLogisticsLabel(ctx, account, runtime, request)
+	default:
+		return sdk.LabelResult{}, ErrUnavailable
+	}
 }
 
-// LogisticsCanceler resolves the explicitly qualified CDEK cancellation
-// surface. The host must still enforce tenant scope, capability settings,
+// LogisticsWebhook verifies a carrier status callback through the reviewed
+// host transport. The callback body is only a hint; admitted transports must
+// re-check the claimed shipment with the provider before returning a result.
+func (r *Registry) LogisticsWebhook(ctx context.Context, account sdk.Account, runtime sdk.Runtime, body, proof []byte) (sdk.LogisticsWebhook, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.webhooks.verify") {
+		return sdk.LogisticsWebhook{}, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil).VerifyLogisticsWebhook(ctx, account, runtime, body, proof)
+	default:
+		return sdk.LogisticsWebhook{}, ErrUnavailable
+	}
+}
+
+// LogisticsCanceler resolves explicitly qualified carrier cancellation
+// surfaces. The host must still enforce tenant scope, capability settings,
 // policy/approval and operation idempotency before invoking it.
 func (r *Registry) LogisticsCanceler(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsShipmentCanceler, error) {
-	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "cdek" || !SupportsCapability(account.ConnectorID, "logistics.shipment.cancel") {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.shipment.cancel") {
 		return nil, ErrUnavailable
 	}
-	return cdek.New(cdekHTTP{r.http}, nil), nil
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil), nil
+	case "dellin":
+		return dellin.New(dellinHTTP{r.http}, nil), nil
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+	case "pek":
+		return pek.New(pekHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
 }
 
-// LogisticsCreator resolves the qualified CDEK shipment-creation surface.
-// The host must still enforce tenant scope, capability settings, policy/
-// approval and operation idempotency before invoking it.
-func (r *Registry) LogisticsCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsShipmentCreator, error) {
-	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || account.ConnectorID != "cdek" || !SupportsCapability(account.ConnectorID, "logistics.shipment.create") {
+// LogisticsCreator resolves the qualified CDEK or bounded Деловые Линии
+// shipment-creation surface. The host must still enforce tenant scope,
+// capability settings, policy/approval and operation idempotency before
+// invoking it.
+func (r *Registry) LogisticsCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.LogisticsShipmentCreator, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.shipment.create") {
 		return nil, ErrUnavailable
 	}
-	return cdek.New(cdekHTTP{r.http}, nil), nil
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil), nil
+	case "dellin":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return dellin.New(dellinHTTP{r.http}, nil, dellinConfigSource{load: load}), nil
+	case "pek":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return pek.NewWithConfiguration(pekHTTP{r.http}, pekConfigSource{load: load}, nil), nil
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// LogisticsReturnCreator resolves the qualified single-RPO return shipment
+// surface. The durable return worker remains responsible for tenant scope,
+// idempotency, policy and reconciliation before invoking this adapter.
+func (r *Registry) LogisticsReturnCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsReturnCreator, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.return.create") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "cdek":
+		return cdek.New(cdekHTTP{r.http}, nil), nil
+	case "pochta-russia":
+		return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
 }
 
 type Registry struct {
@@ -615,6 +700,8 @@ func (r *Registry) CommerceWebhookReceiver(account sdk.Account, runtime sdk.Runt
 		return nil, ErrConfigurationNeeded
 	}
 	switch account.ConnectorID {
+	case "saleor":
+		return saleor.New(saleorHTTP{r.http}, saleorConfigSource{load: load}, nil), nil
 	case "woocommerce":
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
 	default:
@@ -785,6 +872,10 @@ var csCartOrderStatuses = map[string]string{
 	"C": "fulfilled", "I": "cancelled", "F": "cancelled", "D": "cancelled",
 }
 
+var csCartWritableOrderStatuses = map[string]string{
+	"pending": "O", "confirmed": "Y", "processing": "P", "fulfilled": "C", "cancelled": "I",
+}
+
 // OrderStatusWriter resolves the provider-native order status writer for an
 // admitted storefront account. The configured status map is required so a
 // canonical lifecycle transition cannot be guessed for a tenant's Bitrix
@@ -842,6 +933,11 @@ func (r *Registry) OrderStatusWriter(ctx context.Context, account sdk.Account, r
 			return nil, ErrConfigurationNeeded
 		}
 		return opencart.New(openCartHTTP{r.http}, openCartConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -894,6 +990,10 @@ func configuredWooCommerceWriter(r *Registry, account sdk.Account, load ConfigLo
 func (r *Registry) OrderStatus(ctx context.Context, account sdk.Account, status string, load ConfigLoader) (string, bool) {
 	if r == nil || !SupportsCapability(account.ConnectorID, "orders.status.write") {
 		return "", false
+	}
+	if account.ConnectorID == "cs-cart" {
+		value, ok := csCartWritableOrderStatuses[status]
+		return value, ok
 	}
 	if account.ConnectorID != "bitrix" && account.ConnectorID != "prestashop" && account.ConnectorID != "opencart" {
 		value, ok := map[string]map[string]string{
@@ -1035,7 +1135,7 @@ func (r *Registry) SupportsOrderStatusWrite(account sdk.Account) bool {
 		return false
 	}
 	switch account.ConnectorID {
-	case "bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce":
+	case "bitrix", "cs-cart", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce":
 		return true
 	default:
 		return false
@@ -1491,6 +1591,11 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "yandex-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -1803,6 +1908,57 @@ type magentoConfigSource struct{ load ConfigLoader }
 type bitrixStoreConfigSource struct{ load ConfigLoader }
 
 type csCartConfigSource struct{ load ConfigLoader }
+
+type dellinConfigSource struct{ load ConfigLoader }
+
+type pekConfigSource struct{ load ConfigLoader }
+
+func (source pekConfigSource) Resolve(ctx context.Context, account sdk.Account) (pek.Configuration, error) {
+	if source.load == nil {
+		return pek.Configuration{}, pek.ErrConfigurationMissing
+	}
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return pek.Configuration{}, pek.ErrConfigurationMissing
+	}
+	var value pek.Configuration
+	if decodeStrict(raw, &value) != nil || value.Validate() != nil {
+		return pek.Configuration{}, pek.ErrInvalidConfiguration
+	}
+	return value, nil
+}
+
+func (source dellinConfigSource) Resolve(ctx context.Context, account sdk.Account) (dellin.Configuration, error) {
+	if source.load == nil {
+		return dellin.Configuration{}, dellin.ErrConfigurationMissing
+	}
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return dellin.Configuration{}, err
+	}
+	var value struct {
+		RequesterUID         string `json:"requester_uid"`
+		SenderCounteragentID int64  `json:"sender_counteragent_id"`
+		FreightUID           string `json:"freight_uid"`
+		ProduceDate          string `json:"produce_date"`
+		DerivalWorktimeStart string `json:"derival_worktime_start"`
+		DerivalWorktimeEnd   string `json:"derival_worktime_end"`
+		PaymentType          string `json:"payment_type"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return dellin.Configuration{}, dellin.ErrInvalidConfiguration
+	}
+	configuration := dellin.Configuration{
+		RequesterUID: value.RequesterUID, SenderCounteragentID: value.SenderCounteragentID,
+		FreightUID: value.FreightUID, ProduceDate: value.ProduceDate,
+		DerivalWorktimeStart: value.DerivalWorktimeStart, DerivalWorktimeEnd: value.DerivalWorktimeEnd,
+		PaymentType: value.PaymentType,
+	}
+	if configuration.Validate() != nil {
+		return dellin.Configuration{}, dellin.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
 
 func (source csCartConfigSource) Resolve(ctx context.Context, account sdk.Account) (cscart.Configuration, error) {
 	raw, err := source.load(ctx, account.ID)

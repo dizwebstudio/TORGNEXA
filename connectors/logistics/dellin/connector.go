@@ -7,19 +7,24 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
-// Connector exposes the reviewed Delivery-surface health check for Деловые
-// Линии. Shipment operations remain behind a future qualified transport.
+// Connector exposes the reviewed Delivery-surface operations for Деловые
+// Линии. Shipment creation uses an explicit tenant configuration.
 type Connector struct {
 	transport Transport
+	configs   ConfigurationSource
 	now       func() time.Time
 }
 
 // New constructs a Деловые Линии connector over a host-mediated transport.
-func New(transport Transport, now func() time.Time) *Connector {
+func New(transport Transport, now func() time.Time, configs ...ConfigurationSource) *Connector {
 	if now == nil {
 		now = time.Now
 	}
-	return &Connector{transport: transport, now: now}
+	var source ConfigurationSource
+	if len(configs) > 0 {
+		source = configs[0]
+	}
+	return &Connector{transport: transport, configs: source, now: now}
 }
 
 // Manifest returns the canonical non-secret connector manifest.
@@ -50,6 +55,20 @@ func (c *Connector) Health(ctx context.Context, account sdk.Account, runtime sdk
 		return sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "provider_unavailable", CheckedAt: c.now().UTC()}, nil
 	}
 	return sdk.Health{Status: sdk.HealthHealthy, CheckedAt: c.now().UTC()}, nil
+}
+
+func (c *Connector) configuration(ctx context.Context, account sdk.Account) (Configuration, error) {
+	if c == nil || c.configs == nil {
+		return Configuration{}, ErrConfigurationMissing
+	}
+	configuration, err := c.configs.Resolve(ctx, account)
+	if err != nil {
+		return Configuration{}, err
+	}
+	if configuration.Validate() != nil {
+		return Configuration{}, ErrInvalidConfiguration
+	}
+	return configuration, nil
 }
 
 func remote(category sdk.ErrorCategory, code string) error {

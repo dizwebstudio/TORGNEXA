@@ -2,6 +2,7 @@ package builtinruntime
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	dellin "github.com/torgnexa/torgnexa/connectors/logistics/dellin"
+	pek "github.com/torgnexa/torgnexa/connectors/logistics/pek"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -262,6 +265,43 @@ func TestCDEKTrackingUsesUUIDQueryAndRejectsInvalidStatusHistory(t *testing.T) {
 	}
 }
 
+func TestCDEKWebhookReverifiesOrderAndIgnoresClaimedStatus(t *testing.T) {
+	const eventUUID = "82753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "webhook-token"})
+		case "/v2/orders":
+			if r.Method != http.MethodGet || r.URL.Query().Get("cdek_number") != "1100285492" || r.Header.Get("Authorization") != "Bearer webhook-token" {
+				t.Fatalf("unexpected CDEK webhook verification request: method=%s query=%s authorization=%q", r.Method, r.URL.RawQuery, r.Header.Get("Authorization"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{
+				"uuid": "72753031-1820-4f99-9240-aab139f05ca5", "cdek_number": "1100285492",
+				"statuses": []any{map[string]any{"code": "DELIVERED", "date_time": "2026-08-30T07:05:06Z"}},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	body := []byte(`{"type":"ORDER_STATUS","uuid":"` + eventUUID + `","date_time":"2026-08-30T07:00:00+0000","attributes":{"cdek_number":"1100285492","code":"CANCELLED","status_code":"9"}}`)
+	result, err := transport.Webhook(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), body, nil)
+	if err != nil {
+		t.Fatalf("CDEK webhook verification failed: %v", err)
+	}
+	if result.DeliveryID != eventUUID || result.RemoteID != "1100285492" || result.Status != "DELIVERED" || result.OccurredAt.Format(time.RFC3339) != "2026-08-30T07:05:06Z" {
+		t.Fatalf("unexpected verified CDEK webhook: %+v", result)
+	}
+}
+
+func TestCDEKWebhookRejectsNonStatusEvent(t *testing.T) {
+	transport := cdekHTTP{h: &httpTransport{client: http.DefaultClient}}
+	if _, err := transport.Webhook(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), []byte(`{"type":"PRINT_FORM","uuid":"82753031-1820-4f99-9240-aab139f05ca5","attributes":{"cdek_number":"1100285492"}}`), nil); err == nil {
+		t.Fatal("non-status CDEK webhook event accepted")
+	}
+}
+
 func TestCDEKCancelResolvesNumberAndDeletesByUUID(t *testing.T) {
 	const uuid = "72753031-1820-4f99-9240-aab139f05ca5"
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -305,6 +345,91 @@ func TestCDEKCancelRejectsMismatchedLookup(t *testing.T) {
 	transport := cdekHTTP{h: testTLSTransport(t, server)}
 	if _, err := transport.Cancel(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ShipmentCancelRequest{RemoteID: "1100285492", IdempotencyKey: "cancel-1"}); err == nil {
 		t.Fatal("CDEK cancellation accepted a mismatched lookup")
+	}
+}
+
+func TestCDEKRefusalUsesOfficialReturnEndpoint(t *testing.T) {
+	const orderUUID = "72753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected CDEK token method: %s", r.Method)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "return-token"})
+		case "/v2/orders/" + orderUUID + "/refusal":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer return-token" || r.Header.Get("Accept") != "application/json" {
+				t.Fatalf("unexpected CDEK refusal request: method=%s authorization=%q accept=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Accept"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || len(body) != 0 {
+				t.Fatalf("CDEK refusal must not invent a request body: %q", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": orderUUID, "cdek_number": "1100285492"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Return(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ReturnCreateRequest{OriginalRemoteID: orderUUID, ExternalID: "return-17", MailType: "refusal", IdempotencyKey: "return-17"})
+	if err != nil {
+		t.Fatalf("CDEK refusal request failed: %v", err)
+	}
+	if result.RemoteID != "1100285492" || result.Status != "created" || result.TrackingNumber != "1100285492" || result.Cost.Currency != "RUB" || !result.ObservedAt.After(time.Time{}) {
+		t.Fatalf("unexpected normalized CDEK refusal result: %+v", result)
+	}
+}
+
+func TestCDEKRefusalRejectsMismatchedProviderResponse(t *testing.T) {
+	const orderUUID = "72753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "return-token"})
+			return
+		}
+		if r.URL.Path != "/v2/orders/"+orderUUID+"/refusal" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": "82753031-1820-4f99-9240-aab139f05ca5", "cdek_number": "1100285492"}})
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Return(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ReturnCreateRequest{OriginalRemoteID: orderUUID, ExternalID: "return-17", MailType: "refusal", IdempotencyKey: "return-17"}); err == nil {
+		t.Fatal("CDEK refusal accepted a mismatched provider response")
+	}
+}
+
+func TestCDEKClientReturnUsesOfficialEndpointAndTariff(t *testing.T) {
+	const orderUUID = "72753031-1820-4f99-9240-aab139f05ca5"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/oauth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "return-token"})
+		case "/v2/orders/" + orderUUID + "/clientReturn":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer return-token" || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected CDEK client return request: method=%s authorization=%q content-type=%q", r.Method, r.Header.Get("Authorization"), r.Header.Get("Content-Type"))
+			}
+			var body struct {
+				TariffCode int `json:"tariff_code"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.TariffCode != 136 {
+				t.Fatalf("unexpected CDEK client return body: %+v err=%v", body, err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"entity": map[string]any{"uuid": orderUUID, "cdek_number": "1100285492"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := cdekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Return(context.Background(), []byte(`{"client_id":"client-1","client_secret":"secret-1"}`), sdk.ReturnCreateRequest{OriginalRemoteID: orderUUID, ExternalID: "return-18", MailType: "client_return", TariffCode: 136, IdempotencyKey: "return-18"})
+	if err != nil {
+		t.Fatalf("CDEK client return request failed: %v", err)
+	}
+	if result.RemoteID != "1100285492" || result.Status != "created" || result.TrackingNumber != "1100285492" || result.Cost.Currency != "RUB" || !result.ObservedAt.After(time.Time{}) {
+		t.Fatalf("unexpected normalized CDEK client return result: %+v", result)
 	}
 }
 
@@ -451,6 +576,56 @@ func TestDellinRatesUseCalculatorAndExactMoney(t *testing.T) {
 	}
 }
 
+func TestDellinCancellationReturnsAcceptedPendingState(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "cancel-session"}})
+		case "/v3/orders/cancel_delivery.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии cancellation request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "pat-1") {
+				t.Fatalf("PAT leaked into Деловые Линии cancellation request: %s", body)
+			}
+			var request struct {
+				AppKey    string `json:"appkey"`
+				SessionID string `json:"sessionID"`
+				OrderID   int64  `json:"orderID"`
+				Requester string `json:"requester"`
+			}
+			if json.Unmarshal(body, &request) != nil || request.AppKey != "app-1" || request.SessionID != "cancel-session" || request.OrderID != 3954004 || request.Requester != "sender" {
+				t.Fatalf("unexpected Деловые Линии cancellation body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"status": "success"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Cancel(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentCancelRequest{RemoteID: "3954004", IdempotencyKey: "cancel-17"})
+	if err != nil || result.RemoteID != "3954004" || result.Status != "cancellation_pending" || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Деловые Линии cancellation: result=%+v err=%v", result, err)
+	}
+}
+
+func TestDellinCancellationRejectsNonSuccessDecisionResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v4/auth/login.json" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "cancel-session"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"status": "rejected"}})
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Cancel(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentCancelRequest{RemoteID: "3954004", IdempotencyKey: "cancel-17"}); err == nil {
+		t.Fatal("non-success Деловые Линии cancellation response accepted")
+	}
+}
+
 func TestDellinRatesRejectMalformedCalculatorPrice(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v4/auth/login.json" {
@@ -562,6 +737,109 @@ func TestDellinTrackingRejectsMismatchedDocument(t *testing.T) {
 	transport := dellinHTTP{h: testTLSTransport(t, server)}
 	if _, err := transport.Track(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentStatusRequest{RemoteID: "400267443"}); err == nil {
 		t.Fatal("mismatched Деловые Линии document accepted")
+	}
+}
+
+func TestDellinLabelRequestsOfficialPrintableWaybill(t *testing.T) {
+	pdf := []byte("%PDF-1.7\nsynthetic waybill\n%%EOF")
+	encoded := base64.StdEncoding.EncodeToString(pdf)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected Деловые Линии login method: %s", r.Method)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "label-session"}})
+		case "/v1/printable.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии printable request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "pat-1") {
+				t.Fatalf("PAT leaked into Деловые Линии printable request: %s", body)
+			}
+			var request struct {
+				AppKey    string `json:"appkey"`
+				SessionID string `json:"sessionID"`
+				DocUID    string `json:"docUID"`
+				Mode      string `json:"mode"`
+			}
+			if json.Unmarshal(body, &request) != nil || request.AppKey != "app-1" || request.SessionID != "label-session" || request.DocUID != "0xad339ac31247666145816f2aeb4935ab" || request.Mode != "order" {
+				t.Fatalf("unexpected Деловые Линии printable body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": []any{map[string]any{
+				"uid": "0xad339ac31247666145816f2aeb4935ab", "base64": encoded, "url": []string{"https://assets.dellin.ru/private.pdf"},
+			}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.LabelRequest{RemoteID: "0xad339ac31247666145816f2aeb4935ab", Format: "pdf"})
+	if err != nil {
+		t.Fatalf("Деловые Линии label request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "dellin:printable:order:0xad339ac31247666145816f2aeb4935ab:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Деловые Линии label: %+v", result)
+	}
+}
+
+func TestDellinLabelRejectsNonPDFDocument(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("not a pdf"))
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v4/auth/login.json" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "label-session"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": []any{map[string]any{"uid": "0xad339ac31247666145816f2aeb4935ab", "base64": encoded}}})
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Label(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.LabelRequest{RemoteID: "0xad339ac31247666145816f2aeb4935ab", Format: "pdf"}); err == nil {
+		t.Fatal("non-PDF Деловые Линии label accepted")
+	}
+}
+
+func TestDellinShipmentCreationUsesOfficialRequestPayload(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/auth/login.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии login request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"sessionID": "create-session"}})
+		case "/v2/request.json":
+			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+				t.Fatalf("unexpected Деловые Линии create request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil || strings.Contains(string(body), "pat-1") {
+				t.Fatalf("PAT leaked into Деловые Линии create request: %s", body)
+			}
+			var request dellinCreateRequest
+			if json.Unmarshal(body, &request) != nil || request.AppKey != "app-1" || request.SessionID != "create-session" || !request.InOrder || request.Delivery.DeliveryType.Type != "auto" || request.Delivery.Derival.ProduceDate != "2026-09-15" || request.Delivery.Derival.Variant != "address" || request.Delivery.Derival.Address.Search != "RU, 101000, Москва, Тверская, 1" || request.Delivery.Derival.Time.WorktimeStart != "09:00" || request.Delivery.Derival.Time.WorktimeEnd != "18:00" || request.Delivery.Arrival.Variant != "address" || request.Delivery.Arrival.Address.Search != "RU, 190000, Санкт-Петербург, Невский, 1" || request.Members.Requester.Role != "sender" || request.Members.Requester.UID != "requester-1" || request.Members.Sender.CounteragentID != 123 || len(request.Members.Sender.ContactPersons) != 1 || request.Members.Sender.ContactPersons[0].Name != "ООО Торгнекса" || request.Members.Sender.PhoneNumbers[0].Number != "74951234567" || request.Members.Receiver.Counteragent == nil || !request.Members.Receiver.Counteragent.IsAnonym || request.Members.Receiver.Counteragent.Phone != "79991234567" || request.Members.Receiver.Counteragent.Name != "Иван Петров" || request.Cargo.Quantity != 1 || request.Cargo.Length.String() != "0.1" || request.Cargo.Width.String() != "0.1" || request.Cargo.Height.String() != "0.1" || request.Cargo.Weight.String() != "1" || request.Cargo.TotalWeight.String() != "1" || request.Cargo.TotalVolume.String() != "0.001" || request.Cargo.FreightUID != "freight-1" || request.Payment.Type != "cash" || request.Payment.PrimaryPayer != "sender" || request.CargoCode != "order-17" {
+				t.Fatalf("unexpected Деловые Линии create body: %s", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"metadata": map[string]any{"status": 200}, "data": map[string]any{"state": "success", "requestID": 3954004, "barcode": "41508460D0905400400000014"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := dellinHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Create(context.Background(), []byte(`{"appkey":"app-1","pat":"pat-1"}`), sdk.ShipmentCreateRequest{
+		ExternalID: "order-17", ServiceCode: "dellin_auto", IdempotencyKey: "create-17",
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+		Sender:  sdk.LogisticsContact{Name: "ООО Торгнекса", Phone: "+74951234567"}, Recipient: sdk.LogisticsContact{Name: "Иван Петров", Phone: "+79991234567"},
+	}, dellin.Configuration{RequesterUID: "requester-1", SenderCounteragentID: 123, FreightUID: "freight-1", ProduceDate: "2026-09-15", DerivalWorktimeStart: "09:00", DerivalWorktimeEnd: "18:00", PaymentType: "cash"})
+	if err != nil {
+		t.Fatalf("Деловые Линии create request failed: %v", err)
+	}
+	if result.RemoteID != "3954004" || result.TrackingNumber != "41508460D0905400400000014" || result.Status != "created" || result.Cost.Currency != "RUB" {
+		t.Fatalf("unexpected normalized Деловые Линии shipment: %+v", result)
 	}
 }
 
@@ -700,6 +978,78 @@ func TestPekTrackingUsesBasicStatusAndNormalizesRussianStatus(t *testing.T) {
 	}
 }
 
+func TestPekShipmentCreateUsesBoundedPreregristrationContract(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/preregistration/submit/" {
+			t.Fatalf("unexpected ПЭК preregistration request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user-1" || password != "password-1" {
+			t.Fatalf("unexpected ПЭК preregistration credentials: user=%q password=%q ok=%v", user, password, ok)
+		}
+		var payload struct {
+			Common struct {
+				DocflowType string `json:"docflowType"`
+				OrderType   int    `json:"orderType"`
+			} `json:"common"`
+			Sender struct {
+				WarehouseID string `json:"warehouseId"`
+			} `json:"sender"`
+			Cargos []struct {
+				Common struct {
+					CustomerCorrelation string          `json:"customerCorrelation"`
+					Type                int             `json:"type"`
+					PositionsCount      int             `json:"positionsCount"`
+					Weight              json.RawMessage `json:"weight"`
+					Volume              json.RawMessage `json:"volume"`
+					Width               json.RawMessage `json:"width"`
+				} `json:"common"`
+			} `json:"cargos"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode ПЭК preregistration request: %v", err)
+		}
+		cargo := payload.Cargos
+		if payload.Common.DocflowType != "FFS" || payload.Common.OrderType != 0 || payload.Sender.WarehouseID != "abcd1234-0001" || len(cargo) != 1 || cargo[0].Common.CustomerCorrelation != "order:pek:1" || cargo[0].Common.Type != 3 || cargo[0].Common.PositionsCount != 1 || string(cargo[0].Common.Weight) != "1" || string(cargo[0].Common.Volume) != "0.001" || string(cargo[0].Common.Width) != "0.100" {
+			t.Fatalf("unexpected ПЭК preregistration payload: %+v", payload)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"documentId": "doc-pek-1", "cargos": []any{map[string]any{"cargoCode": "780339690775"}}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order:pek:1", ServiceCode: "pek_type_3", IdempotencyKey: "idem:pek:1",
+		From:    sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"},
+		To:      sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+		Sender:  sdk.LogisticsContact{Name: "Отправитель", Phone: "+79990000000"}, Recipient: sdk.LogisticsContact{Name: "Получатель", Phone: "+79990000001"},
+	}
+	result, err := transport.Create(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), request, pek.Configuration{SenderWarehouseID: "abcd1234-0001", SenderLegalForm: 1, SenderTitle: "ООО Пример", SenderINN: "7700000000", SenderKPP: "770001001"})
+	if err != nil {
+		t.Fatalf("ПЭК shipment creation failed: %v", err)
+	}
+	if result.RemoteID != "780339690775" || result.Status != "created" || result.TrackingNumber != result.RemoteID || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК shipment: %+v", result)
+	}
+}
+
+func TestPekShipmentCreateRejectsResponseWithoutDocument(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"cargos": []any{map[string]any{"cargoCode": "780339690775"}}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order:pek:2", ServiceCode: "pek_type_3", IdempotencyKey: "idem:pek:2",
+		From: sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Тверская, 1"}, To: sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels: []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}}, Sender: sdk.LogisticsContact{Name: "Отправитель", Phone: "+79990000000"}, Recipient: sdk.LogisticsContact{Name: "Получатель", Phone: "+79990000001"},
+	}
+	configuration := pek.Configuration{SenderWarehouseID: "abcd1234-0001", SenderLegalForm: 1, SenderTitle: "ООО Пример", SenderINN: "7700000000"}
+	if _, err := transport.Create(context.Background(), []byte(`{"username":"user-1","password":"password-1"}`), request, configuration); err == nil {
+		t.Fatal("ПЭК preregistration response without document id accepted")
+	}
+}
+
 func TestPekTrackingRejectsMalformedResponse(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"cargos": []any{map[string]any{"info": map[string]any{"cargoStatus": "В пути"}}}})
@@ -748,6 +1098,47 @@ func TestRussianPostCredentialProbe(t *testing.T) {
 	}
 }
 
+func TestRussianPostBatchDirectoryRequest(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/batch" || r.URL.Query().Get("size") != "2" || r.URL.Query().Get("page") != "3" || r.URL.Query().Get("mailType") != "ONLINE_PARCEL" || r.URL.Query().Get("mailCategory") != "ORDERED" {
+			t.Fatalf("unexpected Почта России batch request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"batch-name": "batch-2026-001", "batch-status": "CREATED", "shipment-count": 2},
+			{"batch-name": "batch-2026-002", "batch-status": "SENT", "shipment-count": 5},
+		})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	batches, err := transport.Batches(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchQuery{MailType: "ONLINE_PARCEL", MailCategory: "ORDERED", Limit: 2, Page: 3})
+	if err != nil {
+		t.Fatalf("Почта России batch request failed: %v", err)
+	}
+	if len(batches) != 2 || batches[0].RemoteID != "batch-2026-001" || batches[0].Status != "CREATED" || batches[0].ShipmentCount != 2 || batches[1].RemoteID != "batch-2026-002" || batches[1].ShipmentCount != 5 {
+		t.Fatalf("unexpected normalized Почта России batches: %+v", batches)
+	}
+	if batches[0].ObservedAt.IsZero() || batches[0].ObservedAt.Location() != time.UTC {
+		t.Fatalf("batch observation timestamp is not UTC: %v", batches[0].ObservedAt)
+	}
+}
+
+func TestRussianPostBatchDirectoryRejectsDuplicateRows(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"batch-name": "batch-duplicate", "batch-status": "CREATED", "shipment-count": 1},
+			{"batch-name": "batch-duplicate", "batch-status": "SENT", "shipment-count": 2},
+		})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Batches(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchQuery{Limit: 2}); err == nil {
+		t.Fatal("duplicate Почта России batch rows accepted")
+	}
+}
+
 func TestRussianPostTrackingUsesSOAPHistoryAndLatestOperation(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/rtm34" || r.Header.Get("Content-Type") != "application/soap+xml; charset=utf-8" || r.Header.Get("Accept") != "application/soap+xml, text/xml;q=0.9" {
@@ -787,6 +1178,265 @@ func TestRussianPostTrackingRejectsMismatchedBarcode(t *testing.T) {
 	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
 	if _, err := transport.Track(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz","tracking_login":"tracking-login","tracking_password":"tracking-password"}`), sdk.ShipmentStatusRequest{RemoteID: "RA644000001RU"}); err == nil {
 		t.Fatal("mismatched Почта России barcode accepted")
+	}
+}
+
+func TestRussianPostLabelRequestsOfficialBacklogForm(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/forms/backlog/310115153/forms" ||
+			r.URL.Query().Get("print-type") != "PAPER" || r.URL.Query().Get("sending-date") == "" ||
+			r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России label request: method=%s path=%s query=%v authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.URL.Query(), r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		if _, err := time.Parse("2006-01-02", r.URL.Query().Get("sending-date")); err != nil {
+			t.Fatalf("invalid sending date: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7\nsynthetic form\n%%EOF"))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "310115153", Format: "pdf"})
+	if err != nil {
+		t.Fatalf("Почта России label request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:backlog:310115153:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России label: %+v", result)
+	}
+}
+
+func TestRussianPostLabelRejectsNonPDFResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"not-ready"}`))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	if _, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "310115153", Format: "pdf"}); err == nil {
+		t.Fatal("non-PDF Почта России label response accepted")
+	}
+}
+
+func TestRussianPostReturnLabelRequestsEasyReturnPDF(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/1.0/forms/RA644000001RU/easy-return-pdf" || r.URL.Query().Get("print-type") != "PAPER" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России return label request: method=%s path=%s query=%s authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7\nsynthetic return label\n%%EOF"))
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "RA644000001RU", Format: "return_pdf"})
+	if err != nil {
+		t.Fatalf("Почта России return label request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pochta-russia:form:return:RA644000001RU:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России return label: %+v", result)
+	}
+	if _, err := transport.Label(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LabelRequest{RemoteID: "not-an-rpo", Format: "return_pdf"}); err == nil {
+		t.Fatal("invalid Почта России return label RPO accepted")
+	}
+}
+
+func TestRussianPostShipmentCreationUsesBacklogAndNormalizesOrderID(t *testing.T) {
+	reject := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/1.0/user/backlog" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России shipment request: method=%s path=%s authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		var orders []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&orders); err != nil || len(orders) != 1 {
+			t.Fatalf("invalid Почта России backlog request: orders=%v err=%v", orders, err)
+		}
+		order := orders[0]
+		if order["order-num"] != "order-001" || order["mail-type"] != "ONLINE_PARCEL" || order["index-to"] != float64(190000) || order["postoffice-code"] != "101000" || order["given-name"] != "Пётр" || order["surname"] != "Петров" || order["street-to"] != "Невский" || order["house-to"] != "1" || order["tel-address"] != "+79990000001" {
+			t.Fatalf("unexpected Почта России backlog mapping: %+v", order)
+		}
+		if reject {
+			_ = json.NewEncoder(w).Encode(map[string]any{"errors": []any{map[string]any{"position": 0}}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"result-ids": []any{57565818}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCreateRequest{
+		ExternalID: "order-001", ServiceCode: "pochta_parcel_online", IdempotencyKey: "idem-001", PickupPointRef: "101000",
+		From:      sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
+		To:        sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		Parcels:   []sdk.Parcel{{WeightGrams: 1000, LengthMM: 100, WidthMM: 100, HeightMM: 100}},
+		Sender:    sdk.LogisticsContact{Name: "Иван Иванов", Phone: "+79990000000"},
+		Recipient: sdk.LogisticsContact{Name: "Пётр Петров", Phone: "+79990000001"},
+	}
+	result, err := transport.Create(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request)
+	if err != nil {
+		t.Fatalf("Почта России shipment creation failed: %v", err)
+	}
+	if result.RemoteID != "57565818" || result.Status != "created" || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России shipment: %+v", result)
+	}
+	reject = true
+	if _, err := transport.Create(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request); err == nil {
+		t.Fatal("Почта России backlog error response accepted")
+	}
+}
+
+func TestRussianPostShipmentCancellationDeletesExactBacklogOrder(t *testing.T) {
+	reject := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/1.0/backlog" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России cancellation request: method=%s path=%s authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		var ids []int64
+		if err := json.NewDecoder(r.Body).Decode(&ids); err != nil || len(ids) != 1 || ids[0] != 57565818 {
+			t.Fatalf("unexpected Почта России cancellation body: ids=%v err=%v", ids, err)
+		}
+		if reject {
+			_ = json.NewEncoder(w).Encode(map[string]any{"errors": []any{map[string]any{"position": 0}}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"result-ids": []any{57565818}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCancelRequest{RemoteID: "57565818", IdempotencyKey: "idem-cancel-001"}
+	result, err := transport.Cancel(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request)
+	if err != nil {
+		t.Fatalf("Почта России shipment cancellation failed: %v", err)
+	}
+	if result.RemoteID != request.RemoteID || result.Status != "cancelled" || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России cancellation: %+v", result)
+	}
+	reject = true
+	if _, err := transport.Cancel(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request); err == nil {
+		t.Fatal("Почта России cancellation error response accepted")
+	}
+}
+
+func TestRussianPostReturnCreatesShipmentForExactRPO(t *testing.T) {
+	reject := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/1.0/returns" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России return request: method=%s path=%s authorization=%q user-authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		var payload struct {
+			DirectBarcode string `json:"direct-barcode"`
+			MailType      string `json:"mail-type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.DirectBarcode != "RA644000001RU" || payload.MailType != "POSTAL_PARCEL" {
+			t.Fatalf("unexpected Почта России return body: %+v err=%v", payload, err)
+		}
+		if reject {
+			_ = json.NewEncoder(w).Encode(map[string]any{"errors": []any{map[string]any{"position": 0}}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"return-barcode": "RA644000002RU"})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ReturnCreateRequest{OriginalRemoteID: "RA644000001RU", ExternalID: "return-001", MailType: "POSTAL_PARCEL", IdempotencyKey: "return-idem-001"}
+	result, err := transport.Return(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request)
+	if err != nil {
+		t.Fatalf("Почта России return request failed: %v", err)
+	}
+	if result.RemoteID != "RA644000002RU" || result.Status != "created" || result.TrackingNumber != result.RemoteID || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России return: %+v", result)
+	}
+	reject = true
+	if _, err := transport.Return(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), request); err == nil {
+		t.Fatal("Почта России return error response accepted")
+	}
+}
+
+func TestPEKShipmentCancellationAnnulsExactPreRegistration(t *testing.T) {
+	success := true
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/order/cancellation/" || r.Header.Get("Authorization") != "Basic "+base64.StdEncoding.EncodeToString([]byte("synthetic-user:synthetic-key")) {
+			t.Fatalf("unexpected ПЭК cancellation request: method=%s path=%s authorization=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"))
+		}
+		var codes []string
+		if err := json.NewDecoder(r.Body).Decode(&codes); err != nil || len(codes) != 1 || codes[0] != "780339690775" {
+			t.Fatalf("unexpected ПЭК cancellation body: codes=%v err=%v", codes, err)
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"code": "780339690775", "success": success, "description": "Предварительное оформление аннулировано"}})
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	request := sdk.ShipmentCancelRequest{RemoteID: "780339690775", IdempotencyKey: "cancel-pek-1"}
+	result, err := transport.Cancel(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), request)
+	if err != nil {
+		t.Fatalf("ПЭК shipment cancellation failed: %v", err)
+	}
+	if result.RemoteID != request.RemoteID || result.Status != "cancelled" || result.TrackingNumber != request.RemoteID || result.Cost.Currency != "RUB" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК cancellation: %+v", result)
+	}
+	success = false
+	if _, err := transport.Cancel(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), request); err == nil {
+		t.Fatal("ПЭК unsuccessful cancellation response accepted")
+	}
+}
+
+func TestPEKLabelRequestsOneCargoPDF(t *testing.T) {
+	pdf := []byte("%PDF-1.7\nfixture")
+	encoded := base64.StdEncoding.EncodeToString(pdf)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/order/print/" {
+			t.Fatalf("unexpected ПЭК label request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		var request struct {
+			CargoIndex string `json:"cargoIndex"`
+			Type       string `json:"type"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil || request.CargoIndex != "780339690775" || request.Type != "simple" {
+			t.Fatalf("unexpected ПЭК label body: %+v", request)
+		}
+		_ = json.NewEncoder(w).Encode(encoded)
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), sdk.LabelRequest{RemoteID: "780339690775", Format: "pdf"})
+	if err != nil {
+		t.Fatalf("ПЭК label request failed: %v", err)
+	}
+	if result.MediaType != "application/pdf" || result.ArtifactRef == "" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК label: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode("not-a-pdf")
+	}))
+	defer invalidServer.Close()
+	invalidTransport := pekHTTP{h: testTLSTransport(t, invalidServer)}
+	if _, err := invalidTransport.Label(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), sdk.LabelRequest{RemoteID: "780339690775", Format: "pdf"}); err == nil {
+		t.Fatal("ПЭК non-PDF label response accepted")
+	}
+}
+
+func TestPEKLabelRequestsFullOrderPDF(t *testing.T) {
+	pdf := []byte("%PDF-1.7\nfull order form\n%%EOF")
+	encoded := base64.StdEncoding.EncodeToString(pdf)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/order/print/" {
+			t.Fatalf("unexpected ПЭК order-form request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		var request struct {
+			CargoIndex string `json:"cargoIndex"`
+			Type       string `json:"type"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil || request.CargoIndex != "780339690775" || request.Type != "big" {
+			t.Fatalf("unexpected ПЭК order-form body: %+v", request)
+		}
+		_ = json.NewEncoder(w).Encode(encoded)
+	}))
+	defer server.Close()
+	transport := pekHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.Label(context.Background(), []byte(`{"username":"synthetic-user","password":"synthetic-key"}`), sdk.LabelRequest{RemoteID: "780339690775", Format: "request_pdf"})
+	if err != nil {
+		t.Fatalf("ПЭК order-form request failed: %v", err)
+	}
+	if !strings.HasPrefix(result.ArtifactRef, "pek:print:big:780339690775:") || result.MediaType != "application/pdf" || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized ПЭК order form: %+v", result)
 	}
 }
 

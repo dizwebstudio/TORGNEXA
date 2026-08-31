@@ -77,3 +77,36 @@ func TestInspectionRequiresQuantityForAcceptedOutcomes(t *testing.T) {
 		t.Fatalf("zero rejected inspection: %v", err)
 	}
 }
+
+func TestReturnLogisticsOperationRequiresRemoteResultOnlyOnSuccess(t *testing.T) {
+	now := testUTC()
+	base := ReturnLogisticsOperation{
+		ID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0301", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+		ReturnID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0302", ConnectorAccountID: "pochta-account", OriginalRemoteID: "RA644000001RU", ExternalID: "return-001", MailType: "POSTAL_PARCEL",
+		Status: ReturnLogisticsSucceeded, RemoteID: "57565818", IdempotencyKey: "return-logistics-001", Version: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid successful operation: %v", err)
+	}
+	base.Status = ReturnLogisticsUnknown
+	base.RemoteID = ""
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid unknown operation: %v", err)
+	}
+	base.Status = ReturnLogisticsSucceeded
+	base.RemoteID = ""
+	if err := base.Validate(); err != ErrInvalidRecord {
+		t.Fatalf("success without remote id error = %v", err)
+	}
+}
+
+func TestReturnLogisticsResultIsCreatedOnly(t *testing.T) {
+	result := ReturnLogisticsResult{RemoteID: "57565818", Status: "created", ObservedAt: testUTC()}
+	if err := result.Validate(); err != nil {
+		t.Fatalf("created result: %v", err)
+	}
+	result.Status = "in_transit"
+	if err := result.Validate(); err != ErrInvalidRecord {
+		t.Fatalf("unexpected result status error = %v", err)
+	}
+}

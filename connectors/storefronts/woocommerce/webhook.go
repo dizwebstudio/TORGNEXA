@@ -67,10 +67,6 @@ func (connector *Connector) ReceiveCommerceWebhook(ctx context.Context, account 
 			}
 		}
 		deliveryID := canonicalWebhookDelivery(request.Signature, request.Body)
-		duplicate, e := dedup.ClaimCommerceWebhook(ctx, account, deliveryID, request.ExpectedTopic, request.ReceivedAt)
-		if e != nil {
-			return e
-		}
 		canonical, marshalErr := json.Marshal(struct {
 			ID              int64  `json:"id"`
 			DateModifiedGMT string `json:"date_modified_gmt,omitempty"`
@@ -79,7 +75,12 @@ func (connector *Connector) ReceiveCommerceWebhook(ctx context.Context, account 
 		if marshalErr != nil {
 			return ErrInvalidResponse
 		}
-		output = sdk.CommerceWebhookResult{DeliveryID: deliveryID, EventType: request.ExpectedTopic, ResourceKind: parts[0], ResourceRemoteID: intString(envelope.ID), OccurredAt: occurred.UTC(), Duplicate: duplicate, CanonicalPayload: canonical}
+		claim := sdk.CommerceWebhookClaim{DeliveryID: deliveryID, EventType: request.ExpectedTopic, ResourceKind: parts[0], ResourceRemoteID: intString(envelope.ID), OccurredAt: occurred.UTC(), CanonicalPayload: canonical}
+		duplicate, e := dedup.ClaimCommerceWebhook(ctx, account, claim)
+		if e != nil {
+			return e
+		}
+		output = sdk.CommerceWebhookResult{DeliveryID: claim.DeliveryID, EventType: claim.EventType, ResourceKind: claim.ResourceKind, ResourceRemoteID: claim.ResourceRemoteID, OccurredAt: claim.OccurredAt, Duplicate: duplicate, CanonicalPayload: claim.CanonicalPayload}
 		return output.Validate()
 	})
 	return output, err

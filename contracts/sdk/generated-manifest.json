@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "02572098ea9f00d5dfe49fc8c0742be62c0199197c2ebe9dbe35ab59a578759b",
+    "sha256": "5f2a2b901e46cbf39c917f10129961d2a127664a7a67beb87f66a2294eef0677",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -218,6 +218,11 @@
       "operation_id": "createReturnItem",
       "method": "POST",
       "path": "/returns/{return_id}/items"
+    },
+    {
+      "operation_id": "createReturnLogistics",
+      "method": "POST",
+      "path": "/returns/{return_id}/logistics"
     },
     {
       "operation_id": "createSocialChannel",
@@ -465,6 +470,11 @@
       "path": "/returns/{return_id}"
     },
     {
+      "operation_id": "getReturnLogistics",
+      "method": "GET",
+      "path": "/return-logistics/{operation_id}"
+    },
+    {
       "operation_id": "getRuntimeSecurityPosture",
       "method": "GET",
       "path": "/settings/security/posture"
@@ -628,6 +638,11 @@
       "operation_id": "listInventoryWarehouses",
       "method": "GET",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "listLogisticsBatches",
+      "method": "GET",
+      "path": "/logistics/batches"
     },
     {
       "operation_id": "listLogisticsPickupPoints",
@@ -828,6 +843,11 @@
       "operation_id": "readLogisticsTracking",
       "method": "GET",
       "path": "/logistics/tracking"
+    },
+    {
+      "operation_id": "receiveCommerceWebhook",
+      "method": "POST",
+      "path": "/webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
     },
     {
       "operation_id": "recordAssistantFeedback",

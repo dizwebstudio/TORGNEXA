@@ -63,15 +63,11 @@ different storefront connector in this repository so far.
   `sdk.ProductWriteRequest` does not carry — defaulting it to some assumed
   product type would put a real, publicly visible product live with the
   wrong attribute set.
-- Webhook receipt (`notifications.receive`): genuinely investigated, not
-  assumed unsupported by precedent. Saleor's real signing mechanism (a
-  detached JWS/RS256, verifiable via the store's own published
-  `/.well-known/jwks.json`, requiring no separate shared secret) was traced
-  through Saleor's own core source, then found to structurally exceed this
-  Connector SDK's 256-byte webhook `Signature` field cap — an RS256
-  detached JWS's base64url signature segment alone is already ~342
-  characters. There is no way to carry it through this envelope without
-  silent truncation.
+- Legacy HMAC webhook receipt (`notifications.receive` with Saleor's
+  deprecated `secretKey`): the current account secret scope contains only the
+  Saleor App bearer token, so this variant remains fail-closed. The current
+  no-secret mode is admitted: the connector verifies Saleor's detached
+  RS256/JWKS signature over the exact raw body and applies replay protection.
 - Order status transitions beyond cancellation: every other Saleor order
   status is a side effect of fulfillment/invoicing workflows with their own
   mutations, not a directly settable field.

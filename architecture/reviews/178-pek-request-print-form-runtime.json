@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-178",
+  "task": "178",
+  "change_class": "mixed",
+  "summary": "Admit the PEK request print form through the existing bounded label reader.",
+  "scopes": [
+    "adr/0130-pek-request-print-form-runtime.md",
+    "architecture/reviews/178-pek-request-print-form-runtime.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/logistics-write-qualification.md",
+    "docs/connectors/pek/README.md",
+    "docs/connectors/pek/capability-audit.md",
+    "docs/connectors/pek/conformance-plan.md",
+    "docs/connectors/pek/spec.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "internal/platform/builtinruntime/logistics_transport.go",
+    "internal/platform/builtinruntime/logistics_transport_test.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/178-pek-request-print-form-runtime.md"
+  ],
+  "frozen_pillars": [
+    "universal-commerce-content-fulfillment-models",
+    "connector-plugin-runtime-capabilities",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0130-pek-request-print-form-runtime.md",
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0129-pochta-return-label-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"The existing tenant-scoped PEK account and permission path remains the source of the document request."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"The bounded PDF is reduced to an opaque digest reference before leaving host transport."},
+    {"area":"api_compatibility", "status":"not_affected", "evidence":"The provider-neutral LabelRequest and LabelResult contracts are reused."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope, event type or event payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"not_affected", "evidence":"The existing logistics.label.read capability and SDK interface remain unchanged."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"No database columns, mappings or durable provider payloads are added."},
+    {"area":"security", "status":"affected", "evidence":"The cargo code, response size, base64 data and PDF signature are bounded before artifact publication."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The existing label permission and outbound policy continue to gate the read operation."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"Existing logistics label lineage records the opaque artifact reference without PDF contents."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"Repeated reads are deterministic for the same validated payload; ambiguous responses never fabricate a document."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The transport adds a bounded fixed-host HTTPS POST under the existing host-mediated egress boundary."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Existing logistics timeout, rate and error normalization covers the additional PEK print request."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing the PEK label format or support entry disables request-form reads without migration."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic tests verify type=big, cargo code, base64/PDF validation and the opaque artifact prefix."}
+  ],
+  "provider": {
+    "id": "pek",
+    "route": "connector_sdk",
+    "manifest": "connectors/logistics/pek/manifest.json",
+    "connector_spec": "docs/connectors/pek/spec.md",
+    "capability_audit": "docs/connectors/pek/capability-audit.md",
+    "conformance_plan": "docs/connectors/pek/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

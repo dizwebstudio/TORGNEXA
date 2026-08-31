@@ -27,7 +27,7 @@ func (candidateTransport) Cancel(context.Context, []byte, sdk.ShipmentCancelRequ
 	return shipment("cancelled"), nil
 }
 func (candidateTransport) Return(context.Context, []byte, sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
-	return shipment("return_created"), nil
+	return shipment("created"), nil
 }
 func (candidateTransport) Label(context.Context, []byte, sdk.LabelRequest) (sdk.LabelResult, error) {
 	return sdk.LabelResult{ArtifactRef: "artifact:label:1", MediaType: "application/pdf", ObservedAt: ct}, nil

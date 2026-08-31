@@ -24,9 +24,12 @@ Primary evidence:
 
 ## Production runtime subset
 
-Task 132 composes `social.post.text` only. Media/video need the released-upload
-host bridge; buttons and edit/delete need their own application authorization
-and reconciliation flows. Those SDK-qualified capabilities therefore remain
+Task 174 composes `social.post.text`, `social.post.media` and
+`social.post.video` through the released-upload host bridge. Task 181 composes
+`social.post.buttons` through the canonical variant, API and worker route;
+buttons are HTTPS-only and are admitted for text, one photo and one video.
+Edit/delete need their own application authorization and reconciliation flows;
+webhooks need a separate inbound security contract. Those capabilities remain
 disabled in the runtime support contract and UI.
 
 ## Retry decision

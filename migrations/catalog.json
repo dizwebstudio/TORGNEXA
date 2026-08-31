@@ -793,6 +793,86 @@
       },
       "backfill": null,
       "sha256": "7ed2a3da8e881898706bb89cbb88f097827d7b3a8ae1304080f58dd6c43bf7ac"
+    },
+    {
+      "version": 39,
+      "name": "logistics_webhook_evidence",
+      "file": "000039_logistics_webhook_evidence.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [38],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "3e788b13e856f7d57d81df6d72decd43642f975c7fe1f3469b1b9a2626ec904a"
+    },
+    {
+      "version": 40,
+      "name": "return_logistics_operations",
+      "file": "000040_return_logistics_operations.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [29, 39],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "bdcd1ceb0b84fd607dade69adc68af42860ad0f33acb60ec654b399637e65b9a"
+    },
+    {
+      "version": 41,
+      "name": "return_logistics_tariff_code",
+      "file": "000041_return_logistics_tariff_code.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [40],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "f2264f72a41dc5d5eabaf43757d9c73ecdb3b7eabd8bf7a514641ee84a5a732c"
+    },
+    {
+      "version": 42,
+      "name": "social_publication_buttons",
+      "file": "000042_social_publication_buttons.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [41],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "ba25f1fd5fbc9cbcd8e57706aa189f5457d7003140fa8dbe8be45cd7b38ec513"
     }
   ]
 }

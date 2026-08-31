@@ -593,11 +593,8 @@ func (t sbpHTTP) VerifyWebhook(ctx context.Context, host string, secret, body, s
 var _ sbp.Transport = sbpHTTP{}
 
 // ---- Robokassa: fixed hosts, JWT-signed (HMAC-MD5) CreateInvoice REST API,
-// legacy XML OpStateExt status API, MD5-signed ResultURL webhook. Verified
-// against Robokassa's own PHP SDK (github.com/robokassa/sdk-php) and
-// https://docs.robokassa.ru//ru/xml-interfaces. There is no merchant-level
-// refund API (only a Partner/aggregator RefundOperation, a distinct business
-// relationship), so Refund fails closed rather than faking success. ----
+// legacy XML OpStateExt status API, MD5-signed ResultURL webhook and the
+// official Password3-signed merchant Refund API. ----
 
 const (
 	robokassaInvoiceHost = "services.robokassa.ru"
@@ -607,17 +604,35 @@ const (
 type robokassaHTTP struct{ h *httpTransport }
 
 // splitRobokassaCredential separates the "login\npassword1\npassword2"
-// three-part secret bundle Robokassa's API requires: Password1 signs
-// CreateInvoice requests, Password2 signs OpStateExt/ResultURL callbacks.
+// secret bundle Robokassa's payment/status APIs require. A fourth line is
+// accepted for the optional refund Password3 and is intentionally ignored by
+// this helper so legacy payment-only credentials remain valid.
 func splitRobokassaCredential(secret []byte) (login, password1, password2 []byte, err error) {
 	if len(secret) < 5 || len(secret) > 4096 {
 		return nil, nil, nil, errors.New("payment credential: invalid length")
 	}
-	parts := bytes.SplitN(secret, []byte{'\n'}, 3)
-	if len(parts) != 3 || len(parts[0]) == 0 || len(parts[1]) == 0 || len(parts[2]) == 0 {
-		return nil, nil, nil, errors.New("payment credential: expected \"login\\npassword1\\npassword2\"")
+	parts := bytes.Split(secret, []byte{'\n'})
+	if (len(parts) != 3 && len(parts) != 4) || len(parts[0]) == 0 || len(parts[1]) == 0 || len(parts[2]) == 0 {
+		return nil, nil, nil, errors.New("payment credential: expected \"login\\npassword1\\npassword2[\\npassword3]\"")
+	}
+	if len(parts) == 4 && len(parts[3]) == 0 {
+		return nil, nil, nil, errors.New("payment credential: password3 must not be empty")
 	}
 	return parts[0], parts[1], parts[2], nil
+}
+
+// splitRobokassaRefundCredential returns the merchant credentials required by
+// the official Refund API. Password3 is deliberately not reused for payment
+// creation, status reads or webhook verification.
+func splitRobokassaRefundCredential(secret []byte) (login, password3 []byte, err error) {
+	if len(secret) < 7 || len(secret) > 4096 {
+		return nil, nil, errors.New("payment credential: invalid length")
+	}
+	parts := bytes.Split(secret, []byte{'\n'})
+	if len(parts) != 4 || len(parts[0]) == 0 || len(parts[1]) == 0 || len(parts[2]) == 0 || len(parts[3]) == 0 {
+		return nil, nil, errors.New("payment credential: refund requires \"login\\npassword1\\npassword2\\npassword3\"")
+	}
+	return parts[0], parts[3], nil
 }
 
 func robokassaMD5Hex(v string) string {
@@ -670,6 +685,7 @@ type robokassaOpState struct {
 	} `xml:"State"`
 	Info struct {
 		OutSum string `xml:"OutSum"`
+		OpKey  string `xml:"OpKey"`
 	} `xml:"Info"`
 }
 
@@ -775,17 +791,75 @@ func (t robokassaHTTP) Status(ctx context.Context, secret []byte, request sdk.Pa
 	return sdk.PaymentStatus{RemoteID: request.RemoteID, Status: robokassaStatusFromCode(state.State.Code), Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: "RUB"}, ObservedAt: time.Now().UTC()}, nil
 }
 
-// Refund: Robokassa exposes no merchant-level refund API — only a
-// Partner/aggregator "RefundOperation" that requires a registered-partner
-// relationship distinct from a regular merchant account. Rather than
-// silently no-op or fabricate a success response, this fails closed with a
-// normalized "unsupported" remote error, no network call made.
-func (t robokassaHTTP) Refund(context.Context, []byte, sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
-	remoteErr, err := sdk.NewRemoteError(sdk.ErrorUnsupported, "refund_not_supported", "", 0)
+type robokassaRefundPayload struct {
+	OpKey     string      `json:"OpKey"`
+	RefundSum json.Number `json:"RefundSum,omitempty"`
+}
+
+// robokassaSignRefundJWT signs the compact merchant Refund API token with
+// Password3. Unlike Invoice API, the refund API uses standard HS256 and the
+// token itself is sent as a JSON string in the POST body.
+func robokassaSignRefundJWT(password3, opKey string, refundSum json.Number) (string, error) {
+	header := []byte(`{"alg":"HS256","typ":"JWT"}`)
+	payload, err := json.Marshal(robokassaRefundPayload{OpKey: opKey, RefundSum: refundSum})
+	if err != nil {
+		return "", err
+	}
+	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(payload)
+	mac := hmac.New(sha256.New, []byte(password3))
+	_, _ = mac.Write([]byte(signingInput))
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+// Refund creates a full or partial refund through Robokassa's official
+// merchant Refund API. OpStateExt supplies the provider OpKey; the merchant
+// endpoint does not accept the locally assigned invoice number as a refund
+// identifier. The provider returns an asynchronous requestId, so the
+// normalized result is accepted rather than succeeded.
+func (t robokassaHTTP) Refund(ctx context.Context, secret []byte, request sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
+	_, password3, err := splitRobokassaRefundCredential(secret)
 	if err != nil {
 		return sdk.PaymentRefundResult{}, err
 	}
-	return sdk.PaymentRefundResult{}, remoteErr
+	state, err := t.fetchState(ctx, secret, request.RemotePaymentID)
+	if err != nil {
+		return sdk.PaymentRefundResult{}, err
+	}
+	if state.State.Code != 100 {
+		return sdk.PaymentRefundResult{}, errors.New("robokassa: only a succeeded payment can be refunded")
+	}
+	if state.Info.OpKey == "" {
+		return sdk.PaymentRefundResult{}, errors.New("robokassa: refund OpKey missing from status response")
+	}
+	refundSum := json.Number(minorUnitsToDecimal(request.Amount.MinorUnits))
+	if remoteMinor, amountErr := decimalToMinorUnits(state.Info.OutSum); amountErr == nil && remoteMinor == request.Amount.MinorUnits {
+		// Robokassa defines a full refund by omission of RefundSum.
+		refundSum = ""
+	}
+	token, err := robokassaSignRefundJWT(string(password3), state.Info.OpKey, refundSum)
+	if err != nil {
+		return sdk.PaymentRefundResult{}, err
+	}
+	body, err := json.Marshal(token)
+	if err != nil {
+		return sdk.PaymentRefundResult{}, err
+	}
+	headers := http.Header{"Content-Type": []string{"application/json"}}
+	status, respBody, _, _, _, err := t.h.do(ctx, http.MethodPost, robokassaInvoiceHost, "/RefundService/Refund/Create", nil, body, headers, nil, nil)
+	if err != nil {
+		return sdk.PaymentRefundResult{}, err
+	}
+	if status < 200 || status >= 300 {
+		return sdk.PaymentRefundResult{}, fmt.Errorf("robokassa: refund rejected with status %d", status)
+	}
+	var response struct {
+		Success   bool   `json:"success"`
+		RequestID string `json:"requestId"`
+	}
+	if err := json.Unmarshal(respBody, &response); err != nil || !response.Success || response.RequestID == "" {
+		return sdk.PaymentRefundResult{}, errors.New("robokassa: invalid refund response")
+	}
+	return sdk.PaymentRefundResult{RemoteRefundID: response.RequestID, Status: "accepted", ObservedAt: time.Now().UTC()}, nil
 }
 
 // Reconcile: GetInvoiceInformationList is a date/status filtered list report

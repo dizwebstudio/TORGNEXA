@@ -81,3 +81,34 @@ func TestRepositoryKeepsTenantScopeOutboxAuditAndSafeEventPayloads(t *testing.T)
 		}
 	}
 }
+
+func TestPublicationButtonsMigrationIsBoundedAndAdditive(t *testing.T) {
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime caller")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(source), "..", "..", "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, "migrations", "000042_social_publication_buttons.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ToLower(string(raw))
+	for _, needle := range []string{
+		"create or replace function social_valid_capabilities",
+		"social.post.buttons",
+		"create function social_valid_buttons",
+		"add column buttons jsonb not null default ''[]''::jsonb",
+		"social_variants_buttons_chk",
+		"callback data",
+		"insert into migration_history",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Errorf("buttons migration missing %q", needle)
+		}
+	}
+	for _, forbidden := range []string{"drop table", "drop column", "access_token", "callback_payload"} {
+		if strings.Contains(text, forbidden) {
+			t.Errorf("buttons migration contains forbidden %q", forbidden)
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,18 +145,70 @@ func TestWebhookIsUnsupported(t *testing.T) {
 
 type memoryDedup struct{ seen map[string]bool }
 
-func (dedup *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, id, _ string, _ time.Time) (bool, error) {
-	duplicate := dedup.seen[id]
-	dedup.seen[id] = true
+func (dedup *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, claim sdk.CommerceWebhookClaim) (bool, error) {
+	duplicate := dedup.seen[claim.DeliveryID]
+	dedup.seen[claim.DeliveryID] = true
 	return duplicate, nil
 }
 
-func TestUpsertProductCreateIsUnsupported(t *testing.T) {
-	connector := New(scriptedTransport{}, testConfig{}, nil)
-	_, err := connector.UpsertProduct(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, sdk.ProductWriteRequest{SellerSKU: "NEW-1", Title: "New", StatusRemoteID: "active", IdempotencyKey: "create-1"})
-	var remote *sdk.RemoteError
-	if !errors.As(err, &remote) || remote.Category != sdk.ErrorUnsupported {
-		t.Fatalf("expected unsupported, got %v", err)
+func TestUpsertProductCreatesByExactGraphQLSKU(t *testing.T) {
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		switch {
+		case calls == 1 && request.Method == "POST" && request.Path == "/admin/api/"+apiVersion+"/graphql.json":
+			if !strings.Contains(string(request.Body), "productVariants") || !strings.Contains(string(request.Body), "NEW-1") {
+				t.Fatalf("missing exact SKU lookup in body: %s", request.Body)
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"data":{"productVariants":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}`)}, nil
+		case calls == 2 && request.Method == "POST" && request.Path == "/admin/api/"+apiVersion+"/products.json":
+			if !strings.Contains(string(request.Body), `"sku":"NEW-1"`) || !strings.Contains(string(request.Body), `"title":"New"`) {
+				t.Fatalf("unexpected create body: %s", request.Body)
+			}
+			return Response{StatusCode: 201, Body: []byte(`{"product":{"id":101}}`)}, nil
+		case calls == 3 && request.Method == "GET" && request.Path == "/admin/api/"+apiVersion+"/products/101.json":
+			return Response{StatusCode: 200, Body: []byte(`{"product":{"id":101,"title":"New","body_html":"Description","status":"active","variants":[{"id":1010,"sku":"NEW-1"}]}}`)}, nil
+		default:
+			t.Fatalf("unexpected request #%d: %s %s", calls, request.Method, request.Path)
+			return Response{}, nil
+		}
+	}}
+	connector := New(transport, testConfig{}, nil)
+	receipt, err := connector.UpsertProduct(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, sdk.ProductWriteRequest{SellerSKU: "NEW-1", Title: "New", Description: "Description", StatusRemoteID: "active", IdempotencyKey: "create-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Applied || receipt.RemoteID != "101" || receipt.Duplicate || receipt.Reconciled {
+		t.Fatalf("unexpected %#v", receipt)
+	}
+}
+
+func TestUpsertProductReconcilesAmbiguousCreate(t *testing.T) {
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		switch {
+		case (calls == 1 || calls == 3) && request.Method == "POST" && request.Path == "/admin/api/"+apiVersion+"/graphql.json":
+			if calls == 1 {
+				return Response{StatusCode: 200, Body: []byte(`{"data":{"productVariants":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}`)}, nil
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"data":{"productVariants":{"nodes":[{"id":"gid://shopify/ProductVariant/990","sku":"NEW-1","product":{"id":"gid://shopify/Product/99"}}],"pageInfo":{"hasNextPage":false}}}}`)}, nil
+		case calls == 2 && request.Method == "POST" && request.Path == "/admin/api/"+apiVersion+"/products.json":
+			return Response{StatusCode: 503, RetryAfterMS: 25}, nil
+		case calls == 4 && request.Method == "GET" && request.Path == "/admin/api/"+apiVersion+"/products/99.json":
+			return Response{StatusCode: 200, Body: []byte(`{"product":{"id":99,"title":"New","body_html":"Description","status":"active","variants":[{"id":990,"sku":"NEW-1"}]}}`)}, nil
+		default:
+			t.Fatalf("unexpected request #%d: %s %s", calls, request.Method, request.Path)
+			return Response{}, nil
+		}
+	}}
+	connector := New(transport, testConfig{}, nil)
+	receipt, err := connector.UpsertProduct(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, sdk.ProductWriteRequest{SellerSKU: "NEW-1", Title: "New", Description: "Description", StatusRemoteID: "active", IdempotencyKey: "create-ambiguous"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Applied || !receipt.Reconciled || receipt.RemoteID != "99" {
+		t.Fatalf("unexpected %#v", receipt)
 	}
 }
 

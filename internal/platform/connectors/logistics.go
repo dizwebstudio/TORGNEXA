@@ -9,6 +9,8 @@ import (
 
 var ErrInvalidLogisticsRequest = errors.New("connectors: invalid logistics request")
 var logisticsRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+var logisticsReturnCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
+var logisticsProviderCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 
 type LogisticsMoney struct {
 	MinorUnits int64
@@ -113,11 +115,58 @@ type ShipmentResult struct {
 }
 type ShipmentStatusRequest struct{ RemoteID string }
 type ShipmentCancelRequest struct{ RemoteID, IdempotencyKey string }
-type ReturnCreateRequest struct{ OriginalRemoteID, ExternalID, IdempotencyKey string }
+type ReturnCreateRequest struct {
+	OriginalRemoteID string `json:"original_remote_id"`
+	ExternalID       string `json:"external_id"`
+	MailType         string `json:"mail_type"`
+	// TariffCode is an optional provider-native tariff for return services
+	// that require one (for example, CDEK client returns). Zero means that
+	// the selected return service does not use a tariff code.
+	TariffCode     int    `json:"tariff_code,omitempty"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
 type LabelRequest struct{ RemoteID, Format string }
 type LabelResult struct {
 	ArtifactRef, MediaType string
 	ObservedAt             time.Time
+}
+
+// LogisticsBatchQuery bounds a provider batch-directory read. Provider-native
+// filters remain optional strings and never become canonical batch state.
+type LogisticsBatchQuery struct {
+	MailType     string
+	MailCategory string
+	Limit        int
+	Page         int
+}
+
+// Validate checks the bounded batch-directory query.
+func (query LogisticsBatchQuery) Validate(maxLimit int) error {
+	if maxLimit < 1 || query.Limit < 1 || query.Limit > maxLimit || query.Page < 0 || query.Page > 100000 {
+		return ErrInvalidLogisticsRequest
+	}
+	if (query.MailType != "" && !logisticsProviderCodePattern.MatchString(query.MailType)) || (query.MailCategory != "" && !logisticsProviderCodePattern.MatchString(query.MailCategory)) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsBatch is the bounded neutral projection of one provider batch.
+// RemoteID and Status remain provider references/codes; no raw provider
+// payload or order list crosses the connector boundary.
+type LogisticsBatch struct {
+	RemoteID      string
+	Status        string
+	ShipmentCount int
+	ObservedAt    time.Time
+}
+
+// Validate checks the normalized batch projection.
+func (batch LogisticsBatch) Validate() error {
+	if !logisticsRefPattern.MatchString(batch.RemoteID) || !logisticsProviderCodePattern.MatchString(batch.Status) || batch.ShipmentCount < 0 || batch.ShipmentCount > 1000000 || batch.ObservedAt.IsZero() || batch.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
 }
 
 // Validate checks the bounded remote reference and provider-neutral format
@@ -132,6 +181,16 @@ func (r LabelRequest) Validate() error {
 
 func (r ShipmentCreateRequest) Validate() error {
 	if !logisticsRefPattern.MatchString(r.ExternalID) || !safeCodePattern.MatchString(r.ServiceCode) || !logisticsRefPattern.MatchString(r.IdempotencyKey) || r.From.Validate() != nil || r.To.Validate() != nil || len(r.Parcels) < 1 {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// Validate checks the bounded inputs for a return shipment created from an
+// existing remote shipment. The connector may further narrow MailType to its
+// own official service-code allow-list.
+func (r ReturnCreateRequest) Validate() error {
+	if r.TariffCode < 0 || !logisticsRefPattern.MatchString(r.OriginalRemoteID) || !logisticsRefPattern.MatchString(r.ExternalID) || !logisticsReturnCodePattern.MatchString(r.MailType) || !logisticsRefPattern.MatchString(r.IdempotencyKey) {
 		return ErrInvalidLogisticsRequest
 	}
 	return nil
@@ -154,6 +213,9 @@ type LogisticsReturnCreator interface {
 }
 type LogisticsLabelReader interface {
 	ReadLogisticsLabel(context.Context, Account, Runtime, LabelRequest) (LabelResult, error)
+}
+type LogisticsBatchReader interface {
+	ReadLogisticsBatches(context.Context, Account, Runtime, LogisticsBatchQuery) ([]LogisticsBatch, error)
 }
 
 type LogisticsWebhook struct {

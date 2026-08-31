@@ -5,8 +5,9 @@
 верхнеуровневым GraphQL `errors`, поэтому транспорт анализирует оба уровня.
 
 Runtime поддерживает `products.read`/`write`, `prices.read`/`write`,
-`inventory.read`/`write`, `orders.read`, отмену заказа и `returns.read`.
-Создание продукта и входящие webhooks намеренно остаются fail-closed (см.
+`inventory.read`/`write`, `orders.read`, отмену заказа, `returns.read` и
+входящие webhooks Saleor с detached RS256/JWKS-подписью. Создание продукта и
+устаревший HMAC-вариант webhook с `secretKey` остаются fail-closed (см.
 [capability-audit.md](capability-audit.md)).
 
 Docker-стенд и credentialed проверки описаны в

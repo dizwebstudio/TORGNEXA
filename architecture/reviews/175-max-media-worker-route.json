@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-175",
+  "task": "175",
+  "change_class": "pillar_change",
+  "summary": "Compose qualified MAX image, gallery and supported-video publication through the released-upload worker bridge.",
+  "scopes": [
+    "adr/0127-max-media-worker-route.md",
+    "architecture/reviews/175-max-media-worker-route.json",
+    "connectors/social/max-messenger/connector.go",
+    "connectors/social/max-messenger/social.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/max-messenger/README.md",
+    "docs/connectors/max-messenger/capability-audit.md",
+    "docs/connectors/max-messenger/conformance-plan.md",
+    "docs/connectors/max-messenger/spec.md",
+    "internal/platform/builtinruntime/http.go",
+    "internal/platform/builtinruntime/http_test.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "internal/platform/builtinruntime/support_test.go",
+    "frontend/src/generated/connector-catalog.ts",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/175-max-media-worker-route.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0127-max-media-worker-route.md",
+  "existing_adrs": [
+    "adr/0009-transactional-outbox.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0100-runtime-truthful-integration-catalog.md",
+    "adr/0126-telegram-media-worker-route.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"Media scope is derived from the host-owned connector account and released-upload gate."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Media bytes remain in upload storage and are not copied to canonical events or audit."},
+    {"area":"api_compatibility", "status":"not_affected", "evidence":"The existing provider-neutral SocialPublishRequest and worker dispatch are reused."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope or event payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"affected", "evidence":"UploadRequest gains callback-scoped access-token material required by the documented MAX upload endpoint; it is not normalized or persisted."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"Existing upload release records, social publication state and receipts are reused."},
+    {"area":"security", "status":"affected", "evidence":"Upload URLs use an exact host allowlist and multipart requests are bounded before egress."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"Existing social publication lifecycle and connector capability settings remain mandatory."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"Existing publication and receipt lineage covers the media write without storing media contents."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The upload/send sequence has no complete caller idempotency key; existing receipt recovery handles ambiguous outcomes."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The host transport adds fixed-host multipart upload egress under the existing outbound policy."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Existing worker leases, retry/DLQ, timeout and MAX rate policy remain active."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Disabling media/video capability admission or upload processing stops new media publication without migration."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic host allowlist, multipart, adapter and worker mapping tests cover success and malformed media cases."}
+  ],
+  "provider": null,
+  "follow_up_tasks": []
+}

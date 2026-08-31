@@ -228,11 +228,12 @@ func logisticsApprovalMutation(delivery eventbus.Delivery, phase string) approva
 }
 
 func normalizeCancelledShipment(result sdk.ShipmentResult, expectedRemoteID string) (logistics.RemoteResult, error) {
-	if result.RemoteID != expectedRemoteID || strings.ToLower(strings.TrimSpace(result.Status)) != string(logistics.StatusCancelled) || result.Cost.Validate() != nil || result.ObservedAt.IsZero() {
+	status := strings.ToLower(strings.TrimSpace(result.Status))
+	if result.RemoteID != expectedRemoteID || (status != string(logistics.StatusCancelled) && status != string(logistics.StatusCancellationPending)) || result.Cost.Validate() != nil || result.ObservedAt.IsZero() {
 		return logistics.RemoteResult{}, logistics.ErrInvalidRecord
 	}
 	observedAt := result.ObservedAt.UTC()
-	return logistics.RemoteResult{RemoteID: result.RemoteID, Status: logistics.StatusCancelled, TrackingNumber: result.TrackingNumber, CostMinorUnits: result.Cost.MinorUnits, Currency: strings.ToUpper(result.Cost.Currency), ObservedAt: observedAt}, nil
+	return logistics.RemoteResult{RemoteID: result.RemoteID, Status: logistics.Status(status), TrackingNumber: result.TrackingNumber, CostMinorUnits: result.Cost.MinorUnits, Currency: strings.ToUpper(result.Cost.Currency), ObservedAt: observedAt}, nil
 }
 
 func classifyLogisticsCancelError(err error) error {

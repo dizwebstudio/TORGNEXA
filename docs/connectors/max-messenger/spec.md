@@ -19,9 +19,9 @@ Admitted capabilities:
 - `social.post.buttons` — HTTPS link buttons only
 - `social.webhooks` — verified/deduplicated `message_created`, `message_edited`, `message_removed`
 
-Task-133 production application admission is intentionally narrower than this
-SDK adapter ceiling: only `social.post.text` is connected through API, worker
-and UI. The exact official message endpoint is
+Task-175 production application admission connects `social.post.text`,
+`social.post.media` and `social.post.video` through API, worker and UI. The
+exact official message endpoint is
 [`POST /messages`](https://dev.max.ru/docs-api/methods/POST/messages); account
 health uses [`GET /me`](https://dev.max.ru/docs-api/methods/GET/me) and the
 configured chat membership check.
@@ -38,7 +38,7 @@ A caller cannot override ChatID. Publish receipts and status reads are matched t
 
 Only a Task-020 READY Publication is dispatched by the host. Text is bounded to 4000 Unicode code points. MAX attachments are constructed from Task-088 released media plus an optional inline keyboard; the connector conservatively caps the combined attachment list at 12.
 
-For media, `MediaAccessor.OpenReleased` is called immediately before each upload. The qualified baseline accepts official image formats up to 50 MiB and MP4/MOV/MKV/WebM video up to 250 MiB. The connector obtains an upload URL from `POST /uploads`, then permits upload egress only to the official type-specific HTTPS hosts used in this baseline (`iu.oneme.ru` for image and `vu.okcdn.ru` for video). Userinfo, non-443 ports, encoded authorities, fragments and host-suffix tricks are rejected.
+For media, `MediaAccessor.OpenReleased` is called immediately before each upload. The qualified baseline accepts official image formats up to 50 MiB and MP4/MOV/MKV/WebM video up to 250 MiB. The connector obtains an upload URL from `POST /uploads`, then permits upload egress only to the official type-specific HTTPS hosts used in this baseline (`iu.oneme.ru` for image and `omub.okcdn.ru` for video). Userinfo, non-443 ports, encoded authorities, fragments and host-suffix tricks are rejected.
 
 The channel send uses `POST /messages?chat_id=...` with `notify=true`. Link buttons are HTTPS-only and are laid out at most three per row.
 

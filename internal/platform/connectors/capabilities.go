@@ -129,6 +129,7 @@ var capabilityDefinitions = map[Capability]CapabilityDefinition{
 	"payments.status.read": readable("payments.status.read", families(FamilyPayment)),
 	"payments.webhooks":    readable("payments.webhooks", families(FamilyPayment)),
 
+	"logistics.batches.read":    readable("logistics.batches.read", families(FamilyLogistics)),
 	"logistics.rates.read":      readable("logistics.rates.read", families(FamilyLogistics)),
 	"logistics.shipment.create": writeSensitive("logistics.shipment.create", families(FamilyLogistics)),
 	"logistics.shipment.cancel": writeSensitive("logistics.shipment.cancel", families(FamilyLogistics)),

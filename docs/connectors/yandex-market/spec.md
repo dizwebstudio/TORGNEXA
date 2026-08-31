@@ -12,10 +12,11 @@
 
 Read/receive: `products.read`, `prices.read`, `inventory.read`, `orders.read`, `notifications.receive`.
 
-Write: `prices.write` for an exact desired price only, admitted by Task 116.
+Write: `prices.write` for an exact desired price and `inventory.write` for one
+exact non-negative available quantity, admitted by Tasks 116 and 172.
 
-No product, stock, order-status, campaign or notification-setting write
-capability is granted.
+No product, order-status, campaign or notification-setting write capability is
+granted.
 
 ## Configuration and remote identities
 
@@ -50,6 +51,20 @@ ambiguity. A successful remote acceptance returns `Applied=true` and
 Task-014 reconciliation must confirm the observed remote value. The host still
 owns authorization, policy/risk checks, audit and any required approval before
 dispatch.
+
+## Exact inventory writes
+
+For `partner_warehouses`, the adapter sends one SKU item to the business
+`POST /v3/businesses/{businessId}/offers/stocks/update` endpoint and includes
+the configured numeric `partnerWarehouseId`. For `campaign_warehouses`, it
+sends one SKU item to `PUT /v2/campaigns/{campaignId}/offers/stocks`; the host
+must first validate the requested warehouse against its configured allowlist,
+while the provider's grouped endpoint carries no warehouse field.
+
+Stock quantity is an integer from zero through the provider's documented
+maximum of 2,000,000,000. The provider acknowledges the request
+asynchronously, so the receipt is `Applied=true`, `Reconciled=false`; the
+normal inventory read/reconciliation path confirms eventual convergence.
 
 ## Limits
 

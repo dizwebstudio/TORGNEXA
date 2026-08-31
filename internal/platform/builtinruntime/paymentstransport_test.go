@@ -2,11 +2,15 @@ package builtinruntime
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -216,6 +220,100 @@ func TestYooKassaVerifyWebhookIgnoresUnverifiedBodyStatus(t *testing.T) {
 	}
 	if eventType != "payment_pending" {
 		t.Fatalf("VerifyWebhook trusted the unverified body status: got %q, want payment_pending (the authoritative status)", eventType)
+	}
+}
+
+func TestRobokassaRefundUsesOpKeyAndPassword3(t *testing.T) {
+	var refundPayloads []map[string]any
+	mux := http.NewServeMux()
+	mux.HandleFunc("/Merchant/WebService/Service.asmx/OpStateExt", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("MerchantLogin") != "shop_1" {
+			t.Fatalf("unexpected OpStateExt request: %s %s", r.Method, r.URL.String())
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = io.WriteString(w, `<OperationStateResponse><Result><Code>0</Code></Result><State><Code>100</Code></State><Info><OutSum>150.00</OutSum><OpKey>0005F891-8CCD-434B-8455-816AFFFDBF37-0VOisWikFF</OpKey></Info></OperationStateResponse>`)
+	})
+	mux.HandleFunc("/RefundService/Refund/Create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+			t.Fatalf("unexpected refund request: %s %s", r.Method, r.URL.String())
+		}
+		body, _ := io.ReadAll(r.Body)
+		var token string
+		if err := json.Unmarshal(body, &token); err != nil {
+			t.Fatalf("refund body is not a JSON string: %v", err)
+		}
+		parts := strings.Split(token, ".")
+		if len(parts) != 3 {
+			t.Fatalf("refund token has %d parts", len(parts))
+		}
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			t.Fatalf("decode refund payload: %v", err)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+			t.Fatalf("decode refund payload JSON: %v", err)
+		}
+		refundPayloads = append(refundPayloads, payload)
+		headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+		if err != nil {
+			t.Fatalf("decode refund header: %v", err)
+		}
+		if string(headerBytes) != `{"alg":"HS256","typ":"JWT"}` {
+			t.Fatalf("unexpected refund JWT header: %s", headerBytes)
+		}
+		mac := hmac.New(sha256.New, []byte("password_3"))
+		_, _ = mac.Write([]byte(parts[0] + "." + parts[1]))
+		if got := base64.RawURLEncoding.EncodeToString(mac.Sum(nil)); got != parts[2] {
+			t.Fatalf("refund JWT signature mismatch")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if len(refundPayloads) == 1 {
+			_, _ = io.WriteString(w, `{"success":true,"requestId":"refund-request-full"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"success":true,"requestId":"refund-request-partial"}`)
+	})
+	server := httptest.NewTLSServer(mux)
+	defer server.Close()
+
+	client := robokassaHTTP{h: testTLSTransport(t, server)}
+	secret := []byte("shop_1\npassword_1\npassword_2\npassword_3")
+	full, err := client.Refund(context.Background(), secret, sdk.PaymentRefundRequest{
+		RemotePaymentID: "1932809606", ExternalID: "refund-full", IdempotencyKey: "refund-full",
+		Amount: sdk.PaymentAmount{MinorUnits: 15000, Currency: "RUB"},
+	})
+	if err != nil {
+		t.Fatalf("full Refund: %v", err)
+	}
+	if full.RemoteRefundID != "refund-request-full" || full.Status != "accepted" {
+		t.Fatalf("unexpected full refund result: %+v", full)
+	}
+	partial, err := client.Refund(context.Background(), secret, sdk.PaymentRefundRequest{
+		RemotePaymentID: "1932809606", ExternalID: "refund-partial", IdempotencyKey: "refund-partial",
+		Amount: sdk.PaymentAmount{MinorUnits: 5000, Currency: "RUB"},
+	})
+	if err != nil {
+		t.Fatalf("partial Refund: %v", err)
+	}
+	if partial.RemoteRefundID != "refund-request-partial" || partial.Status != "accepted" {
+		t.Fatalf("unexpected partial refund result: %+v", partial)
+	}
+	if len(refundPayloads) != 2 || refundPayloads[0]["OpKey"] != "0005F891-8CCD-434B-8455-816AFFFDBF37-0VOisWikFF" || refundPayloads[0]["RefundSum"] != nil {
+		t.Fatalf("unexpected full refund payload: %+v", refundPayloads[0])
+	}
+	if refundPayloads[1]["OpKey"] != "0005F891-8CCD-434B-8455-816AFFFDBF37-0VOisWikFF" || refundPayloads[1]["RefundSum"] != 50.0 {
+		t.Fatalf("unexpected partial refund payload: %+v", refundPayloads[1])
+	}
+}
+
+func TestRobokassaRefundRequiresPassword3(t *testing.T) {
+	client := robokassaHTTP{h: newHTTPTransport()}
+	_, err := client.Refund(context.Background(), []byte("shop_1\npassword_1\npassword_2"), sdk.PaymentRefundRequest{
+		RemotePaymentID: "1932809606", ExternalID: "refund", IdempotencyKey: "refund", Amount: sdk.PaymentAmount{MinorUnits: 100, Currency: "RUB"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "password3") {
+		t.Fatalf("Refund without Password3 error = %v", err)
 	}
 }
 

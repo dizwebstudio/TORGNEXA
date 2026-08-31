@@ -7,7 +7,9 @@
 проверки подключения. Дополнительно доступно bounded read-only чтение
 справочника складов/ПВЗ по capability `pickup.points.read`, предпросмотр
 тарифов по capability `logistics.rates.read` и текущий статус груза по
-capability `logistics.track.read`.
+capability `logistics.track.read`, одиночная PDF-этикетка по capability
+`logistics.label.read`, а также аннулирование одного предварительного
+оформления по capability `logistics.shipment.cancel`.
 
 ## Objective
 
@@ -26,12 +28,19 @@ capability `logistics.track.read`.
 - `logistics.track.read` использует официальный `/cargos/basicstatus/`, передаёт
   один код груза, ограничивает ответ 50 элементами и переводит русские статусы
   в нейтральные коды без раскрытия сырого ответа;
+- `logistics.shipment.cancel` использует официальный
+  `/order/cancellation/`, отправляет ровно один код груза и принимает только
+  точный ответ с `success=true`;
+- `logistics.label.read` использует официальный `/order/print/` с типом
+  `simple`, декодирует base64 и принимает только PDF с сигнатурой `%PDF-`;
 - SDK-тесты и conformance-кандидат выполняются без сети и production secrets;
-- операции записи остаются qualification-gated до фиксации актуальных fixtures.
+- подача заявки, отмена сформированного груза, возврат и другие операции
+  записи остаются qualification-gated до фиксации актуальных fixtures.
 
 ## Qualification
 
 Официальная документация ПЭК подтверждает Basic-аутентификацию, JSON POST и
 методы расчёта, заявок, статусов и справочников. Предпросмотр тарифов остаётся
-read-only; для включения боевых заявок нужны тестовый аккаунт, обезличенные
+read-only; аннулирование ограничено одной заявкой и проверкой точного ответа.
+Для включения подачи боевых заявок нужны тестовый аккаунт, обезличенные
 fixtures и проверка повторов по одному idempotency key.

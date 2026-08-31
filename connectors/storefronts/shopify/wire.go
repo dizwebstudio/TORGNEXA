@@ -17,6 +17,7 @@ type shopifyVariant struct {
 type shopifyProduct struct {
 	ID        int64            `json:"id"`
 	Title     string           `json:"title"`
+	BodyHTML  string           `json:"body_html"`
 	Status    string           `json:"status"`
 	Vendor    string           `json:"vendor"`
 	UpdatedAt string           `json:"updated_at"`

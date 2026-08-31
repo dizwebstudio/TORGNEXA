@@ -17,7 +17,7 @@ chunk arrives.
 
 ### Public documentation rendering and indexing
 
-The public `/docs` hub and its 17 topical routes are prerendered during
+The public `/docs` hub and its 20 topical routes are prerendered during
 `npm run build` into `frontend/dist/docs/**/index.html`. Each page contains its
 own content, H1, title, description, canonical URL, Open Graph metadata,
 `TechArticle` and `BreadcrumbList` JSON-LD before the browser executes
@@ -28,7 +28,7 @@ public pages useful without a module bundle.
 The production overlay requires `TORGNEXA_PUBLIC_URL` and bakes that HTTPS URL
 into the canonical metadata, `robots.txt` and `sitemap.xml`. When the content or
 public host changes, rebuild the frontend and run `npm run test:docs` from
-`frontend/`; the check verifies all 18 rendered URLs, unique metadata,
+`frontend/`; the check verifies all 21 rendered URLs, unique metadata,
 breadcrumbs, indexing policy and absence of the SPA module from public HTML.
 
 ### Public documentation reading quality
@@ -53,10 +53,12 @@ are present, so a content edit cannot silently remove the reader or crawler
 layer.
 
 The public guide also tracks the current operator surfaces: returns and refund
-allocation, publication-quality preflight, WMS execution tasks, the bounded
-workflow builder, channel unit economics and qualified logistics read
-operations. Runtime availability remains sourced from the generated connector
-catalog; SDK-declared capability alone is never presented as a live operation.
+allocation, publication-quality preflight, WMS execution tasks, marking and
+UPD handling, the bounded workflow builder, the grounded AI operator assistant,
+channel unit economics, the integration state center and qualified logistics
+read operations. Runtime availability remains sourced from the generated
+connector catalog; SDK-declared capability alone is never presented as a live
+operation.
 ## Единый центр состояния интеграций
 
 Маршрут `/integrations/status` отделён от marketplace-каталога `/integrations`.

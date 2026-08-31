@@ -8,10 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/netip"
+	"net/textproto"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,7 +107,11 @@ func dialTargetFromContext(ctx context.Context) (string, bool) {
 func publicIP(a netip.Addr) bool { return connectorsandbox.PublicInternetAddress(a) }
 
 func (h *httpTransport) do(ctx context.Context, method, host, path string, query url.Values, body []byte, headers http.Header, basicUser, basicPass []byte) (int, []byte, string, int64, http.Header, error) {
-	if ctx == nil || h == nil || h.resolver == nil || h.client == nil || method == "" || !validHost(host) || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") || len(body) > maxResponseBody {
+	return h.doWithLimits(ctx, method, host, path, query, body, headers, basicUser, basicPass, maxResponseBody, maxResponseBody)
+}
+
+func (h *httpTransport) doWithLimits(ctx context.Context, method, host, path string, query url.Values, body []byte, headers http.Header, basicUser, basicPass []byte, requestLimit, responseLimit int) (int, []byte, string, int64, http.Header, error) {
+	if requestLimit < 1 || responseLimit < 1 || ctx == nil || h == nil || h.resolver == nil || h.client == nil || method == "" || !validHost(host) || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") || len(body) > requestLimit {
 		return 0, nil, "", 0, nil, errors.New("provider http: invalid request")
 	}
 	ips, err := h.resolver.LookupNetIP(ctx, "ip", host)
@@ -170,8 +177,8 @@ func (h *httpTransport) do(ctx context.Context, method, host, path string, query
 		defer zipped.Close()
 		responseBody = zipped
 	}
-	payload, err := io.ReadAll(io.LimitReader(responseBody, maxResponseBody+1))
-	if err != nil || len(payload) > maxResponseBody {
+	payload, err := io.ReadAll(io.LimitReader(responseBody, int64(responseLimit)+1))
+	if err != nil || len(payload) > responseLimit {
 		return 0, nil, "", 0, nil, errors.New("provider http: response too large")
 	}
 	requestID := firstHeader(resp.Header, "X-Request-Id", "X-Request-ID", "Request-Id", "X-Trace-Id")
@@ -684,16 +691,73 @@ func (t yandexGPTHTTP) Do(ctx context.Context, r yandexgpt.Request) (yandexgpt.R
 type telegramHTTP struct{ h *httpTransport }
 
 func (t telegramHTTP) Do(ctx context.Context, request telegram.Request) (telegram.Response, error) {
-	if t.h == nil || request.Host != "api.telegram.org" || request.Method != http.MethodPost || request.APIMethod == "" || len(request.Files) != 0 || len(request.BotToken) == 0 {
+	if t.h == nil || request.Host != "api.telegram.org" || request.Method != http.MethodPost || request.APIMethod == "" || len(request.BotToken) == 0 {
 		return telegram.Response{}, errors.New("telegram http: invalid request")
 	}
-	form := url.Values{}
-	for _, parameter := range request.Params {
-		form.Add(parameter.Name, parameter.Value)
+	var body []byte
+	var contentType string
+	if len(request.Files) == 0 {
+		form := url.Values{}
+		for _, parameter := range request.Params {
+			form.Add(parameter.Name, parameter.Value)
+		}
+		body = []byte(form.Encode())
+		contentType = "application/x-www-form-urlencoded"
+	} else {
+		var err error
+		body, contentType, err = telegramMultipartBody(request.Params, request.Files)
+		if err != nil {
+			return telegram.Response{}, err
+		}
 	}
-	headers := http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}}
-	status, body, requestID, _, _, err := t.h.do(ctx, request.Method, request.Host, "/bot"+string(request.BotToken)+"/"+request.APIMethod, url.Values{}, []byte(form.Encode()), headers, nil, nil)
-	return telegram.Response{StatusCode: status, Body: body, RequestID: requestID}, err
+	headers := http.Header{"Content-Type": []string{contentType}}
+	status, responseBody, requestID, _, _, err := t.h.doWithLimits(ctx, request.Method, request.Host, "/bot"+string(request.BotToken)+"/"+request.APIMethod, url.Values{}, body, headers, nil, nil, maxTelegramUploadBody, maxResponseBody)
+	return telegram.Response{StatusCode: status, Body: responseBody, RequestID: requestID}, err
+}
+
+const maxTelegramUploadBody = 128 << 20
+
+var telegramMultipartNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,31}$`)
+
+func telegramMultipartBody(params []telegram.Param, files []telegram.FilePart) ([]byte, string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for _, parameter := range params {
+		if !telegramMultipartNamePattern.MatchString(parameter.Name) || strings.ContainsAny(parameter.Value, "\x00\r\n") {
+			return nil, "", errors.New("telegram http: invalid multipart parameter")
+		}
+		if err := writer.WriteField(parameter.Name, parameter.Value); err != nil {
+			return nil, "", errors.New("telegram http: multipart parameter failed")
+		}
+	}
+	for _, file := range files {
+		if !telegramMultipartNamePattern.MatchString(file.FieldName) || file.Body == nil || file.SizeBytes < 1 || file.SizeBytes > maxTelegramUploadBody || file.FileName == "" || strings.ContainsAny(file.FileName, "\x00\r\n\\/") || !validTelegramMediaType(file.MediaType) {
+			return nil, "", errors.New("telegram http: invalid multipart file")
+		}
+		header := textproto.MIMEHeader{}
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, file.FieldName, file.FileName))
+		header.Set("Content-Type", file.MediaType)
+		part, err := writer.CreatePart(header)
+		if err != nil {
+			return nil, "", errors.New("telegram http: multipart file failed")
+		}
+		written, err := io.CopyN(part, file.Body, file.SizeBytes)
+		if err != nil || written != file.SizeBytes {
+			return nil, "", errors.New("telegram http: multipart file size mismatch")
+		}
+		var extra [1]byte
+		if count, readErr := file.Body.Read(extra[:]); count != 0 || (readErr != nil && readErr != io.EOF) {
+			return nil, "", errors.New("telegram http: multipart file has trailing data")
+		}
+	}
+	if err := writer.Close(); err != nil || body.Len() > maxTelegramUploadBody {
+		return nil, "", errors.New("telegram http: multipart body exceeds limit")
+	}
+	return body.Bytes(), writer.FormDataContentType(), nil
+}
+
+func validTelegramMediaType(value string) bool {
+	return value == "image/jpeg" || value == "image/png" || value == "image/webp" || value == "video/mp4"
 }
 
 type maxHTTP struct{ h *httpTransport }
@@ -714,12 +778,85 @@ func (t maxHTTP) Do(ctx context.Context, request maxmessenger.Request) (maxmesse
 	return maxmessenger.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
 }
 
-func (maxHTTP) Upload(context.Context, maxmessenger.UploadRequest) (maxmessenger.Response, error) {
-	return maxmessenger.Response{}, errors.New("max http: media upload is not admitted")
+func (t maxHTTP) Upload(ctx context.Context, upload maxmessenger.UploadRequest) (maxmessenger.Response, error) {
+	if t.h == nil || len(upload.AccessToken) == 0 || upload.Body == nil || upload.SizeBytes < 1 || upload.SizeBytes > maxMAXMediaBytes || !validMAXUploadURL(upload.URL, upload.MediaType) || upload.FileName == "" || strings.ContainsAny(upload.FileName, "\x00\r\n\\/") || !validMAXMediaType(upload.MediaType) {
+		return maxmessenger.Response{}, errors.New("max http: invalid media upload")
+	}
+	body, contentType, err := maxMultipartBody(upload)
+	if err != nil {
+		return maxmessenger.Response{}, err
+	}
+	parsed, _ := url.Parse(upload.URL)
+	query, err := url.ParseQuery(parsed.RawQuery)
+	if err != nil {
+		return maxmessenger.Response{}, errors.New("max http: invalid upload query")
+	}
+	headers := http.Header{"Authorization": []string{string(upload.AccessToken)}, "Content-Type": []string{contentType}}
+	status, responseBody, requestID, retryAfter, _, err := t.h.doWithLimits(ctx, http.MethodPost, parsed.Hostname(), parsed.EscapedPath(), query, body, headers, nil, nil, maxMAXUploadBody, maxResponseBody)
+	return maxmessenger.Response{StatusCode: status, Body: responseBody, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+const (
+	maxMAXMediaBytes = 250 << 20
+	maxMAXUploadBody = 256 << 20
+)
+
+func maxMultipartBody(upload maxmessenger.UploadRequest) ([]byte, string, error) {
+	var body bytes.Buffer
+	if upload.SizeBytes > maxMAXMediaBytes || upload.SizeBytes > int64(maxMAXUploadBody) {
+		return nil, "", errors.New("max http: media upload exceeds limit")
+	}
+	writer := multipart.NewWriter(&body)
+	header := textproto.MIMEHeader{}
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="data"; filename="%s"`, upload.FileName))
+	header.Set("Content-Type", upload.MediaType)
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		return nil, "", errors.New("max http: multipart file failed")
+	}
+	written, err := io.CopyN(part, upload.Body, upload.SizeBytes)
+	if err != nil || written != upload.SizeBytes {
+		return nil, "", errors.New("max http: multipart file size mismatch")
+	}
+	if err := writer.Close(); err != nil || body.Len() > maxMAXUploadBody {
+		return nil, "", errors.New("max http: multipart body exceeds limit")
+	}
+	return body.Bytes(), writer.FormDataContentType(), nil
+}
+
+func validMAXUploadURL(value, mediaType string) bool {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" || parsed.Hostname() == "" || parsed.Path == "" || strings.ContainsAny(value, "\x00\r\n") {
+		return false
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	parsedHost := strings.ToLower(parsed.Host)
+	if strings.HasPrefix(mediaType, "image/") {
+		return host == "iu.oneme.ru" && (parsedHost == host || parsedHost == host+":443")
+	}
+	if strings.HasPrefix(mediaType, "video/") {
+		return host == "omub.okcdn.ru" && (parsedHost == host || parsedHost == host+":443")
+	}
+	return false
+}
+
+func validMAXMediaType(value string) bool {
+	switch value {
+	case "image/jpeg", "image/png", "image/gif", "image/tiff", "image/bmp", "image/heic", "video/mp4", "video/quicktime", "video/x-matroska", "video/webm":
+		return true
+	default:
+		return false
+	}
 }
 
 func validMAXRuntimeRequest(request maxmessenger.Request) bool {
 	if request.Method == http.MethodPost {
+		if request.Path == "/uploads" {
+			return len(request.Body) == 0 && len(request.Params) == 1 && request.Params[0].Name == "type" && (request.Params[0].Value == "image" || request.Params[0].Value == "video")
+		}
 		if request.Path != "/messages" || len(request.Body) == 0 || len(request.Params) != 1 || request.Params[0].Name != "chat_id" {
 			return false
 		}

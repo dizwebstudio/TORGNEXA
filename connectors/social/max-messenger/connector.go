@@ -42,6 +42,9 @@ type UploadRequest struct {
 	SizeBytes int64
 	SHA256    string
 	Body      io.Reader
+	// AccessToken is valid only during the host transport callback. It is
+	// intentionally not part of normalized media metadata or persisted state.
+	AccessToken []byte
 }
 
 type Response struct {

@@ -2,6 +2,11 @@ package saleor
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"strconv"
 	"strings"
@@ -131,21 +136,88 @@ func TestReadProductsPagesUsingCursor(t *testing.T) {
 	}
 }
 
-func TestWebhookIsUnsupported(t *testing.T) {
-	connector := New(scriptedTransport{}, testConfig{}, nil)
-	request := sdk.CommerceWebhookRequest{Signature: "0123456789abcdef", HeaderTopic: "order.updated", ExpectedTopic: "order.updated", Body: []byte(`{"id":1}`), ReceivedAt: time.Now().UTC()}
+func saleorDetachedJWS(t *testing.T, body []byte) (string, []byte) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate Saleor test key: %v", err)
+	}
+	protected := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","kid":"saleor-test-key","b64":false,"crit":["b64"]}`))
+	signingInput := append([]byte(protected+"."), body...)
+	digest := sha256.Sum256(signingInput)
+	rawSignature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign Saleor webhook: %v", err)
+	}
+	modulus := base64.RawURLEncoding.EncodeToString(key.PublicKey.N.Bytes())
+	jwks := []byte(`{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"saleor-test-key","n":"` + modulus + `","e":"AQAB"}]}`)
+	return protected + ".." + base64.RawURLEncoding.EncodeToString(rawSignature), jwks
+}
+
+func TestWebhookVerifiesDetachedJWSAndDeduplicates(t *testing.T) {
+	body := []byte(`{"event":"PRODUCT_UPDATED","data":{"object":{"id":"UHJvZHVjdDox"}}}`)
+	signature, jwks := saleorDetachedJWS(t, body)
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		if request.Method != "GET" || request.Host != "shop.example.com" || request.Path != "/.well-known/jwks.json" || string(request.Bearer) != testToken {
+			t.Fatalf("unexpected JWKS request: %+v", request)
+		}
+		return Response{StatusCode: 200, Body: jwks}, nil
+	}}
+	connector := New(transport, testConfig{}, nil)
+	receivedAt := time.Date(2026, 8, 12, 7, 0, 0, 0, time.UTC)
+	request := sdk.CommerceWebhookRequest{Signature: signature, HeaderTopic: "product.updated", ExpectedTopic: "product.updated", Body: body, ReceivedAt: receivedAt}
+	dedup := &memoryDedup{seen: map[string]bool{}}
+	first, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, dedup)
+	if err != nil {
+		t.Fatalf("first webhook: %v", err)
+	}
+	if first.Duplicate || first.EventType != "product.updated" || first.ResourceKind != "product" || first.ResourceRemoteID != "UHJvZHVjdDox" || string(first.CanonicalPayload) != `{"event":"product.updated","resource_id":"UHJvZHVjdDox"}` {
+		t.Fatalf("unexpected first result: %+v", first)
+	}
+	second, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, dedup)
+	if err != nil {
+		t.Fatalf("duplicate webhook: %v", err)
+	}
+	if !second.Duplicate || second.DeliveryID != first.DeliveryID || calls != 2 {
+		t.Fatalf("unexpected duplicate result: %+v calls=%d", second, calls)
+	}
+}
+
+func TestWebhookRejectsTamperedDetachedJWS(t *testing.T) {
+	body := []byte(`{"event":"PRODUCT_UPDATED","data":{"object":{"id":"UHJvZHVjdDox"}}}`)
+	signature, jwks := saleorDetachedJWS(t, body)
+	connector := New(scriptedTransport{fn: func(request Request) (Response, error) {
+		return Response{StatusCode: 200, Body: jwks}, nil
+	}}, testConfig{}, nil)
+	request := sdk.CommerceWebhookRequest{Signature: signature, HeaderTopic: "product.updated", ExpectedTopic: "product.updated", Body: []byte(`{"event":"PRODUCT_UPDATED","data":{"object":{"id":"tampered"}}}`), ReceivedAt: time.Date(2026, 8, 12, 7, 0, 0, 0, time.UTC)}
 	_, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, &memoryDedup{seen: map[string]bool{}})
 	var remote *sdk.RemoteError
-	if !errors.As(err, &remote) || remote.Category != sdk.ErrorUnsupported {
-		t.Fatalf("expected unsupported, got %v", err)
+	if !errors.As(err, &remote) || remote.Category != sdk.ErrorUnauthorized || remote.Code != "webhook_signature_invalid" {
+		t.Fatalf("expected unauthorized signature error, got %v", err)
+	}
+}
+
+func TestWebhookPreservesJWKSRemoteError(t *testing.T) {
+	body := []byte(`{"event":"PRODUCT_UPDATED","data":{"object":{"id":"UHJvZHVjdDox"}}}`)
+	signature, _ := saleorDetachedJWS(t, body)
+	connector := New(scriptedTransport{fn: func(Request) (Response, error) {
+		return Response{StatusCode: 503, RetryAfterMS: 250}, nil
+	}}, testConfig{}, nil)
+	request := sdk.CommerceWebhookRequest{Signature: signature, HeaderTopic: "product.updated", ExpectedTopic: "product.updated", Body: body, ReceivedAt: time.Date(2026, 8, 12, 7, 0, 0, 0, time.UTC)}
+	_, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, &memoryDedup{seen: map[string]bool{}})
+	var remote *sdk.RemoteError
+	if !errors.As(err, &remote) || remote.Category != sdk.ErrorUnavailable || remote.Code != "remote_unavailable" || remote.RetryAfterMS != 250 {
+		t.Fatalf("expected preserved JWKS availability error, got %v", err)
 	}
 }
 
 type memoryDedup struct{ seen map[string]bool }
 
-func (dedup *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, id, _ string, _ time.Time) (bool, error) {
-	duplicate := dedup.seen[id]
-	dedup.seen[id] = true
+func (dedup *memoryDedup) ClaimCommerceWebhook(_ context.Context, _ sdk.Account, claim sdk.CommerceWebhookClaim) (bool, error) {
+	duplicate := dedup.seen[claim.DeliveryID]
+	dedup.seen[claim.DeliveryID] = true
 	return duplicate, nil
 }
 

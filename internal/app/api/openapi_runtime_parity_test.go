@@ -49,9 +49,9 @@ func TestFormerlyReservedContractRoutesAreProductionAdapters(t *testing.T) {
 	}
 }
 
-func TestProductionRoutesCoverOpenAPI(t *testing.T) {
+func TestProtectedProductionRoutesCoverProtectedOpenAPI(t *testing.T) {
 	operations, pathCount := readOpenAPIOperations(t, "../../../contracts/openapi/torgnexa-v1.yaml")
-	if pathCount != 175 || len(operations) != 206 {
+	if pathCount != 178 || len(operations) != 209 {
 		t.Fatalf("unexpected OpenAPI surface: got %d paths and %d operations", pathCount, len(operations))
 	}
 
@@ -100,6 +100,12 @@ func readOpenAPIOperations(t *testing.T, path string) ([]openAPIOperation, int) 
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(line, "  /") && !strings.HasPrefix(line, "    ") && strings.HasSuffix(trimmed, ":") {
 			currentPath = strings.TrimSuffix(trimmed, ":")
+			if strings.HasPrefix(currentPath, "/webhooks/") {
+				// Public webhook operations are intentionally validated by their
+				// own route tests; this helper covers only authenticated routes.
+				currentPath = ""
+				continue
+			}
 			pathCount++
 			continue
 		}

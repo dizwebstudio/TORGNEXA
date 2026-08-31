@@ -231,6 +231,7 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 			KafkaBrokers:       []string{"127.0.0.1:9092"},
 			KafkaConsumerGroup: "torgnexa.webhooks.v1",
 			KafkaTopics: []string{
+				"ai.operator_assistant.events.v1",
 				"billing.subscription.events.v1",
 				"commerce.catalog.events.v1",
 				"commerce.claim.events.v1",
@@ -242,6 +243,7 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 				"commerce.pricing.events.v1",
 				"commerce.returns.events.v1",
 				"commerce.social.events.v1",
+				"commerce.storefront.events.v1",
 				"compliance.document.events.v1",
 				"compliance.product.events.v1",
 				"enterprise.legal_party.events.v1",

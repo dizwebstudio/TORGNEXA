@@ -1,6 +1,18 @@
 # Package status — 2026-08-31
 
-**Tasks 001–169 are repository-implemented.** Task 159 adds Google Gemini and
+**Tasks 001–180 are repository-implemented.** Task 180 admits the SBP payment
+webhook through the shared public receiver with mTLS status re-fetch and replay
+evidence. Task 179 adds the bounded Russian
+Post batch-directory route. Task 178 adds the PEK request
+print-form route. Task 177 adds the Russian Post
+easy-return PDF label route. Task 176 adds Robokassa merchant refunds through
+the official Password3-signed Refund API. Task 175 adds MAX media/video
+publication through the released-upload worker bridge. Task 174 adds Telegram
+media publication through the released-upload worker bridge. Task 173 adds bounded ПЭК
+shipment preregistration through the explicit self-delivery runtime. Task 172
+adds Yandex Market inventory writes through the explicit partner/grouped
+warehouse runtime. Task
+159 adds Google Gemini and
 Grok to the governed AI-provider surface. Midjourney remains intentionally
 unavailable because its official policy disallows third-party automation. Task
 158 adds «Долями» to the
@@ -21,10 +33,10 @@ evidence. Connector
 packages are organized as `connectors/<category>/<provider>`, with provider
 IDs and generated catalog order unchanged. The catalog therefore contains 18
 generic product integrations and 43 separate-surface providers; there are no
-planned connectors. Architecture policy: **142 modules / 61 providers / 157
-reviews**. Active migrations are **38**, latest `000038`, with
+planned connectors. Architecture policy: **146 modules / 61 providers / 168
+reviews**. Active migrations are **41**, latest `000041`, with
 the original **74-file / legacy head 000074** chain archived as immutable
-evidence. Public OpenAPI is **206 operations / 0.21.2**.
+evidence. Public OpenAPI is **210 operations / 0.21.2**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -34,13 +46,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 540
-- adrs: 123
-- tasks: 173
+- docs: 541
+- adrs: 132
+- tasks: 182
 - milestones: 14
-- contracts: 240
+- contracts: 241
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3108
+- total source files (excluding local secrets/build/dependency/cache trees): 3172
 
 
 ## Connector category layout
@@ -642,6 +654,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0121-integration-state-center.md`
 - `adr/0122-marking-execution-and-edo.md`
 - `adr/0123-ai-operator-assistant.md`
+- `adr/0124-yandex-market-inventory-write.md`
+- `adr/0125-pek-bounded-shipment-create.md`
+- `adr/0126-telegram-media-worker-route.md`
+- `adr/0127-max-media-worker-route.md`
+- `adr/0128-robokassa-refund-runtime.md`
+- `adr/0129-pochta-return-label-runtime.md`
+- `adr/0130-pek-request-print-form-runtime.md`
+- `adr/0131-pochta-batch-directory-read-runtime.md`
+- `adr/0132-sbp-payment-webhook-runtime-admission.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -802,6 +823,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/168-integration-state-center.json`
 - `architecture/reviews/169-ai-operator-assistant.json`
 - `architecture/reviews/171-marking-execution-and-upd.json`
+- `architecture/reviews/172-yandex-market-inventory-write.json`
+- `architecture/reviews/173-pek-bounded-shipment-create.json`
+- `architecture/reviews/174-telegram-media-worker-route.json`
+- `architecture/reviews/175-max-media-worker-route.json`
+- `architecture/reviews/176-robokassa-refund-runtime.json`
+- `architecture/reviews/177-pochta-return-label-runtime.json`
+- `architecture/reviews/178-pek-request-print-form-runtime.json`
+- `architecture/reviews/179-pochta-batch-directory-read-runtime.json`
+- `architecture/reviews/180-sbp-payment-webhook-runtime-admission.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -1000,6 +1030,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/logistics/cdek/operations.go`
 - `connectors/logistics/cdek/presentation.json`
 - `connectors/logistics/dellin/candidate_transport.go`
+- `connectors/logistics/dellin/config.go`
 - `connectors/logistics/dellin/connector.go`
 - `connectors/logistics/dellin/connector_test.go`
 - `connectors/logistics/dellin/manifest.json`
@@ -1020,6 +1051,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/logistics/ozon-delivery/presentation.json`
 - `connectors/logistics/ozon-delivery/transport.go`
 - `connectors/logistics/pek/candidate_transport.go`
+- `connectors/logistics/pek/config.go`
 - `connectors/logistics/pek/conformance.go`
 - `connectors/logistics/pek/connector.go`
 - `connectors/logistics/pek/connector_test.go`
@@ -1529,6 +1561,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/events/social-publication-status-changed-v1.schema.json`
 - `contracts/events/social-variant-changed-v1.schema.json`
 - `contracts/events/stock-changed-v1.schema.json`
+- `contracts/events/storefront-webhook-received-v1.schema.json`
 - `contracts/events/unit-economics-snapshot-published-v1.schema.json`
 - `contracts/events/unit-economics-snapshot-requested-v1.schema.json`
 - `contracts/events/upload-quarantined-v1.schema.json`
@@ -1892,6 +1925,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/connectors/egais/conformance-report.json`
 - `docs/connectors/egais/reconciliation.md`
 - `docs/connectors/egais/spec.md`
+- `docs/connectors/fail-closed-operation-matrix.md`
 - `docs/connectors/fivepost/README.md`
 - `docs/connectors/fivepost/capability-audit.md`
 - `docs/connectors/fivepost/conformance-plan.md`
@@ -2253,6 +2287,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/security/js-supply-chain-locking.md`
 - `docs/security/production-api-security-composition.md`
 - `frontend/.gitignore`
+- `frontend/.prerender/brand/torgnexa-favicon.png`
+- `frontend/.prerender/brand/torgnexa-logo.png`
+- `frontend/.prerender/brand/torgnexa-symbol.png`
 - `frontend/.prerender/connector-logos/README.md`
 - `frontend/.prerender/connector-logos/aliexpress-ru.svg`
 - `frontend/.prerender/connector-logos/auto-ru.svg`
@@ -2344,17 +2381,25 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/.prerender/demo-images/demo-avatar.svg`
 - `frontend/.prerender/docs-entry.js`
 - `frontend/.prerender/docs-entry.js.map`
+- `frontend/.prerender/docs/ai-assistant.png`
 - `frontend/.prerender/docs/documentation.png`
 - `frontend/.prerender/docs/integration-connection.png`
+- `frontend/.prerender/docs/integration-status.png`
 - `frontend/.prerender/docs/integrations.png`
 - `frontend/.prerender/docs/login.png`
+- `frontend/.prerender/docs/marking.png`
 - `frontend/.prerender/docs/mobile.png`
 - `frontend/.prerender/docs/opencart-smoke.png`
 - `frontend/.prerender/docs/opencart-store.png`
 - `frontend/.prerender/docs/prestashop-guide.png`
 - `frontend/.prerender/docs/prestashop-store.png`
+- `frontend/.prerender/docs/publication-quality.png`
+- `frontend/.prerender/docs/returns.png`
+- `frontend/.prerender/docs/unit-economics.png`
+- `frontend/.prerender/docs/wms-task.png`
 - `frontend/.prerender/docs/woocommerce-guide.png`
 - `frontend/.prerender/docs/woocommerce-store.png`
+- `frontend/.prerender/docs/workflow-builder.png`
 - `frontend/.prerender/oidc/silent-callback.html`
 - `frontend/.prerender/robots.txt`
 - `frontend/Dockerfile.dev`
@@ -2362,6 +2407,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/index.html`
 - `frontend/package-lock.json`
 - `frontend/package.json`
+- `frontend/public/brand/torgnexa-favicon.png`
+- `frontend/public/brand/torgnexa-logo.png`
+- `frontend/public/brand/torgnexa-symbol.png`
 - `frontend/public/connector-logos/README.md`
 - `frontend/public/connector-logos/aliexpress-ru.svg`
 - `frontend/public/connector-logos/auto-ru.svg`
@@ -2451,17 +2499,25 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/public/demo-images/demo-25.svg`
 - `frontend/public/demo-images/demo-26.svg`
 - `frontend/public/demo-images/demo-avatar.svg`
+- `frontend/public/docs/ai-assistant.png`
 - `frontend/public/docs/documentation.png`
 - `frontend/public/docs/integration-connection.png`
+- `frontend/public/docs/integration-status.png`
 - `frontend/public/docs/integrations.png`
 - `frontend/public/docs/login.png`
+- `frontend/public/docs/marking.png`
 - `frontend/public/docs/mobile.png`
 - `frontend/public/docs/opencart-smoke.png`
 - `frontend/public/docs/opencart-store.png`
 - `frontend/public/docs/prestashop-guide.png`
 - `frontend/public/docs/prestashop-store.png`
+- `frontend/public/docs/publication-quality.png`
+- `frontend/public/docs/returns.png`
+- `frontend/public/docs/unit-economics.png`
+- `frontend/public/docs/wms-task.png`
 - `frontend/public/docs/woocommerce-guide.png`
 - `frontend/public/docs/woocommerce-store.png`
+- `frontend/public/docs/workflow-builder.png`
 - `frontend/public/oidc/silent-callback.html`
 - `frontend/public/robots.txt`
 - `frontend/repository-shims.d.ts`
@@ -2544,6 +2600,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/pages/PublicationQualityPage.tsx`
 - `frontend/src/pages/ReportsPage.tsx`
 - `frontend/src/pages/ReturnsPage.tsx`
+- `frontend/src/pages/SecurityPage.tsx`
 - `frontend/src/pages/SettingsPage.tsx`
 - `frontend/src/pages/SocialPage.tsx`
 - `frontend/src/pages/SyncPage.tsx`
@@ -2598,6 +2655,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/audit_test.go`
 - `internal/app/api/catalog.go`
 - `internal/app/api/catalog_images_test.go`
+- `internal/app/api/commerce_webhooks.go`
+- `internal/app/api/commerce_webhooks_test.go`
 - `internal/app/api/compliance.go`
 - `internal/app/api/compliance_test.go`
 - `internal/app/api/connector_accounts.go`
@@ -2621,6 +2680,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/lineage_test.go`
 - `internal/app/api/logistics.go`
 - `internal/app/api/logistics_test.go`
+- `internal/app/api/logistics_webhooks.go`
+- `internal/app/api/logistics_webhooks_test.go`
 - `internal/app/api/marking.go`
 - `internal/app/api/mcp_accounts.go`
 - `internal/app/api/mcp_agent_policies.go`
@@ -2695,6 +2756,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/worker/reconciliation_actions.go`
 - `internal/app/worker/reporting_batch.go`
 - `internal/app/worker/reporting_batch_test.go`
+- `internal/app/worker/returns_logistics_route.go`
+- `internal/app/worker/returns_logistics_route_test.go`
+- `internal/app/worker/social_media.go`
 - `internal/app/worker/social_publication.go`
 - `internal/app/worker/social_publication_test.go`
 - `internal/app/worker/worker.go`
@@ -3160,6 +3224,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000036_logistics_shipment_payload_reference.sql`
 - `migrations/000037_marking_execution.sql`
 - `migrations/000038_ai_operator_assistant.sql`
+- `migrations/000039_logistics_webhook_evidence.sql`
+- `migrations/000040_return_logistics_operations.sql`
+- `migrations/000041_return_logistics_tariff_code.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -3521,6 +3588,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/169-ai-operator-assistant.md`
 - `tasks/issues/170-wms-operator-workspace-marketplace-fulfillment.md`
 - `tasks/issues/171-marking-execution-and-upd.md`
+- `tasks/issues/172-yandex-market-inventory-write.md`
+- `tasks/issues/173-pek-bounded-shipment-create.md`
+- `tasks/issues/174-telegram-media-worker-route.md`
+- `tasks/issues/175-max-media-worker-route.md`
+- `tasks/issues/176-robokassa-refund-runtime.md`
+- `tasks/issues/177-pochta-return-label-runtime.md`
+- `tasks/issues/178-pek-request-print-form-runtime.md`
+- `tasks/issues/179-pochta-batch-directory-read-runtime.md`
+- `tasks/issues/180-sbp-payment-webhook-runtime-admission.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

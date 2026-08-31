@@ -1,8 +1,9 @@
 # Shopify
 
 Storefront connector. OAuth2 per-tenant host, Shopify Admin REST API for
-products/inventory/prices/orders/returns. Product create and webhook receipt
-are unsupported by design (see capability-audit.md).
+products/inventory/prices/orders/returns. Product creation uses exact-SKU
+lookup plus REST create and read-after-write reconciliation; webhook receipt
+remains unsupported by design (see capability-audit.md).
 
 The connector is pinned to Admin REST API `2026-07`, the current stable version
 used for qualification. Shopify is SaaS and has no official self-hosted Docker

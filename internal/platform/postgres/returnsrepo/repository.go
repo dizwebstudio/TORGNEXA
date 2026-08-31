@@ -4,7 +4,9 @@ package returnsrepo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +21,8 @@ import (
 )
 
 const applyScope = `SELECT set_config('app.organization_id',$1,true),set_config('app.workspace_id',$2,true)`
+
+const returnLogisticsSelect = `id,organization_id,workspace_id,return_id,connector_account_id,original_remote_id,external_id,mail_type,tariff_code,status,COALESCE(remote_id,''),COALESCE(tracking_number,''),COALESCE(failure_code,''),idempotency_key,version,created_at,updated_at`
 
 type Repository struct{ db *sql.DB }
 
@@ -383,6 +387,182 @@ func (r *Repository) CreateRefundAllocation(ctx context.Context, scope core.Scop
 		return appendAudit(ctx, tx, scope, mutation, "returns.refund_allocation.created", "refund_allocation", allocation.ID.String(), audit.RiskLegallySignificant, audit.Summary{"payment_id": allocation.PaymentID, "return_id": allocation.ReturnID.String(), "component": string(allocation.Component), "amount_minor_units": allocation.Amount.MinorUnits(), "currency": allocation.Currency.String()})
 	})
 	return result, err
+}
+
+// ReturnLogistics loads the durable carrier operation for one return.
+func (r *Repository) ReturnLogistics(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID) (core.ReturnLogisticsOperation, error) {
+	if err := r.validate(ctx, scope); err != nil || !id.Valid() {
+		return core.ReturnLogisticsOperation{}, core.ErrInvalidRecord
+	}
+	var result core.ReturnLogisticsOperation
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		var err error
+		result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), id.String()))
+		return err
+	})
+	return result, err
+}
+
+// CreateReturnLogistics durably admits one carrier operation for an already
+// authorized return. It never performs a remote call in the API transaction.
+func (r *Repository) CreateReturnLogistics(ctx context.Context, scope core.Scope, command core.ReturnLogisticsCommand, mutation core.Mutation) (core.ReturnLogisticsOperation, error) {
+	if err := r.validateMutation(ctx, scope, command.OrganizationID, command.WorkspaceID, mutation); err != nil || command.Validate() != nil {
+		return core.ReturnLogisticsOperation{}, core.ErrInvalidRecord
+	}
+	var result core.ReturnLogisticsOperation
+	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		var returnStatus string
+		if err := tx.QueryRowContext(ctx, `SELECT status FROM commerce_returns WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR SHARE`, scope.OrganizationID(), scope.WorkspaceID(), command.ReturnID.String()).Scan(&returnStatus); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return core.ErrNotFound
+			}
+			return err
+		}
+		if returnStatus != string(core.ReturnAuthorized) {
+			return core.ErrInvalidState
+		}
+		inserted, err := tx.ExecContext(ctx, `INSERT INTO return_logistics_operations(id,organization_id,workspace_id,return_id,connector_account_id,original_remote_id,external_id,mail_type,tariff_code,status,idempotency_key,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,1,$12,$12) ON CONFLICT DO NOTHING`, command.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), command.ReturnID.String(), command.ConnectorAccountID, command.OriginalRemoteID, command.ExternalID, command.MailType, command.TariffCode, core.ReturnLogisticsRequested, command.IdempotencyKey, mutation.OccurredAt)
+		if err != nil {
+			return err
+		}
+		rows, err := inserted.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, scope.OrganizationID(), scope.WorkspaceID(), command.IdempotencyKey))
+			if errors.Is(err, core.ErrNotFound) {
+				result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND return_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), command.ReturnID.String()))
+			}
+			if err != nil {
+				return core.ErrConflict
+			}
+			if result.ReturnID != command.ReturnID || result.ConnectorAccountID != command.ConnectorAccountID || result.OriginalRemoteID != command.OriginalRemoteID || result.ExternalID != command.ExternalID || result.MailType != command.MailType {
+				return core.ErrConflict
+			}
+			return nil
+		}
+		result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID(), scope.WorkspaceID(), command.ID.String()))
+		if err != nil {
+			return err
+		}
+		if err := appendAudit(ctx, tx, scope, mutation, "returns.logistics.requested", "return_logistics", result.ID.String(), audit.RiskWriteSensitive, audit.Summary{"return_id": result.ReturnID.String(), "connector_account_id": result.ConnectorAccountID}); err != nil {
+			return err
+		}
+		return enqueue(ctx, tx, scope, mutation, "commerce.returns.logistics_requested.v1", "return_logistics", result.ID.String(), map[string]any{"operation_id": result.ID.String(), "return_id": result.ReturnID.String(), "version": result.Version})
+	})
+	return result, err
+}
+
+// BeginReturnLogistics claims the remote side effect. Only a fresh requested
+// operation may call the provider; replayed or terminal operations are safe
+// no-ops.
+func (r *Repository) BeginReturnLogistics(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID, mutation core.Mutation) (core.ReturnLogisticsOperation, bool, error) {
+	if err := r.validateMutation(ctx, scope, "", "", mutation); err != nil || !id.Valid() {
+		return core.ReturnLogisticsOperation{}, false, core.ErrInvalidRecord
+	}
+	var result core.ReturnLogisticsOperation
+	fresh := false
+	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		current, err := scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, scope.OrganizationID(), scope.WorkspaceID(), id.String()))
+		if err != nil {
+			return err
+		}
+		if current.Status != core.ReturnLogisticsRequested {
+			result = current
+			return nil
+		}
+		fresh = true
+		result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `UPDATE return_logistics_operations SET status=$4,version=version+1,updated_at=$5 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$6 RETURNING `+returnLogisticsSelect, scope.OrganizationID(), scope.WorkspaceID(), id.String(), core.ReturnLogisticsExecuting, mutation.OccurredAt, current.Version))
+		if err != nil {
+			return err
+		}
+		return appendAudit(ctx, tx, scope, mutation, "returns.logistics.executing", "return_logistics", id.String(), audit.RiskWriteSensitive, audit.Summary{"return_id": result.ReturnID.String()})
+	})
+	return result, fresh, err
+}
+
+// ApplyReturnLogisticsResult commits only a validated, positive remote result.
+func (r *Repository) ApplyReturnLogisticsResult(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID, expectedVersion int64, remote core.ReturnLogisticsResult, mutation core.Mutation) (core.ReturnLogisticsOperation, error) {
+	if err := r.validateMutation(ctx, scope, "", "", mutation); err != nil || !id.Valid() || expectedVersion < 1 || remote.Validate() != nil {
+		return core.ReturnLogisticsOperation{}, core.ErrInvalidRecord
+	}
+	return r.finishReturnLogistics(ctx, scope, id, expectedVersion, core.ReturnLogisticsSucceeded, "", remote, mutation)
+}
+
+// ApplyReturnLogisticsFailure records a definitive provider rejection without
+// retrying it as if its remote side effect were unknown.
+func (r *Repository) ApplyReturnLogisticsFailure(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID, expectedVersion int64, failureCode string, mutation core.Mutation) (core.ReturnLogisticsOperation, error) {
+	if err := r.validateMutation(ctx, scope, "", "", mutation); err != nil || !id.Valid() || expectedVersion < 1 || !core.ValidReasonCode(failureCode) {
+		return core.ReturnLogisticsOperation{}, core.ErrInvalidRecord
+	}
+	return r.finishReturnLogistics(ctx, scope, id, expectedVersion, core.ReturnLogisticsFailed, failureCode, core.ReturnLogisticsResult{Status: "created", ObservedAt: mutation.OccurredAt, RemoteID: "failure-reference"}, mutation)
+}
+
+// ApplyReturnLogisticsUnknown closes an ambiguous remote attempt for manual
+// reconciliation and prevents a blind duplicate carrier request.
+func (r *Repository) ApplyReturnLogisticsUnknown(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID, expectedVersion int64, mutation core.Mutation) (core.ReturnLogisticsOperation, error) {
+	if err := r.validateMutation(ctx, scope, "", "", mutation); err != nil || !id.Valid() || expectedVersion < 1 {
+		return core.ReturnLogisticsOperation{}, core.ErrInvalidRecord
+	}
+	return r.finishReturnLogistics(ctx, scope, id, expectedVersion, core.ReturnLogisticsUnknown, "remote_outcome_unknown", core.ReturnLogisticsResult{Status: "created", ObservedAt: mutation.OccurredAt}, mutation)
+}
+
+func (r *Repository) finishReturnLogistics(ctx context.Context, scope core.Scope, id core.ReturnLogisticsOperationID, expectedVersion int64, status core.ReturnLogisticsStatus, failureCode string, remote core.ReturnLogisticsResult, mutation core.Mutation) (core.ReturnLogisticsOperation, error) {
+	var result core.ReturnLogisticsOperation
+	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		current, err := scanReturnLogistics(tx.QueryRowContext(ctx, `SELECT `+returnLogisticsSelect+` FROM return_logistics_operations WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, scope.OrganizationID(), scope.WorkspaceID(), id.String()))
+		if err != nil {
+			return err
+		}
+		if current.Version != expectedVersion || current.Status != core.ReturnLogisticsExecuting {
+			return core.ErrConflict
+		}
+		remoteID, tracking := "", ""
+		if status == core.ReturnLogisticsSucceeded {
+			remoteID, tracking = remote.RemoteID, remote.TrackingNumber
+		}
+		result, err = scanReturnLogistics(tx.QueryRowContext(ctx, `UPDATE return_logistics_operations SET status=$4,remote_id=NULLIF($5,''),tracking_number=NULLIF($6,''),failure_code=NULLIF($7,''),version=version+1,updated_at=$8 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$9 RETURNING `+returnLogisticsSelect, scope.OrganizationID(), scope.WorkspaceID(), id.String(), status, remoteID, tracking, failureCode, mutation.OccurredAt, expectedVersion))
+		if err != nil {
+			return err
+		}
+		digestInput := result.ID.String() + "\x00" + string(result.Status) + "\x00" + result.RemoteID + "\x00" + result.FailureCode
+		digest := sha256.Sum256([]byte(digestInput))
+		if _, err := tx.ExecContext(ctx, `INSERT INTO commerce_operation_evidence(id,organization_id,workspace_id,operation_type,operation_id,outcome,reason_code,remote_id,digest,correlation_id,causation_id,occurred_at) VALUES($1,$2,$3,'return_logistics',$4,$5,NULLIF($6,''),NULLIF($7,''),$8,$9,NULLIF($10,''),$11)`, mutation.AuditID, scope.OrganizationID(), scope.WorkspaceID(), result.ID.String(), result.Status, failureCode, remoteID, hex.EncodeToString(digest[:]), mutation.CorrelationID, mutation.CausationID, mutation.OccurredAt); err != nil {
+			return err
+		}
+		if err := appendAudit(ctx, tx, scope, mutation, "returns.logistics.completed", "return_logistics", id.String(), audit.RiskWriteSensitive, audit.Summary{"return_id": result.ReturnID.String(), "status": string(status), "failure_code": failureCode}); err != nil {
+			return err
+		}
+		return enqueue(ctx, tx, scope, mutation, "commerce.returns.logistics_state_changed.v1", "return_logistics", id.String(), map[string]any{"operation_id": id.String(), "return_id": result.ReturnID.String(), "status": result.Status, "version": result.Version})
+	})
+	return result, err
+}
+
+func scanReturnLogistics(row scanner) (core.ReturnLogisticsOperation, error) {
+	var result core.ReturnLogisticsOperation
+	var id, org, workspace, returnID, accountID, status string
+	if err := row.Scan(&id, &org, &workspace, &returnID, &accountID, &result.OriginalRemoteID, &result.ExternalID, &result.MailType, &result.TariffCode, &status, &result.RemoteID, &result.TrackingNumber, &result.FailureCode, &result.IdempotencyKey, &result.Version, &result.CreatedAt, &result.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return core.ReturnLogisticsOperation{}, core.ErrNotFound
+		}
+		return core.ReturnLogisticsOperation{}, err
+	}
+	var err error
+	result.ID, err = core.ParseReturnLogisticsOperationID(id)
+	if err != nil {
+		return core.ReturnLogisticsOperation{}, err
+	}
+	result.ReturnID, err = core.ParseReturnID(returnID)
+	if err != nil {
+		return core.ReturnLogisticsOperation{}, err
+	}
+	result.OrganizationID, result.WorkspaceID, result.ConnectorAccountID, result.Status = org, workspace, accountID, core.ReturnLogisticsStatus(status)
+	result.CreatedAt, result.UpdatedAt = result.CreatedAt.UTC(), result.UpdatedAt.UTC()
+	if err := result.Validate(); err != nil {
+		return core.ReturnLogisticsOperation{}, err
+	}
+	return result, nil
 }
 
 func (r *Repository) ListEvidence(ctx context.Context, scope core.Scope, operationID string, limit int) ([]core.OperationEvidence, error) {

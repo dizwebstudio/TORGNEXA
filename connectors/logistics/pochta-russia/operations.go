@@ -29,6 +29,70 @@ func (c *Connector) ReadLogisticsRates(ctx context.Context, account sdk.Account,
 	return out, nil
 }
 
+// CreateLogisticsShipment creates one order in the Russian Post backlog.
+// Final batch formation and hand-off remain separate provider operations.
+func (c *Connector) CreateLogisticsShipment(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Create(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if out.RemoteID == "" || out.Status != "created" || out.Cost.Validate() != nil || out.ObservedAt.IsZero() {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// CancelLogisticsShipment removes one new order from the Russian Post
+// backlog. The provider's response must confirm the exact order ID.
+func (c *Connector) CancelLogisticsShipment(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || strings.TrimSpace(request.RemoteID) == "" || strings.TrimSpace(request.IdempotencyKey) == "" {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Cancel(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if out.RemoteID != strings.TrimSpace(request.RemoteID) || out.Status != "cancelled" || out.Cost.Validate() != nil || out.ObservedAt.IsZero() {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// CreateLogisticsReturn creates one return shipment for an existing RPO. The
+// separate-return form and return-label generation remain outside this
+// bounded operation.
+func (c *Connector) CreateLogisticsReturn(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Return(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if out.RemoteID == "" || out.Status != "created" || out.Cost.Validate() != nil || out.ObservedAt.IsZero() {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 // ReadPickupPoints reads a bounded Russian Post office directory by city.
 // Provider postal indexes remain remote references and never become Core
 // warehouse identifiers.
@@ -74,6 +138,55 @@ func (c *Connector) ReadLogisticsTracking(ctx context.Context, account sdk.Accou
 	return out, nil
 }
 
+// ReadLogisticsLabel requests the official order print form. The provider
+// returns a PDF body; the host transport converts it to an opaque artifact
+// reference so provider credentials and binary content do not cross the SDK
+// boundary.
+func (c *Connector) ReadLogisticsLabel(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LabelResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LabelResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Label(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LabelResult{}, err
+	}
+	if out.ArtifactRef == "" || out.MediaType != "application/pdf" || out.ObservedAt.IsZero() {
+		return sdk.LabelResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// ReadLogisticsBatches reads a bounded page of Russian Post batches. The
+// provider order list is intentionally not projected into this SDK surface.
+func (c *Connector) ReadLogisticsBatches(ctx context.Context, account sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || query.Validate(100) != nil {
+		return nil, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out []sdk.LogisticsBatch
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.Batches(ctx, secret, query)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > query.Limit {
+		return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	for _, batch := range out {
+		if batch.Validate() != nil {
+			return nil, remote(sdk.ErrorInternal, "invalid_remote_response")
+		}
+	}
+	return out, nil
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -83,4 +196,9 @@ func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn
 
 var _ sdk.PickupPointReader = (*Connector)(nil)
 var _ sdk.LogisticsRateReader = (*Connector)(nil)
+var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
+var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
+var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
+var _ sdk.LogisticsLabelReader = (*Connector)(nil)
+var _ sdk.LogisticsBatchReader = (*Connector)(nil)

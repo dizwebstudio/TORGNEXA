@@ -62,8 +62,9 @@ is never trusted directly).
 
 - SBP webhook delivery cannot be qualified end-to-end without a real
   acquiring-bank gateway (same limitation already documented for SBP's
-  create/status/refund paths); ship it to the same "code-complete, honestly
-  unverified" bar, not a live qualification claim.
+  create/status/refund paths); Task 180 admits the repository runtime while
+  retaining the "code-complete, honestly unverified" bar, not a live
+  qualification claim.
 - No provider-signature verification framework — out of scope per ADR-0105
   until a signing provider is actually admitted.
 - No frontend changes; `FinancePage.tsx` already renders whatever status the

@@ -15,7 +15,7 @@ const siteURL = canonical.replace(/\/docs$/, "");
 const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
 const uniqueUrls = new Set(urls);
 const checks = [
-  [urls.length === 18, "sitemap contains the documentation hub and 17 topical pages"],
+  [urls.length === 21, "sitemap contains the documentation hub and 20 topical pages"],
   [uniqueUrls.size === urls.length, "sitemap URLs are unique"],
   [urls.includes(canonical), "sitemap contains the documentation hub"],
   [robots.includes("Allow: /docs") && robots.includes("Disallow: /api/"), "robots policy protects private routes"],
@@ -54,6 +54,9 @@ checks.push(
   [pages.some(({url, html}) => url.endsWith("/troubleshooting") && html.includes("FAQPage") && html.includes("Question")), "troubleshooting page has FAQ JSON-LD"],
   [pages.every(({html}) => [...html.matchAll(/<img\b[^>]*>/g)].every(([tag]) => tag.includes("alt=") && tag.includes("width=") && tag.includes("height=") && tag.includes('loading="lazy"') && tag.includes('decoding="async"'))), "every documentation screenshot has accessible dimensions and lazy loading"],
   [pages.some(({url, html}) => url.endsWith("/integrations") && html.includes("Пошаговое подключение") && html.includes("Долями")), "integration page has current connection guidance"],
+  [pages.some(({url, html}) => url.endsWith("/marking") && html.includes("gtin_mismatch") && html.includes("Безопасность кодов")), "marking page has operator guidance and safety boundaries"],
+  [pages.some(({url, html}) => url.endsWith("/integration-status") && html.includes("health history") && html.includes("unknown")), "integration status page explains snapshot states"],
+  [pages.some(({url, html}) => url.endsWith("/ai-assistant") && html.includes("grounding_state") && html.includes("typed preview")), "AI assistant page explains evidence and previews"],
 );
 
 const failed = checks.filter(([passed]) => !passed).map(([, message]) => message);

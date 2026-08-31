@@ -65,11 +65,11 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("CBR FX separate-surface support is inaccurate: %+v", cbr)
 	}
 	telegram, ok := SupportFor("telegram")
-	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || SupportsCapability("telegram", "social.post.media") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
+	if !ok || telegram.Stage != SupportSeparateSurface || telegram.Surface != "social" || !SupportsAccountConfiguration("telegram") || !SupportsCapability("telegram", "social.post.text") || !SupportsCapability("telegram", "social.post.media") || !SupportsCapability("telegram", "social.post.video") || !SupportsCapability("telegram", "social.post.buttons") || SupportsSync("telegram", "products", "inbound") || SocialTextLimit("telegram") != 4096 {
 		t.Fatalf("Telegram social runtime support is inaccurate: %+v", telegram)
 	}
 	max, ok := SupportFor("max-messenger")
-	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || SupportsCapability("max-messenger", "social.post.media") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
+	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || !SupportsCapability("max-messenger", "social.post.media") || !SupportsCapability("max-messenger", "social.post.video") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
 		t.Fatalf("MAX social runtime support is inaccurate: %+v", max)
 	}
 	if SocialTextLimit("avito") != 0 {
@@ -84,24 +84,24 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
-	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsCapability("cs-cart", "prices.read") || !SupportsCapability("cs-cart", "prices.write") || !SupportsCapability("cs-cart", "inventory.read") || !SupportsCapability("cs-cart", "inventory.write") || !SupportsCapability("cs-cart", "orders.read") || !SupportsSync("cs-cart", "products", "bidirectional") || !SupportsSync("cs-cart", "prices", "bidirectional") || !SupportsSync("cs-cart", "inventory", "bidirectional") || !SupportsSync("cs-cart", "orders", "inbound") {
+	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsCapability("cs-cart", "prices.read") || !SupportsCapability("cs-cart", "prices.write") || !SupportsCapability("cs-cart", "inventory.read") || !SupportsCapability("cs-cart", "inventory.write") || !SupportsCapability("cs-cart", "orders.read") || !SupportsCapability("cs-cart", "orders.status.write") || !SupportsSync("cs-cart", "products", "bidirectional") || !SupportsSync("cs-cart", "prices", "bidirectional") || !SupportsSync("cs-cart", "inventory", "bidirectional") || !SupportsSync("cs-cart", "orders", "bidirectional") {
 		t.Fatalf("CS-Cart storefront runtime support is inaccurate: %+v", csCart)
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
 		carrier, ok := SupportFor(connectorID)
-		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
+		if !ok || carrier.Stage != SupportSeparateSurface || carrier.Surface != "logistics" || !SupportsAccountConfiguration(connectorID) || (connectorID != "cdek" && connectorID != "dellin" && connectorID != "pek" && connectorID != "pochta-russia" && SupportsCapability(connectorID, "logistics.shipment.create")) || SupportsSync(connectorID, "products", "inbound") {
 			t.Fatalf("%s logistics verification support is inaccurate: %+v", connectorID, carrier)
 		}
 		if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
 			wantCapabilities := 1
 			if connectorID == "cdek" {
-				wantCapabilities = 6
+				wantCapabilities = 8
 			} else if connectorID == "dellin" {
-				wantCapabilities = 3
+				wantCapabilities = 6
 			} else if connectorID == "pek" {
-				wantCapabilities = 3
+				wantCapabilities = 6
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 3
+				wantCapabilities = 8
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -112,14 +112,31 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.rates.read") {
 				t.Fatalf("%s rate support is inaccurate: %+v", connectorID, carrier)
 			}
-			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.cancel") {
-				t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
+			if connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia" {
+				if !SupportsCapability(connectorID, "logistics.shipment.cancel") {
+					t.Fatalf("%s cancellation support is inaccurate: %+v", connectorID, carrier)
+				}
 			}
 			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
 				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
 			}
-			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.label.read") {
+			if connectorID == "cdek" && !SupportsCapability(connectorID, "logistics.webhooks.verify") {
+				t.Fatalf("%s webhook verification support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "dellin" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "pek" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if connectorID == "pochta-russia" && !SupportsCapability(connectorID, "logistics.shipment.create") {
+				t.Fatalf("%s shipment creation support is inaccurate: %+v", connectorID, carrier)
+			}
+			if (connectorID == "cdek" || connectorID == "dellin" || connectorID == "pek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.label.read") {
 				t.Fatalf("%s label support is inaccurate: %+v", connectorID, carrier)
+			}
+			if (connectorID == "cdek" || connectorID == "pochta-russia") && !SupportsCapability(connectorID, "logistics.return.create") {
+				t.Fatalf("%s return support is inaccurate: %+v", connectorID, carrier)
 			}
 		} else if len(carrier.OperationalCapabilities) != 0 {
 			t.Fatalf("%s must remain capability-free until qualification: %+v", connectorID, carrier)
@@ -128,6 +145,25 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	dolyami, ok := SupportFor("dolyami")
 	if !ok || dolyami.Stage != SupportSeparateSurface || dolyami.Surface != "finance" || !dolyami.HealthOnly || !SupportsAccountConfiguration("dolyami") || SupportsCapability("dolyami", "payments.create") || SupportsSync("dolyami", "products", "inbound") {
 		t.Fatalf("Dolyami health-only payment support is inaccurate: %+v", dolyami)
+	}
+}
+
+func TestPaymentWebhookAdmissionIsExact(t *testing.T) {
+	registry := New()
+	for _, connectorID := range []string{"robokassa", "yookassa", "sbp"} {
+		if !SupportsCapability(connectorID, "payments.webhooks") {
+			t.Fatalf("%s webhook capability is not admitted", connectorID)
+		}
+		var load ConfigLoader
+		if connectorID == "sbp" {
+			load = func(context.Context, string) (json.RawMessage, error) {
+				return json.RawMessage(`{"gateway_host":"sbp-gateway.example.test","member_id":"100000001"}`), nil
+			}
+		}
+		gateway, err := registry.PaymentGateway(supportTestAccount(t, connectorID), load)
+		if err != nil || gateway == nil {
+			t.Fatalf("%s payment gateway unavailable for webhook route: gateway=%T err=%v", connectorID, gateway, err)
+		}
 	}
 }
 
@@ -367,6 +403,27 @@ func TestWooCommerceWebhookReceiverAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestSaleorWebhookReceiverAdmissionIsExact(t *testing.T) {
+	registry := New()
+	account := supportTestAccount(t, "saleor")
+	if !SupportsCapability("saleor", "notifications.receive") {
+		t.Fatal("Saleor webhook capability is not admitted")
+	}
+	load := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"store_host":"shop.example.com","channel":"default-channel","warehouse":"main-warehouse"}`), nil
+	}
+	receiver, err := registry.CommerceWebhookReceiver(account, supportTestRuntime{}, load)
+	if err != nil {
+		t.Fatalf("Saleor webhook receiver unavailable: %v", err)
+	}
+	if _, ok := receiver.(sdk.CommerceWebhookReceiver); !ok {
+		t.Fatalf("unexpected Saleor webhook receiver type %T", receiver)
+	}
+	if _, err := registry.CommerceWebhookReceiver(supportTestAccount(t, "shopify"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted Shopify webhook receiver resolved: %v", err)
+	}
+}
+
 func TestYandexNotificationDecoderAdmissionIsExact(t *testing.T) {
 	registry := New()
 	account := supportTestAccount(t, "yandex-market")
@@ -442,7 +499,7 @@ func TestStorefrontPriceWriterAdmissionIsExact(t *testing.T) {
 func TestStorefrontInventoryWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	for _, connectorID := range []string{"bitrix", "cs-cart", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce"} {
+	for _, connectorID := range []string{"bitrix", "cs-cart", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
 		if !registry.SupportsInventoryWrite(account) || !SupportsCapability(connectorID, "inventory.write") || !SupportsSync(connectorID, "inventory", "outbound") {
 			t.Fatalf("%s inventory write support is not admitted", connectorID)
@@ -500,6 +557,7 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
 	cases := map[string]map[string]string{
+		"cs-cart":     {"pending": "O", "confirmed": "Y", "processing": "P", "fulfilled": "C", "cancelled": "I"},
 		"magento":     {"cancelled": "canceled"},
 		"medusa":      {"cancelled": "canceled"},
 		"opencart":    {"pending": "1", "confirmed": "2", "processing": "3", "fulfilled": "4", "cancelled": "5"},
@@ -531,7 +589,7 @@ func TestStorefrontOrderStatusWriterAdmissionIsExact(t *testing.T) {
 				t.Fatalf("%s status %q = %q, %v; want %q, true", connectorID, canonical, got, ok, expected)
 			}
 		}
-		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", currentLoad); connectorID != "woocommerce" && connectorID != "prestashop" && connectorID != "opencart" && ok {
+		if _, ok := registry.OrderStatus(context.Background(), account, "confirmed", currentLoad); connectorID != "cs-cart" && connectorID != "woocommerce" && connectorID != "prestashop" && connectorID != "opencart" && ok {
 			t.Fatalf("%s exposed an unsupported non-cancel status transition", connectorID)
 		}
 	}
@@ -616,6 +674,54 @@ func TestLogisticsHealthRegistryAdmissionIsExact(t *testing.T) {
 		connector, err := registry.healthConnector(supportTestAccount(t, connectorID), nil)
 		if err != nil || connector == nil || connector.Manifest().ID != connectorID {
 			t.Fatalf("%s health connector unavailable: connector=%T err=%v", connectorID, connector, err)
+		}
+	}
+}
+
+func TestLogisticsCreatorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "pochta-russia"} {
+		creator, err := registry.LogisticsCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}, load)
+		if err != nil || creator == nil {
+			t.Fatalf("%s shipment creator unavailable: creator=%T err=%v", connectorID, creator, err)
+		}
+	}
+	for _, connectorID := range []string{"fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified shipment creator resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsCancelerAdmissionIsExact(t *testing.T) {
+	registry := New()
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "pochta-russia"} {
+		canceler, err := registry.LogisticsCanceler(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{})
+		if err != nil || canceler == nil {
+			t.Fatalf("%s shipment canceler unavailable: canceler=%T err=%v", connectorID, canceler, err)
+		}
+	}
+	for _, connectorID := range []string{"fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsCanceler(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified shipment canceler resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsReturnCreatorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	cdekCreator, err := registry.LogisticsReturnCreator(context.Background(), supportTestAccount(t, "cdek"), supportTestRuntime{})
+	if err != nil || cdekCreator == nil {
+		t.Fatalf("CDEK return creator unavailable: creator=%T err=%v", cdekCreator, err)
+	}
+	creator, err := registry.LogisticsReturnCreator(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || creator == nil {
+		t.Fatalf("Russian Post return creator unavailable: creator=%T err=%v", creator, err)
+	}
+	for _, connectorID := range []string{"pek", "dellin", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsReturnCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified return creator resolved: %v", connectorID, err)
 		}
 	}
 }

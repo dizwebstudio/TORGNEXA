@@ -74,8 +74,11 @@ scripts/saleor-smoke.sh
 Запись проверяет три реальные мутации product (`sku`, `name`, publication),
 цену канала и stock warehouse, затем выполняет read-after-write и
 восстанавливает исходные значения. `SALEOR_KEEP_CHANGES=1` оставляет изменения
-для ручного осмотра. Создание продукта и входящие webhooks намеренно не
-тестируются: они fail-closed в коннекторе.
+для ручного осмотра. Создание продукта намеренно не тестируется: оно
+fail-closed в коннекторе. Входящий webhook проверяется отдельным
+детерминированным тестом через публичный маршрут
+`/api/v1/webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}`;
+внешний merchant endpoint для него остаётся отдельной qualification-проверкой.
 
 Для удалённого staging используйте HTTPS и не задавайте `SALEOR_ALLOW_HTTP`;
 самоподписанный сертификат разрешается только явно через

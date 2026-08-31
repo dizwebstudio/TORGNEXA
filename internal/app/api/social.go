@@ -52,17 +52,18 @@ type socialChannelView struct {
 }
 
 type socialPublicationView struct {
-	ID               string     `json:"id"`
-	ChannelAccountID string     `json:"channel_account_id"`
-	ChannelName      string     `json:"channel_name"`
-	Text             string     `json:"text"`
-	Status           string     `json:"status"`
-	ReasonCode       string     `json:"reason_code,omitempty"`
-	Attempt          int        `json:"attempt"`
-	PublishAt        *time.Time `json:"publish_at,omitempty"`
-	PublishedAt      *time.Time `json:"published_at,omitempty"`
-	Version          int64      `json:"version"`
-	CreatedAt        time.Time  `json:"created_at"`
+	ID               string          `json:"id"`
+	ChannelAccountID string          `json:"channel_account_id"`
+	ChannelName      string          `json:"channel_name"`
+	Text             string          `json:"text"`
+	Buttons          []social.Button `json:"buttons,omitempty"`
+	Status           string          `json:"status"`
+	ReasonCode       string          `json:"reason_code,omitempty"`
+	Attempt          int             `json:"attempt"`
+	PublishAt        *time.Time      `json:"publish_at,omitempty"`
+	PublishedAt      *time.Time      `json:"published_at,omitempty"`
+	Version          int64           `json:"version"`
+	CreatedAt        time.Time       `json:"created_at"`
 }
 
 func newSocialRoutes(repository socialAPIRepository, accounts socialConnectorAccounts, runtime connectorRuntimeAdmission) []ProtectedRoute {
@@ -128,7 +129,11 @@ func (api socialAPI) createChannel(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Social text capability is not enabled")
 		return
 	}
-	command := social.CreateChannelAccount{ID: id, ConnectorAccountID: account.ID, DisplayName: strings.TrimSpace(input.DisplayName), Capabilities: []social.Capability{social.CapabilityPostText}}
+	capabilities := []social.Capability{social.CapabilityPostText}
+	if socialButtonEnabled(settings) {
+		capabilities = []social.Capability{social.CapabilityPostButtons, social.CapabilityPostText}
+	}
+	command := social.CreateChannelAccount{ID: id, ConnectorAccountID: account.ID, DisplayName: strings.TrimSpace(input.DisplayName), Capabilities: capabilities}
 	channel, err := api.repository.CreateChannelAccount(r.Context(), socialScope, command, socialMutation(principal.Subject, key))
 	if errors.Is(err, social.ErrConflict) {
 		channel, err = api.repository.ChannelAccount(r.Context(), socialScope, id)
@@ -142,7 +147,7 @@ func (api socialAPI) createChannel(w http.ResponseWriter, r *http.Request) {
 				DisplayName string
 			}{command.ConnectorAccountID, command.DisplayName},
 		)
-		matchesCapability := channel.Supports(social.CapabilityPostText)
+		matchesCapability := reflect.DeepEqual(channel.Capabilities, command.Capabilities)
 		matchesReplay := matchesIdentity && matchesCapability
 		if err == nil && !matchesReplay {
 			err = social.ErrConflict
@@ -178,7 +183,12 @@ func (api socialAPI) updateChannel(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	channel, err := api.repository.UpdateChannelAccount(r.Context(), socialScope, social.UpdateChannelAccount{ID: id, ExpectedVersion: input.ExpectedVersion, DisplayName: strings.TrimSpace(input.DisplayName), Capabilities: []social.Capability{social.CapabilityPostText}, Status: status}, socialMutation(principal.Subject, key))
+	current, err := api.repository.ChannelAccount(r.Context(), socialScope, id)
+	if err != nil {
+		writeSocialError(w, err)
+		return
+	}
+	channel, err := api.repository.UpdateChannelAccount(r.Context(), socialScope, social.UpdateChannelAccount{ID: id, ExpectedVersion: input.ExpectedVersion, DisplayName: strings.TrimSpace(input.DisplayName), Capabilities: current.Capabilities, Status: status}, socialMutation(principal.Subject, key))
 	if err != nil {
 		writeSocialError(w, err)
 		return
@@ -218,10 +228,11 @@ func (api socialAPI) createPublication(w http.ResponseWriter, r *http.Request) {
 	principal, principalOK := PrincipalFromContext(r.Context())
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	var input struct {
-		ID               string     `json:"id"`
-		ChannelAccountID string     `json:"channel_account_id"`
-		Text             string     `json:"text"`
-		PublishAt        *time.Time `json:"publish_at"`
+		ID               string          `json:"id"`
+		ChannelAccountID string          `json:"channel_account_id"`
+		Text             string          `json:"text"`
+		Buttons          []social.Button `json:"buttons"`
+		PublishAt        *time.Time      `json:"publish_at"`
 	}
 	if !ok || !principalOK || api.repository == nil || api.accounts == nil || api.runtime == nil || decodeStrictJSON(r, &input) != nil || key != input.ID {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
@@ -240,10 +251,23 @@ func (api socialAPI) createPublication(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Social channel unavailable")
 		return
 	}
+	if social.ValidateButtons(input.Buttons) != nil {
+		writeProblem(w, http.StatusBadRequest, "Invalid publication buttons")
+		return
+	}
+	if len(input.Buttons) > 0 && !channel.Supports(social.CapabilityPostButtons) {
+		writeProblem(w, http.StatusConflict, "Social button capability is not enabled")
+		return
+	}
 	account, err := api.accounts.AccountByID(r.Context(), tenantScope.OrganizationID().String(), tenantScope.WorkspaceID().String(), channel.ConnectorAccountID)
 	limiter, limitOK := api.runtime.(socialTextRuntime)
 	if err != nil || account.Family != sdk.FamilySocial || !limitOK {
 		writeProblem(w, http.StatusConflict, "Social channel unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), tenantScope, account.ID)
+	if err != nil || !socialTextEnabled(settings) || (len(input.Buttons) > 0 && !socialButtonEnabled(settings)) {
+		writeProblem(w, http.StatusConflict, "Social capability is not enabled")
 		return
 	}
 	textLimit := limiter.SocialTextLimit(account.ConnectorID)
@@ -278,11 +302,11 @@ func (api socialAPI) createPublication(w http.ResponseWriter, r *http.Request) {
 		writeSocialError(w, err)
 		return
 	}
-	variantCommand := social.CreateVariant{ID: social.VariantID(variantID), ContentID: content.ID, Format: social.FormatText, Body: input.Text}
+	variantCommand := social.CreateVariant{ID: social.VariantID(variantID), ContentID: content.ID, Format: social.FormatText, Body: input.Text, Buttons: input.Buttons}
 	variant, err := api.repository.CreateVariant(r.Context(), socialScope, variantCommand, socialMutation(principal.Subject, key))
 	if errors.Is(err, social.ErrConflict) {
 		variant, err = api.repository.Variant(r.Context(), socialScope, variantCommand.ID)
-		if err == nil && (variant.ContentID != content.ID || variant.Format != social.FormatText || variant.Body != input.Text) {
+		if err == nil && (variant.ContentID != content.ID || variant.Format != social.FormatText || variant.Body != input.Text || !socialButtonsEqual(variant.Buttons, input.Buttons)) {
 			err = social.ErrConflict
 		}
 	}
@@ -323,7 +347,7 @@ func (api socialAPI) publicationResponse(ctx context.Context, scope social.Scope
 	if err != nil {
 		return socialPublicationView{}, err
 	}
-	return socialPublicationView{ID: publication.ID.String(), ChannelAccountID: channel.ID.String(), ChannelName: channel.DisplayName, Text: variant.Body, Status: string(publication.Status), ReasonCode: publication.ReasonCode, Attempt: publication.Attempt, PublishAt: publication.Schedule.PublishAt, PublishedAt: publication.PublishedAt, Version: publication.Version, CreatedAt: publication.CreatedAt}, nil
+	return socialPublicationView{ID: publication.ID.String(), ChannelAccountID: channel.ID.String(), ChannelName: channel.DisplayName, Text: variant.Body, Buttons: variant.Buttons, Status: string(publication.Status), ReasonCode: publication.ReasonCode, Attempt: publication.Attempt, PublishAt: publication.Schedule.PublishAt, PublishedAt: publication.PublishedAt, Version: publication.Version, CreatedAt: publication.CreatedAt}, nil
 }
 
 func socialRequestScope(w http.ResponseWriter, r *http.Request) (tenancy.Scope, social.Scope, bool) {
@@ -360,6 +384,27 @@ func socialTextEnabled(settings []sdk.AccountCapabilitySetting) bool {
 		}
 	}
 	return false
+}
+
+func socialButtonEnabled(settings []sdk.AccountCapabilitySetting) bool {
+	for _, setting := range settings {
+		if setting.Capability == sdk.Capability("social.post.buttons") && setting.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+func socialButtonsEqual(left, right []social.Button) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func socialSchedulesEqual(left, right social.Schedule) bool {

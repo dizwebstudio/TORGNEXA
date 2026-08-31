@@ -58,6 +58,7 @@ capabilities:
   payments.create: Create payment/QR/link
   payments.refund: Refund payment
   payments.reconcile: Read/reconcile settlements
+  logistics.batches.read: Read provider batch directory
   logistics.rates.read: Calculate delivery rates/SLA
   logistics.shipment.create: Create shipment
   logistics.track.read: Track shipment

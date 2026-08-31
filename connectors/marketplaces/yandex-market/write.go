@@ -4,13 +4,46 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
+	"time"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
 type priceWriteResponse struct {
 	Status string `json:"status"`
+}
+
+const maxYandexStockQuantity int64 = 2_000_000_000
+
+type inventoryWriteResponse struct {
+	Status string `json:"status"`
+}
+
+type partnerStockWriteBody struct {
+	SKUItems []partnerStockWriteItem `json:"skuItems"`
+}
+
+type partnerStockWriteItem struct {
+	SKU                string `json:"sku"`
+	PartnerWarehouseID int64  `json:"partnerWarehouseId"`
+	Count              int64  `json:"count"`
+	UpdatedAt          string `json:"updatedAt"`
+}
+
+type campaignStockWriteBody struct {
+	SKUs []campaignStockWriteSKU `json:"skus"`
+}
+
+type campaignStockWriteSKU struct {
+	SKU   string                   `json:"sku"`
+	Items []campaignStockWriteItem `json:"items"`
+}
+
+type campaignStockWriteItem struct {
+	Count     int64  `json:"count"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type priceWriteBody struct {
@@ -88,6 +121,65 @@ func (connector *Connector) WritePrice(ctx context.Context, account sdk.Account,
 		return sdk.CommerceWriteReceipt{}, errors.New("yandexmarket: invalid write receipt")
 	}
 	_ = requestID // request ids stay in transport/error telemetry and never affect canonical identity.
+	return receipt, nil
+}
+
+// WriteInventory sends one exact available-stock value to the provider's
+// documented warehouse endpoint. Yandex Market applies the update
+// asynchronously, so acceptance is returned as Applied=true and is later
+// confirmed by the normal inventory reconciliation scan.
+func (connector *Connector) WriteInventory(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.write") != nil || request.Validate() != nil || request.Quantity > maxYandexStockQuantity || request.LocationRemoteID == "" {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	configuration, err := connector.configuration(ctx, account)
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, err
+	}
+	warehouseID, err := strconv.ParseInt(request.LocationRemoteID, 10, 64)
+	if err != nil || warehouseID < 1 || !configuredWarehouseAllowed(configuration, warehouseID) {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	updatedAt := connector.now().UTC()
+	if updatedAt.IsZero() {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	updatedAtValue := updatedAt.Format(time.RFC3339Nano)
+	var body any
+	method := "POST"
+	path := businessV3Path(configuration.BusinessID, "/offers/stocks/update")
+	if configuration.InventoryMode == InventoryPartnerWarehouses {
+		body = partnerStockWriteBody{SKUItems: []partnerStockWriteItem{{SKU: request.VariantRemoteID, PartnerWarehouseID: warehouseID, Count: request.Quantity, UpdatedAt: updatedAtValue}}}
+	} else {
+		method = "PUT"
+		path = campaignPath(configuration.CampaignID, "/offers/stocks")
+		body = campaignStockWriteBody{SKUs: []campaignStockWriteSKU{{SKU: request.VariantRemoteID, Items: []campaignStockWriteItem{{Count: request.Quantity, UpdatedAt: updatedAtValue}}}}}
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil || len(encoded) > maxBodyBytes {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	err = connector.withAPIKey(ctx, runtime, account.SecretReference, func(key []byte) error {
+		response, callErr := connector.transport.Do(ctx, Request{Method: method, Host: apiHost, Path: path, Body: encoded, APIKey: key})
+		if callErr != nil {
+			return normalizedTransportError()
+		}
+		if remote := normalizeHTTP(response); remote != nil {
+			return remote
+		}
+		var parsed inventoryWriteResponse
+		if decodeUseNumber(response.Body, &parsed) != nil || parsed.Status != "OK" {
+			return ErrInvalidResponse
+		}
+		return nil
+	})
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, err
+	}
+	receipt := sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true, Reconciled: false}
+	if receipt.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, errors.New("yandexmarket: invalid inventory write receipt")
+	}
 	return receipt, nil
 }
 

@@ -14,19 +14,25 @@ func TestReturnsMigrationKeepsFactsTenantScopedAndAppendOnly(t *testing.T) {
 		t.Fatal("runtime caller")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(source), "..", "..", "..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, "migrations", "000029_returns_cancellations_refunds.sql"))
+	base, err := os.ReadFile(filepath.Join(root, "migrations", "000029_returns_cancellations_refunds.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.ToLower(string(raw))
+	logistics, err := os.ReadFile(filepath.Join(root, "migrations", "000040_return_logistics_operations.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ToLower(string(base) + "\n" + string(logistics))
 	for _, needle := range []string{
 		"create table order_cancellations",
 		"create table commerce_returns",
+		"create table return_logistics_operations",
 		"create table return_items",
 		"create table refund_allocations",
 		"create table commerce_operation_evidence",
 		"force row level security",
 		"idempotency_key",
+		"return_logistics_operations_return_key",
 		"insert into migration_history",
 	} {
 		if !strings.Contains(text, needle) {

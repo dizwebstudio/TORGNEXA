@@ -18,6 +18,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorconfigrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
@@ -74,6 +75,7 @@ type productionRouteDependencies struct {
 	entitlements       *entitlements.Service
 	quotas             *entitlements.QuotaService
 	webhooks           webhookService
+	inboundWebhooks    *inboxrepo.Processor
 	settingsSecurity   securitysettings.Store
 	settingsAudit      securitysettings.SettingsAuditReader
 	identityProviders  securitysettings.IdentityProviderStore
@@ -155,6 +157,8 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 // registered through the other's table.
 func newProductionWebhookRoutes(deps productionRouteDependencies) []PublicWebhookRoute {
 	var routes []PublicWebhookRoute
+	routes = append(routes, newLogisticsWebhookRoutes(deps.logistics, deps.accounts, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newPaymentWebhookRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
+	routes = append(routes, newCommerceWebhookRoutes(deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry, deps.inboundWebhooks)...)
 	return routes
 }

@@ -7,7 +7,9 @@ export const documentationSections = [
   ["overview", "Обзор"],
   ["catalog-orders", "Каталог и заказы"],
   ["inventory-incidents", "Остатки и инциденты"],
+  ["marking", "Маркировка и УПД"],
   ["integrations", "Интеграции"],
+  ["integration-status", "Состояние интеграций"],
   ["social", "Публикации"],
   ["sync", "Синхронизация"],
   ["master-data", "Контрагенты и финансы"],
@@ -15,6 +17,7 @@ export const documentationSections = [
   ["monitoring", "Уведомления, отчёты и аудит"],
   ["settings", "Настройки"],
   ["automation", "Автоматизация и расширения"],
+  ["assistant", "AI-помощник оператора"],
   ["developer", "API и расширения"],
   ["security", "Доступ и безопасность"],
   ["environment", "Переменные .env"],
@@ -22,22 +25,27 @@ export const documentationSections = [
   ["troubleshooting", "Решение проблем"],
 ] as const;
 
+type DocumentationNavigationItem = (typeof documentationSections)[number];
+const documentationSection = (id: DocumentationNavigationItem[0]): DocumentationNavigationItem => documentationSections.find(([sectionId]) => sectionId === id)!;
+
 const documentationNavigation = [
-  {title: "Начало", items: [documentationSections[0], documentationSections[1], documentationSections[2]]},
-  {title: "Операционная работа", items: [documentationSections[3], documentationSections[4], documentationSections[5], documentationSections[6], documentationSections[7], documentationSections[8], documentationSections[9]]},
-  {title: "Администрирование и поддержка", items: [documentationSections[10], documentationSections[11], documentationSections[12], documentationSections[14], documentationSections[15], documentationSections[16], documentationSections[17]]},
-  {title: "Для разработчиков", items: [documentationSections[13]]},
+  {title: "Начало", items: [documentationSection("start"), documentationSection("interface"), documentationSection("overview")]},
+  {title: "Операционная работа", items: [documentationSection("catalog-orders"), documentationSection("inventory-incidents"), documentationSection("marking"), documentationSection("integrations"), documentationSection("integration-status"), documentationSection("social"), documentationSection("sync"), documentationSection("master-data"), documentationSection("control"), documentationSection("monitoring")]},
+  {title: "Администрирование и поддержка", items: [documentationSection("settings"), documentationSection("automation"), documentationSection("assistant"), documentationSection("security"), documentationSection("environment"), documentationSection("operations"), documentationSection("troubleshooting")]},
+  {title: "Для разработчиков", items: [documentationSection("developer")]},
 ] as const;
 
-export const docsTitle = "Документация TORGNEXA — интеграции, каталог и синхронизация";
-export const docsDescription = "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, управление каталогом, заказами и синхронизацией.";
+export const docsTitle = "Документация TORGNEXA — интеграции, WMS и автоматизация";
+export const docsDescription = "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, работа с каталогом, WMS, маркировкой, возвратами и автоматизацией.";
 
 export const documentationPages = [
   {id: "interface", path: "/docs/getting-started", heading: "Первый вход и интерфейс", title: "Первый вход и интерфейс — документация TORGNEXA", description: "Как войти в TORGNEXA, выбрать рабочий контур и быстро найти нужный раздел интерфейса."},
   {id: "overview", path: "/docs/overview", heading: "Обзор", title: "Обзор TORGNEXA — документация", description: "Как читать операционные показатели, онбординг, состояние сервисов и задачи, требующие внимания."},
   {id: "catalog-orders", path: "/docs/catalog-and-orders", heading: "Каталог и заказы", title: "Каталог и заказы — документация TORGNEXA", description: "Как работать с товарами, изображениями, предложениями, заказами, статусами и безопасными повторными операциями."},
   {id: "inventory-incidents", path: "/docs/inventory-and-incidents", heading: "Остатки и инциденты", title: "Остатки и инциденты — документация TORGNEXA", description: "Как читать остатки и ATP, обрабатывать складские инциденты и безопасно маршрутизировать fulfillment."},
+  {id: "marking", path: "/docs/marking", heading: "Маркировка и УПД", title: "Маркировка и УПД — документация TORGNEXA", description: "Как безопасно проверять коды, вести партии и упаковки, обрабатывать расхождения и готовить УПД."},
   {id: "integrations", path: "/docs/integrations", heading: "Интеграции", title: "Интеграции — документация TORGNEXA", description: "Пошаговое подключение маркетплейсов, интернет-магазинов, платежей, CRM и других внешних систем."},
+  {id: "integration-status", path: "/docs/integration-status", heading: "Состояние интеграций", title: "Состояние интеграций — документация TORGNEXA", description: "Как читать фактическое состояние кабинетов, health history, ошибки, unknown и рекомендации по восстановлению."},
   {id: "social", path: "/docs/publications", heading: "Публикации", title: "Публикации — документация TORGNEXA", description: "Как создавать и планировать публикации в подключённых социальных каналах с контролем статуса и прав."},
   {id: "sync", path: "/docs/synchronization", heading: "Синхронизация", title: "Синхронизация — документация TORGNEXA", description: "Как настроить направления обмена, расписание, импорт, сверку и разбор расхождений."},
   {id: "master-data", path: "/docs/counterparties-and-finance", heading: "Контрагенты и финансы", title: "Контрагенты и финансы — документация TORGNEXA", description: "Как вести единые справочники юридических лиц, банковские реквизиты, платежи, курсы и расчёты."},
@@ -45,6 +53,7 @@ export const documentationPages = [
   {id: "monitoring", path: "/docs/notifications-reports-audit", heading: "Уведомления, отчёты и аудит", title: "Уведомления, отчёты и аудит — документация TORGNEXA", description: "Как отслеживать ошибки, читать отчёты и подтверждать историю привилегированных действий."},
   {id: "settings", path: "/docs/settings", heading: "Настройки", title: "Настройки TORGNEXA — документация", description: "Как настроить профиль, рабочее пространство, роли, уведомления, интеграции, AI-провайдеров и безопасность."},
   {id: "automation", path: "/docs/automation", heading: "Автоматизация и расширения", title: "Автоматизация и расширения — документация TORGNEXA", description: "Как безопасно использовать AI-провайдеров, MCP, webhooks, n8n и плагины с ограниченными правами."},
+  {id: "assistant", path: "/docs/ai-assistant", heading: "AI-помощник оператора", title: "AI-помощник оператора — документация TORGNEXA", description: "Как получать ответы по данным рабочего пространства с evidence, freshness и безопасными typed previews."},
   {id: "developer", path: "/docs/api-and-extensions", heading: "API и расширения", title: "API и расширения — документация TORGNEXA", description: "Как интегрировать TORGNEXA через REST API, SDK, webhooks, MCP и внешние расширения."},
   {id: "security", path: "/docs/security", heading: "Доступ и безопасность", title: "Доступ и безопасность — документация TORGNEXA", description: "Как устроены default deny, OIDC, секреты, tenant-контекст, аудит и согласования опасных действий."},
   {id: "environment", path: "/docs/environment", heading: "Переменные окружения .env", title: "Переменные окружения .env — документация TORGNEXA", description: "Справочник переменных Community-развёртывания: секреты, порты, OIDC, worker, ClamAV и уведомления."},
@@ -99,12 +108,24 @@ const documentationGuides: Record<DocumentationSectionId, DocumentationGuide> = 
     audience: "Для склада и fulfillment-команды",
     before: "Подключённый источник остатков и складские правила",
     outcome: "Вы отличите доступный остаток от резерва и разберёте инцидент",
-    next: {id: "sync", label: "Настроить обмен данными"},
+    next: {id: "marking", label: "Проверить маркировку и УПД"},
+  },
+  marking: {
+    audience: "Для складского оператора и специалиста по compliance",
+    before: "GTIN/SKU, задание WMS, права на сканирование и активный контур маркировки",
+    outcome: "Вы проверите код, поймёте причину отказа и не увеличите количество повторным сканом",
+    next: {id: "integrations", label: "Подключить внешний API"},
   },
   integrations: {
     audience: "Для администратора или интеграционного специалиста",
     before: "Доступ провайдера, API/OAuth и нужные права",
     outcome: "Кабинет проверен, возможности ограничены, импорт готов к запуску",
+    next: {id: "integration-status", label: "Проверить состояние кабинета"},
+  },
+  "integration-status": {
+    audience: "Для оператора интеграций и первой линии поддержки",
+    before: "Созданный кабинет, доступ к истории проверок и идентификатор внешней операции",
+    outcome: "Вы отличите отключённый кабинет от временной ошибки и выберете безопасное восстановление",
     next: {id: "sync", label: "Настроить синхронизацию"},
   },
   social: {
@@ -147,7 +168,13 @@ const documentationGuides: Record<DocumentationSectionId, DocumentationGuide> = 
     audience: "Для администратора платформы и разработчика",
     before: "Понятная задача автоматизации и минимальные права",
     outcome: "Вы подключите расширение, не превращая AI или MCP в обход контроля",
-    next: {id: "developer", label: "Открыть API и расширения"},
+    next: {id: "assistant", label: "Открыть AI-помощника"},
+  },
+  assistant: {
+    audience: "Для оператора, руководителя и сотрудника поддержки",
+    before: "Разрешения на чтение модулей и вопрос, который можно подтвердить источниками",
+    outcome: "Вы получите ответ с состоянием grounding, freshness и ссылками на первичные данные",
+    next: {id: "troubleshooting", label: "Перейти к диагностике"},
   },
   developer: {
     audience: "Для backend- и integration-разработчика",
@@ -349,7 +376,7 @@ function IntegrationConnectionGuide() {
     <h3>Рабочие шаблоны текущих карточек</h3>
     <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Карточка</th><th>Учётные данные</th><th>Параметры среды / результат проверки</th></tr></thead><tbody>
       <tr><td><strong>1С-Битрикс</strong></td><td><code>{`{ user_id, webhook_code }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>catalog_iblock_id</code>, <code>store_currency</code>, <code>price_type_id</code>; товары read/write, регулярные цены на запись.</td></tr>
-      <tr><td><strong>CS-Cart</strong></td><td><code>{`{ email, api_key }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>store_currency</code>; официальный REST API 2.0, товары read/write, базовые цены, остатки и заказы read.</td></tr>
+      <tr><td><strong>CS-Cart</strong></td><td><code>{`{ email, api_key }`}</code></td><td><code>store_host</code>, <code>base_path</code>, <code>store_currency</code>; официальный REST API 2.0, товары read/write, базовые цены, остатки, заказы read и стандартные статусы заказов write.</td></tr>
       <tr><td><strong>OpenCart</strong></td><td>Bearer token модуля TORGNEXA</td><td><code>store_host</code>, <code>base_path</code>, <code>store_currency</code>; сначала установите <code>torgnexa.ocmod.zip</code> — он добавляет <code>extension/torgnexa/api/*</code>, затем доступны товары read/write.</td></tr>
       <tr><td><strong>Shopify</strong></td><td>OAuth client JSON</td><td><code>shop_domain</code>, <code>store_currency</code>; OAuth с host-owned refresh, товары read/write.</td></tr>
       <tr><td><strong>Bitrix24 CRM</strong></td><td>OAuth client JSON</td><td><code>portal_host</code>; лиды, сделки, контакты, компании и товарные строки в отдельном CRM-контуре.</td></tr>
@@ -513,6 +540,7 @@ const routes = [
   ["Возвраты", "/returns", "Возвраты, отмены, инспекции и связанные refunds"],
   ["Остатки", "/inventory", "Позиции, склады, инциденты, fulfillment и импорт"],
   ["Инциденты", "/incidents", "Отклонения, сбои складов и действия оператора"],
+  ["Маркировка", "/marking", "Проверка кодов, партии, упаковки и УПД"],
   ["Состояние интеграций", "/integrations/status", "Состояние подключений, проверки и история доступности"],
   ["Интеграции", "/integrations", "Подключения маркетплейсов и внешних систем"],
   ["Публикации", "/social", "Текстовые публикации в подключённые социальные каналы"],
@@ -524,6 +552,8 @@ const routes = [
   ["Сертификаты и документы", "/compliance", "Разрешительные документы и запросы приватности"],
   ["Уведомления", "/notifications", "Ошибки, предупреждения и системные события"],
   ["Отчёты", "/reports", "Аналитика, фильтры и экспорт"],
+  ["AI-помощник", "/assistant", "Ответы по разрешённым данным с evidence и deep links"],
+  ["Безопасность", "/security", "Активные сессии, история входов и журнал изменений"],
   ["Аудит", "/audit", "История привилегированных действий"],
   ["Настройки", "/settings", "Рабочее пространство, доступ, автоматизация и безопасность"],
 ] as const;
@@ -746,6 +776,19 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             <div><h3>Заказы</h3><ul><li>Фильтруйте по поиску и нормализованному статусу через серверный API.</li><li>В боковой панели проверяйте источник, состав, суммы и историю заказа.</li><li>Не создавайте повторную операцию с новым idempotency key, пока результат первой неизвестен.</li><li>Ошибки доставки данных разбирайте через синхронизацию и инциденты.</li></ul></div>
             <div><h3>Возвраты</h3><ul><li>Раздел «Возвраты» показывает жизненный цикл от запроса до закрытия, позиции, quantities и disposition.</li><li>Переходы статуса используют optimistic version и ключ идемпотентности; конфликт версии требует обновить карточку.</li><li>Инспекция и refund allocation фиксируются отдельными API-операциями и не переписывают историю.</li></ul></div>
           </div>
+          <h3>Возврат, отмена и возврат денег</h3>
+          <p>Это три разные операции: отмена заказа меняет состояние заказа, физический возврат проходит через приёмку и инспекцию, а refund относится к уже захваченной оплате. Поэтому refund не доказывает, что товар принят, а disposition не должен менять платёжную историю задним числом.</p>
+          <ol className="docs-steps compact">
+            <li><strong>Откройте карточку возврата</strong><span>Проверьте заказ, причину, валюту, requested/received/accepted quantity и связанные позиции.</span></li>
+            <li><strong>Переведите возврат по state machine</strong><span>Допустимый путь: requested → approved → authorized → in_transit → received → inspecting → accepted, partially_accepted или rejected → closed.</span></li>
+            <li><strong>Зафиксируйте результат инспекции</strong><span>Выберите disposition: restock, quarantine, scrap или replace. Частичный возврат сохраняет точное decimal-количество.</span></li>
+            <li><strong>Создайте refund allocation отдельно</strong><span>Сумма не может превысить захваченную оплату; sensitive-операция проходит capability, policy, approval и аудит.</span></li>
+          </ol>
+          <DocsScreenshot src="/docs/returns.png" width={1265} height={712} alt="Карточка возврата TORGNEXA со статусом, позициями и действиями инспекции" caption="Карточка возврата: оператор видит допустимое следующее состояние и не смешивает физическую приёмку с возвратом денег."/>
+          <h3>Качество публикации</h3>
+          <p>Перед записью в канал откройте <code>/publication-quality</code> и выберите target: товар/offer, кабинет, connector, канал, locale и jurisdiction. Проверка сохраняет snapshot/profile digest, score, категории проблем и gate receipt. Статус <code>ready</code> разрешает запись; <code>ready_with_warnings</code> показывает предупреждения, а <code>blocked</code>, <code>approval_required</code>, <code>stale</code>, <code>unsupported</code> и <code>unknown</code> останавливают публикацию.</p>
+          <ul><li><strong>Сначала исправьте issues</strong> — обязательное поле, media, цена, остаток, capability или compliance evidence.</li><li><strong>Затем повторите preflight</strong> — старый receipt нельзя использовать после изменения товара, профиля или runtime capability.</li><li><strong>Для remediation используйте предложение исправления</strong> — оно содержит expected snapshot digest, а применение проходит обычной Product/PIM-командой с optimistic version.</li></ul>
+          <DocsScreenshot src="/docs/publication-quality.png" width={1265} height={712} alt="Центр качества публикации TORGNEXA со score, решением и проблемами карточки" caption="Центр качества: решение публикации и причины блокировки видны до внешней записи."/>
           <Callout title="Деньги и количества">Суммы передаются в минимальных единицах вместе с валютой. Дробные количества используют точное decimal-представление.</Callout>
         </DocSection>
 
@@ -766,7 +809,32 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             <article><h3>Передача в pack area</h3><p>До 50 завершённых задач подбора можно собрать в видимую аудируемую batch-передачу. Marketplace shipment и автоматическое списание не заявляются этим контуром.</p></article>
           </div>
           <p>Сканирование сохраняет только SHA-256 отпечаток штрихкода, локацию, точное количество, исполнителя и время UTC. Это позволяет подтвердить операцию, не складывая необязательные данные о товаре в событие.</p>
+          <p>В очереди WMS оператор может отфильтровать задачу по состоянию и типу, открыть карточку, взять её в работу, выполнить сканирование, завершить, отменить или зафиксировать exception. Передача в pack area объединяет до 50 завершённых pick-задач одного склада, но не подтверждает отгрузку на маркетплейсе и не списывает остаток автоматически.</p>
+          <DocsScreenshot src="/docs/wms-task.png" width={1265} height={712} alt="Публичная инструкция TORGNEXA по остаткам и заданиям WMS" caption="Публичная инструкция по WMS: остатки, задания оператора, сканирование и ограничения текущего fulfillment-контура."/>
           <Callout title="Корректировки требуют причины" tone="warning">История остатков ведётся как журнал. Исправление создаёт новую запись, а не переписывает прошлое.</Callout>
+        </DocSection>
+
+        <DocSection id="marking" title="Маркировка и УПД" intro="Раздел «Маркировка» помогает оператору проверить код, связать его с GTIN/SKU и заданием WMS и безопасно обработать расхождение. Исходный Data Matrix в приложении не сохраняется.">
+          <ol className="docs-steps">
+            <li><strong>Откройте партию</strong><span>Проверьте SKU, GTIN, запрошенное и зарезервированное количество, открытые расхождения и текущее состояние партии.</span></li>
+            <li><strong>Выберите операцию WMS</strong><span>Перед сканированием укажите receiving, put-away, pick, pack, cycle count или return receiving — действие должно соответствовать заданию.</span></li>
+            <li><strong>Передайте код и количество</strong><span>Система принимает barcode, GTIN, SKU и точное ожидаемое количество. Повторный запрос используйте с новым ключом только после понятного результата предыдущего.</span></li>
+            <li><strong>Разберите результат</strong><span>Принятый код обновляет проверяемое состояние, а отказ показывает reason code. Не закрывайте задание вручную, если количество не совпало.</span></li>
+            <li><strong>Проведите УПД через контроль</strong><span>Печать, агрегация, ЭДО, УКЭП и МЧД выполняются отдельными согласованными операциями; истёкший сертификат или отсутствие МЧД блокируют отправку.</span></li>
+          </ol>
+          <div className="docs-feature-grid">
+            <article><h3><code>gtin_mismatch</code></h3><p>GTIN кода не совпал с партией или SKU. Проверьте этикетку и исходное задание, не повторяйте скан вслепую.</p></article>
+            <article><h3><code>duplicate</code></h3><p>Код уже принимался. Количество не увеличивается, поэтому повторная отправка не создаёт скрытый излишек.</p></article>
+            <article><h3><code>overflow</code></h3><p>Сканов больше, чем разрешено заданием. Операция остаётся открытой для проверки, а остаток не исправляется автоматически.</p></article>
+            <article><h3><code>unknown</code></h3><p>Удалённый результат неясен после timeout. Сначала выполните status read/reconciliation, затем принимайте решение о повторе.</p></article>
+          </div>
+          <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Что проверяется</th><th>Что сохраняется</th><th>Чего нет в приложении</th></tr></thead><tbody>
+            <tr><td>GTIN, SKU, задание и точное количество</td><td>SHA-256 fingerprint, location, quantity, actor и UTC time</td><td>Исходный Data Matrix и секреты провайдера</td></tr>
+            <tr><td>Состояние партии и открытые drifts</td><td>Неизменяемая история операции и reason code</td><td>Автоматическое подтверждение поставки маркетплейса</td></tr>
+            <tr><td>Сертификат, МЧД и результат ЭДО</td><td>Bounded evidence и audit-событие</td><td>Автоматический retry неизвестной удалённой записи</td></tr>
+          </tbody></table></div>
+          <DocsScreenshot src="/docs/marking.png" width={1265} height={712} alt="Публичная инструкция TORGNEXA по разделу «Маркировка и УПД»" caption="Публичная страница инструкции: перед сканированием оператор видит условия, порядок действий и правила обработки отказа."/>
+          <Callout title="Безопасность кодов" tone="warning">Исходный код не кладётся в логи, события или screenshots. Любая запись capability маркировки проходит права, policy, approval и audit; live qualification провайдера не заменяется synthetic-тестом.</Callout>
         </DocSection>
 
         <DocSection id="integrations" title="Интеграции" intro="Раздел оформлен как каталог площадок: карточка показывает назначение, статус, доступные возможности и подключённые кабинеты.">
@@ -791,9 +859,28 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
           <IntegrationQualificationGuides/>
           <DocsScreenshot src="/docs/integration-connection.png" width={1265} height={712} alt="Пошаговое подключение кабинета интеграции TORGNEXA" caption="Визуальная шпаргалка к панели подключения: кабинет, учётные данные, проверка, возможности и запуск импорта."/>
           <p>Для OAuth-подключения нажмите «Войти». Токен доступа обновляется сервером автоматически до истечения срока. Повторный вход требуется только если площадка отозвала доступ, отклонила токен обновления или не выдала его; карточка кабинета покажет «Войти снова».</p>
-          <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур включает товары, базовые цены, остатки, заказы и явно указанные направления синхронизации. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>
+          <p>К текущим готовым storefront-маршрутам относятся 1С‑Битрикс, CS-Cart, Magento, Medusa, OpenCart, Shopify и Shopware; для них рабочий контур включает товары, базовые цены, остатки, заказы и явно указанные направления синхронизации. Для CS-Cart дополнительно доступна стандартная смена статуса заказа. Bitrix24 — отдельный CRM-контур: лиды, сделки, контакты, компании и товарные строки не превращаются в product sync.</p>
           <p>В разделе «Качество публикации» (<code>/publication-quality</code>) оператор видит target-specific score, проблемы карточки и срок действия evidence. `ready` допускает запись, а `blocked`, `approval_required`, `stale`, `unsupported` и `unknown` останавливают её; старый receipt не может пройти preflight после изменения товара или capability.</p>
           <Callout title="Боевые учётные данные" tone="warning">Не используйте боевые ключи в тестовом контуре. Выдавайте минимальные права, а при раскрытии немедленно отзывайте ключ у провайдера и выполняйте его ротацию.</Callout>
+        </DocSection>
+
+        <DocSection id="integration-status" title="Состояние интеграций" intro="Центр состояния показывает единый снимок кабинетов, runtime, доступности, операций и синхронизации. Чтение снимка не выполняет удалённую проверку и не изменяет кабинет.">
+          <ol className="docs-steps">
+            <li><strong>Начните со сводки</strong><span>Счётчики «Работают», «Внимание», «Заблокированы», «Устарели» и «Синхронизация» показывают масштаб проблемы, но не заменяют открытие конкретного кабинета.</span></li>
+            <li><strong>Отфильтруйте очередь</strong><span>Используйте состояние, рабочий контур, семейство, capability или причину. Фильтры меняют только чтение снимка и сохраняют cursor пагинации.</span></li>
+            <li><strong>Откройте кабинет</strong><span>В карточке доступны измерения Runtime, кабинета, credentials, configuration, health, capability, sync, reconciliation, webhook и rate limit.</span></li>
+            <li><strong>Отделите проблему от отсутствия данных</strong><span>Красный статус не означает одно и то же: <code>unknown</code> — наблюдение недоступно, <code>stale</code> — оно устарело, <code>reauthorization_required</code> — нужна повторная авторизация.</span></li>
+            <li><strong>Выполните следующее действие</strong><span>Используйте только предложенное действие с ожидаемой версией кабинета. Если источники неполны, состояние не считается зелёным.</span></li>
+          </ol>
+          <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Состояние</th><th>Как читать</th><th>Безопасная реакция</th></tr></thead><tbody>
+            <tr><td><strong>Работает</strong> / <code>healthy</code></td><td>Снимок подтверждён доступными источниками и активными операциями.</td><td>Проверить дату evidence и продолжить обычный обмен.</td></tr>
+            <tr><td><strong>Требует внимания</strong> / <code>attention</code></td><td>Есть проблема или неполное измерение, но причина уже известна.</td><td>Открыть issue, исправить причину и повторить bounded health-check.</td></tr>
+            <tr><td><strong>Устарело</strong> / <code>stale</code></td><td>Последнее evidence старше допустимого TTL.</td><td>Не считать кабинет исправным; проверить worker, расписание и источник.</td></tr>
+            <tr><td><strong>Нет данных</strong> / <code>unknown</code></td><td>Система не смогла доказательно определить состояние.</td><td>Не выполнять запись и не повторять внешний вызов вслепую; начать с reconciliation.</td></tr>
+            <tr><td><strong>Заблокировано</strong> / <code>blocked</code></td><td>Сработала policy, capability, approval или security boundary.</td><td>Исправить условие и пройти обычный approval, а не обходить gate.</td></tr>
+          </tbody></table></div>
+          <DocsScreenshot src="/docs/integration-status.png" width={1265} height={712} alt="Центр состояния интеграций TORGNEXA со сводкой и фильтрами" caption="Центр состояния: сначала сводка и фильтры, затем карточка конкретного кабинета с измерениями и рекомендациями."/>
+          <Callout title="Не путайте чтение и проверку" tone="info">Центр показывает сохранённый snapshot с generated_at и digest. Кнопку реальной проверки запускайте в карточке «Интеграции» только после проверки scope и параметров среды.</Callout>
         </DocSection>
 
         <DocSection id="social" title="Публикации" intro="Social Core хранит контент, канал, расписание и историю статусов независимо от конкретной социальной сети.">
@@ -810,7 +897,7 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
 
         <DocSection id="master-data" title="Контрагенты и финансы" intro="Единые справочники не позволяют разным модулям создавать противоречивые версии одной сущности.">
           <div className="docs-split"><div><h3>Контрагенты</h3><p>Ищите юридическое лицо по каноническому справочнику и проверяйте его роли: покупатель, поставщик или партнёр. ERP, ЭДО, платежи и закупки ссылаются на эту запись.</p></div><div><h3>Финансы</h3><p>Вкладки «Расчёты», «Курсы валют» и «Платежи» показывают журнал продаж, комиссий, возвратов, выплат, официальные FX-факты и операции платёжных шлюзов. Конвертация использует сохранённый источник и точный курс; исправления оформляются корректирующими записями.</p></div></div>
-          <p>В текущей рабочей среде платёжные операции доступны для СБП, YooKassa и Robokassa: создание, статус и сверка. Возврат разрешается только шлюзам с правом <code>payments.refund</code>; у Robokassa возврат на уровне продавца намеренно не заявлен. Ozon Pay пока ограничен проверкой Seller API, а «Долями» — проверкой настроенного API endpoint; для «Долями» дополнительно требуется mTLS-сертификат.</p>
+          <p>В текущей рабочей среде платёжные операции доступны для СБП, YooKassa и Robokassa: создание, статус и сверка. Возврат разрешается только шлюзам с правом <code>payments.refund</code>; у Robokassa полный и частичный возврат требуют Password3 и возвращают асинхронный идентификатор заявки. Ozon Pay пока ограничен проверкой Seller API, а «Долями» — проверкой настроенного API endpoint; для «Долями» дополнительно требуется mTLS-сертификат.</p>
           <p>Для входящих уведомлений используйте <code>POST /api/v1/webhooks/payments/&#123;connector_id&#125;/&#123;organization&#95;id&#125;/&#123;workspace&#95;id&#125;/&#123;account_id&#125;</code>. Это публичный callback без пользовательской сессии: сервер проверяет активный платёжный кабинет, повторно подтверждает состояние у провайдера, записывает свидетельство и применяет переход ровно один раз. Провайдер получает унифицированный <code>200</code> при ошибке до проверки, а тело callback не считается источником статуса.</p>
         </DocSection>
 
@@ -828,6 +915,9 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
           <div className="docs-tab-guide"><article><strong>Уведомления</strong><span>Ошибки, предупреждения и системные события с признаком прочтения.</span></article><article><strong>Отчёты</strong><span>Периоды 7, 30 и 90 дней, поиск, графики, CSV/PDF и доступная AI-аналитика.</span></article><article><strong>Аудит</strong><span>Append-only история привилегированных изменений с субъектом, временем и результатом.</span></article><article><strong>Realtime</strong><span>Аутентифицированный SSE передаёт только heartbeat и сигналы инвалидации; данные перечитываются обычными API.</span></article></div>
           <p>Экспорт отчёта сохраняет выбранные фильтры. PDF создаётся сервером и скачивается готовым файлом. Аналитические проекции могут обновляться с небольшой задержкой и не являются транзакционной истиной.</p>
           <p>Отчёт «Юнит-экономика по каналам» показывает фактическую contribution margin по <code>channel_ref</code>: чистую выручку, комиссии, логистику, рекламу, возвраты, COGS, payout и покрытие источников. База признания выбирается явно (<code>order_accrual</code>, <code>settlement</code> или <code>cash</code>); статусы <code>partial</code>, <code>unmatched</code>, <code>conflict</code> и <code>mixed_currency</code> не превращаются в нулевые значения. Для подробной формулы и диагностики откройте <a href="/docs/operations">руководство эксплуатации</a>.</p>
+          <div className="docs-split"><div><h3>Как читать сумму</h3><p>GMV за вычетом скидок, отмен и возвратов даёт net revenue. После комиссий, payment fee, fulfilment, хранения, рекламы, промо, COGS и штрафов получается contribution profit.</p></div><div><h3>Как читать качество</h3><p><code>complete</code> означает полное покрытие источников, <code>partial</code> — неполное, <code>unmatched</code> — неуверенное сопоставление, <code>conflict</code> — спорную запись, а <code>mixed_currency</code> — отсутствие безопасной конвертации.</p></div></div>
+          <p>В фильтре «База» выберите одну дату признания: <code>order_accrual</code>, <code>settlement</code> или <code>cash</code>. Для каждой строки проверяйте <code>channel_ref</code>, покрытие и источник; отсутствующий факт не должен выглядеть как нулевой расход. CSV/PDF повторяет тот же bounded snapshot и не пересчитывает его новым курсом.</p>
+          <DocsScreenshot src="/docs/unit-economics.png" width={1265} height={712} alt="Публичная инструкция TORGNEXA по отчёту юнит-экономики" caption="Публичная инструкция по юнит-экономике: база признания, формула, качество покрытия и безопасное чтение результата."/>
           <p>Поток <code>GET /api/v1/realtime</code> доступен только при разрешении <code>operations.realtime.read</code>. Browser coalesces burst-инвалидации в окне 150 мс и не помещает в SSE payload товары, заказы, аудит или PII; после сигнала интерфейс повторно запрашивает только разрешённые данные.</p>
         </DocSection>
 
@@ -865,11 +955,30 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
             ["Отмена и повтор", "Worker хранит доступность и число попыток, а отмена и повтор проходят те же права, политику и аудит, что и исходное действие."],
           ]}/>
           <Callout title="Автоматизация не расширяет права">Workflow запускается в границах рабочего пространства и текущей версии. Если действие требует approval или capability, схема не может обойти эту проверку.</Callout>
+          <p>Практический путь в интерфейсе: создайте draft, добавьте событие или расписание, соедините его с condition и allowlisted action, нажмите «Проверить схему», затем «Опубликовать» и «Тестовый запуск». По идентификатору run открывается timeline шагов и evidence; для <code>failed</code> или <code>cancelled</code> доступен retry с новой run identity, а незавершённый запуск можно отменить.</p>
+          <DocsScreenshot src="/docs/workflow-builder.png" width={1265} height={712} alt="Публичная инструкция TORGNEXA по конструктору автоматизаций" caption="Публичная инструкция по workflow: схема, проверка, публикация, тестовый запуск и безопасное восстановление."/>
           <ul><li><strong>Провайдеры ИИ</strong> включают Claude, DeepSeek, GigaChat, Google Gemini, Grok (xAI), Kimi, OpenAI-совместимый, Qwen, YandexGPT и локальные Ollama, LM Studio, Open WebUI. Gemini использует официальный <code>generateContent</code> с ключом <code>x-goog-api-key</code>, Grok — xAI Chat Completions с Bearer; локальные серверы уже должны быть запущены.</li><li><strong>Ограничения ИИ</strong> одинаковы для hosted и local providers: только bounded non-streaming text completion, без скачивания моделей и без вызовов инструментов из этого контура.</li><li><strong>Политика передачи данных ИИ</strong> ограничивает классы данных, провайдеров, моделей, размер запроса и месячный лимит. Предварительная проверка редактирует чувствительные фрагменты и не отправляет тестовый запрос наружу.</li><li><strong>MCP-аккаунт</strong> получает одноразовый токен Bearer и ограниченный набор инструментов. В базовой сборке без настроенной политики управления <code>tools/list</code> пуст, а <code>tools/call</code> отклоняется.</li><li><strong>Аварийная остановка</strong> блокирует всех MCP-агентов рабочего пространства до явного возобновления.</li><li><strong>Вебхук</strong> доставляет выбранные события на HTTPS-адрес с подписью, повторными попытками и очередью ошибок, историей попыток и ручным повтором по идентификатору доставки.</li><li><strong>Плагин</strong> показывает запрошенные права, классы секретов и сетевые адреса; просмотр каталога ничего не устанавливает.</li></ul>
-          <h3>AI-помощник оператора</h3>
-          <p>Раздел <a href="/assistant">«AI-помощник»</a> — отдельный grounded-контур над каталогом, качеством публикации, остатками, возвратами, отчётами и состоянием интеграций. Сервер сам классифицирует вопрос, собирает разрешённый контекст и показывает <code>grounding_state</code>, freshness, digest и deep links. Источник без evidence не превращается в уверенный факт.</p>
-          <p>Помощник принимает вопросы «Что требует внимания?», «Почему товар не публикуется?», «Какие каналы просели?», «Что будет с остатком?» и «Сформируй план исправления». План возвращается только как typed preview; кнопка не запускает запись, а sensitive write передаётся в обычный approval/domain worker. Raw prompt, chain-of-thought, ключи и provider payload не сохраняются.</p>
           <Callout title="ИИ не является привилегированным обходом">Даже действительный токен не отменяет границу рабочего пространства, разрешения, лимит запросов, класс риска, политику и согласование.</Callout>
+        </DocSection>
+
+        <DocSection id="assistant" title="AI-помощник оператора" intro="Помощник отвечает по разрешённым данным рабочего пространства, показывает evidence и ссылки на первоисточники и не выполняет доменные записи напрямую.">
+          <ol className="docs-steps">
+            <li><strong>Создайте сессию</strong><span>Откройте «AI-помощник» и нажмите «Новая сессия». Сессия ограничена вашим actor, organization и workspace-контекстом.</span></li>
+            <li><strong>Задайте операционный вопрос</strong><span>Например: «Что требует внимания в интеграциях?», «Почему товар не публикуется?», «Какие каналы просели?» или «Что будет с остатком?».</span></li>
+            <li><strong>Проверьте grounding</strong><span>Смотрите <code>grounding_state</code>, freshness, digest и deep links. Без evidence ответ остаётся partial, stale, unavailable или refused.</span></li>
+            <li><strong>Используйте план как preview</strong><span>«Сформируй план исправления» возвращает typed preview. Кнопка не выполняет запись; чувствительное действие уходит в обычный approval/domain worker.</span></li>
+          </ol>
+          <div className="docs-feature-grid">
+            <article><h3>Только чтение</h3><p>Помощник не получает секреты, raw provider payload, chain-of-thought и прямой доступ к connector packages.</p></article>
+            <article><h3>Доказуемый ответ</h3><p><code>grounded</code> разрешён только при актуальном evidence; устаревший или недоступный источник явно обозначается.</p></article>
+            <article><h3>Untrusted data</h3><p>Тексты товара, отзывы, webhooks и ответы провайдеров считаются недоверенными данными и не превращаются в инструкции для модели.</p></article>
+            <article><h3>Безопасный preview</h3><p>Любая чувствительная запись требует capability, policy, approval, version и idempotency вне AI-контуры.</p></article>
+          </div>
+          <h3>Если ответ кажется неполным</h3>
+          <p><code>source_unavailable</code> означает, что источник интеграций или отчёта недоступен; <code>insufficient_data</code> — что фактов недостаточно; <code>stale_data</code> — что evidence старше допустимого TTL. В этих случаях откройте deep link исходного раздела и проверьте состояние там, не воспринимая ответ как подтверждение операции.</p>
+          <pre><code>POST /api/v1/assistant/sessions{`\n`}POST /api/v1/assistant/sessions/&#123;session_id&#125;/messages{`\n`}GET  /api/v1/assistant/runs/&#123;run_id&#125;</code></pre>
+          <DocsScreenshot src="/docs/ai-assistant.png" width={1265} height={712} alt="Публичная инструкция TORGNEXA по AI-помощнику оператора" caption="Публичная инструкция по AI-помощнику: вопросы, evidence, freshness и границы typed preview."/>
+          <Callout title="AI не является привилегированным обходом" tone="warning">Даже действительный токен не отменяет границу рабочего пространства, разрешения, лимит запросов, класс риска, policy и согласование.</Callout>
         </DocSection>
 
         <DocSection id="developer" title="API и расширения" intro="Публичная поверхность для интеграторов строится вокруг версионированных контрактов, а не внутренних таблиц.">
@@ -885,7 +994,7 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
         </DocSection>
 
         <DocSection id="security" title="Доступ и безопасность" intro="TORGNEXA использует модель default deny: разрешено только то, что выдано явно.">
-          <ul className="docs-checklist"><li>Контекст организации и рабочего пространства берётся из проверенной сессии.</li><li>Пароли остаются у провайдера идентификации; TORGNEXA их не видит и не хранит.</li><li>Ключи, токены, приватные ключи и платёжные данные нельзя помещать в комментарии, логи и экспорт.</li><li>Не отключайте последнего активного администратора рабочего пространства.</li><li>Завершайте неизвестные активные сессии во вкладке «Основные».</li><li>Опасные действия проходят проверку политики и согласования и фиксируются в аудите.</li></ul>
+          <ul className="docs-checklist"><li>Контекст организации и рабочего пространства берётся из проверенной сессии.</li><li>Пароли остаются у провайдера идентификации; TORGNEXA их не видит и не хранит.</li><li>Ключи, токены, приватные ключи и платёжные данные нельзя помещать в комментарии, логи и экспорт.</li><li>Не отключайте последнего активного администратора рабочего пространства.</li><li>Завершайте неизвестные активные сессии в разделе «Безопасность».</li><li>Опасные действия проходят проверку политики и согласования и фиксируются в аудите.</li></ul>
           <p>Внешний OIDC-провайдер сначала создаётся как черновик: адрес издателя должен входить в список разрешённых адресов развёртывания, обнаружение конфигурации проходит проверку, и только затем конфигурацию можно активировать.</p>
         </DocSection>
 

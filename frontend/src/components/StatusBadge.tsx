@@ -8,6 +8,7 @@ const statusLabels: Readonly<Record<string, string>> = {
   allocations: "Резервы исполнения",
   archived: "Архив",
   cancelled: "Отменён",
+  cancellation_pending: "Отмена на согласовании",
   canceled: "Отменён",
   closed: "Закрыт",
   completed: "Завершён",

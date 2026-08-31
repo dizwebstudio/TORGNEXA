@@ -6,6 +6,7 @@
   "sdk_version": 1,
   "capabilities": [
     "inventory.read",
+    "inventory.write",
     "notifications.receive",
     "orders.read",
     "prices.read",

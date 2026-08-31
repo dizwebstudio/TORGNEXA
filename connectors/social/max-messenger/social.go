@@ -178,7 +178,7 @@ func (connector *Connector) uploadMedia(ctx context.Context, account sdk.Account
 	if json.Unmarshal(raw, &init) != nil || !validUploadURL(init.URL, typ) {
 		return attachment{}, ErrInvalidResponse
 	}
-	response, e := connector.transport.Upload(ctx, UploadRequest{URL: init.URL, FileName: ref.UploadID + ext, MediaType: descriptor.MediaType, SizeBytes: descriptor.SizeBytes, SHA256: descriptor.SHA256, Body: io.LimitReader(reader, descriptor.SizeBytes)})
+	response, e := connector.transport.Upload(ctx, UploadRequest{URL: init.URL, FileName: ref.UploadID + ext, MediaType: descriptor.MediaType, SizeBytes: descriptor.SizeBytes, SHA256: descriptor.SHA256, Body: io.LimitReader(reader, descriptor.SizeBytes), AccessToken: token})
 	if e != nil {
 		return attachment{}, remoteError(sdk.ErrorInternal, "upload_outcome_unknown", "", 0)
 	}
@@ -357,7 +357,7 @@ func validUploadURL(value, typ string) bool {
 	host = strings.ToLower(host)
 	expected := "iu.oneme.ru"
 	if typ == "video" {
-		expected = "vu.okcdn.ru"
+		expected = "omub.okcdn.ru"
 	}
 	return host == expected
 }

@@ -35,8 +35,8 @@ const siteURL = publicURL();
 const rootPage = {
   path: "/docs",
   heading: "Документация TORGNEXA",
-  title: "Документация TORGNEXA — интеграции, каталог и синхронизация",
-  description: "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, управление каталогом, заказами и синхронизацией.",
+  title: "Документация TORGNEXA — интеграции, WMS и автоматизация",
+  description: "Официальная документация TORGNEXA: подключение маркетплейсов, интернет-магазинов, платежей и CRM, работа с каталогом, WMS, маркировкой, возвратами и автоматизацией.",
 };
 const pages = [rootPage, ...ssrModule.documentationPages];
 const canonicalFor = page => `${siteURL}${page.path}`;

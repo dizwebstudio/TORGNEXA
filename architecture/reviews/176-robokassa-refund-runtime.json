@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-176",
+  "task": "176",
+  "change_class": "mixed",
+  "summary": "Admit Robokassa merchant full and partial refunds through the official Password3-signed Refund API.",
+  "scopes": [
+    "adr/0128-robokassa-refund-runtime.md",
+    "architecture/reviews/176-robokassa-refund-runtime.json",
+    "connectors/payments/robokassa/operations.go",
+    "contracts/connectors/builtin-runtime-support-v1.json",
+    "docs/10-integrations-matrix.md",
+    "docs/connectors/fail-closed-operation-matrix.md",
+    "docs/connectors/robokassa/README.md",
+    "docs/connectors/robokassa/capability-audit.md",
+    "docs/connectors/robokassa/conformance-plan.md",
+    "docs/connectors/robokassa/reconciliation.md",
+    "docs/connectors/robokassa/spec.md",
+    "frontend/src/features/settings/IntegrationCatalog.tsx",
+    "frontend/src/generated/connector-catalog.ts",
+    "internal/platform/builtinruntime/paymentstransport.go",
+    "internal/platform/builtinruntime/paymentstransport_test.go",
+    "internal/platform/builtinruntime/support_generated.go",
+    "tasks/BACKLOG.md",
+    "tasks/EXECUTION_PLAN.md",
+    "tasks/issues/176-robokassa-refund-runtime.md"
+  ],
+  "frozen_pillars": [
+    "connector-plugin-runtime-capabilities",
+    "reporting-settlements-growth-supply-planning",
+    "privacy-secrets-security-governance"
+  ],
+  "adr": "adr/0128-robokassa-refund-runtime.md",
+  "existing_adrs": [
+    "adr/0009-transactional-outbox.md",
+    "adr/0010-connector-capabilities.md",
+    "adr/0039-connector-conformance-admission-gate.md",
+    "adr/0071-payment-rails.md",
+    "adr/0090-built-in-provider-runtime-composition-boundary.md",
+    "adr/0105-unauthenticated-webhook-ingress.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "architecture_change"
+  },
+  "impacts": [
+    {"area":"tenancy", "status":"affected", "evidence":"Refund runs through the existing tenant-scoped payment account and SecretProvider callback."},
+    {"area":"privacy_data_governance", "status":"affected", "evidence":"Password3 remains secret material; only bounded OpKey/requestId identifiers cross the operation boundary."},
+    {"area":"api_compatibility", "status":"not_affected", "evidence":"The existing provider-neutral PaymentRefundRequest and payment API are reused."},
+    {"area":"event_compatibility", "status":"not_affected", "evidence":"No event envelope or payload changes."},
+    {"area":"plugin_sdk_compatibility", "status":"not_affected", "evidence":"The existing manifest-declared payments.refund capability and SDK interface are reused."},
+    {"area":"database_migration", "status":"not_affected", "evidence":"Existing refund remote ID/status lifecycle stores the provider request ID."},
+    {"area":"security", "status":"affected", "evidence":"The fourth secret line is callback-scoped Password3 and the fixed HTTPS transport signs requests without logging credentials."},
+    {"area":"approvals_risk", "status":"affected", "evidence":"The existing payment refund permission, policy and audit path remains the only mutation entry point."},
+    {"area":"audit_lineage", "status":"affected", "evidence":"Existing refund mutation records correlate the accepted provider request."},
+    {"area":"reconciliation_idempotency", "status":"affected", "evidence":"The provider response is asynchronous; timeout is mapped to unknown and never blindly retried."},
+    {"area":"webhooks_egress", "status":"affected", "evidence":"The host performs one OpStateExt read followed by a fixed-host Refund API POST."},
+    {"area":"slo_observability", "status":"affected", "evidence":"Existing payment timeout, retry and unknown-outcome policies cover the additional request."},
+    {"area":"operations_rollback", "status":"affected", "evidence":"Removing payments.refund from runtime support disables new Robokassa refund calls without migration."},
+    {"area":"testing_conformance", "status":"affected", "evidence":"Deterministic tests verify OpKey extraction, HS256 signature, full/partial payloads and Password3 gating."}
+  ],
+  "provider": {
+    "id": "robokassa",
+    "route": "connector_sdk",
+    "manifest": "connectors/payments/robokassa/manifest.json",
+    "connector_spec": "docs/connectors/robokassa/spec.md",
+    "capability_audit": "docs/connectors/robokassa/capability-audit.md",
+    "conformance_plan": "docs/connectors/robokassa/conformance-plan.md"
+  },
+  "follow_up_tasks": []
+}

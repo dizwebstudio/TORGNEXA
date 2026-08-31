@@ -96,6 +96,22 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+  /logistics/batches:
+    get:
+      operationId: listLogisticsBatches
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_account_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: mail_type, in: query, required: false, schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}}
+        - {name: mail_category, in: query, required: false, schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: page, in: query, required: false, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+      responses:
+        '200': {description: Bounded Russian Post batch directory, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchPage'}}}}
+        '400': {description: Invalid batch query}
+        '403': {description: Caller lacks connectors.read}
+        '409': {description: Logistics account or capability is unavailable}
+        '502': {description: Logistics provider unavailable}
   /logistics/rates:
     post:
       operationId: calculateLogisticsRates
@@ -237,6 +253,26 @@ paths:
       responses:
         '200': {description: Return state changed, content: {application/json: {schema: {$ref: '#/components/schemas/Return'}}}}
         '409': {description: State or version conflict}
+  /returns/{return_id}/logistics:
+    post:
+      operationId: createReturnLogistics
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: return_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnLogisticsCreate'}}}}
+      responses:
+        '202': {description: Carrier return shipment accepted for asynchronous processing, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnLogistics'}}}}
+        '409': {description: Return state or idempotency conflict}
+  /return-logistics/{operation_id}:
+    get:
+      operationId: getReturnLogistics
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: operation_id, in: path, required: true, schema: {$ref: '#/components/schemas/SortableID'}}
+      responses:
+        '200': {description: Carrier return operation, content: {application/json: {schema: {$ref: '#/components/schemas/ReturnLogistics'}}}}
+        '404': {description: Return operation not found}
   /returns/{return_id}/inspection:
     post:
       operationId: recordReturnInspection
@@ -2168,6 +2204,38 @@ paths:
         '400': {description: 'Invalid subscription, event allowlist, signing secret or unsafe endpoint'}
         '401': {description: Authenticated tenant scope missing}
         '409': {description: Subscription already exists}
+  /webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}:
+    post:
+      operationId: receiveCommerceWebhook
+      security: []
+      description: >-
+        Public provider callback boundary. The connector account, tenant scope
+        and provider signature are resolved and verified by the runtime before
+        a minimized event is placed in the transactional outbox. Saleor uses
+        Saleor-Signature/Saleor-Event; WooCommerce uses
+        X-WC-Webhook-Signature/X-WC-Webhook-Topic. Invalid deliveries are
+        acknowledged uniformly and are not persisted.
+      parameters:
+        - {name: connector_id, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9-]{1,63}$'}}
+        - {name: organization_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: workspace_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: account_id, in: path, required: true, schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+        - {name: Saleor-Signature, in: header, required: false, schema: {type: string, maxLength: 4096}}
+        - {name: Saleor-Event, in: header, required: false, schema: {type: string, maxLength: 128}}
+        - {name: X-WC-Webhook-Signature, in: header, required: false, schema: {type: string, maxLength: 4096}}
+        - {name: X-WC-Webhook-Topic, in: header, required: false, schema: {type: string, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, maxProperties: 10000, additionalProperties: true}
+      responses:
+        '200':
+          description: Uniform provider acknowledgement; verification failures are not disclosed.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
+        '404': {description: Route not found}
   /webhook-subscriptions/{subscription_id}:
     delete:
       operationId: disableWebhookSubscription
@@ -2899,7 +2967,7 @@ components:
         id: {$ref: '#/components/schemas/SortableID'}
         connector_account_id: {type: string, minLength: 1, maxLength: 128}
         display_name: {type: string, minLength: 1, maxLength: 300}
-        capabilities: {type: array, items: {type: string, enum: [social.post.text]}, minItems: 1, maxItems: 1}
+        capabilities: {type: array, items: {type: string, enum: [social.post.text, social.post.buttons]}, minItems: 1, maxItems: 2}
         status: {type: string, enum: [disabled, active]}
         version: {type: integer, minimum: 1}
     SocialChannelPage:
@@ -2934,6 +3002,16 @@ components:
         channel_account_id: {$ref: '#/components/schemas/SortableID'}
         channel_name: {type: string, minLength: 1, maxLength: 300}
         text: {type: string, minLength: 1, maxLength: 4096}
+        buttons:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required: [text, url]
+            properties:
+              text: {type: string, minLength: 1, maxLength: 64}
+              url: {type: string, maxLength: 2048, pattern: '^https://[^\\s]+$'}
         status: {type: string, enum: [scheduled, ready, publishing, published, failed, cancelled]}
         reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
         attempt: {type: integer, minimum: 0}
@@ -2964,6 +3042,21 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/LogisticsPickupPoint'}}
+    LogisticsBatch:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, shipment_count, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        shipment_count: {type: integer, minimum: 0, maximum: 1000000}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsBatchPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsBatch'}}
     LogisticsAddress:
       type: object
       additionalProperties: false
@@ -3053,7 +3146,7 @@ components:
       required: [id, status, version, accepted, fresh]
       properties:
         id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
-        status: {type: string, enum: [pending, created, in_transit, delivered, cancelled, unknown]}
+        status: {type: string, enum: [pending, created, in_transit, delivered, cancellation_pending, cancelled, unknown]}
         version: {type: integer, minimum: 1}
         accepted: {const: true}
         fresh: {type: boolean}
@@ -3063,7 +3156,7 @@ components:
       required: [id, status, version, accepted, fresh]
       properties:
         id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
-        status: {type: string, enum: [pending, created, in_transit, delivered, cancelled, unknown]}
+        status: {type: string, enum: [pending, created, in_transit, delivered, cancellation_pending, cancelled, unknown]}
         version: {type: integer, minimum: 1}
         accepted: {const: true}
         fresh: {type: boolean}
@@ -3168,6 +3261,37 @@ components:
       properties:
         status: {type: string, enum: [requested, approved, authorized, in_transit, received, inspecting, accepted, partially_accepted, rejected, closed, cancelled, expired]}
         version: {type: integer, minimum: 1}
+    ReturnLogistics:
+      type: object
+      additionalProperties: false
+      required: [id, return_id, connector_account_id, original_remote_id, external_id, mail_type, status, idempotency_key, version, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        return_id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 192}
+        original_remote_id: {type: string, minLength: 1, maxLength: 192}
+        external_id: {type: string, minLength: 1, maxLength: 192}
+        mail_type: {type: string, minLength: 1, maxLength: 64}
+        tariff_code: {type: integer, minimum: 0, default: 0}
+        status: {type: string, enum: [requested, executing, succeeded, failed, unknown]}
+        remote_id: {type: string, maxLength: 192}
+        tracking_number: {type: string, maxLength: 192}
+        failure_code: {type: string, maxLength: 64}
+        idempotency_key: {type: string, minLength: 1, maxLength: 192}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ReturnLogisticsCreate:
+      type: object
+      additionalProperties: false
+      required: [id, connector_account_id, original_remote_id, external_id, mail_type]
+      properties:
+        id: {$ref: '#/components/schemas/SortableID'}
+        connector_account_id: {type: string, minLength: 1, maxLength: 192}
+        original_remote_id: {type: string, minLength: 1, maxLength: 192}
+        external_id: {type: string, minLength: 1, maxLength: 192}
+        mail_type: {type: string, minLength: 1, maxLength: 64}
+        tariff_code: {type: integer, minimum: 0, default: 0}
     ReturnItemCreate:
       type: object
       additionalProperties: false
@@ -3291,6 +3415,16 @@ components:
         id: {$ref: '#/components/schemas/SortableID'}
         channel_account_id: {$ref: '#/components/schemas/SortableID'}
         text: {type: string, minLength: 1, maxLength: 4096}
+        buttons:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required: [text, url]
+            properties:
+              text: {type: string, minLength: 1, maxLength: 64}
+              url: {type: string, maxLength: 2048, pattern: '^https://[^\\s]+$'}
         publish_at: {type: string, format: date-time}
     WarehouseWrite:
       type: object

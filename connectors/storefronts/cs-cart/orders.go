@@ -193,3 +193,83 @@ func (c *Connector) ReadOrders(ctx context.Context, account sdk.Account, runtime
 	})
 	return output, err
 }
+
+var writableOrderStatuses = map[string]struct{}{
+	"O": {}, // open
+	"Y": {}, // awaiting call
+	"P": {}, // processed
+	"B": {}, // backordered
+	"C": {}, // complete
+	"I": {}, // cancelled
+	"F": {}, // failed
+	"D": {}, // declined
+}
+
+func (c *Connector) fetchOrderStatus(ctx context.Context, cfg Configuration, cred credentials, remoteID string) (string, error) {
+	order, err := c.fetchOrder(ctx, cfg, cred, remoteID)
+	if err != nil {
+		return "", err
+	}
+	if !validRemoteText(order.Status, 1) {
+		return "", ErrInvalidResponse
+	}
+	if _, ok := writableOrderStatuses[order.Status]; !ok {
+		return "", ErrInvalidResponse
+	}
+	return order.Status, nil
+}
+
+// WriteOrderStatus updates one of CS-Cart's standard order status codes. The
+// API accepts a partial order PUT; the adapter still reads the current status
+// first and verifies it after the write so a timeout cannot be retried blindly.
+func (c *Connector) WriteOrderStatus(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.OrderStatusWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if c == nil || c.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "orders.status.write") != nil || request.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	if _, ok := writableOrderStatuses[request.StatusRemoteID]; !ok {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	if parsed, err := strconv.ParseInt(request.OrderRemoteID, 10, 64); err != nil || parsed < 1 {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	cfg, err := c.configuration(ctx, account)
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, err
+	}
+	var receipt sdk.CommerceWriteReceipt
+	err = c.withCredentials(ctx, runtime, account.SecretReference, func(cred credentials) error {
+		current, readErr := c.fetchOrderStatus(ctx, cfg, cred, request.OrderRemoteID)
+		if readErr != nil {
+			return readErr
+		}
+		if current == request.StatusRemoteID {
+			receipt = sdk.CommerceWriteReceipt{RemoteID: request.OrderRemoteID, Duplicate: true, Reconciled: true}
+			return receipt.Validate()
+		}
+		body, marshalErr := json.Marshal(struct {
+			Status string `json:"status"`
+		}{Status: request.StatusRemoteID})
+		if marshalErr != nil {
+			return marshalErr
+		}
+		_, callErr := c.call(ctx, cfg, cred, "PUT", "/orders/"+request.OrderRemoteID, nil, body)
+		if callErr != nil {
+			if !isAmbiguousWrite(callErr) {
+				return callErr
+			}
+			verified, verifyErr := c.fetchOrderStatus(ctx, cfg, cred, request.OrderRemoteID)
+			if verifyErr == nil && verified == request.StatusRemoteID {
+				receipt = sdk.CommerceWriteReceipt{RemoteID: request.OrderRemoteID, Applied: true, Reconciled: true}
+				return receipt.Validate()
+			}
+			return writeOutcomeUnknown()
+		}
+		verified, verifyErr := c.fetchOrderStatus(ctx, cfg, cred, request.OrderRemoteID)
+		if verifyErr != nil || verified != request.StatusRemoteID {
+			return ErrInvalidResponse
+		}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.OrderRemoteID, Applied: true, Reconciled: true}
+		return receipt.Validate()
+	})
+	return receipt, err
+}

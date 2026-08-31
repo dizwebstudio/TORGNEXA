@@ -10,6 +10,8 @@ Provider-specific deterministic evidence additionally covers:
 - text and HTTPS link-button publication;
 - Task-088 image/video re-open before upload;
 - official upload-host SSRF allowlist and media ceilings;
+- worker mapping from Core image/gallery/video variants to the provider-neutral
+  SocialPublishRequest and receipt-safe publication lifecycle;
 - exact channel-bound remote publication IDs and status reads;
 - non-retryable ambiguous write outcomes;
 - production webhook endpoint validation, subscription/unsubscription and fixed update allowlist;

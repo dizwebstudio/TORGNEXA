@@ -20,9 +20,11 @@ Admitted capabilities:
 - `social.post.edit` — one remote message only
 - `social.post.delete` — one message or the 2–10 message set emitted for one album
 
-Production composition in Task 132 intentionally activates only
-`social.post.text`. The remaining entries are qualified SDK capability ceilings,
-not claims about currently reachable application workflows.
+Production composition in Task 174 activates `social.post.text`,
+`social.post.media` and `social.post.video` through the worker's released-upload
+bridge. Task 181 additionally activates HTTPS URL buttons for text, single
+photo and single video publications. Edit/delete and webhooks remain qualified
+SDK ceilings, not claims about currently reachable application workflows.
 
 Not admitted: provider scheduling, inbound updates/callback queries, comments, analytics, arbitrary files, live/video processing status reads or atomic album edit.
 

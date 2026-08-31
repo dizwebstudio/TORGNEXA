@@ -105,7 +105,10 @@ func TestManifestMatchesCommittedJSONAndDeclaresOnlyQualifiedWrites(t *testing.T
 	if !Manifest().Supports("prices.write") {
 		t.Fatal("qualified prices.write capability missing")
 	}
-	for _, capability := range []sdk.Capability{"products.write", "inventory.write", "orders.status.write"} {
+	if !Manifest().Supports("inventory.write") {
+		t.Fatal("qualified inventory.write capability missing")
+	}
+	for _, capability := range []sdk.Capability{"products.write", "orders.status.write"} {
 		if Manifest().Supports(capability) {
 			t.Fatalf("unqualified write capability %s", capability)
 		}
@@ -195,6 +198,96 @@ func TestWritePriceBusinessModeAndFailuresFailClosed(t *testing.T) {
 	}
 }
 
+func TestWriteInventoryUsesPartnerWarehouseEndpoint(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"status":"OK"}`)}}}
+	connector := New(transport, staticConfig{partnerConfig()}, func() time.Time {
+		return time.Date(2026, 8, 10, 15, 4, 5, 123000000, time.UTC)
+	})
+	receipt, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{apiKey()}, sdk.InventoryWriteRequest{
+		VariantRemoteID:  "YM-RED-M",
+		LocationRemoteID: "70001",
+		Quantity:         7,
+		IdempotencyKey:   "inventory-partner-1",
+	})
+	if err != nil || !receipt.Applied || receipt.Reconciled || receipt.RemoteID != "YM-RED-M" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].Method != "POST" || transport.requests[0].Path != "/v3/businesses/10001/offers/stocks/update" {
+		t.Fatalf("request=%+v", transport.requests)
+	}
+	var body struct {
+		SKUItems []struct {
+			SKU                string `json:"sku"`
+			PartnerWarehouseID int64  `json:"partnerWarehouseId"`
+			Count              int64  `json:"count"`
+			UpdatedAt          string `json:"updatedAt"`
+		} `json:"skuItems"`
+	}
+	if err := json.Unmarshal(transport.requests[0].Body, &body); err != nil || len(body.SKUItems) != 1 {
+		t.Fatalf("body=%s err=%v", transport.requests[0].Body, err)
+	}
+	item := body.SKUItems[0]
+	if item.SKU != "YM-RED-M" || item.PartnerWarehouseID != 70001 || item.Count != 7 || item.UpdatedAt != "2026-08-10T15:04:05.123Z" {
+		t.Fatalf("stock item=%+v", item)
+	}
+}
+
+func TestWriteInventoryUsesConfiguredCampaignWarehouseEndpoint(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"status":"OK"}`)}}}
+	connector := New(transport, staticConfig{campaignConfig()}, func() time.Time {
+		return time.Date(2026, 8, 10, 15, 4, 5, 0, time.UTC)
+	})
+	receipt, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{apiKey()}, sdk.InventoryWriteRequest{
+		VariantRemoteID:  "YM-BLUE-L",
+		LocationRemoteID: "80001",
+		Quantity:         0,
+		IdempotencyKey:   "inventory-campaign-1",
+	})
+	if err != nil || !receipt.Applied || receipt.Reconciled || receipt.RemoteID != "YM-BLUE-L" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].Method != "PUT" || transport.requests[0].Path != "/v2/campaigns/20001/offers/stocks" {
+		t.Fatalf("request=%+v", transport.requests)
+	}
+	var body struct {
+		SKUs []struct {
+			SKU   string `json:"sku"`
+			Items []struct {
+				Count     int64  `json:"count"`
+				UpdatedAt string `json:"updatedAt"`
+			} `json:"items"`
+		} `json:"skus"`
+	}
+	if err := json.Unmarshal(transport.requests[0].Body, &body); err != nil || len(body.SKUs) != 1 || len(body.SKUs[0].Items) != 1 {
+		t.Fatalf("body=%s err=%v", transport.requests[0].Body, err)
+	}
+	if body.SKUs[0].SKU != "YM-BLUE-L" || body.SKUs[0].Items[0].Count != 0 || body.SKUs[0].Items[0].UpdatedAt != "2026-08-10T15:04:05Z" || strings.Contains(string(transport.requests[0].Body), "partnerWarehouseId") {
+		t.Fatalf("stock body=%s", transport.requests[0].Body)
+	}
+}
+
+func TestWriteInventoryRejectsInvalidWarehouseBoundsAndProviderResponse(t *testing.T) {
+	connector := New(&scriptedTransport{}, staticConfig{partnerConfig()}, nil)
+	base := sdk.InventoryWriteRequest{VariantRemoteID: "YM-RED-M", LocationRemoteID: "70001", Quantity: 1, IdempotencyKey: "inventory-invalid-1"}
+	for _, request := range []sdk.InventoryWriteRequest{
+		{VariantRemoteID: base.VariantRemoteID, LocationRemoteID: base.LocationRemoteID, Quantity: maxYandexStockQuantity + 1, IdempotencyKey: base.IdempotencyKey},
+		{VariantRemoteID: base.VariantRemoteID, LocationRemoteID: "not-a-number", Quantity: base.Quantity, IdempotencyKey: base.IdempotencyKey},
+		{VariantRemoteID: base.VariantRemoteID, LocationRemoteID: "", Quantity: base.Quantity, IdempotencyKey: base.IdempotencyKey},
+	} {
+		if _, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{apiKey()}, request); !errors.Is(err, sdk.ErrInvalidCommerceWrite) {
+			t.Fatalf("invalid request=%+v err=%v", request, err)
+		}
+	}
+	wrongWarehouse := New(&scriptedTransport{}, staticConfig{campaignConfig()}, nil)
+	if _, err := wrongWarehouse.WriteInventory(context.Background(), testAccount(), testRuntime{apiKey()}, sdk.InventoryWriteRequest{VariantRemoteID: "YM-RED-M", LocationRemoteID: "70001", Quantity: 1, IdempotencyKey: "inventory-invalid-2"}); !errors.Is(err, sdk.ErrInvalidCommerceWrite) {
+		t.Fatalf("unconfigured warehouse err=%v", err)
+	}
+	bad := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"status":"ERROR"}`)}}}
+	if _, err := New(bad, staticConfig{partnerConfig()}, nil).WriteInventory(context.Background(), testAccount(), testRuntime{apiKey()}, base); !errors.Is(err, ErrInvalidResponse) {
+		t.Fatalf("bad response err=%v", err)
+	}
+}
+
 func TestInventorySupportsPartnerAndConfiguredCampaignWarehouses(t *testing.T) {
 	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: warehousesPageOne}, {StatusCode: 200, Body: warehousesLast}, {StatusCode: 200, Body: stocksPartner}}}
 	connector := New(transport, staticConfig{partnerConfig()}, nil)
@@ -280,6 +373,7 @@ func TestInterfaces(t *testing.T) {
 	var _ sdk.InventoryReader = (*Connector)(nil)
 	var _ sdk.PriceReader = (*Connector)(nil)
 	var _ sdk.PriceWriter = (*Connector)(nil)
+	var _ sdk.InventoryWriter = (*Connector)(nil)
 	var _ sdk.OrderReader = (*Connector)(nil)
 	var _ sdk.MarketplaceNotificationDecoder = (*Connector)(nil)
 }

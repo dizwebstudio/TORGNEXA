@@ -29,6 +29,7 @@ var (
 	tokenPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	sourcePattern      = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
 	reasonPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	buttonURLPattern   = regexp.MustCompile(`^https://[^\s]+$`)
 )
 
 type ContentID string
@@ -217,12 +218,13 @@ type ContentVariant struct {
 	Title          string
 	Body           string
 	Media          []MediaRef
+	Buttons        []Button
 	Version        int64
 	CreatedAt      time.Time
 }
 
 func (v ContentVariant) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ContentID.Valid() || !v.Format.Valid() || !validOptionalText(v.Title, 300, false) || !validOptionalText(v.Body, 50000, true) || v.Version != 1 || !isUTC(v.CreatedAt) || len(v.Media) > 20 {
+	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ContentID.Valid() || !v.Format.Valid() || !validOptionalText(v.Title, 300, false) || !validOptionalText(v.Body, 50000, true) || v.Version != 1 || !isUTC(v.CreatedAt) || len(v.Media) > 20 || validateButtons(v.Buttons) != nil {
 		return ErrInvalidRecord
 	}
 	seen := map[string]struct{}{}
@@ -235,7 +237,7 @@ func (v ContentVariant) Validate() error {
 		}
 		seen[media.UploadID] = struct{}{}
 	}
-	return validateVariantShape(v.Format, v.Title, v.Body, v.Media)
+	return validateVariantShape(v.Format, v.Title, v.Body, v.Media, v.Buttons)
 }
 
 type CreateVariant struct {
@@ -245,10 +247,11 @@ type CreateVariant struct {
 	Title     string
 	Body      string
 	Media     []MediaRef
+	Buttons   []Button
 }
 
 func (c CreateVariant) Validate() error {
-	if !c.ID.Valid() || !c.ContentID.Valid() || !c.Format.Valid() || !validOptionalText(c.Title, 300, false) || !validOptionalText(c.Body, 50000, true) || len(c.Media) > 20 {
+	if !c.ID.Valid() || !c.ContentID.Valid() || !c.Format.Valid() || !validOptionalText(c.Title, 300, false) || !validOptionalText(c.Body, 50000, true) || len(c.Media) > 20 || validateButtons(c.Buttons) != nil {
 		return ErrInvalidRecord
 	}
 	seen := make(map[string]struct{}, len(c.Media))
@@ -261,10 +264,10 @@ func (c CreateVariant) Validate() error {
 		}
 		seen[media.UploadID] = struct{}{}
 	}
-	return validateVariantShape(c.Format, c.Title, c.Body, c.Media)
+	return validateVariantShape(c.Format, c.Title, c.Body, c.Media, c.Buttons)
 }
 
-func validateVariantShape(format VariantFormat, title, body string, media []MediaRef) error {
+func validateVariantShape(format VariantFormat, title, body string, media []MediaRef, buttons []Button) error {
 	for _, ref := range media {
 		if ref.Validate() != nil {
 			return ErrInvalidRecord
@@ -302,12 +305,44 @@ func validateVariantShape(format VariantFormat, title, body string, media []Medi
 	return nil
 }
 
+// Button is a provider-neutral HTTPS link button attached to a publication.
+// Callback-data buttons are intentionally outside this contract because they
+// require an inbound update lifecycle and authorization policy.
+type Button struct {
+	Text string `json:"text"`
+	URL  string `json:"url"`
+}
+
+func (button Button) Validate() error {
+	if !validText(button.Text, 1, 64, false) || len(button.URL) > 2048 || !buttonURLPattern.MatchString(button.URL) || strings.ContainsAny(button.URL, `\"<>[]{}`) {
+		return ErrInvalidRecord
+	}
+	return nil
+}
+
+func validateButtons(buttons []Button) error {
+	if len(buttons) > 8 {
+		return ErrInvalidRecord
+	}
+	for _, button := range buttons {
+		if button.Validate() != nil {
+			return ErrInvalidRecord
+		}
+	}
+	return nil
+}
+
+// ValidateButtons validates an optional publication button set before any
+// content or publication record is written.
+func ValidateButtons(buttons []Button) error { return validateButtons(buttons) }
+
 type Capability string
 
 const (
 	CapabilityPostText      Capability = "social.post.text"
 	CapabilityPostMedia     Capability = "social.post.media"
 	CapabilityPostVideo     Capability = "social.post.video"
+	CapabilityPostButtons   Capability = "social.post.buttons"
 	CapabilityPostEdit      Capability = "social.post.edit"
 	CapabilityPostDelete    Capability = "social.post.delete"
 	CapabilityCommentsRead  Capability = "social.comments.read"
@@ -317,7 +352,7 @@ const (
 
 func (c Capability) Valid() bool {
 	switch c {
-	case CapabilityPostText, CapabilityPostMedia, CapabilityPostVideo, CapabilityPostEdit, CapabilityPostDelete, CapabilityCommentsRead, CapabilityCommentsReply, CapabilityAnalyticsRead:
+	case CapabilityPostText, CapabilityPostMedia, CapabilityPostVideo, CapabilityPostButtons, CapabilityPostEdit, CapabilityPostDelete, CapabilityCommentsRead, CapabilityCommentsReply, CapabilityAnalyticsRead:
 		return true
 	default:
 		return false
@@ -609,6 +644,9 @@ func ValidatePublicationPlan(account ChannelAccount, variant ContentVariant) err
 		return err
 	}
 	if !account.Supports(capability) {
+		return ErrCapabilityMissing
+	}
+	if len(variant.Buttons) > 0 && !account.Supports(CapabilityPostButtons) {
 		return ErrCapabilityMissing
 	}
 	return nil

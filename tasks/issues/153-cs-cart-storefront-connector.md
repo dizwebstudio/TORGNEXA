@@ -17,7 +17,10 @@ Acceptance criteria:
   order reconciliation;
 - базовые цены и остатки записываются через product PUT с проверкой валюты,
   единой storefront-локации и read-after-write в outbound reconciliation;
-- runtime support не заявляет неподдержанные сущности;
+- стандартный статус заказа записывается через order PUT с фиксированной
+  таблицей кодов и read-after-write;
+- runtime support заявляет стандартную запись статуса заказа и не заявляет
+  неподдержанные сущности;
 - тесты, контракты, архитектурный review и документация обновлены;
 - `scripts/cscart-smoke.sh` предоставляет credentialed API 2.0 Basic Auth
   smoke для настоящего non-production store, отдельно от SDK-конформанса;

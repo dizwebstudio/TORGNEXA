@@ -1906,6 +1906,28 @@
       }
     },
     {
+      "schema": "events/storefront-webhook-received-v1.schema.json",
+      "valid": {
+        "connector_account_id": "saleor-main",
+        "event_type": "product.updated",
+        "resource_kind": "product",
+        "resource_remote_id": "UHJvZHVjdDox",
+        "canonical_payload": {
+          "event": "product.updated",
+          "resource_id": "UHJvZHVjdDox"
+        }
+      },
+      "invalid": {
+        "connector_account_id": "saleor-main",
+        "event_type": "payment.created",
+        "resource_kind": "payment",
+        "resource_remote_id": "payment-1",
+        "canonical_payload": {
+          "event": "payment.created"
+        }
+      }
+    },
+    {
       "schema": "events/unit-economics-snapshot-published-v1.schema.json",
       "valid": {
         "run_id": "ue-run-001",

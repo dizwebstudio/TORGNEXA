@@ -52,7 +52,7 @@ func (c *Connector) ReadPaymentStatus(ctx context.Context, a sdk.Account, r sdk.
 	return out, nil
 }
 func (c *Connector) RefundPayment(ctx context.Context, a sdk.Account, r sdk.Runtime, q sdk.PaymentRefundRequest) (sdk.PaymentRefundResult, error) {
-	if q.Validate() != nil || len(q.IdempotencyKey) > 64 {
+	if q.Validate() != nil || len(q.IdempotencyKey) > 64 || sdk.RequireCapability(Manifest(), "payments.refund") != nil {
 		return sdk.PaymentRefundResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected", 0)
 	}
 	var out sdk.PaymentRefundResult

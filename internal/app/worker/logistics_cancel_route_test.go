@@ -127,6 +127,26 @@ func TestLogisticsCancelRouteConsumesApprovalAndCompletesRemoteMutation(t *testi
 	}
 }
 
+func TestLogisticsCancelRoutePersistsProviderAcceptedPendingState(t *testing.T) {
+	shipment := logisticsCancelShipment()
+	remote := &logisticsCancelConnectorStub{result: sdk.ShipmentResult{RemoteID: shipment.RemoteID, Status: "cancellation_pending", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: shipment.RemoteID, ObservedAt: time.Now().UTC()}}
+	approvals := &logisticsCancelApprovalStub{request: logisticsCancelApproval(shipment)}
+	shipments := &logisticsCancelShipmentStub{shipment: shipment}
+	runtime := &logisticsCancelRuntimeStub{canceler: remote}
+	route, err := newLogisticsCancelRoute(shipments, logisticsCancelAccountStub{account: logisticsCancelAccount(t), settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.shipment.cancel", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, approvals, runtime, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
+		return logisticsCancelRuntimeValue{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := route.Handle(context.Background(), logisticsCancelDelivery(t, shipment, approvals.request.ID)); err != nil {
+		t.Fatal(err)
+	}
+	if shipments.applied != 1 || shipments.shipment.Status != logistics.StatusCancellationPending || approvals.complete != 1 || len(approvals.success) != 1 || !approvals.success[0] || remote.calls != 1 {
+		t.Fatalf("status=%s applied=%d approval_complete=%d success=%v remote=%d", shipments.shipment.Status, shipments.applied, approvals.complete, approvals.success, remote.calls)
+	}
+}
+
 func TestLogisticsCancelRouteFailsPermanentRemoteErrorAndDoesNotRetry(t *testing.T) {
 	_ = logisticsCancelScope(t)
 	shipment := logisticsCancelShipment()

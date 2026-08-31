@@ -23,8 +23,19 @@ func candidateShipment(status string) sdk.ShipmentResult {
 	return sdk.ShipmentResult{RemoteID: "pek-cargo:1", Status: status, Cost: sdk.LogisticsMoney{MinorUnits: 50000, Currency: "RUB"}, TrackingNumber: "PEK-TRACK-1", ObservedAt: candidateTime}
 }
 
-func (candidateTransport) Create(context.Context, []byte, sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
+func (candidateTransport) Create(context.Context, []byte, sdk.ShipmentCreateRequest, Configuration) (sdk.ShipmentResult, error) {
 	return candidateShipment("created"), nil
+}
+
+func (candidateTransport) Cancel(_ context.Context, _ []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+	result := candidateShipment("cancelled")
+	result.RemoteID = request.RemoteID
+	result.TrackingNumber = request.RemoteID
+	return result, nil
+}
+
+func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	return sdk.LabelResult{ArtifactRef: "pek:print:" + request.RemoteID + ":fixture", MediaType: "application/pdf", ObservedAt: candidateTime}, nil
 }
 
 func (candidateTransport) Track(context.Context, []byte, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {

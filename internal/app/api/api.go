@@ -32,6 +32,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/entitlementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/legalpartyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo"
@@ -123,6 +124,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}
 	}()
 	logger.Info("database pool ready", "event", "database.pool_ready", "max_open_connections", cfg.Database.MaxOpenConns, "max_idle_connections", cfg.Database.MaxIdleConns)
+	inboundWebhookInbox, err := inboxrepo.New(db)
+	if err != nil {
+		return newRuntimeError("inbound_webhook_inbox_startup_failed", err)
+	}
 	postureInspector, err := runtimeposture.NewInspector(db)
 	if err != nil {
 		return newRuntimeError("runtime_posture_startup_failed", err)
@@ -412,7 +417,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		images: imageRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
-		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository,
+		settlements: settlementRepository, social: socialRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
 		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository,
 		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()},

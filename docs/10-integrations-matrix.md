@@ -46,9 +46,9 @@ capabilities.
 | Shopware 6 | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | Wildberries | product/inventory read | products, inventory inbound | no |
 | WooCommerce | product/price/inventory/order/return reads; product/price/inventory writes; order status write and signed webhook receipt ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
-| Yandex Market | product/price/inventory/order reads; price write; notification decoder | products, prices inbound; prices outbound; inventory and orders inbound | required |
+| Yandex Market | product/price/inventory/order reads; price and inventory writes; notification decoder | products inbound; prices and inventory bidirectional; orders inbound | required |
 | Magento (Adobe Commerce) | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
-| CS-Cart | product read/write; base price and inventory reads/writes; order reads | products, prices and inventory inbound + outbound; orders inbound | required |
+| CS-Cart | product read/write; base price and inventory reads/writes; order reads/status writes (standard codes) | products, prices, inventory and orders inbound + outbound | required |
 | Saleor | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 
 The host registry contains SDK price, inventory and order readers for the qualified
@@ -109,14 +109,18 @@ without credentials.
 Telegram is executed on the dedicated Social surface. The normal connector
 account control plane stores the bot token in SecretProvider and the negative
 `chat_id` as non-secret runtime configuration. Social Core API and worker
-currently execute only `social.post.text`; remote receipts make crash recovery
-safe without duplicate-prone automatic resend.
+execute text, one-photo/2–10-photo album and one-MP4-video publication through
+the released-upload bridge; remote receipts make crash recovery safe without
+duplicate-prone automatic resend. HTTPS URL buttons are also admitted for
+text, one-photo and one-video publications; edit/delete and webhooks remain
+outside the application runtime subset.
 
 MAX uses the same dedicated Social surface and receipt-safe worker. Its account
 stores the bot token in SecretProvider and a non-zero numeric `chat_id` as
-non-secret runtime configuration. Production admission is text-only with the
-provider's 4000-code-point limit; Task-042 media/webhook SDK capabilities are
-not claimed as connected application workflows.
+non-secret runtime configuration. Production admission includes text, released
+image/gallery and video publication with the provider's 4000-code-point limit;
+buttons, destructive edits/deletes and webhooks remain outside the connected
+application workflow.
 
 Bitrix24 is available on the dedicated CRM surface. Its account uses the
 host-owned OAuth 2.0/refresh flow, keeps the lower-case `portal_host` in the
@@ -140,11 +144,37 @@ bounded read-only чтение справочника ПВЗ/терминало�
 Для СДЭК, ПЭК, «Деловых Линий» и «Почты России» также доступно bounded
 read-only отслеживание одного отправления через
 `GET /api/v1/logistics/tracking` с capability `logistics.track.read`.
-Для СДЭК создание отправления доступно через approval-bound асинхронный
-маршрут `POST /api/v1/logistics/shipments`, а транспортная этикетка — через
-`GET /api/v1/logistics/labels`; операции остальных перевозчиков остаются
-закрытыми до qualification актуального API, provider fixtures и тестового
-кабинета.
+Для СДЭК, ПЭК и Деловых Линий создание отправления доступно через approval-bound
+асинхронный маршрут `POST /api/v1/logistics/shipments`, а транспортная
+этикетка — через `GET /api/v1/logistics/labels` для СДЭК, ПЭК, «Деловых Линий» и «Почты России»;
+для Почты России обычная форма использует официальный
+`GET /1.0/forms/backlog/{order-id}/forms`, а возвратная этикетка —
+`GET /1.0/forms/{rpo}/easy-return-pdf` с `print-type=PAPER`; наружу возвращается
+только проверенная content-addressed PDF-ссылка. Почта
+России также принимает одиночный заказ через `PUT /1.0/user/backlog` с
+ограниченным маппингом адреса, ФИО и габаритов; bounded чтение справочника
+партий доступно через `GET /api/v1/logistics/batches`, а формирование партии и
+передача в работу остаются закрытыми. Удаление одного нового заказа доступно через
+`DELETE /1.0/backlog` при точном совпадении результата. Для ПЭК доступно
+bounded создание одной заявки самовывозом через официальный
+`POST /api/v1/preregistration/submit/`: sender warehouse, контактные данные,
+российский receiver и один груз типа `3` передаются только после строгой
+проверки tenant-конфигурации и размеров. `documentId` и `cargoCode`
+проверяются, но асинхронное принятие не считается сверкой. Также для ПЭК
+доступно аннулирование одного предварительного оформления через официальный
+`POST /api/v1/order/cancellation/` с проверкой точного кода в ответе. Одиночная
+PDF-этикетка ПЭК доступна через официальный `/order/print/` с `type=simple`, а
+полная печатная форма заявки — через тот же маршрут с `type=big`; оба ответа
+проверяются как PDF и наружу возвращаются только digest-ссылки. Для СДЭК
+ограниченный возврат/отказ доступен через
+`POST /api/v1/returns/{return_id}/logistics`: для отказа используется
+`mail_type=refusal`, а для клиентского возврата — `mail_type=client_return` с
+обязательным положительным `tariff_code`. Операции
+остальных перевозчиков остаются
+закрытыми до qualification актуального API,
+provider fixtures и тестового кабинета. Для Деловых Линий создание ограничено
+address-to-address LTL-заявкой с явными runtime-параметрами контрагента,
+характера груза, даты и окна передачи.
 
 Ozon Доставка доступна отдельной карточкой на поверхности «Доставка». Она
 использует пару `client_id`/`api_key` продавца Ozon и проверяет доступ к
@@ -180,19 +210,37 @@ and Ozon Доставка SDK adapters. CDEK, ПЭК, «Деловые Лини�
 expose a bounded, read-only `pickup.points.read` application route for their
 official ПВЗ/terminal directories; CDEK, ПЭК, «Деловые Линии» and «Почта России»
 additionally expose a bounded read-only rate preview, while CDEK, ПЭК, «Деловые Линии» and
-«Почта России» expose a bounded `logistics.track.read` status lookup. CDEK
+«Почта России» expose a bounded `logistics.track.read` status lookup and a
+bounded `logistics.batches.read` directory projection. CDEK
 shipment creation also runs only through the approval-bound worker, while its
-transport-label read returns an opaque PDF artifact reference. Returns, webhooks and
-other carrier operations remain fail-closed until provider qualification. 5Post and Ozon
+transport-label read returns an opaque PDF artifact reference. ПЭК additionally
+admits one bounded self-delivery preregistration with explicit sender-warehouse
+configuration; the provider acceptance remains asynchronous. Почта России
+returns the same neutral artifact reference after validating the official PDF
+response for both the regular and easy-return forms. Dellin additionally
+supports the bounded address-to-address shipment-create route with explicit
+counterparty runtime configuration. ПЭК также допускает аннулирование одной
+предварительной заявки через официальный `/order/cancellation/` с точным
+подтверждением кода. CDEK `ORDER_STATUS` webhooks are verified
+by an OAuth re-fetch and stored as append-only evidence; client-return creation
+with an explicit tariff is admitted, while other carrier operations remain
+fail-closed until provider qualification. 5Post and Ozon
 Доставка expose only the separately reviewed credential-check surface.
 
 The exact write qualification boundary and next host-side steps are recorded in
 the [logistics write qualification matrix](connectors/logistics-write-qualification.md).
+The full manifest-versus-runtime boundary is tracked in the
+[fail-closed operation matrix](connectors/fail-closed-operation-matrix.md).
 
 Lamoda и М.Видео также доступны в категории «Маркетплейсы» как health-only
 карточки. Для них можно завести tenant-scoped кабинет и выполнить bounded
 проверку настроенного HTTPS endpoint, но товары, цены, остатки и заказы не
 передаются в worker до квалификации актуального партнёрского API.
+
+СБП теперь принимает проверенные payment webhook через общий публичный receiver:
+уведомление подтверждается повторным запросом статуса по mTLS, а тело callback
+не используется как источник истины. Доставка от реального acquiring bank
+остаётся отдельным live qualification gate.
 
 «Долями» доступен в категории «Платежи» как health-only карточка. Официальный
 API использует логин/пароль и mTLS-сертификат; TORGNEXA проверяет только
@@ -208,7 +256,7 @@ API использует логин/пароль и mTLS-сертификат; T
 | ERP | 1C, MoySklad | catalog, stock, orders, shipments, returns, finance mapping |
 | Government | Chestny ZNAK, VetIS/Mercury, EGAIS | status/docs/reconciliation; regulated writes phased and approved |
 | EDO | Diadoc, Saby | provider SDK, document/status/signing workflow |
-| Payments | SBP, YooKassa, Robokassa, «Долями» + reference card/acquirer + plugin acquirers | payment/status/webhook/refund/commission/reconciliation; «Долями» пока health-only |
+| Payments | SBP, YooKassa, Robokassa, «Долями» + reference card/acquirer + plugin acquirers | payment/status/webhook/refund/commission/reconciliation; YooKassa, Robokassa and SBP expose verified webhook receipt; «Долями» пока health-only |
 | Logistics | reference carrier + carrier plugins/PUDO | rate/create/cancel/track/label/return/capacity/issue |
 | Notifications | Email/TG/MAX/Webhook/n8n/SMS providers | transactional delivery/status/fallback with policy |
 | Enterprise IAM/SIEM | LDAP/AD, SAML, SCIM, JIT; syslog/webhook/Kafka/OTLP | federation/provisioning and security-event export |

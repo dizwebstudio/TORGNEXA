@@ -10,7 +10,7 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
 - Contiguous implemented baseline: Tasks `001`–`134`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces; Task `134` closes the host-owned OAuth access-token projection and refresh boundary. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
-- Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152`, `153`, `154`, `155` and `156` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates. Task `156` groups all former planned entries into explicit category surfaces and admits only health checks.
+- Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152`, `153`, `154`, `155`, `156`, `172`, `173`, `174`, `175`, `176`, `177` and `178` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates. Task `156` groups all former planned entries into explicit category surfaces and admits only health checks.
 - Task `157` is repository-complete: Lamoda and М.Видео are visible in the Marketplace catalog as health-only surfaces with tenant-scoped API-key enrollment and bounded operator-configured HTTPS probes; product, price, stock and order operations remain qualification-gated.
 - Task `158` is repository-complete: «Долями» is visible in Payments as an mTLS/basic health-only surface; payment mutations and webhooks remain qualification-gated.
 - Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
@@ -512,10 +512,12 @@ surface and leased worker delivery. The executable subset is deliberately
 
 Task 133 composes the existing MAX adapter through the same provider-neutral
 Social API, leased worker and append-only receipt recovery introduced by Task
-132. Only `social.post.text` is executable: the provider ceiling is 4000 Unicode
-code points and the host permits only exact account/channel health reads plus
-`POST /messages?chat_id=...`. Runtime inventory becomes 11 generic product
-integrations, nine working separate-surface providers and 18 planned entries.
+132. At that point only `social.post.text` was executable: the provider ceiling
+was 4000 Unicode code points and the host permitted only exact account/channel
+health reads plus `POST /messages?chat_id=...`. Task 175 extends the MAX worker
+route with released image, gallery and supported-video publication. Runtime
+inventory becomes 11 generic product integrations, nine working
+separate-surface providers and 18 planned entries.
 
 ### Gate RUNTIME-133
 
@@ -523,7 +525,8 @@ integrations, nine working separate-surface providers and 18 planned entries.
   configuration;
 - API/Core/worker remain provider-neutral and MAX protocol branching stays in
   built-in composition;
-- uploads, media, status and webhooks fail closed despite their SDK presence;
+- Task 175 closes the released-media upload bridge; buttons, status and webhooks
+  remain fail-closed despite their SDK presence;
 - Task-132 ambiguous-write recovery cannot duplicate a remote message;
 - generation, Go test/vet, contracts, architecture, frontend build and live MAX
   qualification must pass before a deployment claims complete production proof.
@@ -626,7 +629,9 @@ non-production credentials are qualified.
   cabinet Basic login/access-key probe;
 - ПЭК additionally exposes bounded read-only `pickup.points.read` and
   `logistics.rates.read` routes for its branch/warehouse directory and
-  calculator; no shipment or other write route is advertised;
+  calculator, plus one-code cancellation of a pre-registration through
+  `/order/cancellation/`; shipment creation, formed-cargo cancellation and
+  other write routes remain closed;
 - no carrier credential or recipient data is logged, persisted in plaintext or
   copied into events;
 - runtime support is `separate_surface/logistics`, never `planned`, while no
@@ -647,11 +652,16 @@ has the same bounded terminal/PUDO read route plus bounded rate and order-status
 history reads (`logistics.rates.read`, `logistics.track.read`). CDEK, ПЭК and
 Деловые Линии admit bounded read-only rate previews (`logistics.rates.read`)
 with fixed-decimal money normalization, while CDEK, ПЭК and Деловые Линии also
-admit a bounded `logistics.track.read` status lookup; no shipment, label, return or product-sync
-route is advertised until the current carrier contracts and an idempotent host
-bridge are qualified. Runtime inventory keeps logistics as a separate surface
-and admits only these exact CDEK rate/tracking/PVZ, ПЭК rate/tracking/PVZ and
-Деловые Линии rate/tracking/PVZ routes.
+admit a bounded `logistics.track.read` status lookup. Деловые Линии дополнительно
+admit только address-to-address shipment-create с явной конфигурацией контрагента,
+характера груза, даты и окна передачи; PDF-форма накладной доступна по
+`docUID`; only the bounded CDEK refusal/client-return variants are admitted;
+terminal/create variants and other return variants are not. Runtime inventory
+keeps logistics as a separate surface and admits only these exact CDEK
+rate/tracking/PVZ/create/cancel/refusal/client-return/label and
+verified `ORDER_STATUS` webhook, ПЭК rate/tracking/PVZ/cancel-pre-registration/label, Деловые Линии
+rate/tracking/PVZ/create/label and Почта России
+rate/tracking/PVZ/label/single-backlog-create/single-new-order-cancel routes.
 
 ### Gate RUNTIME-145
 
@@ -792,7 +802,9 @@ official API 2.0 Basic Auth surface admits product catalog reads and
 idempotent creates/updates with SKU lookup and read-after-write reconciliation,
 bounded base-price and single-storefront inventory reads, and bounded order
 list/detail reads; price/inventory writes use product PUT with
-read-after-write; order writes and webhooks remain unavailable.
+read-after-write; standard order-status writes use order PUT with
+read-after-write; order creation/deletion, custom status codes and webhooks
+remain unavailable.
 
 ### Gate RUNTIME-153
 
@@ -802,7 +814,8 @@ read-after-write; order writes and webhooks remain unavailable.
   with bounded responses and cursor pagination;
 - runtime support, generated catalogs, architecture policy/review, frontend
   presentation, task docs and conformance evidence are synchronized;
-- order status writes and webhook receipt remain fail-closed;
+- order creation/deletion, custom status codes and webhook receipt remain
+  fail-closed;
 - option-combination order lines and unknown remote status codes remain
   fail-closed rather than being projected ambiguously;
 - Go tests/vet, contracts, frontend tests/build and package-index checks pass;
@@ -831,7 +844,7 @@ orders/refunds, product/price/inventory writes, read-after-write and cleanup.
 - a real Shopify Dev Store, installed app token, required scopes and a
   synthetic SKU are still required for external qualification, using the same
   smoke script over HTTPS;
-- product creation and webhook receipt remain fail-closed, and order
+- webhook receipt remains fail-closed, and order
   cancel/close/reopen writes are excluded from the smoke because they do not
   have a safe complete rollback in the generic test contract;
 - status is tracked in `docs/connectors/shopify/live-qualification-status.json`.
@@ -875,9 +888,11 @@ for SKU `111223580`.
 - the reproducible stack is
   `docker-compose.saleor-test.yml` with `scripts/saleor-smoke.sh` and the
   procedure in `docs/connectors/saleor/docker-live-qualification.md`;
-- product creation and webhook receipt remain fail-closed because the current
-  Connector SDK contract cannot carry Saleor's required product type or its
-  detached JWS signature;
+- product creation remains fail-closed because the current Connector SDK
+  contract cannot carry Saleor's required product type; current no-secret
+  webhook receipt is admitted through detached RS256/JWKS verification and
+  the public commerce webhook route, while the deprecated HMAC `secretKey`
+  variant remains closed;
 - external merchant staging remains a separate gate requiring an HTTPS
   endpoint, scoped App token and synthetic channel/warehouse/SKU. The status is
   tracked in `docs/connectors/saleor/live-qualification-status.json`.
@@ -893,15 +908,21 @@ checked through a fixed HTTPS settings probe. A bounded read-only
 office card by postal index. A separate read-only `logistics.rates.read` route
 uses the official tariff calculator with postal indexes and total parcel weight;
 `logistics.track.read` uses the separate official SOAP `getOperationHistory`
-service for one domestic or S10 barcode. Shipment, document and return
-operations remain closed until a current test account and fixtures qualify the
-REST/API contracts.
+service for one domestic or S10 barcode. `logistics.label.read` requests the
+official PDF order form for a numeric backlog order ID and returns only an
+opaque content-addressed reference. `logistics.shipment.create` creates one
+strictly mapped order in the backlog, while `logistics.shipment.cancel` deletes
+one new order only after the response confirms the exact ID. Batch formation,
+hand-off and return operations remain closed until current test-account
+fixtures qualify the REST/API contracts.
 
 ### Gate RUNTIME-155
 
 - the Delivery card, manifest, runtime-support contract, policy/review and
   generated catalogs agree on `separate_surface/logistics` with only bounded
-  `pickup.points.read`, `logistics.rates.read` and `logistics.track.read`
+  `pickup.points.read`, `logistics.rates.read`, `logistics.label.read`,
+  `logistics.track.read`, single-backlog `logistics.shipment.create` and
+  exact-single-order `logistics.shipment.cancel`
   admitted;
 - credentials stay callback-scoped, strict JSON decoding rejects unknown fields,
   and the host sends only the documented authentication headers to the fixed
@@ -909,7 +930,7 @@ REST/API contracts.
   account credentials;
 - deterministic connector, transport, conformance, contract and frontend
   checks pass without production credentials or network access;
-- shipments, labels and returns cannot be enabled until
+- shipments and returns cannot be enabled until
   non-production provider qualification is retained.
 
 ## Phase 29 — Категорийные health-check поверхности
@@ -1454,3 +1475,125 @@ only. The implementation is split into thirteen subtasks:
   raw provider/model payloads or use AI as a privileged executor;
 - Go, contract, architecture, migration, frontend, conformance, performance,
   Compose E2E and documentation checks pass before production admission.
+
+## Phase 41 — Yandex Market inventory write
+
+`172`
+
+Task 172 is repository-complete. Yandex Market now admits the provider-neutral
+`inventory.write` route through the existing commerce-sync worker. The adapter
+maps explicit `partner_warehouses` mode to the documented business v3 stock
+update and `campaign_warehouses` mode to the grouped campaign v2 stock update;
+both modes validate tenant configuration, numeric warehouse scope, integer
+quantity bounds and asynchronous acceptance. The generated runtime/catalog,
+registry admission, deterministic provider tests and connector documentation
+are synchronized. Product, order-status and other unqualified writes remain
+fail-closed; live credentialed staging is a separate release gate.
+
+## Phase 42 — ПЭК bounded shipment create
+
+`173`
+
+Task 173 is repository-complete. ПЭК now admits a bounded
+`logistics.shipment.create` path through the existing approval-bound logistics
+worker: one Russian self-delivery preregistration (`orderType=0`, `FFS`, cargo
+type `3`, service `pek_type_3`) with a configured sender warehouse and no more
+than 50 parcels. The host-side adapter validates sender configuration, contacts,
+country and dimensions, then accepts only a response with a document identifier
+and one numeric cargo code. Provider acceptance remains asynchronous and is not
+treated as reconciliation. Formed-cargo cancellation, returns, address
+delivery and batch print forms remain fail-closed pending separate qualification.
+
+## Phase 43 — Telegram media publication worker route
+
+`174`
+
+Task 174 is repository-complete. Telegram now composes text, one-photo,
+2–10-photo album and one-MP4-video publication through the existing Social
+worker. Core media variants are converted to the provider-neutral SDK request;
+the worker revalidates Task-088 released-upload evidence and the host sends
+bounded multipart requests. URL buttons, edit/delete, inbound webhooks and
+arbitrary file types remain fail-closed pending separate application
+authorization or provider qualification.
+
+## Phase 44 — MAX media publication worker route
+
+`175`
+
+Task 175 is repository-complete. MAX now composes text, released image/gallery
+and supported video publication through the existing Social worker. The host
+implements the documented `/uploads` initialization and exact image/video
+upload-host allowlist, then sends bounded multipart `data` bodies with the
+callback-scoped bot token. Buttons, webhooks, status reads, destructive
+mutations and arbitrary files remain fail-closed.
+
+## Phase 45 — Robokassa merchant refund runtime
+
+`176`
+
+Task 176 is repository-complete. Robokassa now admits `payments.refund` through
+the official merchant Refund API at `/RefundService/Refund/Create`. The
+transport reads the authoritative payment with OpStateExt, requires state
+`100` and a non-empty `Info.OpKey`, signs the compact HS256 JWT with Password3,
+omits `RefundSum` for a full refund and sends exact RUB decimal minor units for
+a partial refund. The asynchronous `requestId` is returned as `accepted`;
+malformed credentials, missing OpKey, non-successful payment and ambiguous
+network outcomes remain fail-closed.
+
+## Phase 46 — Почта России — возвратная этикетка
+
+`177`
+
+Task 177 is repository-complete. Почта России now supports the explicit
+`return_pdf` label format for a domestic/S10 RPO through
+`GET /1.0/forms/{rpo}/easy-return-pdf`. The host validates the PDF response and
+returns only a content-addressed opaque artifact reference. Regular backlog
+forms remain on `format=pdf`; separate return shipments, batch formation and
+hand-off remain fail-closed.
+
+## Phase 47 — ПЭК — печатная форма заявки
+
+`178`
+
+Task 178 is repository-complete. ПЭК now supports the explicit `request_pdf`
+label format through the official `/api/v1/order/print/` route with `type=big`.
+The host validates the bounded base64 response as a PDF and returns only a
+content-addressed opaque artifact reference. The existing `format=pdf` remains
+the single-cargo label with `type=simple`; batch printing (`type=multiple`),
+formed-cargo cancellation, returns and other writes remain fail-closed.
+
+## Phase 48 — Почта России — чтение партий
+
+`179`
+
+Task 179 is repository-complete. Почта России now exposes the bounded
+`logistics.batches.read` route backed by the official `GET /1.0/batch` endpoint.
+The API and UI support optional mail type/category filters and bounded page
+navigation, while the neutral result contains only batch identity, status,
+shipment count and observation time. Batch formation and hand-off remain
+fail-closed pending qualification.
+
+## Phase 49 — СБП — admission payment webhook
+
+`180`
+
+Task 180 is repository-complete. SBP's existing `PaymentWebhookVerifier` is
+now admitted by the generated built-in runtime support contract and is routed
+through the shared public payment receiver. The callback body is not trusted:
+the host re-fetches the order status over the account's mTLS channel, then the
+receiver records replay evidence and applies only a valid canonical payment
+transition. A real acquiring-bank callback contract and non-production account
+remain required for live qualification.
+
+## Phase 50 — Telegram HTTPS publication buttons
+
+`181`
+
+Task 181 is repository-complete. Telegram `social.post.buttons` now crosses
+the provider-neutral immutable Social Core variant, tenant-scoped PostgreSQL
+snapshot, authenticated Social API and leased worker into the existing
+HTTPS-only Telegram markup adapter. The `/social` UI validates and submits up
+to eight link buttons and renders them in publication history. Callback-data
+buttons, edit/delete and inbound webhooks remain fail-closed because they need
+separate authorization, callback and reconciliation contracts. Credentialed
+live Telegram qualification remains a release gate.

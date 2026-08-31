@@ -24,6 +24,7 @@ import (
 
 const (
 	logisticsPickupPointsPath   = "/api/v1/logistics/pickup-points"
+	logisticsBatchesPath        = "/api/v1/logistics/batches"
 	logisticsRatesPath          = "/api/v1/logistics/rates"
 	logisticsTrackingPath       = "/api/v1/logistics/tracking"
 	logisticsLabelsPath         = "/api/v1/logistics/labels"
@@ -55,6 +56,10 @@ type logisticsRuntime interface {
 	LogisticsRates(context.Context, sdk.Account, sdk.Runtime, sdk.RateRequest) ([]sdk.RateQuote, error)
 	LogisticsTracking(context.Context, sdk.Account, sdk.Runtime, sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error)
 	LogisticsLabel(context.Context, sdk.Account, sdk.Runtime, sdk.LabelRequest) (sdk.LabelResult, error)
+}
+
+type logisticsBatchRuntime interface {
+	LogisticsBatches(context.Context, sdk.Account, sdk.Runtime, sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error)
 }
 
 type logisticsAPI struct {
@@ -140,6 +145,13 @@ type logisticsLabelView struct {
 	ObservedAt  time.Time `json:"observed_at"`
 }
 
+type logisticsBatchView struct {
+	RemoteID      string    `json:"remote_id"`
+	Status        string    `json:"status"`
+	ShipmentCount int       `json:"shipment_count"`
+	ObservedAt    time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime, dependencies ...logisticsRouteDependency) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
 	if len(dependencies) > 0 {
@@ -148,6 +160,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	}
 	routes := []ProtectedRoute{
 		{Method: http.MethodGet, Path: logisticsPickupPointsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listPickupPoints)},
+		{Method: http.MethodGet, Path: logisticsBatchesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.listBatches)},
 		{Method: http.MethodPost, Path: logisticsRatesPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.calculateRates)},
 		{Method: http.MethodGet, Path: logisticsTrackingPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readTracking)},
 		{Method: http.MethodGet, Path: logisticsLabelsPath, Permission: "connectors.read", Handler: http.HandlerFunc(api.readLabel)},
@@ -155,6 +168,76 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentCreatePath, Permission: "logistics.shipment.create", Handler: http.HandlerFunc(api.createShipment)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
 	return routes
+}
+
+func (api logisticsAPI) listBatches(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.accounts == nil || api.secrets == nil || api.runtime == nil {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	batchRuntime, runtimeOK := api.runtime.(logisticsBatchRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Batch operation is unavailable")
+		return
+	}
+	accountID := strings.TrimSpace(r.URL.Query().Get("connector_account_id"))
+	mailType := strings.TrimSpace(r.URL.Query().Get("mail_type"))
+	mailCategory := strings.TrimSpace(r.URL.Query().Get("mail_category"))
+	limit, page := 50, 0
+	for name, target := range map[string]*int{"limit": &limit, "page": &page} {
+		if raw := strings.TrimSpace(r.URL.Query().Get(name)); raw != "" {
+			value, err := strconv.Atoi(raw)
+			if err != nil {
+				writeProblem(w, http.StatusBadRequest, "Bad Request")
+				return
+			}
+			*target = value
+		}
+	}
+	query := sdk.LogisticsBatchQuery{MailType: mailType, MailCategory: mailCategory, Limit: limit, Page: page}
+	if accountID == "" || query.Validate(100) != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.batches.read")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Batch operation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Batch capability is not enabled")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	batches, err := batchRuntime.LogisticsBatches(r.Context(), account, runtime, query)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	if len(batches) > query.Limit {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	views := make([]logisticsBatchView, 0, len(batches))
+	for _, batch := range batches {
+		if batch.Validate() != nil {
+			writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+			return
+		}
+		views = append(views, logisticsBatchView{RemoteID: batch.RemoteID, Status: batch.Status, ShipmentCount: batch.ShipmentCount, ObservedAt: batch.ObservedAt})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": views})
 }
 
 func (api logisticsAPI) createShipment(w http.ResponseWriter, r *http.Request) {

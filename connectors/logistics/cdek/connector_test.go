@@ -38,7 +38,13 @@ func TestRatesShipmentTrackLabelPickupAndReturn(t *testing.T) {
 	if hook, hookErr := c.VerifyLogisticsWebhook(context.Background(), acc(), rt{}, []byte(`{"uuid":"order:1"}`), []byte("verified-signature")); hookErr != nil || hook.RemoteID != sh.RemoteID {
 		t.Fatalf("webhook=%+v err=%v", hook, hookErr)
 	}
-	if _, e = c.CreateLogisticsReturn(context.Background(), acc(), rt{}, sdk.ReturnCreateRequest{OriginalRemoteID: sh.RemoteID, ExternalID: "ret:1", IdempotencyKey: "idem:2"}); e != nil {
-		t.Fatal(e)
+	if result, returnErr := c.CreateLogisticsReturn(context.Background(), acc(), rt{}, sdk.ReturnCreateRequest{OriginalRemoteID: sh.RemoteID, ExternalID: "ret:1", MailType: "refusal", IdempotencyKey: "idem:2"}); returnErr != nil || result.Status != "created" || result.RemoteID == "" {
+		t.Fatalf("unexpected CDEK refusal result: result=%+v err=%v", result, returnErr)
+	}
+	if result, returnErr := c.CreateLogisticsReturn(context.Background(), acc(), rt{}, sdk.ReturnCreateRequest{OriginalRemoteID: sh.RemoteID, ExternalID: "ret:2", MailType: "client_return", TariffCode: 136, IdempotencyKey: "idem:3"}); returnErr != nil || result.Status != "created" {
+		t.Fatalf("unexpected CDEK client return result: result=%+v err=%v", result, returnErr)
+	}
+	if _, returnErr := c.CreateLogisticsReturn(context.Background(), acc(), rt{}, sdk.ReturnCreateRequest{OriginalRemoteID: sh.RemoteID, ExternalID: "ret:3", MailType: "client_return", IdempotencyKey: "idem:4"}); returnErr == nil {
+		t.Fatal("client return without a tariff code was accepted")
 	}
 }

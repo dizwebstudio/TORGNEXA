@@ -70,6 +70,6 @@ credentials, bounded catalog/price/inventory/order read, создание син
 CS-Cart REST API 2.0 live smoke: all checks passed
 ```
 
-До этого момента CS-Cart остаётся repository-qualified: SDK 13/13, products
-read/write, base price, inventory и order reads в runtime; live/Docker-
-совместимость не заявляется.
+До этого момента CS-Cart остаётся repository-qualified: SDK 13/13, products,
+base price, inventory и order reads, а также стандартная смена статуса заказа
+в runtime; live/Docker-совместимость не заявляется.

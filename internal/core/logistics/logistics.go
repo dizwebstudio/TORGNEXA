@@ -52,13 +52,16 @@ const (
 	StatusInTransit Status = "in_transit"
 	StatusDelivered Status = "delivered"
 	StatusCancelled Status = "cancelled"
-	StatusUnknown   Status = "unknown"
+	// StatusCancellationPending means the carrier accepted an asynchronous
+	// cancellation request, but has not confirmed the shipment cancellation.
+	StatusCancellationPending Status = "cancellation_pending"
+	StatusUnknown             Status = "unknown"
 )
 
 // Valid reports whether the status is a known canonical lifecycle value.
 func (status Status) Valid() bool {
 	switch status {
-	case StatusPending, StatusCreated, StatusInTransit, StatusDelivered, StatusCancelled, StatusUnknown:
+	case StatusPending, StatusCreated, StatusInTransit, StatusDelivered, StatusCancelled, StatusCancellationPending, StatusUnknown:
 		return true
 	default:
 		return false
@@ -155,6 +158,34 @@ type RemoteResult struct {
 	ObservedAt     time.Time
 }
 
+// WebhookEvidence is append-only proof for a verified carrier callback. The
+// provider payload is never retained; only its digest and normalized identity
+// cross the public webhook boundary.
+type WebhookEvidence struct {
+	DeliveryID         string
+	ConnectorAccountID string
+	ShipmentID         ShipmentID
+	RemoteID           string
+	EventType          string
+	RemoteStatus       string
+	BodyDigest         string
+	VerifiedAt         time.Time
+}
+
+// Validate checks the bounded, tenant-scoped callback evidence.
+func (e WebhookEvidence) Validate() error {
+	if !referencePattern.MatchString(e.DeliveryID) ||
+		!referencePattern.MatchString(e.ConnectorAccountID) ||
+		!e.ShipmentID.Valid() || !referencePattern.MatchString(e.RemoteID) ||
+		!referencePattern.MatchString(e.EventType) ||
+		!referencePattern.MatchString(e.RemoteStatus) ||
+		!digestPattern.MatchString(e.BodyDigest) ||
+		e.VerifiedAt.IsZero() || e.VerifiedAt.Location() != time.UTC {
+		return ErrInvalidRecord
+	}
+	return nil
+}
+
 // Validate checks the normalized remote result before persistence.
 func (result RemoteResult) Validate() error {
 	if !referencePattern.MatchString(result.RemoteID) || !result.Status.Valid() || result.CostMinorUnits < 0 || !currencyPattern.MatchString(result.Currency) || result.ObservedAt.IsZero() || result.ObservedAt.Location() != time.UTC {
@@ -195,6 +226,7 @@ func (mutation Mutation) Validate() error {
 // side effect; replayed keys never issue a second remote command.
 type Repository interface {
 	Shipment(context.Context, tenancy.Scope, ShipmentID) (Shipment, error)
+	ShipmentByRemoteID(context.Context, tenancy.Scope, string, string) (Shipment, error)
 	BeginCreate(context.Context, tenancy.Scope, CreateCommand, Mutation) (Shipment, bool, error)
 	ApplyCreateResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
 	ApplyCreateUnknown(context.Context, tenancy.Scope, ShipmentID, int64, Mutation) (Shipment, error)
@@ -202,6 +234,7 @@ type Repository interface {
 	ApplyCancelResult(context.Context, tenancy.Scope, ShipmentID, int64, RemoteResult, Mutation) (Shipment, error)
 	ApplyCancelUnknown(context.Context, tenancy.Scope, ShipmentID, int64, Mutation) (Shipment, error)
 	AppendTrackingEvidence(context.Context, tenancy.Scope, ShipmentID, Status, time.Time) error
+	RecordWebhookEvidence(context.Context, tenancy.Scope, WebhookEvidence) (bool, error)
 }
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)

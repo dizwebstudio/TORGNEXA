@@ -37,6 +37,11 @@ type logisticsRuntimeStub struct {
 	label     sdk.LabelResult
 }
 
+type logisticsBatchRuntimeStub struct {
+	logisticsRuntimeStub
+	batches []sdk.LogisticsBatch
+}
+
 type logisticsShipmentStub struct {
 	shipment logistics.Shipment
 	fresh    bool
@@ -99,6 +104,13 @@ func (stub logisticsRuntimeStub) LogisticsLabel(_ context.Context, _ sdk.Account
 	return stub.label, nil
 }
 
+func (stub logisticsBatchRuntimeStub) LogisticsBatches(_ context.Context, _ sdk.Account, runtime sdk.Runtime, query sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if runtime == nil || query.Validate(100) != nil {
+		return nil, errors.New("runtime or batch query missing")
+	}
+	return stub.batches, nil
+}
+
 type logisticsSecretsStub struct{}
 
 func (logisticsSecretsStub) Create(context.Context, tenancy.Scope, secrets.Class, []byte) (secrets.Metadata, error) {
@@ -151,6 +163,32 @@ func TestLogisticsPickupPointsRouteFailsClosedWithoutCapability(t *testing.T) {
 	response := httptest.NewRecorder()
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsBatchesRouteReturnsBoundedPage(t *testing.T) {
+	scope := validTestScope(t)
+	account := logisticsTestAccount(t)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	settings := []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.read", Direction: sdk.CapabilityRead, Risk: sdk.CapabilityRiskRead, Enabled: true}}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: settings}, logisticsSecretsStub{}, logisticsBatchRuntimeStub{
+		logisticsRuntimeStub: logisticsRuntimeStub{supported: true},
+		batches:              []sdk.LogisticsBatch{{RemoteID: "batch-1", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}},
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Path == logisticsBatchesPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("batch route not registered")
+	}
+	request := logisticsRequest(t, scope, logisticsBatchesPath+"?connector_account_id=cdek-account&mail_type=ONLINE_PARCEL&limit=10&page=2")
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"batch-1"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }

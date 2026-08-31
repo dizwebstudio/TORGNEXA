@@ -47,6 +47,11 @@ type Transaction interface {
 // that are expected to be covered by inbox idempotency.
 type Handler func(context.Context, Transaction, eventbus.Delivery) error
 
+// SQLHandler is the transaction-aware form of Handler. It is used when an
+// inbound delivery must atomically write both its inbox receipt and a
+// transactional-outbox event. The callback must not commit or roll back tx.
+type SQLHandler func(context.Context, *sql.Tx, eventbus.Delivery) error
+
 // Processor owns the PostgreSQL transaction containing duplicate check,
 // business side effects and the final immutable receipt insert.
 type Processor struct{ database *sql.DB }
@@ -62,6 +67,25 @@ func New(database *sql.DB) (*Processor, error) {
 // and immutable event fingerprint. A crash before commit leaves no receipt and
 // no committed side effect; a crash after commit makes redelivery a duplicate.
 func (processor *Processor) Process(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler Handler) (inbox.Result, error) {
+	if handler == nil {
+		return 0, errors.New("inbox processor: handler is required")
+	}
+	return processor.process(ctx, scope, consumer, delivery, func(callCtx context.Context, tx *sql.Tx, item eventbus.Delivery) error {
+		return handler(callCtx, sqlTransaction{tx: tx}, item)
+	})
+}
+
+// ProcessWithSQLTransaction executes a transaction-aware handler exactly once
+// and exposes the caller-owned SQL transaction to it. This keeps an inbound
+// provider webhook's inbox receipt and outbox publication in the same commit.
+func (processor *Processor) ProcessWithSQLTransaction(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler SQLHandler) (inbox.Result, error) {
+	if handler == nil {
+		return 0, errors.New("inbox processor: SQL handler is required")
+	}
+	return processor.process(ctx, scope, consumer, delivery, handler)
+}
+
+func (processor *Processor) process(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler SQLHandler) (inbox.Result, error) {
 	if ctx == nil {
 		return 0, errors.New("inbox processor: context is required")
 	}
@@ -70,9 +94,6 @@ func (processor *Processor) Process(ctx context.Context, scope tenancy.Scope, co
 	}
 	if processor == nil || processor.database == nil {
 		return 0, errors.New("inbox processor: processor is not initialized")
-	}
-	if handler == nil {
-		return 0, errors.New("inbox processor: handler is required")
 	}
 	if err := validateInput(scope, consumer, delivery); err != nil {
 		return 0, err
@@ -231,6 +252,20 @@ type queryer interface {
 type result interface{ RowsAffected() (int64, error) }
 
 type sqlQueries struct{ tx *sql.Tx }
+
+type sqlTransaction struct{ tx *sql.Tx }
+
+func (transaction sqlTransaction) ExecContext(ctx context.Context, statement string, arguments ...any) (sql.Result, error) {
+	return transaction.tx.ExecContext(ctx, statement, arguments...)
+}
+
+func (transaction sqlTransaction) QueryContext(ctx context.Context, statement string, arguments ...any) (*sql.Rows, error) {
+	return transaction.tx.QueryContext(ctx, statement, arguments...)
+}
+
+func (transaction sqlTransaction) QueryRowContext(ctx context.Context, statement string, arguments ...any) *sql.Row {
+	return transaction.tx.QueryRowContext(ctx, statement, arguments...)
+}
 
 func (queries sqlQueries) QueryRowContext(ctx context.Context, statement string, arguments ...any) rowScanner {
 	return queries.tx.QueryRowContext(ctx, statement, arguments...)

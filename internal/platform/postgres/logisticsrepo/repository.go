@@ -63,6 +63,29 @@ func (repository *Repository) Shipment(ctx context.Context, scope tenancy.Scope,
 	return result, err
 }
 
+// ShipmentByRemoteID resolves one carrier reference inside one connector
+// account. The account and tenant predicates are mandatory because a carrier
+// reference is not a globally trusted identity.
+func (repository *Repository) ShipmentByRemoteID(ctx context.Context, scope tenancy.Scope, accountID, remoteID string) (logistics.Shipment, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return logistics.Shipment{}, err
+	}
+	if !validReference(accountID) || !validReference(remoteID) {
+		return logistics.Shipment{}, logistics.ErrInvalidRecord
+	}
+	var result logistics.Shipment
+	err := repository.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		row := tx.QueryRowContext(ctx, `SELECT `+shipmentSelect+` FROM logistics_shipments WHERE organization_id=$1 AND workspace_id=$2 AND provider_account_id=$3 AND remote_id=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, remoteID)
+		var err error
+		result, err = scanShipment(row)
+		if errors.Is(err, sql.ErrNoRows) {
+			return logistics.ErrNotFound
+		}
+		return err
+	})
+	return result, err
+}
+
 // CreateRequestReference returns the opaque SecretProvider reference for the
 // one-time shipment payload. The payload itself never enters the repository.
 func (repository *Repository) CreateRequestReference(ctx context.Context, scope tenancy.Scope, id logistics.ShipmentID) (string, error) {
@@ -254,7 +277,7 @@ func (repository *Repository) BeginCancel(ctx context.Context, scope tenancy.Sco
 			result, err = loadShipment(ctx, tx, scope, logistics.ShipmentID(resourceID), false)
 			return err
 		}
-		if result.Status == logistics.StatusDelivered || result.Status == logistics.StatusCancelled || result.Status == logistics.StatusUnknown {
+		if result.Status == logistics.StatusDelivered || result.Status == logistics.StatusCancelled || result.Status == logistics.StatusCancellationPending || result.Status == logistics.StatusUnknown {
 			return logistics.ErrInvalidState
 		}
 		fresh = true
@@ -274,7 +297,7 @@ func (repository *Repository) ApplyCancelResult(ctx context.Context, scope tenan
 	if err := validate(ctx, repository, scope); err != nil {
 		return logistics.Shipment{}, err
 	}
-	if !id.Valid() || expectedVersion < 1 || remote.Validate() != nil || remote.Status != logistics.StatusCancelled {
+	if !id.Valid() || expectedVersion < 1 || remote.Validate() != nil || (remote.Status != logistics.StatusCancelled && remote.Status != logistics.StatusCancellationPending) {
 		return logistics.Shipment{}, logistics.ErrInvalidRecord
 	}
 	if err := mutation.Validate(); err != nil {
@@ -289,7 +312,7 @@ func (repository *Repository) ApplyCancelResult(ctx context.Context, scope tenan
 		if current.Version != expectedVersion || current.RemoteID == "" || current.Status == logistics.StatusCancelled || remote.RemoteID != current.RemoteID {
 			return logistics.ErrConflict
 		}
-		row := tx.QueryRowContext(ctx, `UPDATE logistics_shipments SET status=$4,version=version+1,updated_at=$5 WHERE organization_id=$1 AND workspace_id=$2 AND shipment_id=$3 AND version=$6 RETURNING `+shipmentSelect, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String(), logistics.StatusCancelled, mutation.OccurredAt.UTC(), expectedVersion)
+		row := tx.QueryRowContext(ctx, `UPDATE logistics_shipments SET status=$4,version=version+1,updated_at=$5 WHERE organization_id=$1 AND workspace_id=$2 AND shipment_id=$3 AND version=$6 RETURNING `+shipmentSelect, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String(), remote.Status, mutation.OccurredAt.UTC(), expectedVersion)
 		result, err = scanShipment(row)
 		if err != nil {
 			return logistics.ErrConflict
@@ -301,10 +324,14 @@ func (repository *Repository) ApplyCancelResult(ctx context.Context, scope tenan
 		if err := completeReceipt(ctx, tx, scope, cancelOperation, key, result, remote); err != nil {
 			return err
 		}
-		if err := appendAudit(ctx, tx, scope, mutation, "fulfillment.shipment.cancelled", id.String(), audit.RiskWriteSensitive, shipmentSummary(result, "cancelled")); err != nil {
+		action, operation := "fulfillment.shipment.cancelled", "cancelled"
+		if remote.Status == logistics.StatusCancellationPending {
+			action, operation = "fulfillment.shipment.cancel.accepted", "cancel_accepted"
+		}
+		if err := appendAudit(ctx, tx, scope, mutation, action, id.String(), audit.RiskWriteSensitive, shipmentSummary(result, operation)); err != nil {
 			return err
 		}
-		return enqueueShipmentEvent(ctx, tx, scope, mutation, result, "cancelled")
+		return enqueueShipmentEvent(ctx, tx, scope, mutation, result, operation)
 	})
 	return result, err
 }
@@ -368,6 +395,39 @@ func (repository *Repository) AppendTrackingEvidence(ctx context.Context, scope 
 		_, err := tx.ExecContext(ctx, `INSERT INTO logistics_tracking_evidence(organization_id,workspace_id,shipment_id,remote_status,observed_at) VALUES($1,$2,$3,$4,$5)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id.String(), status, observedAt)
 		return err
 	})
+}
+
+// RecordWebhookEvidence atomically stores only verified callback metadata and
+// returns false for an already-seen delivery. The raw callback body is never
+// persisted.
+func (repository *Repository) RecordWebhookEvidence(ctx context.Context, scope tenancy.Scope, evidence logistics.WebhookEvidence) (bool, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return false, err
+	}
+	if err := evidence.Validate(); err != nil {
+		return false, logistics.ErrInvalidRecord
+	}
+	var inserted bool
+	err := repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		shipment, err := loadShipment(ctx, tx, scope, evidence.ShipmentID, false)
+		if err != nil {
+			return err
+		}
+		if shipment.AccountID != evidence.ConnectorAccountID || shipment.RemoteID != evidence.RemoteID {
+			return logistics.ErrConflict
+		}
+		result, err := tx.ExecContext(ctx, `INSERT INTO logistics_webhook_receipts(organization_id,workspace_id,connector_account_id,shipment_id,delivery_id,remote_id,event_type,remote_status,body_digest,verified_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`, scope.OrganizationID().String(), scope.WorkspaceID().String(), evidence.ConnectorAccountID, evidence.ShipmentID.String(), evidence.DeliveryID, evidence.RemoteID, evidence.EventType, evidence.RemoteStatus, evidence.BodyDigest, evidence.VerifiedAt)
+		if err != nil {
+			return fmt.Errorf("record logistics webhook evidence: %w", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("logistics webhook evidence rows affected: %w", err)
+		}
+		inserted = affected == 1
+		return nil
+	})
+	return inserted, err
 }
 
 func (repository *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly bool, fn func(*sql.Tx) error) error {

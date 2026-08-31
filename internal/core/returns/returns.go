@@ -27,12 +27,18 @@ var (
 var sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
 var refPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 var reasonPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+var safeReturnCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
+
+// ValidReasonCode reports whether a bounded machine reason code can cross a
+// persistence or event boundary.
+func ValidReasonCode(value string) bool { return reasonPattern.MatchString(value) }
 
 type CancellationID string
 type ReturnID string
 type ReturnItemID string
 type RefundAllocationID string
 type EvidenceID string
+type ReturnLogisticsOperationID string
 
 func parseID[T ~string](value string) (T, error) {
 	var zero T
@@ -48,17 +54,22 @@ func ParseRefundAllocationID(v string) (RefundAllocationID, error) {
 	return parseID[RefundAllocationID](v)
 }
 func ParseEvidenceID(v string) (EvidenceID, error) { return parseID[EvidenceID](v) }
+func ParseReturnLogisticsOperationID(v string) (ReturnLogisticsOperationID, error) {
+	return parseID[ReturnLogisticsOperationID](v)
+}
 
-func (v CancellationID) String() string     { return string(v) }
-func (v ReturnID) String() string           { return string(v) }
-func (v ReturnItemID) String() string       { return string(v) }
-func (v RefundAllocationID) String() string { return string(v) }
-func (v EvidenceID) String() string         { return string(v) }
-func (v CancellationID) Valid() bool        { return sortableIDPattern.MatchString(string(v)) }
-func (v ReturnID) Valid() bool              { return sortableIDPattern.MatchString(string(v)) }
-func (v ReturnItemID) Valid() bool          { return sortableIDPattern.MatchString(string(v)) }
-func (v RefundAllocationID) Valid() bool    { return sortableIDPattern.MatchString(string(v)) }
-func (v EvidenceID) Valid() bool            { return sortableIDPattern.MatchString(string(v)) }
+func (v CancellationID) String() string             { return string(v) }
+func (v ReturnID) String() string                   { return string(v) }
+func (v ReturnItemID) String() string               { return string(v) }
+func (v RefundAllocationID) String() string         { return string(v) }
+func (v EvidenceID) String() string                 { return string(v) }
+func (v ReturnLogisticsOperationID) String() string { return string(v) }
+func (v CancellationID) Valid() bool                { return sortableIDPattern.MatchString(string(v)) }
+func (v ReturnID) Valid() bool                      { return sortableIDPattern.MatchString(string(v)) }
+func (v ReturnItemID) Valid() bool                  { return sortableIDPattern.MatchString(string(v)) }
+func (v RefundAllocationID) Valid() bool            { return sortableIDPattern.MatchString(string(v)) }
+func (v EvidenceID) Valid() bool                    { return sortableIDPattern.MatchString(string(v)) }
+func (v ReturnLogisticsOperationID) Valid() bool    { return sortableIDPattern.MatchString(string(v)) }
 
 type Scope struct{ organizationID, workspaceID string }
 
@@ -285,6 +296,101 @@ func (r ReturnRequest) Validate() error {
 	return nil
 }
 
+// ReturnLogisticsStatus is the durable state of the carrier side-effect for a
+// return. It is deliberately separate from ReturnStatus: creating a carrier
+// parcel does not mean that the customer parcel was received or inspected.
+type ReturnLogisticsStatus string
+
+const (
+	ReturnLogisticsRequested ReturnLogisticsStatus = "requested"
+	ReturnLogisticsExecuting ReturnLogisticsStatus = "executing"
+	ReturnLogisticsSucceeded ReturnLogisticsStatus = "succeeded"
+	ReturnLogisticsFailed    ReturnLogisticsStatus = "failed"
+	ReturnLogisticsUnknown   ReturnLogisticsStatus = "unknown"
+)
+
+func (s ReturnLogisticsStatus) Valid() bool {
+	switch s {
+	case ReturnLogisticsRequested, ReturnLogisticsExecuting, ReturnLogisticsSucceeded, ReturnLogisticsFailed, ReturnLogisticsUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// ReturnLogisticsOperation binds one return to one tenant-scoped connector
+// account and one remote operation. Only normalized carrier references are
+// persisted; credentials and raw provider payloads stay outside Core.
+type ReturnLogisticsOperation struct {
+	ID                 ReturnLogisticsOperationID
+	OrganizationID     string
+	WorkspaceID        string
+	ReturnID           ReturnID
+	ConnectorAccountID string
+	OriginalRemoteID   string
+	ExternalID         string
+	MailType           string
+	TariffCode         int
+	Status             ReturnLogisticsStatus
+	RemoteID           string
+	TrackingNumber     string
+	FailureCode        string
+	Version            int64
+	IdempotencyKey     string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+func (o ReturnLogisticsOperation) Validate() error {
+	if !o.ID.Valid() || !sortableIDPattern.MatchString(o.OrganizationID) || !sortableIDPattern.MatchString(o.WorkspaceID) || !o.ReturnID.Valid() || !refPattern.MatchString(o.ConnectorAccountID) || !refPattern.MatchString(o.OriginalRemoteID) || !refPattern.MatchString(o.ExternalID) || !safeReturnCodePattern.MatchString(o.MailType) || o.TariffCode < 0 || !o.Status.Valid() || (o.RemoteID != "" && !refPattern.MatchString(o.RemoteID)) || (o.TrackingNumber != "" && !refPattern.MatchString(o.TrackingNumber)) || (o.FailureCode != "" && !reasonPattern.MatchString(o.FailureCode)) || o.Version < 1 || !refPattern.MatchString(o.IdempotencyKey) || !utc(o.CreatedAt) || !utc(o.UpdatedAt) || o.UpdatedAt.Before(o.CreatedAt) {
+		return ErrInvalidRecord
+	}
+	if o.Status == ReturnLogisticsSucceeded && o.RemoteID == "" {
+		return ErrInvalidRecord
+	}
+	return nil
+}
+
+// ReturnLogisticsCommand is the input for one provider-neutral return
+// shipment request. MailType is a bounded service code interpreted by the
+// selected connector, not by the Core domain.
+type ReturnLogisticsCommand struct {
+	ID                 ReturnLogisticsOperationID
+	OrganizationID     string
+	WorkspaceID        string
+	ReturnID           ReturnID
+	ConnectorAccountID string
+	OriginalRemoteID   string
+	ExternalID         string
+	MailType           string
+	TariffCode         int
+	IdempotencyKey     string
+}
+
+func (c ReturnLogisticsCommand) Validate() error {
+	if !c.ID.Valid() || !sortableIDPattern.MatchString(c.OrganizationID) || !sortableIDPattern.MatchString(c.WorkspaceID) || !c.ReturnID.Valid() || !refPattern.MatchString(c.ConnectorAccountID) || !refPattern.MatchString(c.OriginalRemoteID) || !refPattern.MatchString(c.ExternalID) || !safeReturnCodePattern.MatchString(c.MailType) || c.TariffCode < 0 || !refPattern.MatchString(c.IdempotencyKey) {
+		return ErrInvalidRecord
+	}
+	return nil
+}
+
+// ReturnLogisticsResult is the normalized result of a carrier return
+// creation. Carrier-specific costs and raw response fields do not cross this
+// boundary.
+type ReturnLogisticsResult struct {
+	RemoteID       string
+	Status         string
+	TrackingNumber string
+	ObservedAt     time.Time
+}
+
+func (r ReturnLogisticsResult) Validate() error {
+	if !refPattern.MatchString(r.RemoteID) || strings.ToLower(strings.TrimSpace(r.Status)) != "created" || (r.TrackingNumber != "" && !refPattern.MatchString(r.TrackingNumber)) || !utc(r.ObservedAt) {
+		return ErrInvalidRecord
+	}
+	return nil
+}
+
 type ReturnItem struct {
 	ID          ReturnItemID
 	ReturnID    ReturnID
@@ -441,6 +547,12 @@ type Repository interface {
 	CreateReturnItem(context.Context, Scope, ReturnItem, Mutation) (ReturnItem, error)
 	RecordInspection(context.Context, Scope, InspectionResult, Mutation) error
 	CreateRefundAllocation(context.Context, Scope, RefundAllocation, Mutation) (RefundAllocation, error)
+	ReturnLogistics(context.Context, Scope, ReturnLogisticsOperationID) (ReturnLogisticsOperation, error)
+	CreateReturnLogistics(context.Context, Scope, ReturnLogisticsCommand, Mutation) (ReturnLogisticsOperation, error)
+	BeginReturnLogistics(context.Context, Scope, ReturnLogisticsOperationID, Mutation) (ReturnLogisticsOperation, bool, error)
+	ApplyReturnLogisticsResult(context.Context, Scope, ReturnLogisticsOperationID, int64, ReturnLogisticsResult, Mutation) (ReturnLogisticsOperation, error)
+	ApplyReturnLogisticsFailure(context.Context, Scope, ReturnLogisticsOperationID, int64, string, Mutation) (ReturnLogisticsOperation, error)
+	ApplyReturnLogisticsUnknown(context.Context, Scope, ReturnLogisticsOperationID, int64, Mutation) (ReturnLogisticsOperation, error)
 	ListEvidence(context.Context, Scope, string, int) ([]OperationEvidence, error)
 }
 

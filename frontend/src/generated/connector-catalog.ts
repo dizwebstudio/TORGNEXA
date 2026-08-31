@@ -196,7 +196,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "logistics.webhooks.verify", "pickup.points.read"],
       sync: [
       ],
     },
@@ -282,17 +282,17 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#1B2032",
       accent: "#7381FD",
     },
-    capabilities: ["inventory.read", "inventory.write", "orders.read", "prices.read", "prices.write", "products.read", "products.write"],
+    capabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
     authKinds: ["basic"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "prices.read", "prices.write", "products.read", "products.write"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["inbound", "outbound"]},
         {entityType: "inventory", directions: ["inbound", "outbound"]},
-        {entityType: "orders", directions: ["inbound"]},
+        {entityType: "orders", directions: ["inbound", "outbound"]},
       ],
       runtimeConfigTemplate: {"store_host":"shop.example.com","base_path":"","store_currency":"RUB"},
     },
@@ -336,9 +336,10 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.rates.read", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
+      runtimeConfigTemplate: {"requester_uid":"replace-with-dellin-counterparty-uid","sender_counteragent_id":1,"freight_uid":"replace-with-freight-uid","produce_date":"2026-09-15","derival_worktime_start":"09:00","derival_worktime_end":"18:00","payment_type":"cash"},
     },
   },
   {
@@ -664,7 +665,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.text"],
+      operationalCapabilities: ["social.post.media", "social.post.text", "social.post.video"],
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-70801090403050},
@@ -992,14 +993,15 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#06448F",
     },
-    capabilities: ["logistics.rates.read", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["basic"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.rates.read", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.label.read", "logistics.rates.read", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
+      runtimeConfigTemplate: {"sender_warehouse_id":"replace-with-pek-warehouse-id","sender_legal_form":1,"sender_title":"ООО Пример","sender_inn":"7700000000","sender_kpp":"770001001"},
     },
   },
   {
@@ -1014,12 +1016,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#003B73",
     },
-    capabilities: ["logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.batches.read", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.rates.read", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.batches.read", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
     },
@@ -1090,7 +1092,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "finance",
-      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.status.read"],
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
       sync: [
       ],
     },
@@ -1160,7 +1162,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"],
       sync: [
         {entityType: "products", directions: ["inbound", "outbound"]},
         {entityType: "prices", directions: ["inbound", "outbound"]},
@@ -1187,7 +1189,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "finance",
-      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read"],
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
       sync: [
       ],
       runtimeConfigTemplate: {"gateway_host":"sbp-gateway.example.ru","member_id":"100000001"},
@@ -1265,7 +1267,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "social",
-      operationalCapabilities: ["social.post.text"],
+      operationalCapabilities: ["social.post.buttons", "social.post.media", "social.post.text", "social.post.video"],
       sync: [
       ],
       runtimeConfigTemplate: {"chat_id":-1001234567890},
@@ -1407,16 +1409,16 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#1C1C1C",
       accent: "#E32636",
     },
-    capabilities: ["inventory.read", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "prices", directions: ["inbound", "outbound"]},
-        {entityType: "inventory", directions: ["inbound"]},
+        {entityType: "inventory", directions: ["inbound", "outbound"]},
         {entityType: "orders", directions: ["inbound"]},
       ],
       runtimeConfigTemplate: {"business_id":1,"campaign_id":1,"inventory_mode":"partner_warehouses","price_mode":"business_wide","warehouses":[]},
@@ -1461,7 +1463,7 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
     runtime: {
       stage: "separate_surface",
       surface: "finance",
-      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read"],
+      operationalCapabilities: ["payments.create", "payments.reconcile", "payments.refund", "payments.status.read", "payments.webhooks"],
       sync: [
       ],
     },

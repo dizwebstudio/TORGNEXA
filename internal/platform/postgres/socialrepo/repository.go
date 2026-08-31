@@ -20,7 +20,7 @@ import (
 
 const applyScope = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
 const contentSelect = `SELECT id,organization_id,workspace_id,title,body,status,version,created_at,updated_at FROM social_contents WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
-const variantSelect = `SELECT id,organization_id,workspace_id,content_id,format,title,body,version,created_at FROM social_content_variants WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
+const variantSelect = `SELECT id,organization_id,workspace_id,content_id,format,title,body,buttons,version,created_at FROM social_content_variants WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
 const channelSelect = `SELECT id,organization_id,workspace_id,connector_account_id,display_name,capabilities,status,version,created_at,updated_at FROM social_channel_accounts WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
 const publicationSelect = `SELECT id,organization_id,workspace_id,variant_id,channel_account_id,schedule_mode,scheduled_at,status,attempt,COALESCE(reason_code,''),version,created_at,updated_at,published_at FROM social_publications WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`
 
@@ -310,7 +310,8 @@ func (r *Repository) CreateVariant(ctx context.Context, scope social.Scope, comm
 				return social.ErrMediaUnavailable
 			}
 		}
-		result, err = scanVariantBase(tx.QueryRowContext(ctx, `INSERT INTO social_content_variants(id,organization_id,workspace_id,content_id,format,title,body) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING RETURNING id,organization_id,workspace_id,content_id,format,title,body,version,created_at`, command.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), command.ContentID.String(), string(command.Format), command.Title, command.Body))
+		buttons, _ := json.Marshal(command.Buttons)
+		result, err = scanVariantBase(tx.QueryRowContext(ctx, `INSERT INTO social_content_variants(id,organization_id,workspace_id,content_id,format,title,body,buttons) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb) ON CONFLICT DO NOTHING RETURNING id,organization_id,workspace_id,content_id,format,title,body,buttons,version,created_at`, command.ID.String(), scope.OrganizationID(), scope.WorkspaceID(), command.ContentID.String(), string(command.Format), command.Title, command.Body, string(buttons)))
 		if errors.Is(err, social.ErrNotFound) {
 			return social.ErrConflict
 		}
@@ -570,11 +571,15 @@ func scanContent(row scanner) (social.Content, error) {
 func scanVariantBase(row scanner) (social.ContentVariant, error) {
 	var result social.ContentVariant
 	var id, org, ws, contentID, format string
-	if err := row.Scan(&id, &org, &ws, &contentID, &format, &result.Title, &result.Body, &result.Version, &result.CreatedAt); err != nil {
+	var rawButtons []byte
+	if err := row.Scan(&id, &org, &ws, &contentID, &format, &result.Title, &result.Body, &rawButtons, &result.Version, &result.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return social.ContentVariant{}, social.ErrNotFound
 		}
 		return social.ContentVariant{}, fmt.Errorf("social repository: scan variant: %w", err)
+	}
+	if len(rawButtons) == 0 || json.Unmarshal(rawButtons, &result.Buttons) != nil {
+		return social.ContentVariant{}, social.ErrInvalidRecord
 	}
 	result.ID, result.OrganizationID, result.WorkspaceID, result.ContentID, result.Format = social.VariantID(id), org, ws, social.ContentID(contentID), social.VariantFormat(format)
 	result.CreatedAt = result.CreatedAt.UTC()

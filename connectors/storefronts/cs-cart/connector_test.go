@@ -233,6 +233,54 @@ func TestReadOrdersRejectsOptionCombination(t *testing.T) {
 	}
 }
 
+func TestWriteOrderStatusUsesOrderPutAndReadAfterWrite(t *testing.T) {
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		switch request.Method + " " + request.Path {
+		case "GET /api/2.0/orders/98":
+			status := "O"
+			if calls > 1 {
+				status = "P"
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"order_id":"98","status":"` + status + `","timestamp":"1720000000","products":{"1":{"product_id":"12","amount":"1"}}}`)}, nil
+		case "PUT /api/2.0/orders/98":
+			var body struct {
+				Status string `json:"status"`
+			}
+			if json.Unmarshal(request.Body, &body) != nil || body.Status != "P" {
+				t.Fatalf("unexpected status update body: %s", request.Body)
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"order_id":"98"}`)}, nil
+		default:
+			t.Fatalf("unexpected request: %+v", request)
+			return Response{}, nil
+		}
+	}}
+	receipt, err := New(transport, testConfig{}, nil).WriteOrderStatus(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.OrderStatusWriteRequest{OrderRemoteID: "98", StatusRemoteID: "P", IdempotencyKey: "cs-order-status-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Applied || !receipt.Reconciled || receipt.Duplicate || receipt.RemoteID != "98" || calls != 3 {
+		t.Fatalf("unexpected receipt=%#v calls=%d", receipt, calls)
+	}
+}
+
+func TestWriteOrderStatusRejectsNonStandardCode(t *testing.T) {
+	called := false
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		called = true
+		return Response{StatusCode: 200}, nil
+	}}
+	_, err := New(transport, testConfig{}, nil).WriteOrderStatus(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.OrderStatusWriteRequest{OrderRemoteID: "98", StatusRemoteID: "CUSTOM", IdempotencyKey: "cs-order-status-2"})
+	if err != sdk.ErrInvalidCommerceWrite {
+		t.Fatalf("expected non-standard status rejection, got %v", err)
+	}
+	if called {
+		t.Fatal("non-standard status triggered a remote request")
+	}
+}
+
 func TestUpsertProductReconcilesExisting(t *testing.T) {
 	calls := 0
 	transport := scriptedTransport{fn: func(request Request) (Response, error) {

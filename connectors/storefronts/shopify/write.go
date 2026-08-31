@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
+	"strings"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
@@ -43,30 +45,110 @@ func (connector *Connector) fetchProduct(ctx context.Context, configuration Conf
 }
 
 func productMatches(product shopifyProduct, request sdk.ProductWriteRequest) bool {
-	return product.ID > 0 && len(product.Variants) > 0 && product.Title == request.Title && product.Status == request.StatusRemoteID
+	return product.ID > 0 && len(product.Variants) > 0 && product.Title == request.Title && product.BodyHTML == request.Description && product.Status == request.StatusRemoteID
 }
 
-// UpsertProduct only supports updating an already-admitted product's
-// title/description/status. Two deliberate exclusions, not oversights:
-//   - Create (RemoteID == "") is unsupported: Shopify's REST API has no
-//     reliable cross-catalog SKU search (only per-product listing or the
-//     GraphQL Admin API), so the find-or-create-by-SKU idempotency pattern
-//     WooCommerce/OpenCart use cannot be implemented safely here without
-//     risking duplicate products on a retried create.
-//   - Changing SellerSKU on an existing product is unsupported: the SKU
-//     lives on the variant sub-resource, a second API call from the product
-//     resource, and this repository's ambiguous-write reconciliation model
-//     assumes one resource per write — bolting on a second call here would
-//     weaken that guarantee rather than extend it.
+func productHasSKU(product shopifyProduct, sku string) bool {
+	for _, variant := range product.Variants {
+		if variant.SKU == sku {
+			return true
+		}
+	}
+	return false
+}
+
+const findShopifyVariantBySKUGraphQL = `query FindProductVariantBySKU($query: String!) {
+  productVariants(first: 250, query: $query) {
+    nodes {
+      id
+      sku
+      product { id }
+    }
+    pageInfo { hasNextPage }
+  }
+}`
+
+type shopifyGraphQLError struct {
+	Message string `json:"message"`
+}
+
+type shopifyVariantBySKUResponse struct {
+	Errors []shopifyGraphQLError `json:"errors"`
+	Data   struct {
+		ProductVariants struct {
+			Nodes []struct {
+				ID      string `json:"id"`
+				SKU     string `json:"sku"`
+				Product struct {
+					ID string `json:"id"`
+				} `json:"product"`
+			} `json:"nodes"`
+			PageInfo struct {
+				HasNextPage bool `json:"hasNextPage"`
+			} `json:"pageInfo"`
+		} `json:"productVariants"`
+	} `json:"data"`
+}
+
+func shopifyProductIDFromGID(value string) (int64, error) {
+	const prefix = "gid://shopify/Product/"
+	if !strings.HasPrefix(value, prefix) {
+		return 0, ErrInvalidResponse
+	}
+	return parsePositiveID(strings.TrimPrefix(value, prefix))
+}
+
+// findProductBySKU uses Shopify's exact variant search instead of scanning an
+// unbounded REST catalog. A second page is rejected: the caller must never
+// choose one of multiple remote variants with the same SKU.
+func (connector *Connector) findProductBySKU(ctx context.Context, configuration Configuration, credential credentials, sku string) (int64, error) {
+	payload, err := json.Marshal(struct {
+		Query     string `json:"query"`
+		Variables struct {
+			Query string `json:"query"`
+		} `json:"variables"`
+	}{
+		Query: findShopifyVariantBySKUGraphQL,
+		Variables: struct {
+			Query string `json:"query"`
+		}{Query: "sku:" + strconv.Quote(sku)},
+	})
+	if err != nil {
+		return 0, ErrInvalidResponse
+	}
+	response, err := connector.call(ctx, configuration, credential, "POST", "/graphql.json", nil, payload)
+	if err != nil {
+		return 0, err
+	}
+	var value shopifyVariantBySKUResponse
+	if json.Unmarshal(response.Body, &value) != nil || len(value.Errors) > 0 || value.Data.ProductVariants.PageInfo.HasNextPage {
+		return 0, ErrInvalidResponse
+	}
+	var productID int64
+	for _, node := range value.Data.ProductVariants.Nodes {
+		if node.SKU != sku {
+			continue
+		}
+		candidate, parseErr := shopifyProductIDFromGID(node.Product.ID)
+		if parseErr != nil || node.ID == "" {
+			return 0, ErrInvalidResponse
+		}
+		if productID != 0 && productID != candidate {
+			return 0, ErrInvalidResponse
+		}
+		productID = candidate
+	}
+	return productID, nil
+}
+
+// UpsertProduct supports exact-SKU create and update. Shopify's GraphQL Admin
+// search provides the idempotency lookup; the REST product endpoint performs
+// the mutation because the current product contract already maps to it.
+// Changing SellerSKU on an existing product remains unsupported: the SKU lives
+// on a variant sub-resource and a second mutation would weaken the
+// read-after-write guarantee of this generic product operation.
 func (connector *Connector) UpsertProduct(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.ProductWriteRequest) (sdk.CommerceWriteReceipt, error) {
 	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "products.write") != nil || request.Validate() != nil || !validShopifyProductStatus(request.StatusRemoteID) {
-		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
-	}
-	if request.RemoteID == "" {
-		return sdk.CommerceWriteReceipt{}, unsupportedOperation("product_create_unsupported")
-	}
-	productID, err := parsePositiveID(request.RemoteID)
-	if err != nil {
 		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
 	}
 	configuration, err := connector.configuration(ctx, account)
@@ -75,15 +157,73 @@ func (connector *Connector) UpsertProduct(ctx context.Context, account sdk.Accou
 	}
 	var receipt sdk.CommerceWriteReceipt
 	err = connector.withCredentials(ctx, runtime, account.SecretReference, func(credential credentials) error {
+		productID := int64(0)
+		created := false
+		if request.RemoteID != "" {
+			var parseErr error
+			productID, parseErr = parsePositiveID(request.RemoteID)
+			if parseErr != nil {
+				return sdk.ErrInvalidCommerceWrite
+			}
+		} else {
+			var findErr error
+			productID, findErr = connector.findProductBySKU(ctx, configuration, credential, request.SellerSKU)
+			if findErr != nil {
+				return findErr
+			}
+			if productID == 0 {
+				body, marshalErr := json.Marshal(map[string]any{"product": map[string]any{
+					"title": request.Title, "body_html": request.Description, "status": request.StatusRemoteID,
+					"variants": []map[string]string{{"sku": request.SellerSKU}},
+				}})
+				if marshalErr != nil {
+					return ErrInvalidResponse
+				}
+				response, callErr := connector.call(ctx, configuration, credential, "POST", "/products.json", nil, body)
+				if callErr != nil {
+					if !isAmbiguousWrite(callErr) {
+						return callErr
+					}
+					productID, findErr = connector.findProductBySKU(ctx, configuration, credential, request.SellerSKU)
+					if findErr != nil || productID == 0 {
+						return writeOutcomeUnknown()
+					}
+					current, reconcileErr := connector.fetchProduct(ctx, configuration, credential, productID)
+					if reconcileErr != nil || !productHasSKU(current, request.SellerSKU) || !productMatches(current, request) {
+						return writeOutcomeUnknown()
+					}
+					receipt = sdk.CommerceWriteReceipt{RemoteID: intString(productID), Applied: true, Reconciled: true}
+					return receipt.Validate()
+				}
+				var createdResponse struct {
+					Product shopifyProduct `json:"product"`
+				}
+				if json.Unmarshal(response.Body, &createdResponse) != nil || createdResponse.Product.ID < 1 {
+					return ErrInvalidResponse
+				}
+				productID = createdResponse.Product.ID
+				created = true
+			}
+		}
 		current, e := connector.fetchProduct(ctx, configuration, credential, productID)
 		if e != nil {
 			return e
 		}
-		if current.Variants[0].SKU != request.SellerSKU {
+		if !productHasSKU(current, request.SellerSKU) {
 			return unsupportedOperation("product_sku_change_unsupported")
 		}
-		if productMatches(current, request) {
+		if !created && productMatches(current, request) {
 			receipt = sdk.CommerceWriteReceipt{RemoteID: request.RemoteID, Duplicate: true, Reconciled: true}
+			if receipt.RemoteID == "" {
+				receipt.RemoteID = intString(productID)
+			}
+			return receipt.Validate()
+		}
+		if created {
+			if !productMatches(current, request) {
+				return ErrInvalidResponse
+			}
+			receipt = sdk.CommerceWriteReceipt{RemoteID: intString(productID), Applied: true}
 			return receipt.Validate()
 		}
 		body, _ := json.Marshal(map[string]any{"product": map[string]any{"id": productID, "title": request.Title, "body_html": request.Description, "status": request.StatusRemoteID}})
@@ -100,7 +240,7 @@ func (connector *Connector) UpsertProduct(ctx context.Context, account sdk.Accou
 			return writeOutcomeUnknown()
 		}
 		updated, e := connector.fetchProduct(ctx, configuration, credential, productID)
-		if e != nil || !productMatches(updated, request) {
+		if e != nil || !productHasSKU(updated, request.SellerSKU) || !productMatches(updated, request) {
 			return ErrInvalidResponse
 		}
 		receipt = sdk.CommerceWriteReceipt{RemoteID: request.RemoteID, Applied: true}

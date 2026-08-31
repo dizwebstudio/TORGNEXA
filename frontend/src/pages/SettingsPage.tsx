@@ -12,7 +12,6 @@ import {PluginsSettings} from "../features/settings/PluginsSettings";
 import {WorkspaceSettings} from "../features/settings/WorkspaceSettings";
 import {MemberSettings} from "../features/settings/MemberSettings";
 import {NotificationSettings} from "../features/settings/NotificationSettings";
-import {SecuritySettings} from "../features/settings/SecuritySettings";
 import {IdentityProviderSettings} from "../features/settings/IdentityProviderSettings";
 import {settingsTabs, type SettingsTabID} from "../features/settings/settings-tabs";
 import {Page} from "./Page";
@@ -165,7 +164,7 @@ export function SettingsPage() {
   const deleteDemo = useMutation({mutationFn:async()=>api.createApprovalRequest({idempotencyKey:crypto.randomUUID(),body:{action:"demo.dataset.delete",resource_type:"demo_dataset",resource_id:"",risk:"write_sensitive"}}),onSuccess:async()=>{await Promise.all([queryClient.invalidateQueries({queryKey:["approvals"]}),queryClient.invalidateQueries({queryKey:["audit"]})]);}});
   if (!session) return null;
 
-  return <Page eyebrow="УЧЁТНАЯ ЗАПИСЬ" title="Настройки" description="Профиль и безопасность текущей OIDC-сессии. Пароль остаётся у провайдера идентификации и никогда не передаётся TORGNEXA.">
+  return <Page eyebrow="УЧЁТНАЯ ЗАПИСЬ" title="Настройки" description="Профиль и рабочие параметры текущего контура. Пароль остаётся у провайдера идентификации и никогда не передаётся TORGNEXA.">
     {auth.error ? <ErrorBlock>{auth.error}</ErrorBlock> : null}
     <div className="settings-tabs" role="tablist" aria-label="Разделы настроек">
       {settingsTabs.map((tab) => <button id={`settings-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} className={`settings-tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)} key={tab.id}>{tab.label}</button>)}
@@ -211,7 +210,6 @@ export function SettingsPage() {
       </section>
       <WorkspaceSettings />
       <MemberSettings />
-      <SecuritySettings />
       <IntegrationCatalog />
       <AIProviderSettings />
       {isAdmin?<section className="panel settings-card danger-zone"><div><p className="eyebrow">Демо-данные</p><h2>Удалить демонстрационный набор</h2><p className="settings-copy">Операция чувствительная: сначала создаётся запрос, затем его нужно одобрить и выполнить в разделе «Согласования».</p></div><button className="button danger" disabled={deleteDemo.isPending} onClick={()=>deleteDemo.mutate()}>{deleteDemo.isPending?"Создаём запрос…":"Запросить удаление"}</button>{deleteDemo.isSuccess?<span className="status status-active">Запрос создан в «Согласованиях»</span>:null}{deleteDemo.isError?<ErrorBlock>Создайте активную политику удаления в разделе «Согласования».</ErrorBlock>:null}</section>:null}

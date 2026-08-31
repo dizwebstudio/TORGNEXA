@@ -24,11 +24,36 @@ func (candidateTransport) Rates(context.Context, []byte, sdk.RateRequest) ([]sdk
 	}}, nil
 }
 
+func (candidateTransport) Create(_ context.Context, _ []byte, request sdk.ShipmentCreateRequest) (sdk.ShipmentResult, error) {
+	return sdk.ShipmentResult{
+		RemoteID: "57565818", Status: "created", TrackingNumber: "",
+		Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (candidateTransport) Cancel(_ context.Context, _ []byte, request sdk.ShipmentCancelRequest) (sdk.ShipmentResult, error) {
+	return sdk.ShipmentResult{
+		RemoteID: request.RemoteID, Status: "cancelled", Cost: sdk.LogisticsMoney{Currency: "RUB"},
+		ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (candidateTransport) Return(_ context.Context, _ []byte, request sdk.ReturnCreateRequest) (sdk.ShipmentResult, error) {
+	return sdk.ShipmentResult{
+		RemoteID: "RA644000002RU", Status: "created", TrackingNumber: "RA644000002RU",
+		Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
+	}, nil
+}
+
 func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{
 		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,
 		Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
 	}, nil
+}
+
+func (candidateTransport) Label(_ context.Context, _ []byte, request sdk.LabelRequest) (sdk.LabelResult, error) {
+	return sdk.LabelResult{ArtifactRef: "pochta-russia:form:backlog:310115153", MediaType: "application/pdf", ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}, nil
 }
 
 func (candidateTransport) Pickup(_ context.Context, _ []byte, query sdk.PickupPointQuery) ([]sdk.PickupPoint, error) {
@@ -37,4 +62,12 @@ func (candidateTransport) Pickup(_ context.Context, _ []byte, query sdk.PickupPo
 		City: query.City, Address: "Москва, Чистопрудный бульвар, 1", Active: true,
 		UpdatedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC),
 	}}, nil
+}
+
+func (candidateTransport) Batches(_ context.Context, _ []byte, query sdk.LogisticsBatchQuery) ([]sdk.LogisticsBatch, error) {
+	if err := query.Validate(100); err != nil {
+		return nil, err
+	}
+	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
+	return []sdk.LogisticsBatch{{RemoteID: "batch-conformance-001", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}}, nil
 }
