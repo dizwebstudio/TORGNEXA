@@ -33,6 +33,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectormaprepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/integrationcenterrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
@@ -220,6 +221,10 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
 	}
+	financialRepository, err := financialrepo.New(db)
+	if err != nil {
+		return fail("worker_financial_repository_startup_failed", err)
+	}
 	marketplacePublicationRepository, err := marketplacepublicationrepo.New(db)
 	if err != nil {
 		return fail("worker_marketplace_publication_repository_startup_failed", err)
@@ -368,6 +373,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	}
 
 	components = append(components, []component{
+		{name: "financial-analytics", run: func(componentCtx context.Context) error {
+			return runFinancialAnalytics(componentCtx, logger, dispatchRepository, financialRepository, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
+		}},
 		{name: "tenant-dispatch", run: func(componentCtx context.Context) error {
 			return runTenantDispatch(componentCtx, logger, dispatchRepository, relay, webhookDelivery, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
 		}},

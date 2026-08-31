@@ -391,6 +391,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/financialrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/fxrepo",
       "kind": "infrastructure_adapter"
     },

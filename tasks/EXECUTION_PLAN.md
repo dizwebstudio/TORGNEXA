@@ -2219,3 +2219,33 @@ send/unknown/retry, WMS receiving evidence and reconciliation.
 - OpenAPI, generated SDKs, frontend workbench, migration catalog, tests and
   architecture review stay synchronized. External EDO/marking/marketplace
   writes remain denied until separate qualification.
+
+## Phase 87 — Автоматическая финансовая аналитика продавца
+
+`219`
+
+Task 174 extends Task 167 with a normalized, deterministic seller-finance
+layer. It materializes management P&L, cash flow, unit economics and quality
+from canonical PostgreSQL facts, values historical COGS through FIFO evidence,
+stores immutable calculation snapshots, exposes bounded reports and keeps the
+daily worker independent from transactional writes.
+
+### Gate RUNTIME-219
+
+- P&L, settlement and cash use explicit bases; payout is not revenue and
+  settlement components cannot be double-counted with payout;
+- all money stays in integer minor units with currency, quantities stay exact
+  fixed-point, and missing COGS/FX/attribution is visible as quality rather
+  than silently converted to zero;
+- FIFO evidence is historical/as-of, supports partial consumption and
+  cross-warehouse transfer layers, and an unavailable layer fails closed;
+- calculation runs are tenant-scoped, idempotent and immutable, with formula,
+  allocation, valuation and attribution versions, input digest, coverage and
+  quality evidence;
+- reports, details and exports are bounded by period/limit and permissions;
+  snapshots contain no raw provider payloads, tokens or bank details;
+- migration 46 is expand-only and requires backup; rollback is capability
+  disablement and worker drain, without destructive down migration;
+- OpenAPI, generated SDKs, frontend, migration catalog, worker, tests and
+  architecture review stay synchronized. Live bank and external provider
+  adapters remain explicitly deferred for separate qualification.

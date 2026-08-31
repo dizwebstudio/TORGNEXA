@@ -21,6 +21,23 @@ func TestGateFailsClosedForSensitiveWrites(t *testing.T) {
 		t.Fatal("unexpected gate decision")
 	}
 }
+
+func TestLegacyDemoApprovalIdentifiersRemainReadable(t *testing.T) {
+	p := policy()
+	p.ID = "demo-approval-policy"
+	if err := p.Validate(); err != nil {
+		t.Fatalf("legacy demo policy should remain readable: %v", err)
+	}
+	now := time.Date(2026, 8, 10, 1, 0, 0, 0, time.UTC)
+	r, err := NewRequest(p, "demo-approval-pending", "requester", "demo.seed", "price-set-1", "demo-seed:approval:pending", RiskWriteSensitive, now)
+	if err != nil {
+		t.Fatalf("legacy demo request should remain readable: %v", err)
+	}
+	if _, _, err := ApplyDecision(r, p, nil, Actor{ID: "approver", Scopes: []string{"approval.pricing"}}, "demo-approval-decision-approved", VoteApprove, "ok", now.Add(time.Minute)); err != nil {
+		t.Fatalf("legacy demo decision should remain readable: %v", err)
+	}
+}
+
 func TestFourEyesQuorumAndMultiStage(t *testing.T) {
 	p := policy()
 	now := time.Date(2026, 8, 10, 1, 0, 0, 0, time.UTC)

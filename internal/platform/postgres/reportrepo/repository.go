@@ -27,6 +27,7 @@ type Data struct {
 	Source      string     `json:"source"`
 	Columns     []Column   `json:"columns"`
 	Rows        [][]string `json:"rows"`
+	NextCursor  string     `json:"next_cursor,omitempty"`
 }
 
 // Filter contains the bounded, report-independent filters accepted by the API.

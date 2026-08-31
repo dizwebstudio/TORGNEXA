@@ -443,7 +443,7 @@ func validText(v string, max int) bool {
 }
 func validID(v string) bool {
 	if len(v) != 26 && len(v) != 36 {
-		return false
+		return legacyDemoApprovalID(v)
 	}
 	for _, r := range v {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' {
@@ -452,6 +452,19 @@ func validID(v string) bool {
 		return false
 	}
 	return true
+}
+
+// legacyDemoApprovalID keeps workspaces seeded by the first Community demo
+// dataset readable after the identifier contract was tightened. New demo rows
+// use canonical 26-character IDs; these exact aliases are intentionally not a
+// general relaxation of the ID invariant.
+func legacyDemoApprovalID(v string) bool {
+	switch v {
+	case "demo-approval-policy", "demo-approval-pending", "demo-approval-approved", "demo-approval-rejected", "demo-approval-decision-approved", "demo-approval-decision-rejected":
+		return true
+	default:
+		return false
+	}
 }
 func CanonicalScopes(scopes []string) []string {
 	out := append([]string(nil), scopes...)

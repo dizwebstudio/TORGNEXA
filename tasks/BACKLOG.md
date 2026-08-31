@@ -1038,5 +1038,20 @@ PurchaseOrder lifecycle now has recommendation snapshot checks, approval-bound
 send, idempotent unknown/retry outcomes, WMS receiving facts and redacted
 reconciliation findings. The frontend procurement workbench and generated SDKs
 are included. Chestny ZNAK, Diadoc, Saby EDO, KKT/OFD and marketplace order
-connectors remain explicitly deferred until separate official API
-qualification.
+  connectors remain explicitly deferred until separate official API
+  qualification.
+
+## Epic 174 — Автоматическая финансовая аналитика продавца
+
+Task 219 is repository-complete for the accepted v1 boundary: added a single
+provider-neutral financial calculation layer over the existing order,
+settlement, logistics and cost evidence. It publishes immutable P&L, cash-flow,
+unit-economics and quality snapshots with deterministic FIFO valuation,
+tenant-scoped idempotency, detail filters, CSV/PDF export, generated SDK,
+frontend tabs and a daily UTC worker. Payout is kept in cash/reconciliation and
+is never treated as sales revenue.
+
+The report marks missing historical COGS, FX, bank receipts and unattributed
+advertising explicitly instead of zero-filling them. Live bank, advertising,
+marketplace-order, refund/return and external FX adapters remain deferred until
+their official connector qualification; no second financial ledger is created.

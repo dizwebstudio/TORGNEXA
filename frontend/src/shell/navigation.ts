@@ -27,7 +27,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 export const navigationSections = [
   {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "returns", "incidents", "marking"]},
   {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "social"]},
-  {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "approvals", "compliance", "reports", "audit"]},
+  {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "financial-analytics", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
 ] as const;
 
@@ -48,6 +48,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "counterparties", label: "Контрагенты", path: "/counterparties", capability: "counterparties.read", risk: "READ", icon: "counterparties", shortcut: "G P"},
   {id: "procurement", label: "Закупки", path: "/procurement", capability: "procurement.suppliers.read", risk: "WRITE_SENSITIVE", icon: "inventory"},
   {id: "finance", label: "Финансы", path: "/finance", capability: "settlements.read", risk: "READ", icon: "finance", shortcut: "G F"},
+  {id: "financial-analytics", label: "Финансовая аналитика", path: "/finance/analytics", capability: "finance.reports.read", risk: "READ", icon: "finance"},
   {id: "approvals", label: "Согласования", path: "/approvals", capability: "approvals.read", risk: "WRITE_SENSITIVE", icon: "approvals", shortcut: "G A"},
   {id: "workflows", label: "Автоматизации", path: "/workflows", capability: "workflows.read", risk: "WRITE_SAFE", icon: "sync", shortcut: "G W"},
   {id: "compliance", label: "Сертификаты и документы", path: "/compliance", capability: "compliance.read", risk: "WRITE_SENSITIVE", icon: "compliance", shortcut: "G L"},
@@ -70,7 +71,9 @@ export function allowedNavigation(capabilities: readonly string[]): NavigationIt
 
 export function routeForPath(pathname: string): NavigationItem | undefined {
   const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
-  return navigationItems.find((item) => item.path === normalized || (item.path !== "/" && normalized.startsWith(item.path + "/")));
+  const exact = navigationItems.find((item) => item.path === normalized);
+  if (exact) return exact;
+  return navigationItems.filter((item) => item.path !== "/" && normalized.startsWith(item.path + "/")).reduce<NavigationItem | undefined>((best, item) => !best || item.path.length > best.path.length ? item : best, undefined);
 }
 
 export function canOpenPath(pathname: string, capabilities: readonly string[]): boolean {
@@ -83,5 +86,6 @@ export function isKnownPath(pathname: string): boolean {
   if (normalized === "/" || navigationItems.some((item) => item.path === normalized)) return true;
   if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/(orders|returns)\/[^/]+$/.test(normalized) || /^\/integrations\/status\/[^/]+$/.test(normalized)) return true;
   if (normalized === "/oauth/connectors/callback") return true;
+  if (normalized === "/finance/analytics") return true;
   return /^\/incidents\/(warehouse|drift|connector|approval)\/[^/]+$/.test(normalized);
 }

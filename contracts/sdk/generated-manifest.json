@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "c570f1fa0bde049ab2ef42eed4a5f53ba7f7f8ea48e13d99b751202987c699a4",
+    "sha256": "a645768f16c62ed2e18e02dc04f10e733cd0d48fa227216b317f84f398d181c7",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -278,6 +278,11 @@
       "operation_id": "createReturnLogistics",
       "method": "POST",
       "path": "/returns/{return_id}/logistics"
+    },
+    {
+      "operation_id": "createSellerFinancialCalculation",
+      "method": "POST",
+      "path": "/reports/financial-runs"
     },
     {
       "operation_id": "createSocialChannel",
@@ -583,6 +588,31 @@
       "operation_id": "getRuntimeSecurityPosture",
       "method": "GET",
       "path": "/settings/security/posture"
+    },
+    {
+      "operation_id": "getSellerCashFlow",
+      "method": "GET",
+      "path": "/reports/seller_cash_flow"
+    },
+    {
+      "operation_id": "getSellerFinancialQuality",
+      "method": "GET",
+      "path": "/reports/seller_financial_quality"
+    },
+    {
+      "operation_id": "getSellerProfitAndLoss",
+      "method": "GET",
+      "path": "/reports/seller_profit_and_loss"
+    },
+    {
+      "operation_id": "getSellerProfitAndLossDetails",
+      "method": "GET",
+      "path": "/reports/seller_profit_and_loss/details"
+    },
+    {
+      "operation_id": "getSellerUnitEconomics",
+      "method": "GET",
+      "path": "/reports/seller_unit_economics"
     },
     {
       "operation_id": "getSettingsSecurityConfiguration",

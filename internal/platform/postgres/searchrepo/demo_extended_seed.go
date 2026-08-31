@@ -246,7 +246,34 @@ func seedDemoSync(ctx context.Context, tx *sql.Tx, org, ws, productID string, st
 }
 
 func seedDemoApprovals(ctx context.Context, tx *sql.Tx, org, ws, requesterID, productID string, stamp time.Time) error {
-	const policyID = "demo-approval-policy"
+	const (
+		policyIDCanonical        = "demo-approval-policy-00001"
+		policyIDLegacy           = "demo-approval-policy"
+		pendingIDCanonical       = "demo-approval-pending-0001"
+		approvedIDCanonical      = "demo-approval-approve-0001"
+		rejectedIDCanonical      = "demo-approval-reject-00001"
+		pendingIDLegacy          = "demo-approval-pending"
+		approvedIDLegacy         = "demo-approval-approved"
+		rejectedIDLegacy         = "demo-approval-rejected"
+		approvedDecisionIDCanon  = "demo-approval-decision-001"
+		rejectedDecisionIDCanon  = "demo-approval-decision-002"
+		approvedDecisionIDLegacy = "demo-approval-decision-approved"
+		rejectedDecisionIDLegacy = "demo-approval-decision-rejected"
+	)
+	policyID := policyIDCanonical
+	requestIDs := [3]string{pendingIDCanonical, approvedIDCanonical, rejectedIDCanonical}
+	decisionIDs := [2]string{approvedDecisionIDCanon, rejectedDecisionIDCanon}
+	var legacyPolicyActive bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM approval_policies WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND active)`, org, ws, policyIDLegacy).Scan(&legacyPolicyActive); err != nil {
+		return fmt.Errorf("search repository: check legacy demo approval policy: %w", err)
+	}
+	if legacyPolicyActive {
+		// Keep the original IDs when upgrading an already-seeded workspace; the
+		// approval tables are append-only and their foreign keys are immutable.
+		policyID = policyIDLegacy
+		requestIDs = [3]string{pendingIDLegacy, approvedIDLegacy, rejectedIDLegacy}
+		decisionIDs = [2]string{approvedDecisionIDLegacy, rejectedDecisionIDLegacy}
+	}
 	stages := `[ {"number":1,"name":"content-owner","required_approvals":1,"eligible_scopes":["approvals.write"]} ]`
 	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_policies(id,organization_id,workspace_id,version,name,action,resource_type,minimum_risk,minimum_risk_rank,request_ttl_seconds,escalate_after_seconds,separation_of_duties,stages,active,created_at) VALUES($1,$2,$3,1,'demo-catalog-publish','demo.catalog.publish','product','write_sensitive',3,172800,86400,true,$4::jsonb,true,$5) ON CONFLICT DO NOTHING`, policyID, org, ws, stages, stamp); err != nil {
 		return fmt.Errorf("search repository: insert demo approval policy: %w", err)
@@ -257,9 +284,9 @@ func seedDemoApprovals(ctx context.Context, tx *sql.Tx, org, ws, requesterID, pr
 		requested                        time.Time
 		approved, rejected               any
 	}{
-		{"demo-approval-pending", "pending", productID, "demo-seed:approval:pending", 1, stamp.Add(-30 * time.Minute), nil, nil},
-		{"demo-approval-approved", "approved", productID, "demo-seed:approval:approved", 2, stamp.Add(-3 * time.Hour), stamp.Add(-2 * time.Hour), nil},
-		{"demo-approval-rejected", "rejected", productID, "demo-seed:approval:rejected", 2, stamp.Add(-6 * time.Hour), nil, stamp.Add(-5 * time.Hour)},
+		{requestIDs[0], "pending", productID, "demo-seed:approval:pending", 1, stamp.Add(-30 * time.Minute), nil, nil},
+		{requestIDs[1], "approved", productID, "demo-seed:approval:approved", 2, stamp.Add(-3 * time.Hour), stamp.Add(-2 * time.Hour), nil},
+		{requestIDs[2], "rejected", productID, "demo-seed:approval:rejected", 2, stamp.Add(-6 * time.Hour), nil, stamp.Add(-5 * time.Hour)},
 	}
 	for _, request := range requests {
 		expires := request.requested.Add(48 * time.Hour)
@@ -269,10 +296,10 @@ func seedDemoApprovals(ctx context.Context, tx *sql.Tx, org, ws, requesterID, pr
 		}
 	}
 	decisionScopes := `["approvals.write"]`
-	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT 'demo-approval-decision-approved',$1,$2,'demo-approval-approved',1,'demo-reviewer','approve',$3::jsonb,'Демонстрационное согласование пройдено.', $4 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-approved' AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-decision-approved') ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-2*time.Hour)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT $4,$1,$2,$5,1,'demo-reviewer','approve',$3::jsonb,'Демонстрационное согласование пройдено.', $6 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id=$5 AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id=$4) ON CONFLICT DO NOTHING`, org, ws, decisionScopes, decisionIDs[0], requestIDs[1], stamp.Add(-2*time.Hour)); err != nil {
 		return fmt.Errorf("search repository: insert demo approval decision: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT 'demo-approval-decision-rejected',$1,$2,'demo-approval-rejected',1,'demo-reviewer','reject',$3::jsonb,'Демонстрационный запрос отклонён для показа истории решений.', $4 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-rejected' AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id='demo-approval-decision-rejected') ON CONFLICT DO NOTHING`, org, ws, decisionScopes, stamp.Add(-5*time.Hour)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions(id,organization_id,workspace_id,request_id,stage,actor_id,decision,actor_scopes,comment,decided_at) SELECT $4,$1,$2,$5,1,'demo-reviewer','reject',$3::jsonb,'Демонстрационный запрос отклонён для показа истории решений.', $6 WHERE EXISTS (SELECT 1 FROM approval_requests WHERE organization_id=$1 AND workspace_id=$2 AND id=$5 AND state='pending' AND current_stage=1) AND NOT EXISTS (SELECT 1 FROM approval_decisions WHERE organization_id=$1 AND workspace_id=$2 AND id=$4) ON CONFLICT DO NOTHING`, org, ws, decisionScopes, decisionIDs[1], requestIDs[2], stamp.Add(-5*time.Hour)); err != nil {
 		return fmt.Errorf("search repository: insert demo rejected decision: %w", err)
 	}
 	for _, request := range requests {

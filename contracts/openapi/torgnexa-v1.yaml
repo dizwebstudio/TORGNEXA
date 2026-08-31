@@ -2353,7 +2353,7 @@ paths:
     post:
       operationId: createAssistantSession
       security: [{bearerAuth: []}]
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantSessionCreate'}}}}
       responses:
         '201': {description: Assistant session created, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantSession'}}}}
@@ -2410,7 +2410,7 @@ paths:
     post:
       operationId: recordAssistantFeedback
       security: [{bearerAuth: []}]
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssistantFeedback'}}}}
       responses: {'202': {description: Feedback recorded}, '400': {description: Invalid feedback}}
   /reports:
@@ -2434,10 +2434,10 @@ paths:
                       additionalProperties: false
                       required: [id, title, description, source, availability, freshness_sla_seconds, dimensions, metrics]
                       properties:
-                        id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel]}
+                        id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel, seller_profit_and_loss, seller_cash_flow, seller_unit_economics, seller_financial_quality]}
                         title: {type: string, minLength: 1, maxLength: 100}
                         description: {type: string, minLength: 1, maxLength: 300}
-                        source: {type: string, enum: [clickhouse, postgresql]}
+                        source: {type: string, enum: [clickhouse, postgresql, postgresql.snapshot]}
                         availability: {type: string, const: ready}
                         freshness_sla_seconds: {type: integer, minimum: 1, maximum: 3600}
                         dimensions: {type: array, minItems: 1, maxItems: 16, uniqueItems: true, items: {type: string}}
@@ -2473,9 +2473,9 @@ paths:
                 additionalProperties: false
                 required: [id, generated_at, source, columns, rows]
                 properties:
-                  id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel]}
+                  id: {type: string, enum: [sales_daily, inventory_current, ingestion_freshness, unit_economics_by_channel, seller_profit_and_loss, seller_cash_flow, seller_unit_economics, seller_financial_quality, seller_profit_and_loss_details]}
                   generated_at: {type: string, format: date-time}
-                  source: {type: string, enum: [clickhouse, postgresql]}
+                  source: {type: string, enum: [clickhouse, postgresql, postgresql.snapshot]}
                   columns:
                     type: array
                     minItems: 1
@@ -2494,6 +2494,7 @@ paths:
                       type: array
                       maxItems: 32
                       items: {type: string, maxLength: 512}
+                  next_cursor: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}
             text/csv:
               schema: {type: string}
             application/pdf:
@@ -2502,6 +2503,116 @@ paths:
         '403': {description: Caller lacks reports.read}
         '404': {description: Unknown report}
         '400': {description: Invalid report filters}
+  /reports/seller_profit_and_loss:
+    get:
+      operationId: getSellerProfitAndLoss
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: run_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200': {description: Immutable seller P&L snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ReportData'}}}}
+        '404': {description: No completed calculation snapshot exists}
+  /reports/seller_profit_and_loss/details:
+    get:
+      operationId: getSellerProfitAndLossDetails
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: run_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: sku, in: query, required: false, schema: {type: string, maxLength: 128}}
+        - {name: order_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200': {description: Detail rows from an immutable seller P&L snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ReportData'}}}}
+        '403': {description: Caller lacks finance.reports.detail.read}
+        '404': {description: No completed calculation snapshot exists}
+  /reports/seller_cash_flow:
+    get:
+      operationId: getSellerCashFlow
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: run_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200': {description: Immutable seller cash-flow snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ReportData'}}}}
+        '404': {description: No completed calculation snapshot exists}
+  /reports/seller_unit_economics:
+    get:
+      operationId: getSellerUnitEconomics
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: run_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200': {description: Immutable seller unit economics snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ReportData'}}}}
+        '404': {description: No completed calculation snapshot exists}
+  /reports/seller_financial_quality:
+    get:
+      operationId: getSellerFinancialQuality
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: run_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: channel_ref, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+        - {name: format, in: query, required: false, schema: {type: string, enum: [json, csv, pdf], default: json}}
+      responses:
+        '200': {description: Immutable financial data-quality snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/ReportData'}}}}
+        '404': {description: No completed calculation snapshot exists}
+  /reports/financial-runs:
+    post:
+      operationId: createSellerFinancialCalculation
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [from, to, basis]
+              properties:
+                from: {type: string, format: date-time}
+                to: {type: string, format: date-time}
+                basis: {type: string, enum: [order_accrual, settlement, cash]}
+                reporting_currency: {type: string, pattern: '^[A-Z]{3}$'}
+      responses:
+        '201': {description: Calculation status and immutable snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/SellerFinancialRun'}}}}
+        '400': {description: Invalid calculation request}
+        '403': {description: Caller lacks finance.reports.write}
   /realtime:
     get:
       operationId: streamRealtimeInvalidations
@@ -3126,6 +3237,28 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    ReportData:
+      type: object
+      additionalProperties: false
+      required: [id, generated_at, source, columns, rows]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        generated_at: {type: string, format: date-time}
+        source: {type: string, enum: [clickhouse, postgresql, postgresql.snapshot]}
+        columns: {type: array, minItems: 1, maxItems: 32, items: {type: object, additionalProperties: false, required: [key, label], properties: {key: {type: string, minLength: 1, maxLength: 64}, label: {type: string, minLength: 1, maxLength: 100}}}}
+        rows: {type: array, maxItems: 200, items: {type: array, maxItems: 32, items: {type: string, maxLength: 512}}}
+        next_cursor: {type: string, maxLength: 128, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    SellerFinancialRun:
+      type: object
+      additionalProperties: false
+      required: [id, idempotency_key, status, created_at, completed_at, snapshot]
+      properties:
+        id: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 192}
+        status: {type: string, enum: [queued, running, completed, partial, stale, failed]}
+        created_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        snapshot: {type: object, additionalProperties: true}
     ProcurementSupplier:
       type: object
       additionalProperties: false

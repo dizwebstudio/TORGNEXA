@@ -59,6 +59,11 @@ const (
 	QualityConflict      QualityStatus = "conflict"
 	QualityMixedCurrency QualityStatus = "mixed_currency"
 	QualityUnsupported   QualityStatus = "unsupported"
+	QualityMissingCOGS   QualityStatus = "missing_cogs"
+	QualityMissingFX     QualityStatus = "missing_fx"
+	QualityUnmatchedSettlement QualityStatus = "unmatched_settlement"
+	QualityUnattributedAdvertising QualityStatus = "unattributed_advertising"
+	QualityDisputed      QualityStatus = "disputed"
 )
 
 // ValueStatus distinguishes a measured zero from an unavailable component.

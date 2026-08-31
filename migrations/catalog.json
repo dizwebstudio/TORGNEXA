@@ -933,6 +933,26 @@
       },
       "backfill": null,
       "sha256": "6c87140c6a935ec8b838521dc4ad1fab07fb4ac807ec4d42d7e48538770f3d4c"
+    },
+    {
+      "version": 46,
+      "name": "seller_financial_analytics",
+      "file": "000046_seller_financial_analytics.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [34, 45],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "d05b3587727cdec446a1002054d8283ff63f77e8076a11ad2fe8320cbfa9e0b7"
     }
   ]
 }
