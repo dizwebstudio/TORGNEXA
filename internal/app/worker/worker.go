@@ -37,6 +37,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/integrationcenterrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo"
@@ -218,6 +219,14 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	dispatchRepository, err := workerrepo.New(db)
 	if err != nil {
 		return fail("worker_dispatch_repository_startup_failed", err)
+	}
+	marketplacePublicationRepository, err := marketplacepublicationrepo.New(db)
+	if err != nil {
+		return fail("worker_marketplace_publication_repository_startup_failed", err)
+	}
+	marketplacePublicationAccounts, err := connectorrepo.New(db)
+	if err != nil {
+		return fail("worker_marketplace_publication_accounts_startup_failed", err)
 	}
 	operatorAssistantRepository, err := operatorassistantrepo.New(db)
 	if err != nil {
@@ -416,6 +425,9 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger, sourceRegi
 	}})
 	components = append(components, component{name: "operator-assistant", run: func(componentCtx context.Context) error {
 		return runOperatorAssistant(componentCtx, logger, dispatchRepository, operatorAssistantRepository, workerID, cfg.Worker)
+	}})
+	components = append(components, component{name: "marketplace-publications", run: func(componentCtx context.Context) error {
+		return runMarketplacePublications(componentCtx, logger, dispatchRepository, marketplacePublicationRepository, marketplacePublicationAccounts, secretProvider, secretRepository, runtimeRegistry, cfg.Worker.PollInterval, cfg.Worker.DispatchBatch)
 	}})
 	components = append(components, component{name: "workflow-events", run: func(componentCtx context.Context) error {
 		return workflowConsumer.Run(componentCtx, func(eventCtx context.Context, delivery eventbus.Delivery) error {

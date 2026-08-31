@@ -290,6 +290,8 @@ func scanPolicy(row scanner) (syncengine.Policy, error) {
 	}
 	p.Direction = syncengine.Direction(d)
 	p.SourceOfTruth = syncengine.SourceOfTruth(s)
+	p.CreatedAt = p.CreatedAt.UTC()
+	p.UpdatedAt = p.UpdatedAt.UTC()
 	if p.Validate() != nil {
 		return p, syncengine.ErrInvalidRecord
 	}
@@ -303,6 +305,7 @@ func scanCheckpoint(row scanner) (syncengine.Checkpoint, error) {
 		}
 		return v, err
 	}
+	v.UpdatedAt = v.UpdatedAt.UTC()
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}
@@ -320,6 +323,7 @@ func scanState(row scanner) (syncengine.EntityState, error) {
 	if remote.Valid {
 		v.LastRemoteChangeID = remote.String
 	}
+	v.UpdatedAt = v.UpdatedAt.UTC()
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}
@@ -335,6 +339,7 @@ func scanReceipt(row scanner) (syncengine.Receipt, error) {
 		return v, err
 	}
 	v.Outcome = syncengine.Outcome(outcome)
+	v.CreatedAt = v.CreatedAt.UTC()
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}

@@ -34,6 +34,50 @@ paths:
       responses:
         '200': {description: Exact-match publication gate receipt, content: {application/json: {schema: {$ref: '#/components/schemas/PublicationQualityGateReceipt'}}}}
         '404': {description: Quality receipt not found}
+  /marketplace-publications/preflight:
+    post:
+      operationId: preflightMarketplacePublication
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflight'}}}}
+      responses:
+        '200': {description: Snapshot and quality receipt passed the local publication gate, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPreflightResult'}}}}
+        '422': {description: Quality receipt is missing, stale or does not match the snapshot}
+  /marketplace-publications:
+    get:
+      operationId: listMarketplacePublications
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Recent tenant-scoped marketplace publication operations, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationPage'}}}}
+    post:
+      operationId: enqueueMarketplacePublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationRequest'}}}}
+      responses:
+        '202': {description: Publication snapshot durably queued after preflight, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublication'}}}}
+        '409': {description: Account capability or approved publication request is unavailable}
+        '422': {description: Quality receipt is missing, stale or does not match the snapshot}
+  /marketplace-publications/{operation_id}:
+    get:
+      operationId: getMarketplacePublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: operation_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Publication operation with normalized state only, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublication'}}}}
+        '404': {description: Publication operation not found}
+  /marketplace-publications/{operation_id}/retry:
+    post:
+      operationId: retryMarketplacePublication
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: operation_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '202': {description: Unresolved publication operation returned to the durable queue, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublication'}}}}
+        '409': {description: Only an unknown or needs-attention operation can be retried}
   /social/channels:
     get:
       operationId: listSocialChannels
@@ -3143,6 +3187,148 @@ components:
         valid_until: {type: string, format: date-time, pattern: 'Z$'}
         run_id: {type: string, maxLength: 192}
         version: {type: integer, minimum: 1}
+    MarketplacePublicationTarget:
+      type: object
+      additionalProperties: false
+      required: [organization_id, workspace_id, product_id, connector_account_id, connector_id, locale, jurisdiction]
+      properties:
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        connector_account_id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        locale: {type: string, pattern: '^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$'}
+        jurisdiction: {type: string, pattern: '^[A-Z]{2}$'}
+    MarketplacePublicationDimension:
+      type: object
+      additionalProperties: false
+      required: [length_mm, width_mm, height_mm, weight_g]
+      properties:
+        length_mm: {type: integer, minimum: 0, maximum: 10000000}
+        width_mm: {type: integer, minimum: 0, maximum: 10000000}
+        height_mm: {type: integer, minimum: 0, maximum: 10000000}
+        weight_g: {type: integer, minimum: 0, maximum: 10000000000}
+    MarketplacePublicationAttribute:
+      type: object
+      additionalProperties: false
+      required: [code, value]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,63}$'}
+        value: {type: string, minLength: 1, maxLength: 2000}
+        unit: {type: string, maxLength: 64}
+        locale: {type: string, maxLength: 16}
+    MarketplacePublicationMedia:
+      type: object
+      additionalProperties: false
+      required: [id, released_object_ref, digest, format, bytes, width, height, position]
+      properties:
+        id: {type: string, maxLength: 192}
+        released_object_ref: {type: string, pattern: '^upl_[0-9a-f]{32}$'}
+        digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        format: {type: string, maxLength: 64}
+        bytes: {type: integer, minimum: 1, maximum: 104857600}
+        width: {type: integer, minimum: 0}
+        height: {type: integer, minimum: 0}
+        position: {type: integer, minimum: 0, maximum: 1000}
+    MarketplacePublicationVariant:
+      type: object
+      additionalProperties: false
+      required: [id, sku, dimension]
+      properties:
+        id: {type: string, maxLength: 192}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        gtin: {type: string, maxLength: 32}
+        barcodes: {type: array, maxItems: 100, items: {type: string, maxLength: 200}}
+        attributes: {type: array, maxItems: 256, items: {$ref: '#/components/schemas/MarketplacePublicationAttribute'}}
+        dimension: {$ref: '#/components/schemas/MarketplacePublicationDimension'}
+    MarketplacePublicationSnapshot:
+      type: object
+      additionalProperties: false
+      required: [id, target, version, sku, title, category_code, dimension, price_minor, currency, product_status, catalog_version, pim_version, price_version, media_version, mapping_version, capability_version, assembled_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        target: {$ref: '#/components/schemas/MarketplacePublicationTarget'}
+        version: {type: integer, minimum: 1}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        gtin: {type: string, maxLength: 32}
+        title: {type: string, minLength: 1, maxLength: 500}
+        description: {type: string, maxLength: 10000}
+        brand: {type: string, maxLength: 300}
+        category_code: {type: string, minLength: 1, maxLength: 192}
+        attributes: {type: array, maxItems: 256, items: {$ref: '#/components/schemas/MarketplacePublicationAttribute'}}
+        variants: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplacePublicationVariant'}}
+        media: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplacePublicationMedia'}}
+        dimension: {$ref: '#/components/schemas/MarketplacePublicationDimension'}
+        price_minor: {type: integer, minimum: 0}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        vat: {type: string, maxLength: 64}
+        product_status: {type: string, enum: [draft, active, archived]}
+        catalog_version: {type: integer, minimum: 1}
+        pim_version: {type: integer, minimum: 0}
+        price_version: {type: integer, minimum: 0}
+        media_version: {type: integer, minimum: 0}
+        mapping_version: {type: integer, minimum: 0}
+        capability_version: {type: integer, minimum: 0}
+        compliance_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        assembled_at: {type: string, format: date-time, pattern: 'Z$'}
+        digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    MarketplacePublicationRequest:
+      type: object
+      additionalProperties: false
+      required: [operation, snapshot, quality_receipt_id]
+      properties:
+        operation: {type: string, enum: [create_product, update_product, update_variant, update_attributes, update_media, archive, unarchive, publish, unpublish, status_read]}
+        snapshot: {$ref: '#/components/schemas/MarketplacePublicationSnapshot'}
+        remote_id: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        dry_run: {type: boolean, default: false}
+        quality_receipt_id: {type: string, maxLength: 192}
+    MarketplacePublication:
+      type: object
+      additionalProperties: false
+      required: [id, target, snapshot_id, snapshot_digest, kind, state, idempotency_key, dry_run, quality_receipt_id, attempt, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        target: {$ref: '#/components/schemas/MarketplacePublicationTarget'}
+        snapshot_id: {type: string, maxLength: 192}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        kind: {type: string, enum: [create_product, update_product, update_variant, update_attributes, update_media, archive, unarchive, publish, unpublish, status_read]}
+        state: {type: string, enum: [draft, preflight, queued, sending, accepted, processing, published, rejected, unknown, needs_attention, cancelled]}
+        idempotency_key: {type: string, maxLength: 128}
+        remote_id: {type: string, maxLength: 192}
+        remote_operation_id: {type: string, maxLength: 192}
+        approval_ref: {type: string, maxLength: 192}
+        quality_receipt_id: {type: string, maxLength: 192}
+        error_code: {type: string, maxLength: 64}
+        attempt: {type: integer, minimum: 0, maximum: 100}
+        dry_run: {type: boolean}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplacePublicationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplacePublication'}}
+    MarketplacePublicationPreflight:
+      type: object
+      additionalProperties: false
+      required: [snapshot, quality_receipt_id]
+      properties:
+        snapshot: {$ref: '#/components/schemas/MarketplacePublicationSnapshot'}
+        quality_receipt_id: {type: string, maxLength: 192}
+    MarketplacePublicationPreflightResult:
+      type: object
+      additionalProperties: false
+      required: [snapshot_id, snapshot_digest, decision, quality_receipt_id, valid_until]
+      properties:
+        snapshot_id: {type: string, maxLength: 192}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        decision: {type: string, enum: [ready, ready_with_warnings]}
+        quality_receipt_id: {type: string, maxLength: 192}
+        valid_until: {type: string, format: date-time, pattern: 'Z$'}
     SortableID:
       type: string
       pattern: '^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$'

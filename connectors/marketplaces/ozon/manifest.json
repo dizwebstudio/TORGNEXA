@@ -4,7 +4,7 @@
   "family": "marketplace",
   "version": "1.0.0",
   "sdk_version": 1,
-  "capabilities": ["inventory.read", "products.read"],
+  "capabilities": ["inventory.read", "products.read", "products.write"],
   "auth": [{"kind": "api_key", "secret_class": "marketplace.api-credentials", "required": true}],
   "connection_test": {"url": "https://api-seller.ozon.ru/v3/product/list", "method": "POST", "headers": {"Client-Id": "${line1}", "Api-Key": "${line2}", "Content-Type": "application/json"}, "body": "{\"filter\":{},\"limit\":1}"},
   "rate_limit": {

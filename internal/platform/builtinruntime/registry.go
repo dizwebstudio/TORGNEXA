@@ -1286,6 +1286,42 @@ func (r *Registry) ProductWriter(account sdk.Account, runtime sdk.Runtime, load 
 	}
 }
 
+// ProductPublicationWriter resolves the dedicated marketplace publication
+// surface. It is intentionally separate from ProductWriter: publication sends
+// an immutable snapshot and is never reached by the generic storefront sync.
+func (r *Registry) ProductPublicationWriter(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.ProductPublicationWriter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "products.write") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
+	case "yandex-market":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
+// ProductPublicationStatusReader resolves the normalized read-after-write
+// surface for marketplace publication operations.
+func (r *Registry) ProductPublicationStatusReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.ProductPublicationStatusReader, error) {
+	writer, err := r.ProductPublicationWriter(account, runtime, load)
+	if err != nil {
+		return nil, err
+	}
+	reader, ok := writer.(sdk.ProductPublicationStatusReader)
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	return reader, nil
+}
+
 // CRMReader resolves the admitted CRM connector for tenant-scoped reads.
 // Bitrix24 is deliberately kept on a separate CRM surface; it is not a
 // generic product-sync source.

@@ -27,12 +27,13 @@ type QueryParam struct {
 }
 
 type Request struct {
-	Method string
-	Host   string
-	Path   string
-	Query  []QueryParam
-	Body   []byte
-	APIKey []byte
+	Method         string
+	Host           string
+	Path           string
+	Query          []QueryParam
+	Body           []byte
+	APIKey         []byte
+	IdempotencyKey string
 }
 
 type Response struct {

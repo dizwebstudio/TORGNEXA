@@ -11,7 +11,8 @@
     "orders.read",
     "prices.read",
     "prices.write",
-    "products.read"
+    "products.read",
+    "products.write"
   ],
   "auth": [
     {

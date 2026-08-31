@@ -25,6 +25,9 @@ type Request struct {
 	Path   string
 	Body   []byte
 	Token  []byte
+	// IdempotencyKey is non-secret host retry metadata. It is never persisted
+	// by the connector and is forwarded only as a bounded request header.
+	IdempotencyKey string
 }
 
 type Response struct {

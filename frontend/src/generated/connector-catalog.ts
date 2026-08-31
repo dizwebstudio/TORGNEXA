@@ -926,12 +926,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#005BFF",
     },
-    capabilities: ["inventory.read", "products.read"],
+    capabilities: ["inventory.read", "products.read", "products.write"],
     authKinds: ["api_key"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "products.read"],
+      operationalCapabilities: ["inventory.read", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "inventory", directions: ["inbound"]},
@@ -1359,12 +1359,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#A00086",
     },
-    capabilities: ["inventory.read", "products.read"],
+    capabilities: ["inventory.read", "products.read", "products.write"],
     authKinds: ["bearer"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "products.read"],
+      operationalCapabilities: ["inventory.read", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "inventory", directions: ["inbound"]},
@@ -1410,12 +1410,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#1C1C1C",
       accent: "#E32636",
     },
-    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
+    capabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read", "products.write"],
     authKinds: ["api_key"],
     runtime: {
       stage: "ready",
       surface: "integrations",
-      operationalCapabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read"],
+      operationalCapabilities: ["inventory.read", "inventory.write", "notifications.receive", "orders.read", "prices.read", "prices.write", "products.read", "products.write"],
       sync: [
         {entityType: "products", directions: ["inbound"]},
         {entityType: "prices", directions: ["inbound", "outbound"]},

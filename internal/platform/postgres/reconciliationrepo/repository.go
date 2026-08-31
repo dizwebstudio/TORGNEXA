@@ -292,6 +292,8 @@ func scanRun(row scanner) (reconciliation.Run, error) {
 	}
 	v.Mode = reconciliation.Mode(mode)
 	v.Status = reconciliation.RunStatus(status)
+	v.StartedAt = v.StartedAt.UTC()
+	v.UpdatedAt = v.UpdatedAt.UTC()
 	if trigger.Valid {
 		v.TriggerRef = trigger.String
 	}
@@ -318,6 +320,7 @@ func scanDrift(row scanner) (reconciliation.Drift, error) {
 	v.Kind = reconciliation.DriftKind(kind)
 	v.Status = reconciliation.DriftStatus(status)
 	v.RecommendedAction = reconciliation.ActionKind(action)
+	v.DetectedAt = v.DetectedAt.UTC()
 	if l.Valid {
 		v.LocalEntityID = l.String
 	}
@@ -360,6 +363,7 @@ func scanAction(row scanner) (reconciliation.ActionRecord, error) {
 	}
 	v.Action = reconciliation.ActionKind(a)
 	v.Result = reconciliation.ActionResult(res)
+	v.CreatedAt = v.CreatedAt.UTC()
 	if ec.Valid {
 		v.ErrorCode = ec.String
 	}

@@ -108,7 +108,10 @@ func TestManifestMatchesCommittedJSONAndDeclaresOnlyQualifiedWrites(t *testing.T
 	if !Manifest().Supports("inventory.write") {
 		t.Fatal("qualified inventory.write capability missing")
 	}
-	for _, capability := range []sdk.Capability{"products.write", "orders.status.write"} {
+	if !Manifest().Supports("products.write") {
+		t.Fatal("qualified products.write capability missing")
+	}
+	for _, capability := range []sdk.Capability{"orders.status.write"} {
 		if Manifest().Supports(capability) {
 			t.Fatalf("unqualified write capability %s", capability)
 		}

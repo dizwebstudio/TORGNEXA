@@ -21,12 +21,13 @@ var (
 )
 
 type Request struct {
-	Method   string
-	Host     string
-	Path     string
-	Body     []byte
-	ClientID []byte
-	APIKey   []byte
+	Method         string
+	Host           string
+	Path           string
+	Body           []byte
+	ClientID       []byte
+	APIKey         []byte
+	IdempotencyKey string
 }
 
 type Response struct {

@@ -318,6 +318,9 @@ func (t wbHTTP) Do(ctx context.Context, r wildberries.Request) (wildberries.Resp
 	if len(r.Token) > 0 {
 		hdr.Set("Authorization", string(r.Token))
 	}
+	if r.IdempotencyKey != "" {
+		hdr.Set("X-Idempotency-Key", r.IdempotencyKey)
+	}
 	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
 	return wildberries.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
 }
@@ -333,6 +336,9 @@ func (t ozonHTTP) Do(ctx context.Context, r ozon.Request) (ozon.Response, error)
 	if len(r.APIKey) > 0 {
 		hdr.Set("Api-Key", string(r.APIKey))
 	}
+	if r.IdempotencyKey != "" {
+		hdr.Set("X-Idempotency-Key", r.IdempotencyKey)
+	}
 	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
 	return ozon.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e
 }
@@ -347,6 +353,9 @@ func (t ymHTTP) Do(ctx context.Context, r yandexmarket.Request) (yandexmarket.Re
 	hdr := http.Header{}
 	if len(r.APIKey) > 0 {
 		hdr.Set("Api-Key", string(r.APIKey))
+	}
+	if r.IdempotencyKey != "" {
+		hdr.Set("X-Idempotency-Key", r.IdempotencyKey)
 	}
 	s, b, id, ra, _, e := t.h.do(ctx, r.Method, r.Host, r.Path, q, r.Body, hdr, nil, nil)
 	return yandexmarket.Response{StatusCode: s, Body: b, RequestID: id, RetryAfterMS: ra}, e

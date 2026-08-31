@@ -83,8 +83,8 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	if !reflect.DeepEqual(got.Canonical(), Manifest().Canonical()) {
 		t.Fatalf("manifest drift")
 	}
-	if Manifest().Supports("products.write") || Manifest().Supports("inventory.write") {
-		t.Fatal("task 012 must remain read-only")
+	if !Manifest().Supports("products.write") || Manifest().Supports("inventory.write") {
+		t.Fatal("marketplace product publication capability is not declared exactly")
 	}
 }
 func TestCredentialBundleIsStrict(t *testing.T) {

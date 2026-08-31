@@ -21,6 +21,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo"
@@ -47,67 +48,68 @@ import (
 )
 
 type productionRouteDependencies struct {
-	accounts           *connectorrepo.Repository
-	connectorConfigs   *connectorconfigrepo.Repository
-	auditRepository    auditReader
-	auditService       *audit.Service
-	secretProvider     secrets.SecretProvider
-	oauthRefresh       connectorauth.RefreshCoordinator
-	connectorCallbacks *connectorauth.CallbackPolicy
-	tenancy            *tenancyrepo.Repository
-	search             *searchrepo.Repository
-	orders             orderStatusRepository
-	catalog            *catalogrepo.Repository
-	pricing            *pricingrepo.Repository
-	publicationQuality *publicationqualityrepo.Repository
-	pim                *pimrepo.Repository
-	images             *catalogimagerepo.Repository
-	inventory          *inventoryrepo.Repository
-	logistics          *logisticsrepo.Repository
-	compliance         *compliancerepo.Repository
-	notifications      *notifications.Service
-	syncPolicies       *syncrepo.Repository
-	reconciliations    *reconciliationrepo.Repository
-	approvals          *approvalrepo.Repository
-	reports            reportReader
-	lineage            lineage.Reader
-	legalParties       LegalPartySearcher
-	counterparties     counterpartyLister
-	entitlements       *entitlements.Service
-	quotas             *entitlements.QuotaService
-	webhooks           webhookService
-	inboundWebhooks    *inboxrepo.Processor
-	settingsSecurity   securitysettings.Store
-	settingsAudit      securitysettings.SettingsAuditReader
-	identityProviders  securitysettings.IdentityProviderStore
-	identityPolicy     *securitysettings.ProviderURLPolicy
-	identityValidator  securitysettings.ProviderValidator
-	profiles           *userprofilerepo.Repository
-	settlements        *settlementrepo.Repository
-	social             *socialrepo.Repository
-	socialReceipts     *socialdispatchrepo.Repository
-	payments           *paymentsrepo.Repository
-	privacy            privacyWorkflow
-	fxRates            *fxrepo.Repository
-	cloudSubscription  *cloudbillingrepo.Repository
-	uploads            *uploads.Service
-	uploadStatus       uploadStatusReader
-	uploadAccess       uploadReleaseGate
-	uploadEvidence     uploadEvidenceReader
-	uploadContent      uploads.ReleaseReader
-	plugins            *pluginmarketplacerepo.Repository
-	aiAdvisory         *aiadvisoryrepo.Repository
-	assistant          *operatorassistantrepo.Repository
-	aiRegistry         *builtinruntime.Registry
-	integrationCenter  integrationCenterReader
-	workflows          *workflowrepo.Repository
-	returns            *returnsrepo.Repository
-	marking            *markingrepo.Repository
-	mcpAccounts        *mcpaccountsrepo.Repository
-	agentGovernance    *agentgovernancerepo.Repository
-	runtimePosture     *runtimeposture.Inspector
-	trustControl       *trustcontrolrepo.Repository
-	oidc               config.OIDC
+	accounts               *connectorrepo.Repository
+	connectorConfigs       *connectorconfigrepo.Repository
+	auditRepository        auditReader
+	auditService           *audit.Service
+	secretProvider         secrets.SecretProvider
+	oauthRefresh           connectorauth.RefreshCoordinator
+	connectorCallbacks     *connectorauth.CallbackPolicy
+	tenancy                *tenancyrepo.Repository
+	search                 *searchrepo.Repository
+	orders                 orderStatusRepository
+	catalog                *catalogrepo.Repository
+	pricing                *pricingrepo.Repository
+	publicationQuality     *publicationqualityrepo.Repository
+	pim                    *pimrepo.Repository
+	images                 *catalogimagerepo.Repository
+	inventory              *inventoryrepo.Repository
+	logistics              *logisticsrepo.Repository
+	compliance             *compliancerepo.Repository
+	notifications          *notifications.Service
+	syncPolicies           *syncrepo.Repository
+	reconciliations        *reconciliationrepo.Repository
+	approvals              *approvalrepo.Repository
+	reports                reportReader
+	lineage                lineage.Reader
+	legalParties           LegalPartySearcher
+	counterparties         counterpartyLister
+	entitlements           *entitlements.Service
+	quotas                 *entitlements.QuotaService
+	webhooks               webhookService
+	inboundWebhooks        *inboxrepo.Processor
+	settingsSecurity       securitysettings.Store
+	settingsAudit          securitysettings.SettingsAuditReader
+	identityProviders      securitysettings.IdentityProviderStore
+	identityPolicy         *securitysettings.ProviderURLPolicy
+	identityValidator      securitysettings.ProviderValidator
+	profiles               *userprofilerepo.Repository
+	settlements            *settlementrepo.Repository
+	social                 *socialrepo.Repository
+	socialReceipts         *socialdispatchrepo.Repository
+	payments               *paymentsrepo.Repository
+	privacy                privacyWorkflow
+	fxRates                *fxrepo.Repository
+	cloudSubscription      *cloudbillingrepo.Repository
+	uploads                *uploads.Service
+	uploadStatus           uploadStatusReader
+	uploadAccess           uploadReleaseGate
+	uploadEvidence         uploadEvidenceReader
+	uploadContent          uploads.ReleaseReader
+	plugins                *pluginmarketplacerepo.Repository
+	aiAdvisory             *aiadvisoryrepo.Repository
+	assistant              *operatorassistantrepo.Repository
+	aiRegistry             *builtinruntime.Registry
+	integrationCenter      integrationCenterReader
+	workflows              *workflowrepo.Repository
+	returns                *returnsrepo.Repository
+	marking                *markingrepo.Repository
+	marketplacePublication *marketplacepublicationrepo.Repository
+	mcpAccounts            *mcpaccountsrepo.Repository
+	agentGovernance        *agentgovernancerepo.Repository
+	runtimePosture         *runtimeposture.Inspector
+	trustControl           *trustcontrolrepo.Repository
+	oidc                   config.OIDC
 }
 
 func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
@@ -128,6 +130,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
+	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry, socialRouteDependency{secrets: deps.secretProvider, configs: deps.connectorConfigs, receipts: deps.socialReceipts, approvals: deps.approvals, operations: deps.logistics, webhookControllerRuntime: deps.aiRegistry, audit: deps.auditService, uploadAccess: deps.uploadAccess, uploadContent: deps.uploadContent})...)
