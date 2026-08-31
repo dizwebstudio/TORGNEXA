@@ -9,9 +9,10 @@ Storefront-коннектор CS-Cart подключается через офи
 `commerce.catalog.product_changed.v1` обрабатывает worker-группа
 `torgnexa.commerce-sync.v1`; для нового товара mapping создаётся после
 подтверждённого ответа CS-Cart, а для существующего используется
-tenant-scoped mapping и детерминированный idempotency key. Запись цен,
-заказов и остатков, а также webhook-события пока не заявляются как рабочие
-маршруты. Остаток доступен только как единый storefront balance.
+tenant-scoped mapping и детерминированный idempotency key. Запись цен и
+остатков выполняется через тот же product PUT с read-after-write и исходящей
+синхронизацией; запись заказов и webhook-события пока не заявляются как
+рабочие маршруты. Остаток доступен только как единый storefront balance.
 
 Официальная документация: [REST API](https://docs.cs-cart.com/latest/developer_guide/api/index.html),
 [Products](https://docs.cs-cart.com/latest/developer_guide/api/entities/products.html),

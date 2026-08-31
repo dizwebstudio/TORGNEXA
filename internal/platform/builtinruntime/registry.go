@@ -1368,6 +1368,11 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
 	case "yandex-market":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -1425,7 +1430,7 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	// Keep the adapter-level admission stable for callers that use this port
 	// outside the generic sync route. The generated runtime-support contract
 	// separately controls which entities the production worker may route.
-	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop" || account.ConnectorID == "opencart")
+	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "cs-cart" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop" || account.ConnectorID == "opencart")
 }
 
 // InventoryWriter resolves first-party connectors with an executable
@@ -1441,6 +1446,11 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return bitrixstore.New(bitrixStoreHTTP{r.http}, bitrixStoreConfigSource{load: load}, nil), nil
+	case "cs-cart":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
 	case "prestashop":
 		if load == nil {
 			return nil, ErrConfigurationNeeded

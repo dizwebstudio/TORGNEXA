@@ -88,7 +88,7 @@ export function AppShell() {
 
   return <div className={`app-shell ${mobileOpen?"nav-open":""}`}>
     <aside className="sidebar">
-      <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Управление торговлей</small></span></button>
+      <button className="brand" onClick={() => navigate("/")} aria-label="TORGNEXA — обзор"><span className="brand-logo-frame"><img className="brand-logo-full" src="/brand/torgnexa-logo.png" alt="TORGNEXA"/><img className="brand-logo-symbol" src="/brand/torgnexa-symbol.png" alt="" aria-hidden="true"/></span><span className="brand-copy"><small>Управление торговлей</small></span></button>
       <nav aria-label="Основная навигация">{navigation.map((item) => <button key={item.id} aria-current={path===item.path?"page":undefined} title={item.label} className={`nav-item ${path === item.path ? "active" : ""}`} onClick={() => navigate(item.path)}><span className="nav-icon"><Icon name={item.icon}/></span><span className="nav-label">{item.label}</span></button>)}</nav>
       <div className="sidebar-footer"><div className="profile"><UserAvatar session={auth.session!}/><span className="profile-copy"><strong>{auth.session?.displayName}</strong><small>Защищённая сессия</small></span></div><button className="icon-button" onClick={() => void auth.logout()} title="Выйти" aria-label="Выйти"><Icon name="logout"/></button></div>
     </aside>

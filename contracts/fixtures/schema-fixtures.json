@@ -63,6 +63,18 @@
       }
     },
     {
+      "schema": "ai/operator-assistant-v1.schema.json",
+      "valid": {
+        "contract_version": "assistant.v1",
+        "answer": {
+          "summary": "Подтверждено", "text": "Статус: healthy", "grounding_state": "grounded", "coverage_percent": 100,
+          "facts": [], "evidence": [], "limitations": [], "recommendations": [], "action_previews": [],
+          "ai_generated": false, "output_kind": "source_facts", "answer_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "invalid": {"contract_version": "assistant.v0", "answer": {"grounding_state": "confident"}}
+    },
+    {
       "schema": "ai/prompt-injection-regressions-v1.schema.json",
       "valid": {
         "schema_version": 1,
@@ -986,6 +998,31 @@
         "effective_from": "2026-08-10T08:00:00+03:00",
         "created_at": "2026-08-10T08:00:00Z"
       }
+    },
+    {
+      "schema": "events/ai-operator-assistant-action-previewed-v1.schema.json",
+      "valid": {"preview_id": "ap:aaaaaaaaaaaaaaaaaaaaaaaaaa", "run_id": "ar.run-1", "action": "open.evidence", "risk": "read", "approval_required": false, "preview_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"preview_id": "bad", "run_id": "", "action": "", "risk": "root", "approval_required": "no", "preview_digest": "bad"}
+    },
+    {
+      "schema": "events/ai-operator-assistant-approval-requested-v1.schema.json",
+      "valid": {"preview_id": "ap:aaaaaaaaaaaaaaaaaaaaaaaaaa", "run_id": "ar.run-1", "action": "approval.request", "required_permission": "approvals.write", "preview_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"preview_id": "bad", "run_id": "", "action": "", "required_permission": "", "preview_digest": "bad"}
+    },
+    {
+      "schema": "events/ai-operator-assistant-run-completed-v1.schema.json",
+      "valid": {"run_id": "ar.run-1", "state": "completed", "grounding_state": "grounded", "answer_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"run_id": "", "state": "running", "answer_digest": "bad", "context_digest": "bad"}
+    },
+    {
+      "schema": "events/ai-operator-assistant-run-failed-v1.schema.json",
+      "valid": {"run_id": "ar.run-1", "error_code": "provider_timeout", "retryable": true},
+      "invalid": {"run_id": "", "error_code": "Bad code", "retryable": "yes"}
+    },
+    {
+      "schema": "events/ai-operator-assistant-run-requested-v1.schema.json",
+      "valid": {"run_id": "ar.run-1", "session_id": "as.session-1", "intent": "integration", "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "invalid": {"run_id": "", "session_id": "s", "intent": "", "context_digest": "bad"}
     },
     {
       "schema": "events/approval-decided-v1.schema.json",
@@ -5318,52 +5355,6 @@
         "observed_at": "bad",
         "extra": true
       }
-    },
-    {
-      "schema": "ai/operator-assistant-v1.schema.json",
-      "valid": {
-        "contract_version": "assistant.v1",
-        "answer": {
-          "summary": "Подтверждено",
-          "text": "Статус: healthy",
-          "grounding_state": "grounded",
-          "coverage_percent": 100,
-          "facts": [],
-          "evidence": [],
-          "limitations": [],
-          "recommendations": [],
-          "action_previews": [],
-          "ai_generated": false,
-          "output_kind": "source_facts",
-          "answer_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        }
-      },
-      "invalid": {"contract_version": "assistant.v0", "answer": {"grounding_state": "confident"}}
-    },
-    {
-      "schema": "events/ai-operator-assistant-run-requested-v1.schema.json",
-      "valid": {"run_id": "ar.run-1", "session_id": "as.session-1", "intent": "integration", "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"run_id": "", "session_id": "s", "intent": "", "context_digest": "bad"}
-    },
-    {
-      "schema": "events/ai-operator-assistant-run-completed-v1.schema.json",
-      "valid": {"run_id": "ar.run-1", "state": "completed", "grounding_state": "grounded", "answer_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"run_id": "", "state": "running", "answer_digest": "bad", "context_digest": "bad"}
-    },
-    {
-      "schema": "events/ai-operator-assistant-run-failed-v1.schema.json",
-      "valid": {"run_id": "ar.run-1", "error_code": "provider_timeout", "retryable": true},
-      "invalid": {"run_id": "", "error_code": "Bad code", "retryable": "yes"}
-    },
-    {
-      "schema": "events/ai-operator-assistant-action-previewed-v1.schema.json",
-      "valid": {"preview_id": "ap:aaaaaaaaaaaaaaaaaaaaaaaaaa", "run_id": "ar.run-1", "action": "open.evidence", "risk": "read", "approval_required": false, "preview_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"preview_id": "bad", "run_id": "", "action": "", "risk": "root", "approval_required": "no", "preview_digest": "bad"}
-    },
-    {
-      "schema": "events/ai-operator-assistant-approval-requested-v1.schema.json",
-      "valid": {"preview_id": "ap:aaaaaaaaaaaaaaaaaaaaaaaaaa", "run_id": "ar.run-1", "action": "approval.request", "required_permission": "approvals.write", "preview_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "invalid": {"preview_id": "bad", "run_id": "", "action": "", "required_permission": "", "preview_digest": "bad"}
     }
   ]
 }

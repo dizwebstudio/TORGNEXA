@@ -2,6 +2,7 @@ package cscart
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
@@ -61,3 +62,60 @@ func (c *Connector) ReadInventory(ctx context.Context, account sdk.Account, runt
 	})
 	return output, err
 }
+
+// WriteInventory updates the single storefront stock balance exposed by
+// CS-Cart's product resource. A location other than cs-cart-store is rejected
+// instead of silently retargeting another warehouse.
+func (c *Connector) WriteInventory(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if c == nil || c.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.write") != nil || request.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	if request.LocationRemoteID != "" && request.LocationRemoteID != storeLocationID {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	cfg, err := c.configuration(ctx, account)
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, err
+	}
+	var receipt sdk.CommerceWriteReceipt
+	err = c.withCredentials(ctx, runtime, account.SecretReference, func(cred credentials) error {
+		current, fetchErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+		if fetchErr != nil {
+			return fetchErr
+		}
+		currentAmount, parseErr := strconv.ParseInt(current.Amount, 10, 64)
+		if parseErr != nil || currentAmount < 0 {
+			return ErrInvalidResponse
+		}
+		if currentAmount == request.Quantity {
+			receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Duplicate: true, Reconciled: true}
+			return receipt.Validate()
+		}
+		body, marshalErr := json.Marshal(struct {
+			Amount int64 `json:"amount"`
+		}{Amount: request.Quantity})
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if _, callErr := c.call(ctx, cfg, cred, "PUT", "/products/"+request.VariantRemoteID, nil, body); callErr != nil {
+			if !isAmbiguousWrite(callErr) {
+				return callErr
+			}
+			reconciled, reconcileErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+			if reconcileErr == nil && reconciled.Amount == strconv.FormatInt(request.Quantity, 10) {
+				receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true, Reconciled: true}
+				return receipt.Validate()
+			}
+			return writeOutcomeUnknown()
+		}
+		updated, fetchErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+		if fetchErr != nil || updated.Amount != strconv.FormatInt(request.Quantity, 10) {
+			return ErrInvalidResponse
+		}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true, Reconciled: true}
+		return receipt.Validate()
+	})
+	return receipt, err
+}
+
+var _ sdk.InventoryWriter = (*Connector)(nil)

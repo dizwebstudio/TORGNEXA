@@ -48,7 +48,7 @@ capabilities.
 | WooCommerce | product/price/inventory/order/return reads; product/price/inventory writes; order status write and signed webhook receipt ([Docker smoke](connectors/woocommerce/docker-smoke.md)) | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 | Yandex Market | product/price/inventory/order reads; price write; notification decoder | products, prices inbound; prices outbound; inventory and orders inbound | required |
 | Magento (Adobe Commerce) | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
-| CS-Cart | product read/write; base price, inventory and order reads | products inbound + outbound; prices, inventory and orders inbound | required |
+| CS-Cart | product read/write; base price and inventory reads/writes; order reads | products, prices and inventory inbound + outbound; orders inbound | required |
 | Saleor | product/price/inventory/order/return reads; product/price/inventory writes; order cancellation | products, prices, inventory, orders inbound + outbound; returns via separate read surface | required |
 
 The host registry contains SDK price, inventory and order readers for the qualified

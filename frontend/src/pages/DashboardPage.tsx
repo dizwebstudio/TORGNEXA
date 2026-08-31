@@ -172,7 +172,7 @@ function OperationalFlow({connectors, query, enabled, incidents, drift}: {connec
     <div className="flow-map">
       <div className="flow-node"><Icon name="connectors"/><strong>Продажи</strong><small>{channelSummary}</small></div>
       <span className="flow-arrow"><Icon name="arrowRight"/></span>
-      <div className="flow-node flow-core"><span className="brand-mark small">TN</span><strong>TORGNEXA</strong><small>синхронизация и контроль</small></div>
+      <div className="flow-node flow-core"><img className="flow-brand-symbol" src="/brand/torgnexa-symbol.png" alt="TORGNEXA"/><small>синхронизация и контроль</small></div>
       <span className="flow-arrow"><Icon name="arrowRight"/></span>
       <div className={`flow-node ${incidents ? "flow-danger" : ""}`}><Icon name="warehouse"/><strong>Склад</strong><small>{incidents ? `${incidents} требуют внимания` : "критичных проблем нет"}</small></div>
     </div>

@@ -39,7 +39,7 @@ const (
 	MaxSummaryRunes       = 1200
 	MaxSessionTitleRunes  = 120
 	MaxSourceRefLength    = 192
-	MaxProviderNameLength = 80
+	MaxTransportRefLength = 80
 	MaxModelNameLength    = 120
 )
 
@@ -315,7 +315,7 @@ type Answer struct {
 	Limitations     []string         `json:"limitations"`
 	Recommendations []Recommendation `json:"recommendations"`
 	ActionPreviews  []ActionPreview  `json:"action_previews"`
-	Provider        string           `json:"provider,omitempty"`
+	TransportRef    string           `json:"provider,omitempty"`
 	Model           string           `json:"model,omitempty"`
 	AIGenerated     bool             `json:"ai_generated"`
 	OutputKind      OutputKind       `json:"output_kind"`
@@ -328,7 +328,7 @@ func (a Answer) Validate(now time.Time) error {
 		len(a.Facts) > MaxFacts || len(a.Evidence) > MaxEvidence ||
 		len(a.Limitations) > MaxLimitations || len(a.Recommendations) > MaxRecommendations ||
 		len(a.ActionPreviews) > MaxActionPreviews || !a.OutputKind.Valid() ||
-		len(a.Provider) > MaxProviderNameLength || len(a.Model) > MaxModelNameLength ||
+		len(a.TransportRef) > MaxTransportRefLength || len(a.Model) > MaxModelNameLength ||
 		len(a.AnswerDigest) != 64 || !hexDigest(a.AnswerDigest) {
 		return ErrInvalid
 	}

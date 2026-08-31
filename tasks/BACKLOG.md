@@ -109,9 +109,9 @@ Task 153 adds CS-Cart as a self-hosted internet-store card using the official
 REST API 2.0 and HTTP Basic Auth (administrator e-mail plus API key). Product
 catalog reads, creates and updates are admitted with cursor pagination,
 idempotent SKU lookup and read-after-write reconciliation; base price and
-inventory reads, plus order reads, are admitted through the product projection
-and order detail endpoints and inbound reconciliation; price writes, inventory
-writes, order status writes and webhooks remain fail-closed. The runtime inventory is now 17
+inventory reads/writes, plus order reads, are admitted through the product
+projection and order detail endpoints with inbound/outbound reconciliation;
+order status writes and webhooks remain fail-closed. The runtime inventory is now 17
 generic integrations, 23 separate-surface providers and 14 planned entries.
 
 ## Saleor storefront runtime

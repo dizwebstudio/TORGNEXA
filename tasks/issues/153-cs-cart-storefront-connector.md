@@ -15,6 +15,8 @@ Acceptance criteria:
   inbound inventory reconciliation;
 - заказы читаются списком и деталями с bounded строками и попадают в inbound
   order reconciliation;
+- базовые цены и остатки записываются через product PUT с проверкой валюты,
+  единой storefront-локации и read-after-write в outbound reconciliation;
 - runtime support не заявляет неподдержанные сущности;
 - тесты, контракты, архитектурный review и документация обновлены;
 - `scripts/cscart-smoke.sh` предоставляет credentialed API 2.0 Basic Auth

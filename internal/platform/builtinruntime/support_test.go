@@ -84,7 +84,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 		t.Fatalf("1C-Bitrix storefront runtime support is inaccurate: %+v", storefront)
 	}
 	csCart, ok := SupportFor("cs-cart")
-	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsCapability("cs-cart", "prices.read") || !SupportsCapability("cs-cart", "inventory.read") || !SupportsCapability("cs-cart", "orders.read") || !SupportsSync("cs-cart", "products", "bidirectional") || !SupportsSync("cs-cart", "prices", "inbound") || !SupportsSync("cs-cart", "inventory", "inbound") || !SupportsSync("cs-cart", "orders", "inbound") || SupportsCapability("cs-cart", "prices.write") || SupportsCapability("cs-cart", "inventory.write") {
+	if !ok || csCart.Stage != SupportReady || csCart.Surface != "integrations" || !SupportsAccountConfiguration("cs-cart") || !SupportsCapability("cs-cart", "products.read") || !SupportsCapability("cs-cart", "products.write") || !SupportsCapability("cs-cart", "prices.read") || !SupportsCapability("cs-cart", "prices.write") || !SupportsCapability("cs-cart", "inventory.read") || !SupportsCapability("cs-cart", "inventory.write") || !SupportsCapability("cs-cart", "orders.read") || !SupportsSync("cs-cart", "products", "bidirectional") || !SupportsSync("cs-cart", "prices", "bidirectional") || !SupportsSync("cs-cart", "inventory", "bidirectional") || !SupportsSync("cs-cart", "orders", "inbound") {
 		t.Fatalf("CS-Cart storefront runtime support is inaccurate: %+v", csCart)
 	}
 	for _, connectorID := range []string{"cdek", "dellin", "fivepost", "ozon-delivery", "pek", "pochta-russia"} {
@@ -428,7 +428,7 @@ func TestBitrixPriceWriterAdmissionIsExact(t *testing.T) {
 func TestStorefrontPriceWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	for _, connectorID := range []string{"bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
+	for _, connectorID := range []string{"bitrix", "cs-cart", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce", "yandex-market"} {
 		account := supportTestAccount(t, connectorID)
 		if !registry.SupportsPriceWrite(account) || !SupportsCapability(connectorID, "prices.write") || !SupportsSync(connectorID, "prices", "outbound") {
 			t.Fatalf("%s price write support is not admitted", connectorID)
@@ -442,7 +442,7 @@ func TestStorefrontPriceWriterAdmissionIsExact(t *testing.T) {
 func TestStorefrontInventoryWriterAdmissionIsExact(t *testing.T) {
 	registry := New()
 	load := func(context.Context, string) (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
-	for _, connectorID := range []string{"bitrix", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce"} {
+	for _, connectorID := range []string{"bitrix", "cs-cart", "magento", "medusa", "opencart", "prestashop", "saleor", "shopify", "shopware", "woocommerce"} {
 		account := supportTestAccount(t, connectorID)
 		if !registry.SupportsInventoryWrite(account) || !SupportsCapability(connectorID, "inventory.write") || !SupportsSync(connectorID, "inventory", "outbound") {
 			t.Fatalf("%s inventory write support is not admitted", connectorID)

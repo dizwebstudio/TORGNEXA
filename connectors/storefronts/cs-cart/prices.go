@@ -2,6 +2,7 @@ package cscart
 
 import (
 	"context"
+	"encoding/json"
 
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
@@ -61,3 +62,57 @@ func (c *Connector) ReadPrices(ctx context.Context, account sdk.Account, runtime
 	})
 	return output, err
 }
+
+// WritePrice updates the product-level CS-Cart price fields. CS-Cart has no
+// separate offer resource in the API surface used by this connector, so the
+// product ID is the only admitted variant identity.
+func (c *Connector) WritePrice(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.PriceWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if c == nil || c.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "prices.write") != nil || request.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	cfg, err := c.configuration(ctx, account)
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, err
+	}
+	if request.Currency != cfg.StoreCurrency {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	var receipt sdk.CommerceWriteReceipt
+	err = c.withCredentials(ctx, runtime, account.SecretReference, func(cred credentials) error {
+		current, fetchErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+		if fetchErr != nil {
+			return fetchErr
+		}
+		if current.Price == request.Value && current.ListPrice == request.CompareAt {
+			receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Duplicate: true, Reconciled: true}
+			return receipt.Validate()
+		}
+		body, marshalErr := json.Marshal(struct {
+			Price     string `json:"price"`
+			ListPrice string `json:"list_price"`
+		}{Price: request.Value, ListPrice: request.CompareAt})
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if _, callErr := c.call(ctx, cfg, cred, "PUT", "/products/"+request.VariantRemoteID, nil, body); callErr != nil {
+			if !isAmbiguousWrite(callErr) {
+				return callErr
+			}
+			reconciled, reconcileErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+			if reconcileErr == nil && reconciled.Price == request.Value && reconciled.ListPrice == request.CompareAt {
+				receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true, Reconciled: true}
+				return receipt.Validate()
+			}
+			return writeOutcomeUnknown()
+		}
+		updated, fetchErr := c.fetchProduct(ctx, cfg, cred, request.VariantRemoteID)
+		if fetchErr != nil || updated.Price != request.Value || updated.ListPrice != request.CompareAt {
+			return ErrInvalidResponse
+		}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true, Reconciled: true}
+		return receipt.Validate()
+	})
+	return receipt, err
+}
+
+var _ sdk.PriceWriter = (*Connector)(nil)

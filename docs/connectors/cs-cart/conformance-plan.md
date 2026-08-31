@@ -5,7 +5,7 @@ conformance suite с тестовым CS-Cart store или детерминир�
 
 1. валидная/невалидная Basic Auth;
 2. постраничное чтение каталога, bounded price/inventory/order reads и tenant isolation;
-3. создание и обновление с повтором idempotency key;
+3. создание и обновление товара, цены и остатка с повтором idempotency key;
 4. read-after-write и reconciliation после timeout;
 5. rate-limit и безопасное преобразование ошибок.
 
@@ -24,6 +24,7 @@ Auth. Поэтому `conformance-report.json` нельзя трактовать
 Для реальной проверки используйте [docker-live-qualification.md](docker-live-qualification.md)
 и запустите `scripts/cscart-smoke.sh` на отдельном non-production магазине.
 Скрипт проверяет отказ без Basic Auth, чтение каталога, базовой цены и списка
-заказов, создание товара, поиск по SKU, обновление и read-after-write, а затем
+заказов, создание товара, поиск по SKU, обновление товара, цены и остатка с
+read-after-write, а затем
 удаляет созданный синтетический товар. Он завершает работу с кодом `2`, если endpoint или
 учётные данные не заданы.

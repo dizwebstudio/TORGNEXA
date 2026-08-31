@@ -431,57 +431,66 @@ tbody tr:last-child td { border-bottom: 0; }
 
 /* Task 119 — UI/UX modernization */
 :root {
-  --bg: #f4f6f9;
+  --bg: #f5f9fc;
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-soft: #f8fafc;
-  --border: #e3e8ef;
-  --border-strong: #cfd7e4;
-  --text: #182230;
-  --text-muted: #697586;
-  --text-faint: #98a2b3;
-  --brand: #3159d8;
-  --brand-strong: #2349bd;
-  --brand-soft: #edf3ff;
+  --surface-soft: #f1f7fb;
+  --border: #dce8ef;
+  --border-strong: #bdd1dd;
+  --text: #10232d;
+  --text-muted: #617884;
+  --text-faint: #91a5b0;
+  --brand: #0b67d1;
+  --brand-strong: #0752b6;
+  --brand-soft: #e8f4ff;
+  --brand-gradient: linear-gradient(135deg,#0752b6 0%,#08a3ca 62%,#67d45b 100%);
+  --accent: #62cf59;
+  --accent-strong: #42b94f;
+  --accent-soft: #effbe9;
   --success: #067647;
   --success-soft: #ecfdf3;
   --warning: #b54708;
   --warning-soft: #fffaeb;
   --danger: #b42318;
   --danger-soft: #fef3f2;
-  --info: #175cd3;
-  --info-soft: #eff8ff;
+  --info: #0084b8;
+  --info-soft: #e8f8fd;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 18px;
   --shadow-sm: 0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.05);
   --shadow-md: 0 12px 32px rgba(16,24,40,.09);
-  --focus: 0 0 0 3px rgba(49,89,216,.18);
+  --focus: 0 0 0 3px rgba(11,103,209,.2);
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #0d1117;
-  --surface: #151b24;
-  --surface-raised: #1a222d;
-  --surface-soft: #10161e;
-  --border: #263241;
-  --border-strong: #344255;
-  --text: #e8edf5;
-  --text-muted: #a7b1c0;
-  --text-faint: #748095;
-  --brand: #7aa2ff;
-  --brand-strong: #a7c0ff;
-  --brand-soft: #18284a;
+  --bg: #07131c;
+  --surface: #0d202a;
+  --surface-raised: #112a35;
+  --surface-soft: #0a1b25;
+  --border: #1d3d49;
+  --border-strong: #2b5664;
+  --text: #ebf8fb;
+  --text-muted: #a4bdc7;
+  --text-faint: #718e9a;
+  --brand: #3fc2ef;
+  --brand-strong: #0a67a8;
+  --brand-soft: #0e3647;
+  --brand-gradient: linear-gradient(135deg,#0752b6 0%,#0ab2d0 62%,#73e26a 100%);
+  --accent: #91ec6d;
+  --accent-strong: #65d85e;
+  --accent-soft: #193b27;
   --success: #5ad69a;
   --success-soft: #10291f;
   --warning: #fdb96b;
   --warning-soft: #332212;
   --danger: #ff8c85;
   --danger-soft: #351817;
-  --info: #8bb7ff;
-  --info-soft: #12253e;
+  --info: #68d8f2;
+  --info-soft: #103945;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
   --shadow-md: 0 18px 40px rgba(0,0,0,.35);
+  --focus: 0 0 0 3px rgba(63,194,239,.25);
   color-scheme: dark;
 }
 html { background: var(--bg); }
@@ -817,6 +826,40 @@ kbd { font: 600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px s
   .catalog-primary-image { max-width:240px; }
   .product-create-card-footer .account-actions { justify-content:stretch; }
   .product-create-card-footer .button { width:100%; justify-content:center; }
+}
+
+/* TORGNEXA brand system */
+.brand-logo-frame { flex:0 0 auto; width:174px; height:34px; display:flex; align-items:center; }
+.brand-logo-frame img { display:block; width:100%; height:100%; object-fit:contain; object-position:left center; }
+.brand-logo-symbol { display:none!important; width:44px!important; }
+.brand-copy { display:grid; gap:2px; }
+.brand-copy small { margin-top:0; color:var(--text-faint); }
+.brand-mark { background:var(--brand-gradient); box-shadow:0 12px 35px color-mix(in srgb,var(--brand) 25%,transparent); }
+.sidebar { background:linear-gradient(180deg,color-mix(in srgb,var(--brand-soft) 48%,var(--surface)),var(--surface) 180px); }
+.eyebrow { color:var(--brand); }
+.primary-metric { background:linear-gradient(135deg,var(--brand-strong),var(--info) 78%); }
+.button.primary { background:linear-gradient(135deg,var(--brand-strong),var(--brand)); }
+.button.primary:hover { background:linear-gradient(135deg,var(--brand),var(--accent-strong)); }
+.button.ghost { background:var(--surface); color:var(--text); border-color:var(--border); }
+.notification.unread { border-left-color:var(--brand); }
+.flow-core { background:linear-gradient(145deg,var(--brand-soft),color-mix(in srgb,var(--accent-soft) 48%,var(--surface))); }
+.flow-brand-symbol { display:block; width:136px; height:38px; object-fit:contain; object-position:center; }
+.docs-brand-logo { display:block; width:180px; height:34px; }
+.docs-brand-logo img { display:block; width:100%; height:100%; object-fit:contain; object-position:left center; }
+.auth-brand-logo { display:block; width:min(320px,78vw); height:auto; max-height:78px; object-fit:contain; object-position:center; }
+.visually-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+.docs-login-link { background:var(--brand-strong); }
+
+@media (max-width: 980px) {
+  .brand-logo-frame { width:44px; height:32px; }
+  .brand-logo-full { display:none!important; }
+  .brand-logo-symbol { display:block!important; }
+  .flow-brand-symbol { width:128px; }
+}
+
+@media (max-width: 700px) {
+  .docs-brand-logo { width:168px; height:31px; }
+  .auth-brand-logo { width:min(290px,82vw); }
 }
 :root[data-density="compact"] .data-table th,
 :root[data-density="compact"] .data-table td { padding-top:8px; padding-bottom:8px; }

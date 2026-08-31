@@ -685,7 +685,7 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
   return <div className="docs-shell">
     <DocumentationMetadata page={page}/>
     <header className="docs-header">
-      <a className="docs-brand" href="/"><span className="brand-mark small">TN</span><span><strong>TORGNEXA</strong><small>Документация</small></span></a>
+      <a className="docs-brand" href="/"><span className="docs-brand-logo"><img src="/brand/torgnexa-logo.png" alt="TORGNEXA" width="985" height="145" loading="lazy" decoding="async"/></span><span><small>Документация</small></span></a>
       <nav aria-label="Навигация документации"><a href="/docs">Руководство</a><a className="docs-login-link" href="/">Войти</a></nav>
     </header>
     <div className="docs-layout">

@@ -53,7 +53,7 @@ scripts/cscart-smoke.sh
 ```
 
 Скрипт использует API 2.0 и Basic Auth (`email:API key`), проверяет `401` без
-credentials, bounded catalog/price/inventory read, создание синтетического товара, поиск по
+credentials, bounded catalog/price/inventory/order read, создание синтетического товара, поиск по
 `pcode`, чтение по ID, обновление и read-after-write. Созданный тестовый товар
 удаляется в `trap`; `CS_CART_KEEP_PRODUCT=1` оставляет его для ручного осмотра.
 Ключ и ответы магазина не выводятся и не сохраняются как evidence. При

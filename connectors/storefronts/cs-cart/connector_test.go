@@ -2,6 +2,7 @@ package cscart
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -124,6 +125,71 @@ func TestReadInventoryRejectsFractionalAmount(t *testing.T) {
 	_, err := New(transport, testConfig{}, nil).ReadInventory(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.InventoryQuery{LocationRemoteID: "cs-cart-store", VariantRemoteIDs: []string{"12"}})
 	if err != ErrInvalidResponse {
 		t.Fatalf("expected invalid response, got %v", err)
+	}
+}
+
+func TestWritePriceUsesProductUpdateAndReadAfterWrite(t *testing.T) {
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		switch request.Method + " " + request.Path {
+		case "GET /api/2.0/products/12":
+			if calls == 1 {
+				return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"100.00","list_price":"120.00","amount":"18","status":"A","updated_timestamp":"1720000000"}`)}, nil
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"199.90","list_price":"249.00","amount":"18","status":"A","updated_timestamp":"1720000001"}`)}, nil
+		case "PUT /api/2.0/products/12":
+			var body map[string]string
+			if json.Unmarshal(request.Body, &body) != nil || body["price"] != "199.90" || body["list_price"] != "249.00" {
+				t.Fatalf("unexpected price update body: %s", request.Body)
+			}
+			return Response{StatusCode: 200, Body: []byte(`{}`)}, nil
+		default:
+			t.Fatalf("unexpected request: %+v", request)
+			return Response{}, nil
+		}
+	}}
+	receipt, err := New(transport, testConfig{}, nil).WritePrice(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.PriceWriteRequest{VariantRemoteID: "12", Value: "199.90", CompareAt: "249.00", Currency: "RUB", IdempotencyKey: "cs-price-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Applied || !receipt.Reconciled || receipt.Duplicate || receipt.RemoteID != "12" {
+		t.Fatalf("unexpected price receipt: %#v", receipt)
+	}
+}
+
+func TestWriteInventoryUsesSingleStorefrontLocation(t *testing.T) {
+	calls := 0
+	transport := scriptedTransport{fn: func(request Request) (Response, error) {
+		calls++
+		switch request.Method + " " + request.Path {
+		case "GET /api/2.0/products/12":
+			if calls == 1 {
+				return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"199.90","list_price":"249.00","amount":"18","status":"A","updated_timestamp":"1720000000"}`)}, nil
+			}
+			return Response{StatusCode: 200, Body: []byte(`{"product_id":"12","product":"100g Pants","product_code":"SKU-12","price":"199.90","list_price":"249.00","amount":"24","status":"A","updated_timestamp":"1720000001"}`)}, nil
+		case "PUT /api/2.0/products/12":
+			var body struct {
+				Amount int64 `json:"amount"`
+			}
+			if json.Unmarshal(request.Body, &body) != nil || body.Amount != 24 {
+				t.Fatalf("unexpected inventory update body: %s", request.Body)
+			}
+			return Response{StatusCode: 200, Body: []byte(`{}`)}, nil
+		default:
+			t.Fatalf("unexpected request: %+v", request)
+			return Response{}, nil
+		}
+	}}
+	receipt, err := New(transport, testConfig{}, nil).WriteInventory(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.InventoryWriteRequest{VariantRemoteID: "12", LocationRemoteID: "cs-cart-store", Quantity: 24, IdempotencyKey: "cs-stock-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !receipt.Applied || !receipt.Reconciled || receipt.Duplicate || receipt.RemoteID != "12" {
+		t.Fatalf("unexpected inventory receipt: %#v", receipt)
+	}
+	if _, err := New(transport, testConfig{}, nil).WriteInventory(context.Background(), testAccount(), testRuntime{credentialJSON()}, sdk.InventoryWriteRequest{VariantRemoteID: "12", LocationRemoteID: "warehouse-2", Quantity: 24, IdempotencyKey: "cs-stock-2"}); err != sdk.ErrInvalidCommerceWrite {
+		t.Fatalf("expected location rejection, got %v", err)
 	}
 }
 

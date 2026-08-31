@@ -791,7 +791,8 @@ Task 153 adds CS-Cart as a distinct self-hosted internet-store connector. The
 official API 2.0 Basic Auth surface admits product catalog reads and
 idempotent creates/updates with SKU lookup and read-after-write reconciliation,
 bounded base-price and single-storefront inventory reads, and bounded order
-list/detail reads; price/inventory/order writes and webhooks remain unavailable.
+list/detail reads; price/inventory writes use product PUT with
+read-after-write; order writes and webhooks remain unavailable.
 
 ### Gate RUNTIME-153
 
@@ -801,7 +802,7 @@ list/detail reads; price/inventory/order writes and webhooks remain unavailable.
   with bounded responses and cursor pagination;
 - runtime support, generated catalogs, architecture policy/review, frontend
   presentation, task docs and conformance evidence are synchronized;
-- price/inventory/order writes and webhook receipt remain fail-closed;
+- order status writes and webhook receipt remain fail-closed;
 - option-combination order lines and unknown remote status codes remain
   fail-closed rather than being projected ambiguously;
 - Go tests/vet, contracts, frontend tests/build and package-index checks pass;

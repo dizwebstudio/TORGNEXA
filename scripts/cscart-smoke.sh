@@ -119,6 +119,8 @@ import json, sys
 print(json.dumps({"product":sys.argv[2]+" updated","product_code":sys.argv[1],"full_description":"Synthetic TORGNEXA CS-Cart live qualification product updated","status":"A"}, separators=(",", ":")))
 PY
 )"
+price_update_body='{"price":"1.00","list_price":"2.00"}'
+inventory_update_body='{"amount":7}'
 
 echo "CS-Cart REST API 2.0 live smoke: $base_url"
 request unauthorized GET 'products?items_per_page=1&pshort=Y&pfull=Y' '' no
@@ -157,8 +159,23 @@ assert_json product amount
 echo "PASS product (product_code=$sku)"
 request update PUT "products/$created_id" "$update_body"
 assert_status update 200
+request price_update PUT "products/$created_id" "$price_update_body"
+assert_status price_update 200
+request inventory_update PUT "products/$created_id" "$inventory_update_body"
+assert_status inventory_update 200
 request read_after_write GET "products/$created_id"
 assert_status read_after_write 200
 [[ "$(json_value read_after_write product)" == "$title updated" ]] || { echo "FAIL read_after_write: title mismatch" >&2; exit 1; }
-echo "PASS read_after_write (title updated and reconciled)"
+python3 - "$tmp_dir/read_after_write.body" <<'PY'
+from decimal import Decimal
+import json, sys
+product = json.load(open(sys.argv[1], encoding="utf-8"))
+if Decimal(str(product.get("price"))) != Decimal("1.00"):
+    raise SystemExit("price was not reconciled")
+if Decimal(str(product.get("list_price"))) != Decimal("2.00"):
+    raise SystemExit("list_price was not reconciled")
+if Decimal(str(product.get("amount"))) != Decimal("7"):
+    raise SystemExit("amount was not reconciled")
+PY
+echo "PASS read_after_write (title, price and inventory reconciled)"
 echo "CS-Cart REST API 2.0 live smoke: all checks passed"
