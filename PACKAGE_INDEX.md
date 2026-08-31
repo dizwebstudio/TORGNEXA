@@ -1,6 +1,9 @@
 # Package status — 2026-08-31
 
-**Tasks 001–183 are repository-implemented.** Task 183 admits MAX inbound
+**Tasks 001–185 are repository-implemented.** Task 185 admits Russian Post
+batch handoff through the approval-bound check-in route and durable idempotency
+receipt. Task 184 admits Russian Post batch formation through the approval-bound
+logistics route and durable idempotency receipt. Task 183 admits MAX inbound
 Webhook reception through the public tenant-bound route and host-owned
 Inbox/outbox. Task 182 admits MAX HTTPS URL buttons through the existing Social
 API, leased worker and inline-keyboard adapter. Task 181 admits Telegram HTTPS
@@ -41,7 +44,7 @@ generic product integrations and 43 separate-surface providers; there are no
 planned connectors. Architecture policy: **146 modules / 61 providers / 168
 reviews**. Active migrations are **41**, latest `000041`, with
 the original **74-file / legacy head 000074** chain archived as immutable
-evidence. Public OpenAPI is **210 operations / 0.21.2**.
+evidence. Public OpenAPI is **212 operations / 0.21.2**.
 
 The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provider qualification remains evidence-specific and is documented in `VALIDATION_REPORT.md`.
 
@@ -52,12 +55,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 ## Summary
 
 - docs: 541
-- adrs: 135
-- tasks: 185
+- adrs: 137
+- tasks: 187
 - milestones: 14
 - contracts: 242
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3187
+- total source files (excluding local secrets/build/dependency/cache trees): 3193
 
 
 ## Connector category layout
@@ -68,6 +71,17 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
   generators are synchronized with the categorized paths;
 - the provider ID remains the package boundary and generated catalog order is
   stable by ID.
+
+## Task 185 additions
+
+- provider-neutral `logistics.batches.submit` capability and generated SDK
+  operation for Russian Post batch check-in;
+- approval-bound tenant API with independent idempotency and pending-receipt
+  handling for ambiguous provider outcomes;
+- official `POST /1.0/batch/{batch-name}/checkin` host transport, explicit
+  `f103-sent` confirmation and optional online-balance flag;
+- integration-catalog UI control, deterministic adapter/transport/API/runtime
+  tests, OpenAPI parity and architecture qualification evidence.
 
 ## Task 163 additions
 
@@ -671,6 +685,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0133-telegram-publication-buttons.md`
 - `adr/0134-max-publication-buttons.md`
 - `adr/0135-max-inbound-webhooks.md`
+- `adr/0136-pochta-batch-formation.md`
+- `adr/0137-pochta-batch-handoff.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -843,6 +859,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/181-telegram-publication-buttons.json`
 - `architecture/reviews/182-max-publication-buttons.json`
 - `architecture/reviews/183-max-inbound-webhooks.json`
+- `architecture/reviews/184-pochta-batch-formation.json`
+- `architecture/reviews/185-pochta-batch-handoff.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -3617,6 +3635,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/181-telegram-publication-buttons.md`
 - `tasks/issues/182-max-publication-buttons.md`
 - `tasks/issues/183-max-inbound-webhooks.md`
+- `tasks/issues/184-pochta-batch-formation.md`
+- `tasks/issues/185-pochta-batch-handoff.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

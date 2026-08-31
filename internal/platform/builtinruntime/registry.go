@@ -179,6 +179,30 @@ func (r *Registry) LogisticsBatches(ctx context.Context, account sdk.Account, ru
 	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil).ReadLogisticsBatches(ctx, account, runtime, query)
 }
 
+// LogisticsBatchCreator resolves the qualified Russian Post batch-formation
+// surface.
+func (r *Registry) LogisticsBatchCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCreator, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.create") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
+// LogisticsBatchSubmitter resolves the qualified Russian Post hand-off
+// surface for formed batches.
+func (r *Registry) LogisticsBatchSubmitter(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchSubmitter, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.batches.submit") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 // LogisticsRates calculates bounded provider rates through the reviewed
 // logistics composition. Provider service identifiers remain inside the
 // adapter; the application exposes only its neutral rate preview.

@@ -155,8 +155,13 @@ read-only отслеживание одного отправления чере�
 только проверенная content-addressed PDF-ссылка. Почта
 России также принимает одиночный заказ через `PUT /1.0/user/backlog` с
 ограниченным маппингом адреса, ФИО и габаритов; bounded чтение справочника
-партий доступно через `GET /api/v1/logistics/batches`, а формирование партии и
-передача в работу остаются закрытыми. Удаление одного нового заказа доступно через
+партий доступно через `GET /api/v1/logistics/batches`, а формирование партии
+из 1–100 числовых order IDs — через approval-bound `POST
+/api/v1/logistics/batches` (официальный `POST /1.0/user/shipment`). Передача
+в работу выполняется отдельным approval-bound `POST
+/api/v1/logistics/batches/{batch_id}/submit` через официальный
+`POST /1.0/batch/{batch-name}/checkin`; принимается только подтверждение
+`f103-sent`. Удаление одного нового заказа доступно через
 `DELETE /1.0/backlog` при точном совпадении результата. Для ПЭК доступно
 bounded создание одной заявки самовывозом через официальный
 `POST /api/v1/preregistration/submit/`: sender warehouse, контактные данные,
@@ -219,7 +224,9 @@ transport-label read returns an opaque PDF artifact reference. ПЭК additional
 admits one bounded self-delivery preregistration with explicit sender-warehouse
 configuration; the provider acceptance remains asynchronous. Почта России
 returns the same neutral artifact reference after validating the official PDF
-response for both the regular and easy-return forms. Dellin additionally
+response for both the regular and easy-return forms. Russian Post batch
+handoff is also available through the approval-bound check-in route and
+idempotent operation receipt; separate return shipments remain closed. Dellin additionally
 supports the bounded address-to-address shipment-create route with explicit
 counterparty runtime configuration. ПЭК также допускает аннулирование одной
 предварительной заявки через официальный `/order/cancellation/` с точным

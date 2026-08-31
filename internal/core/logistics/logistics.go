@@ -5,6 +5,7 @@ package logistics
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -24,6 +25,19 @@ var (
 
 var referencePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// OperationReceipt is the durable host-owned state of an external logistics
+// mutation. A pending receipt intentionally has no retry semantics: the
+// remote outcome may be unknown after a transport failure.
+type OperationReceipt struct {
+	State  string
+	Result json.RawMessage
+}
+
+// Valid reports whether the receipt state is one of the persisted states.
+func (receipt OperationReceipt) Valid() bool {
+	return receipt.State == "pending" || receipt.State == "completed"
+}
 
 // ShipmentID is the canonical TORGNEXA identity of a shipment.
 type ShipmentID string

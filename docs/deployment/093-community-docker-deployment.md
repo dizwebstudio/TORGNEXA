@@ -96,6 +96,17 @@ release policy or change the single-host/non-HA qualification of Task 093.
 `TORGNEXA_E2E_BASE_URL` и `TORGNEXA_E2E_KEYCLOAK_URL` для нестандартных
 локальных адресов.
 
+Чтобы быстро проверить только authorization-code вход и центр качества
+публикации, не изменяя демо-данные, запустите скрипт напрямую:
+
+```bash
+TORGNEXA_E2E_PUBLICATION_QUALITY_ONLY=true node scripts/community-e2e.mjs
+```
+
+Режим открывает `/publication-quality`, проверяет tenant-scoped запрос к
+`/api/v1/publication-quality/runs` и убеждается, что интерфейс не показывает
+ошибку загрузки.
+
 ## Production boundary
 
 This Compose file is not an HA topology. Before public production deployment repeat backup/restore and upgrade rehearsals, supply-chain/signing qualification, hosted architecture rules, provider staging qualification, TLS/WAF/DDoS design, secret management and capacity/SLO tests against the actual topology.

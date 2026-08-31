@@ -97,7 +97,7 @@ func TestPublicationButtonsMigrationIsBoundedAndAdditive(t *testing.T) {
 		"create or replace function social_valid_capabilities",
 		"social.post.buttons",
 		"create function social_valid_buttons",
-		"add column buttons jsonb not null default ''[]''::jsonb",
+		"add column buttons jsonb not null default '[]'::jsonb",
 		"social_variants_buttons_chk",
 		"callback data",
 		"insert into migration_history",

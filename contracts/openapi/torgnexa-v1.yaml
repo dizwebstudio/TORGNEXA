@@ -112,6 +112,44 @@ paths:
         '403': {description: Caller lacks connectors.read}
         '409': {description: Logistics account or capability is unavailable}
         '502': {description: Logistics provider unavailable}
+    post:
+      operationId: createLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchCreateRequest'}
+      responses:
+        '201': {description: Remote batch formed, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatch'}}}}
+        '202': {description: Batch formation outcome is pending and must not be retried automatically}
+        '400': {description: Invalid batch or idempotency key}
+        '403': {description: Caller lacks logistics.batches.create}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
+  /logistics/batches/{batch_id}/submit:
+    post:
+      operationId: submitLogisticsBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsBatchSubmitRequest'}
+      responses:
+        '201': {description: Batch hand-off accepted, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsBatchSubmission'}}}}
+        '202': {description: Batch hand-off outcome is pending and must not be retried automatically}
+        '400': {description: Invalid batch or idempotency key}
+        '403': {description: Caller lacks logistics.batches.submit}
+        '409': {description: 'Batch capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
   /logistics/rates:
     post:
       operationId: calculateLogisticsRates
@@ -3057,6 +3095,31 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/LogisticsBatch'}}
+    LogisticsBatchCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, order_ids]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        order_ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        sending_date: {type: string, format: date, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+        use_online_balance: {type: boolean, default: false}
+    LogisticsBatchSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        use_online_balance: {type: boolean, default: false}
+    LogisticsBatchSubmission:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, accepted, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        accepted: {type: boolean}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsAddress:
       type: object
       additionalProperties: false

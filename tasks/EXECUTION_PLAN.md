@@ -1624,3 +1624,30 @@ tenant-scoped Task-009 Inbox and transactional outbox. Raw provider payloads
 and verification secrets do not enter durable event data. Subscription
 management, edit/delete and live MAX delivery qualification remain separate
 release gates.
+
+## Phase 53 — Почта России — формирование партии
+
+`184`
+
+Task 184 admits the existing Russian Post batch formation contract through the
+production route. The API requires an enabled `logistics.batches.create`
+capability, a matching approved `fulfillment.batch.create` request and an
+`Idempotency-Key`. The connector calls `POST /1.0/user/shipment` with a bounded
+array of numeric backlog order IDs and returns only a normalized batch
+projection. Tenant-scoped operation receipts prevent duplicate external calls;
+ambiguous failures remain pending for reconciliation. Handoff to postal work
+and separate return shipments stay outside this phase.
+
+## Phase 54 — Почта России — передача партии в работу
+
+`185`
+
+Task 185 admits the Russian Post batch check-in contract through the production
+route. The API requires an enabled `logistics.batches.submit` capability, a
+matching approved `fulfillment.batch.submit` request and an `Idempotency-Key`.
+The connector calls `POST /1.0/batch/{batch-name}/checkin`, optionally passes
+`useOnlineBalance=true` and accepts only an explicit `f103-sent` confirmation.
+The normalized submission result is stored in the tenant-scoped operation
+receipt; completed replays never call the provider again and ambiguous results
+remain pending for reconciliation. Separate return shipments remain outside
+this phase.

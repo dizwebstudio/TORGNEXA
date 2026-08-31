@@ -290,6 +290,19 @@ async function run() {
     assert(session?.url === new URL("/", appURL).toString(), `после входа открыта неожиданная страница: ${session?.url}`);
     assert(/Демо|Demo/.test(session.display), "в консоли не отображается демо-пользователь");
 
+    // Publication quality is a read-only, tenant-scoped surface. Check it
+    // immediately after authentication so a missing migration or stale API
+    // image cannot regress into a generic loading error in the console.
+    await navigate(page, new URL("/publication-quality", appURL).toString());
+    await page.waitFor("document.body.innerText.includes('Качество публикации')", "центр качества публикации", 45000);
+    await page.waitFor("!document.body.innerText.includes('Не удалось загрузить центр качества публикации.')", "ответ API центра качества", 45000);
+    await navigate(page, appURL);
+    await page.waitFor("document.querySelector('.sidebar') && document.body.innerText.includes('Каталог')", "возврат в консоль", 45000);
+    if (process.env.TORGNEXA_E2E_PUBLICATION_QUALITY_ONLY === "true") {
+      console.log("community-e2e: PASS — Keycloak demo user and publication quality center verified");
+      return;
+    }
+
     // Keep the browser check self-contained on a fresh or previously reused
     // community stack. The action is idempotent and only creates synthetic
     // tenant-scoped records; it also repairs a stale demo image projection.

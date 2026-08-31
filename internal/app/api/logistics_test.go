@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -35,6 +36,8 @@ type logisticsRuntimeStub struct {
 	rates     []sdk.RateQuote
 	tracking  sdk.ShipmentResult
 	label     sdk.LabelResult
+	creator   sdk.LogisticsBatchCreator
+	submitter sdk.LogisticsBatchSubmitter
 }
 
 type logisticsBatchRuntimeStub struct {
@@ -111,6 +114,70 @@ func (stub logisticsBatchRuntimeStub) LogisticsBatches(_ context.Context, _ sdk.
 	return stub.batches, nil
 }
 
+func (stub logisticsRuntimeStub) LogisticsBatchCreator(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchCreator, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.creator, nil
+}
+
+func (stub logisticsRuntimeStub) LogisticsBatchSubmitter(_ context.Context, _ sdk.Account, runtime sdk.Runtime) (sdk.LogisticsBatchSubmitter, error) {
+	if runtime == nil {
+		return nil, errors.New("runtime missing")
+	}
+	return stub.submitter, nil
+}
+
+type logisticsBatchCreatorStub struct {
+	batch  sdk.LogisticsBatch
+	called bool
+}
+
+type logisticsBatchSubmitterStub struct {
+	submission sdk.LogisticsBatchSubmission
+	called     bool
+}
+
+func (stub *logisticsBatchSubmitterStub) SubmitLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
+	stub.called = true
+	if stub.submission.RemoteID == "" {
+		stub.submission.RemoteID = request.BatchID
+	}
+	return stub.submission, nil
+}
+
+func (stub *logisticsBatchCreatorStub) CreateLogisticsBatch(_ context.Context, _ sdk.Account, _ sdk.Runtime, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
+	stub.called = true
+	if stub.batch.ShipmentCount == 0 {
+		stub.batch.ShipmentCount = len(request.OrderIDs)
+	}
+	return stub.batch, nil
+}
+
+type logisticsOperationStub struct {
+	receipt        logistics.OperationReceipt
+	fresh          bool
+	beginCalled    bool
+	completeCalled bool
+	result         json.RawMessage
+}
+
+func (stub *logisticsOperationStub) BeginOperation(_ context.Context, _ tenancy.Scope, _ string, _ string, _ [32]byte) (logistics.OperationReceipt, bool, error) {
+	stub.beginCalled = true
+	if stub.receipt.State == "" {
+		stub.receipt.State = "pending"
+	}
+	return stub.receipt, stub.fresh, nil
+}
+
+func (stub *logisticsOperationStub) CompleteOperation(_ context.Context, _ tenancy.Scope, _ string, _ string, result json.RawMessage) error {
+	stub.completeCalled = true
+	stub.result = append(json.RawMessage(nil), result...)
+	stub.receipt.State = "completed"
+	stub.receipt.Result = append(json.RawMessage(nil), result...)
+	return nil
+}
+
 type logisticsSecretsStub struct{}
 
 func (logisticsSecretsStub) Create(context.Context, tenancy.Scope, secrets.Class, []byte) (secrets.Metadata, error) {
@@ -178,7 +245,7 @@ func TestLogisticsBatchesRouteReturnsBoundedPage(t *testing.T) {
 	})
 	var route ProtectedRoute
 	for _, candidate := range routes {
-		if candidate.Path == logisticsBatchesPath {
+		if candidate.Method == http.MethodGet && candidate.Path == logisticsBatchesPath {
 			route = candidate
 		}
 	}
@@ -190,6 +257,119 @@ func TestLogisticsBatchesRouteReturnsBoundedPage(t *testing.T) {
 	route.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"remote_id":"batch-1"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLogisticsBatchCreationRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchCreateInput{ConnectorAccountID: account.ID, OrderIDs: []string{"57565818", "57565819"}, SendingDate: "2026-08-31", UseOnlineBalance: true}
+	digest, err := logisticsBatchCreateDigest(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-batch-1"
+	creator := &logisticsBatchCreatorStub{batch: sdk.LogisticsBatch{RemoteID: "batch-2026-003", Status: "CREATED", ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, creator: creator}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.create", ResourceType: "logistics_batch", ResourceID: logisticsBatchApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchesPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil {
+		t.Fatal("batch creation route not registered")
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","order_ids":["57565818","57565819"],"sending_date":"2026-08-31","use_online_balance":true}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchesPath, body)
+	request.Header.Set("Idempotency-Key", "batch-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !creator.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"shipment_count":2`) {
+		t.Fatalf("status=%d body=%s creator=%v operation=%+v", response.Code, response.Body.String(), creator.called, operations)
+	}
+}
+
+func TestLogisticsBatchCreationRouteDoesNotRepeatPendingRemoteOperation(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchCreateInput{ConnectorAccountID: account.ID, OrderIDs: []string{"57565818"}}
+	digest, err := logisticsBatchCreateDigest(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creator := &logisticsBatchCreatorStub{batch: sdk.LogisticsBatch{RemoteID: "batch-2026-004", Status: "CREATED", ShipmentCount: 1, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{receipt: logistics.OperationReceipt{State: "pending"}, fresh: false}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, creator: creator}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: "approval-batch-2", Action: "fulfillment.batch.create", ResourceType: "logistics_batch", ResourceID: logisticsBatchApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchesPath {
+			route = candidate
+		}
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","order_ids":["57565818"]}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchesPath, body)
+	request.Header.Set("Idempotency-Key", "batch-key-2")
+	request.Header.Set("Approval-Request-ID", "approval-batch-2")
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusAccepted || creator.called || operations.completeCalled || !strings.Contains(response.Body.String(), `"pending":true`) {
+		t.Fatalf("status=%d body=%s creator=%v operation=%+v", response.Code, response.Body.String(), creator.called, operations)
+	}
+}
+
+func TestLogisticsBatchSubmissionRouteRequiresApprovalAndStoresNormalizedResult(t *testing.T) {
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "https://id.example.test", Subject: "operator-1"}
+	account := logisticsTestAccount(t)
+	input := logisticsBatchSubmitInput{ConnectorAccountID: account.ID, UseOnlineBalance: true}
+	digest, err := logisticsBatchSubmitDigest(input, "batch-2026-003")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := "approval-submit-1"
+	submitter := &logisticsBatchSubmitterStub{submission: sdk.LogisticsBatchSubmission{Status: "SUBMITTED", Accepted: true, ObservedAt: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)}}
+	operations := &logisticsOperationStub{fresh: true}
+	routes := newLogisticsRoutes(logisticsAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.batches.submit", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}, logisticsSecretsStub{}, logisticsRuntimeStub{supported: true, submitter: submitter}, logisticsRouteDependency{
+		approvals:  logisticsApprovalStub{request: approval.Request{ID: approvalID, Action: "fulfillment.batch.submit", ResourceType: "logistics_batch", ResourceID: logisticsBatchSubmitApprovalResourceID(digest), Risk: approval.RiskWriteSensitive, State: approval.StateApproved}},
+		operations: operations,
+	})
+	var route ProtectedRoute
+	for _, candidate := range routes {
+		if candidate.Method == http.MethodPost && candidate.Path == logisticsBatchSubmitPath {
+			route = candidate
+		}
+	}
+	if route.Handler == nil || !route.PathPrefix {
+		t.Fatal("batch submission route not registered")
+	}
+	body := strings.NewReader(`{"connector_account_id":"cdek-account","use_online_balance":true}`)
+	request := httptest.NewRequest(http.MethodPost, logisticsBatchSubmitPath+"batch-2026-003/submit", body)
+	request.Header.Set("Idempotency-Key", "submit-key-1")
+	request.Header.Set("Approval-Request-ID", approvalID)
+	ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestIdentityKey{}, principal)
+	request = request.WithContext(ctx)
+	response := httptest.NewRecorder()
+	route.Handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !submitter.called || !operations.beginCalled || !operations.completeCalled || !strings.Contains(response.Body.String(), `"remote_id":"batch-2026-003"`) || !strings.Contains(response.Body.String(), `"accepted":true`) {
+		t.Fatalf("status=%d body=%s submitter=%v operation=%+v", response.Code, response.Body.String(), submitter.called, operations)
 	}
 }
 

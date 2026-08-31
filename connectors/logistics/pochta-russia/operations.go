@@ -187,6 +187,48 @@ func (c *Connector) ReadLogisticsBatches(ctx context.Context, account sdk.Accoun
 	return out, nil
 }
 
+// CreateLogisticsBatch forms one Russian Post batch from existing backlog
+// orders. Handoff to postal processing remains a separate operation.
+func (c *Connector) CreateLogisticsBatch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatch{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatch
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.CreateBatch(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	if out.Validate() != nil || out.ShipmentCount != len(request.OrderIDs) {
+		return sdk.LogisticsBatch{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
+// SubmitLogisticsBatch hands one formed Russian Post batch to postal
+// processing through the provider's F103/check-in operation.
+func (c *Connector) SubmitLogisticsBatch(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.LogisticsBatchSubmission{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.LogisticsBatchSubmission
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.SubmitBatch(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.LogisticsBatchSubmission{}, err
+	}
+	if out.Validate() != nil || out.RemoteID != request.BatchID {
+		return sdk.LogisticsBatchSubmission{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 func useSecret(ctx context.Context, runtime sdk.Runtime, account sdk.Account, fn func([]byte) error) error {
 	if runtime == nil || runtime.Secrets() == nil {
 		return remote(sdk.ErrorUnauthorized, "credential_missing")
@@ -202,3 +244,5 @@ var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)
+var _ sdk.LogisticsBatchCreator = (*Connector)(nil)
+var _ sdk.LogisticsBatchSubmitter = (*Connector)(nil)

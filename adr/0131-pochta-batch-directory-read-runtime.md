@@ -20,7 +20,8 @@ Status: Accepted
 неотрицательный `shipment-count` и UTC-время наблюдения.
 
 Сырые provider payloads, состав заказов и credentials не сохраняются и не
-публикуются. Формирование партии, hand-off и пакетные записи остаются
+публикуются. Формирование партии и hand-off вынесены в отдельные
+approval-bound runtime routes Task 184 и Task 185; пакетные записи остаются
 fail-closed до отдельной qualification.
 
 ## Consequences
@@ -35,4 +36,4 @@ fail-closed до отдельной qualification.
 Добавляется обратно совместимый capability, API route и сгенерированная SDK
 операция `listLogisticsBatches`; существующие routes и label formats не
 меняются. Live qualification нужна для проверки актуального тестового
-кабинета; она не утверждает batch creation или hand-off.
+кабинета и не заменяет reconciliation для batch creation или hand-off.

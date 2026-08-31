@@ -3297,4 +3297,84 @@ func (transport pochtarussiaHTTP) Batches(ctx context.Context, secret []byte, qu
 	return result, nil
 }
 
+// CreateBatch forms a batch through the official Otpravka API. The provider
+// accepts numeric backlog order identifiers and returns one remote batch
+// identifier; the host receives only the normalized batch projection.
+func (transport pochtarussiaHTTP) CreateBatch(ctx context.Context, secret []byte, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return sdk.LogisticsBatch{}, errors.New("Почта России batch creation request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	orderIDs := make([]int64, 0, len(request.OrderIDs))
+	for _, rawID := range request.OrderIDs {
+		if !pochtarussiaOrderIDPattern.MatchString(rawID) {
+			return sdk.LogisticsBatch{}, errors.New("Почта России batch order id is invalid")
+		}
+		orderID, parseErr := strconv.ParseInt(rawID, 10, 64)
+		if parseErr != nil || orderID <= 0 {
+			return sdk.LogisticsBatch{}, errors.New("Почта России batch order id is invalid")
+		}
+		orderIDs = append(orderIDs, orderID)
+	}
+	payload, err := json.Marshal(orderIDs)
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	params := url.Values{"use-online-balance": []string{strconv.FormatBool(request.UseOnlineBalance)}}
+	if request.SendingDate != "" {
+		params.Set("sending-date", request.SendingDate)
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", "/1.0/user/shipment", params, payload, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatch{}, fmt.Errorf("Почта России batch creation rejected with status %d", status)
+	}
+	var response pochtarussiaBacklogResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Errors) != 0 || len(response.ResultIDs) != 1 {
+		return sdk.LogisticsBatch{}, errors.New("Почта России batch creation response rejected")
+	}
+	remoteID, err := pochtarussiaBacklogID(response.ResultIDs[0])
+	if err != nil {
+		return sdk.LogisticsBatch{}, err
+	}
+	return sdk.LogisticsBatch{RemoteID: remoteID, Status: "CREATED", ShipmentCount: len(orderIDs), ObservedAt: time.Now().UTC()}, nil
+}
+
+// SubmitBatch hands a formed batch to postal processing through the official
+// F103/check-in endpoint. The provider acknowledgement is reduced to a
+// bounded accepted/status projection.
+func (transport pochtarussiaHTTP) SubmitBatch(ctx context.Context, secret []byte, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
+	if transport.h == nil || request.Validate() != nil {
+		return sdk.LogisticsBatchSubmission{}, errors.New("Почта России batch hand-off request rejected")
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.LogisticsBatchSubmission{}, err
+	}
+	query := url.Values{}
+	if request.UseOnlineBalance {
+		query.Set("useOnlineBalance", "true")
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPost, "otpravka-api.pochta.ru", "/1.0/batch/"+url.PathEscape(request.BatchID)+"/checkin", query, nil, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.LogisticsBatchSubmission{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.LogisticsBatchSubmission{}, fmt.Errorf("Почта России batch hand-off rejected with status %d", status)
+	}
+	var response struct {
+		F103Sent bool              `json:"f103-sent"`
+		Errors   []json.RawMessage `json:"errors"`
+	}
+	if json.Unmarshal(responseBody, &response) != nil || len(response.Errors) != 0 || !response.F103Sent {
+		return sdk.LogisticsBatchSubmission{}, errors.New("Почта России batch hand-off response rejected")
+	}
+	return sdk.LogisticsBatchSubmission{RemoteID: request.BatchID, Status: "SUBMITTED", Accepted: true, ObservedAt: time.Now().UTC()}, nil
+}
+
 var _ pochtarussia.Transport = pochtarussiaHTTP{}

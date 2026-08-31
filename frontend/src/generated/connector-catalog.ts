@@ -1016,12 +1016,12 @@ export const connectorCatalog: readonly ConnectorCatalogEntry[] = [
       foreground: "#FFFFFF",
       accent: "#003B73",
     },
-    capabilities: ["logistics.batches.read", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+    capabilities: ["logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
     authKinds: ["api_key"],
     runtime: {
       stage: "separate_surface",
       surface: "logistics",
-      operationalCapabilities: ["logistics.batches.read", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
+      operationalCapabilities: ["logistics.batches.create", "logistics.batches.read", "logistics.batches.submit", "logistics.label.read", "logistics.rates.read", "logistics.return.create", "logistics.shipment.cancel", "logistics.shipment.create", "logistics.track.read", "pickup.points.read"],
       sync: [
       ],
     },

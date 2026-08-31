@@ -1139,6 +1139,38 @@ func TestRussianPostBatchDirectoryRejectsDuplicateRows(t *testing.T) {
 	}
 }
 
+func TestRussianPostBatchCreationRequest(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/1.0/user/shipment" || r.URL.Query().Get("sending-date") != "2026-08-31" || r.URL.Query().Get("use-online-balance") != "true" {
+			t.Fatalf("unexpected Почта России batch creation request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		var orderIDs []int64
+		if err := json.NewDecoder(r.Body).Decode(&orderIDs); err != nil || len(orderIDs) != 2 || orderIDs[0] != 57565818 || orderIDs[1] != 57565819 {
+			t.Fatalf("unexpected Почта России batch creation body: %v", orderIDs)
+		}
+		if r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch credentials: authorization=%q user-authorization=%q", r.Header.Get("Authorization"), r.Header.Get("X-User-Authorization"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"result-ids": []any{310115153}, "errors": []any{}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	batch, err := transport.CreateBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchCreateRequest{OrderIDs: []string{"57565818", "57565819"}, SendingDate: "2026-08-31", UseOnlineBalance: true, IdempotencyKey: "batch-idem-1"})
+	if err != nil {
+		t.Fatalf("Почта России batch creation failed: %v", err)
+	}
+	if batch.RemoteID != "310115153" || batch.Status != "CREATED" || batch.ShipmentCount != 2 || batch.ObservedAt.IsZero() || batch.ObservedAt.Location() != time.UTC {
+		t.Fatalf("unexpected normalized Почта России batch: %+v", batch)
+	}
+}
+
+func TestRussianPostBatchCreationRejectsNonNumericOrderID(t *testing.T) {
+	transport := pochtarussiaHTTP{h: &httpTransport{}}
+	if _, err := transport.CreateBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchCreateRequest{OrderIDs: []string{"batch-1"}, IdempotencyKey: "batch-idem-2"}); err == nil {
+		t.Fatal("non-numeric Почта России batch order id accepted")
+	}
+}
+
 func TestRussianPostTrackingUsesSOAPHistoryAndLatestOperation(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/rtm34" || r.Header.Get("Content-Type") != "application/soap+xml; charset=utf-8" || r.Header.Get("Accept") != "application/soap+xml, text/xml;q=0.9" {
@@ -1527,6 +1559,35 @@ func TestRussianPostPickupPointsCapProviderFanout(t *testing.T) {
 	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
 	if points, err := transport.Pickup(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.PickupPointQuery{Country: "RU", City: "Москва", Limit: 500}); err != nil || len(points) != 0 {
 		t.Fatalf("points=%+v err=%v", points, err)
+	}
+}
+
+func TestRussianPostBatchSubmissionUsesCheckinEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/1.0/batch/24/checkin" || r.URL.Query().Get("useOnlineBalance") != "true" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России batch hand-off request: method=%s path=%s query=%v", r.Method, r.URL.Path, r.URL.Query())
+		}
+		if content, err := io.ReadAll(r.Body); err != nil || len(content) != 0 {
+			t.Fatalf("batch hand-off must not send a body: %q", content)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"f103-sent": true})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.SubmitBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchSubmitRequest{BatchID: "24", UseOnlineBalance: true, IdempotencyKey: "submit-24"})
+	if err != nil {
+		t.Fatalf("Почта России batch hand-off failed: %v", err)
+	}
+	if result.RemoteID != "24" || result.Status != "SUBMITTED" || !result.Accepted || result.ObservedAt.IsZero() {
+		t.Fatalf("unexpected normalized Почта России batch hand-off: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"f103-sent": false})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).SubmitBatch(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsBatchSubmitRequest{BatchID: "24", IdempotencyKey: "submit-24"}); err == nil {
+		t.Fatal("unsuccessful batch hand-off response accepted")
 	}
 }
 

@@ -91,6 +91,24 @@ func TestShipmentCancellationUsesCandidateTransport(t *testing.T) {
 	}
 }
 
+func TestBatchCreationUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).CreateLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchCreateRequest{
+		OrderIDs: []string{"57565818", "57565819"}, SendingDate: "2026-08-31", UseOnlineBalance: true, IdempotencyKey: "batch-idem-001",
+	})
+	if err != nil || result.RemoteID != "batch-conformance-created-001" || result.Status != "CREATED" || result.ShipmentCount != 2 || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestBatchSubmissionUsesCandidateTransport(t *testing.T) {
+	result, err := New(candidateTransport{}, nil).SubmitLogisticsBatch(context.Background(), testAccount(), testRuntime{}, sdk.LogisticsBatchSubmitRequest{
+		BatchID: "batch-conformance-001", UseOnlineBalance: true, IdempotencyKey: "submit-idem-001",
+	})
+	if err != nil || result.RemoteID != "batch-conformance-001" || result.Status != "SUBMITTED" || !result.Accepted || result.ObservedAt.IsZero() {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 func TestReturnCreationUsesCandidateTransport(t *testing.T) {
 	result, err := New(candidateTransport{}, nil).CreateLogisticsReturn(context.Background(), testAccount(), testRuntime{}, sdk.ReturnCreateRequest{
 		OriginalRemoteID: "RA644000001RU", ExternalID: "return-001", MailType: "POSTAL_PARCEL", IdempotencyKey: "return-idem-001",

@@ -11,6 +11,7 @@ var ErrInvalidLogisticsRequest = errors.New("connectors: invalid logistics reque
 var logisticsRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 var logisticsReturnCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 var logisticsProviderCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
+var logisticsBatchDatePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 
 type LogisticsMoney struct {
 	MinorUnits int64
@@ -161,9 +162,79 @@ type LogisticsBatch struct {
 	ObservedAt    time.Time
 }
 
+// LogisticsBatchSubmission is the normalized acknowledgement of a provider
+// batch hand-off. It intentionally does not claim that every parcel was
+// physically accepted by the carrier.
+type LogisticsBatchSubmission struct {
+	RemoteID   string
+	Status     string
+	Accepted   bool
+	ObservedAt time.Time
+}
+
+// Validate checks the normalized batch hand-off acknowledgement.
+func (submission LogisticsBatchSubmission) Validate() error {
+	if !logisticsRefPattern.MatchString(submission.RemoteID) || !logisticsRefPattern.MatchString(submission.Status) || !submission.Accepted || submission.ObservedAt.IsZero() || submission.ObservedAt.Location() != time.UTC {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+// LogisticsBatchCreateRequest requests formation of one remote carrier
+// batch from already-created provider orders. Order identifiers remain
+// provider references and never become canonical shipment identities.
+type LogisticsBatchCreateRequest struct {
+	OrderIDs         []string `json:"order_ids"`
+	SendingDate      string   `json:"sending_date,omitempty"`
+	UseOnlineBalance bool     `json:"use_online_balance"`
+	IdempotencyKey   string   `json:"idempotency_key"`
+}
+
+// LogisticsBatchSubmitRequest requests hand-off of one formed provider batch
+// to postal processing. The batch identifier remains a provider reference.
+type LogisticsBatchSubmitRequest struct {
+	BatchID          string `json:"batch_id"`
+	UseOnlineBalance bool   `json:"use_online_balance"`
+	IdempotencyKey   string `json:"idempotency_key"`
+}
+
+// Validate checks the bounded batch formation request.
+func (request LogisticsBatchCreateRequest) Validate() error {
+	if len(request.OrderIDs) < 1 || len(request.OrderIDs) > 100 || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	seen := make(map[string]struct{}, len(request.OrderIDs))
+	for _, orderID := range request.OrderIDs {
+		if !logisticsRefPattern.MatchString(orderID) {
+			return ErrInvalidLogisticsRequest
+		}
+		if _, duplicate := seen[orderID]; duplicate {
+			return ErrInvalidLogisticsRequest
+		}
+		seen[orderID] = struct{}{}
+	}
+	if request.SendingDate != "" {
+		if !logisticsBatchDatePattern.MatchString(request.SendingDate) {
+			return ErrInvalidLogisticsRequest
+		}
+		if _, err := time.Parse("2006-01-02", request.SendingDate); err != nil {
+			return ErrInvalidLogisticsRequest
+		}
+	}
+	return nil
+}
+
+// Validate checks the bounded batch hand-off request.
+func (request LogisticsBatchSubmitRequest) Validate() error {
+	if !logisticsRefPattern.MatchString(request.BatchID) || !logisticsRefPattern.MatchString(request.IdempotencyKey) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
 // Validate checks the normalized batch projection.
 func (batch LogisticsBatch) Validate() error {
-	if !logisticsRefPattern.MatchString(batch.RemoteID) || !logisticsProviderCodePattern.MatchString(batch.Status) || batch.ShipmentCount < 0 || batch.ShipmentCount > 1000000 || batch.ObservedAt.IsZero() || batch.ObservedAt.Location() != time.UTC {
+	if !logisticsRefPattern.MatchString(batch.RemoteID) || !logisticsRefPattern.MatchString(batch.Status) || batch.ShipmentCount < 0 || batch.ShipmentCount > 1000000 || batch.ObservedAt.IsZero() || batch.ObservedAt.Location() != time.UTC {
 		return ErrInvalidLogisticsRequest
 	}
 	return nil
@@ -216,6 +287,12 @@ type LogisticsLabelReader interface {
 }
 type LogisticsBatchReader interface {
 	ReadLogisticsBatches(context.Context, Account, Runtime, LogisticsBatchQuery) ([]LogisticsBatch, error)
+}
+type LogisticsBatchCreator interface {
+	CreateLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchCreateRequest) (LogisticsBatch, error)
+}
+type LogisticsBatchSubmitter interface {
+	SubmitLogisticsBatch(context.Context, Account, Runtime, LogisticsBatchSubmitRequest) (LogisticsBatchSubmission, error)
 }
 
 type LogisticsWebhook struct {

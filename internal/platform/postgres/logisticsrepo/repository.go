@@ -112,6 +112,71 @@ func (repository *Repository) CreateRequestReference(ctx context.Context, scope 
 	return reference, err
 }
 
+// BeginOperation reserves one tenant-scoped external operation. The first
+// caller receives fresh=true; a replay with the same digest never executes a
+// second remote request. A pending replay is returned to the caller so an
+// ambiguous provider outcome remains fail-closed.
+func (repository *Repository) BeginOperation(ctx context.Context, scope tenancy.Scope, operation, key string, digest [32]byte) (logistics.OperationReceipt, bool, error) {
+	if err := validate(ctx, repository, scope); err != nil {
+		return logistics.OperationReceipt{}, false, err
+	}
+	if !validReference(operation) || !validReference(key) {
+		return logistics.OperationReceipt{}, false, logistics.ErrInvalidRecord
+	}
+	var receipt logistics.OperationReceipt
+	fresh := false
+	err := repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `INSERT INTO operation_receipts(organization_id,workspace_id,operation,idempotency_key,request_sha256,state) VALUES($1,$2,$3,$4,$5,'pending') ON CONFLICT DO NOTHING`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, digest[:])
+		if err != nil {
+			return fmt.Errorf("claim logistics operation: %w", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("claim logistics operation rows: %w", err)
+		}
+		if affected == 1 {
+			receipt = logistics.OperationReceipt{State: "pending", Result: json.RawMessage(`{}`)}
+			fresh = true
+			return nil
+		}
+		var stored []byte
+		if err := tx.QueryRowContext(ctx, `SELECT request_sha256,state,result FROM operation_receipts WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key).Scan(&stored, &receipt.State, &receipt.Result); err != nil {
+			return fmt.Errorf("load logistics operation receipt: %w", err)
+		}
+		if !bytes.Equal(stored, digest[:]) || !receipt.Valid() || !json.Valid(receipt.Result) {
+			return logistics.ErrConflict
+		}
+		return nil
+	})
+	if err != nil {
+		return logistics.OperationReceipt{}, false, err
+	}
+	return receipt, fresh, nil
+}
+
+// CompleteOperation stores only the normalized result of a previously
+// reserved external operation. Requests, credentials and provider payloads
+// never enter the receipt.
+func (repository *Repository) CompleteOperation(ctx context.Context, scope tenancy.Scope, operation, key string, result json.RawMessage) error {
+	if err := validate(ctx, repository, scope); err != nil {
+		return err
+	}
+	if !validReference(operation) || !validReference(key) || len(result) == 0 || len(result) > 8192 || !json.Valid(result) {
+		return logistics.ErrInvalidRecord
+	}
+	return repository.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		changed, err := tx.ExecContext(ctx, `UPDATE operation_receipts SET state='completed',result=$5::jsonb,completed_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 AND state='pending'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, string(result))
+		if err != nil {
+			return fmt.Errorf("complete logistics operation: %w", err)
+		}
+		rows, err := changed.RowsAffected()
+		if err != nil || rows != 1 {
+			return logistics.ErrConflict
+		}
+		return nil
+	})
+}
+
 // BeginCreate claims a shipment creation command. fresh is true only for the
 // caller that owns the subsequent remote side effect.
 func (repository *Repository) BeginCreate(ctx context.Context, scope tenancy.Scope, command logistics.CreateCommand, mutation logistics.Mutation) (logistics.Shipment, bool, error) {

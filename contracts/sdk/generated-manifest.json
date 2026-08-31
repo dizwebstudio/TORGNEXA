@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "5f2a2b901e46cbf39c917f10129961d2a127664a7a67beb87f66a2294eef0677",
+    "sha256": "2203760a9dac210c43ba7b9206a0e1617d2f7f780af06a9c7e459c1231161689",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -148,6 +148,11 @@
       "operation_id": "createInventoryWarehouse",
       "method": "POST",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "createLogisticsBatch",
+      "method": "POST",
+      "path": "/logistics/batches"
     },
     {
       "operation_id": "createLogisticsShipment",
@@ -978,6 +983,11 @@
       "operation_id": "streamRealtimeInvalidations",
       "method": "GET",
       "path": "/realtime"
+    },
+    {
+      "operation_id": "submitLogisticsBatch",
+      "method": "POST",
+      "path": "/logistics/batches/{batch_id}/submit"
     },
     {
       "operation_id": "syncConnectorAccount",

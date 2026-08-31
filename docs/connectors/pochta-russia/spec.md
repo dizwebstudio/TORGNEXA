@@ -13,9 +13,9 @@
 
 Манифест перечисляет нормализуемые операции расчёта, партий, отправлений,
 отмены, возврата, этикетки, трекинга и пунктов выдачи. В runtime включены
-bounded `logistics.batches.read`, `pickup.points.read`,
-`logistics.rates.read`, `logistics.shipment.cancel`,
-`logistics.shipment.create`, `logistics.return.create`, `logistics.label.read`
+bounded `logistics.batches.create`, `logistics.batches.read`,
+`logistics.batches.submit`, `pickup.points.read`, `logistics.rates.read`,
+`logistics.shipment.cancel`, `logistics.shipment.create`, `logistics.return.create`, `logistics.label.read`
 и `logistics.track.read`.
 Создание одного заказа
 выполняется через официальный `PUT /1.0/user/backlog`; адаптер принимает
@@ -26,9 +26,18 @@ bounded `logistics.batches.read`, `pickup.points.read`,
 только точное совпадение единственного `result-ids`; это не отменяет уже
 сформированную партию. Возврат для существующего RPO выполняется отдельным
 `PUT /1.0/returns` с `direct-barcode` и ограниченным allow-list `mail-type`;
-адаптер принимает только один подтверждённый `return-barcode`. Отдельное
-возвратное отправление, формирование партии и передача в работу остаются
-fail-closed. Отдельная возвратная этикетка запрашивается форматом `return_pdf`
+адаптер принимает только один подтверждённый `return-barcode`. Формирование
+партии выполняется через approval-bound `POST /api/v1/logistics/batches`,
+который вызывает официальный `POST /1.0/user/shipment` с 1–100 числовыми ID
+заказов и передаёт только опциональные `sending-date` и
+`use-online-balance`. Tenant-scoped receipt защищает от повторной отправки;
+неоднозначная ошибка остаётся pending до сверки, поэтому автоматический retry
+запрещён. Передача партии в работу выполняется через
+`POST /api/v1/logistics/batches/{batch_id}/submit` и официальный
+`POST /1.0/batch/{batch-name}/checkin`; при необходимости передаётся
+`useOnlineBalance=true`, а ответ принимается только при `f103-sent`. Операция
+требует approval и idempotency receipt. Отдельное возвратное отправление
+остаётся fail-closed. Отдельная возвратная этикетка запрашивается форматом `return_pdf`
 через `GET /1.0/forms/{rpo}/easy-return-pdf` с фиксированным
 `print-type=PAPER`; допускается только domestic/S10 RPO-barcode, а ответ
 принимается после проверки `application/pdf` и сигнатуры `%PDF-`.
@@ -48,5 +57,5 @@ fan-out общий запрос принимает SDK-лимит до 500, но
 Справочник партий читается через официальный `GET /1.0/batch`; адаптер
 передаёт только bounded фильтры `mailType`/`mailCategory`, `size` и `page`,
 проверяет уникальные имена партий, статусы и неотрицательное число
-отправлений. Это read-only проекция: строки заказов, формирование партии и
-передача в работу в неё не включаются.
+отправлений. Это read-only проекция: строки заказов в неё не включаются;
+передача партии в работу выполняется отдельным check-in маршрутом.

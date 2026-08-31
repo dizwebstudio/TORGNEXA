@@ -134,6 +134,27 @@ transactional outbox. Edit/delete and webhook subscription lifecycle calls
 remain fail-closed at the application boundary; live MAX credentials and
 provider delivery qualification remain release gates.
 
+## Почта России: формирование партии
+
+Task 184 is repository-complete: the qualified `logistics.batches.create`
+capability now calls the official `POST /1.0/user/shipment` endpoint through an
+approval-bound `POST /api/v1/logistics/batches` route. The request is bounded
+to 1–100 numeric backlog order IDs, optional sending date and online-balance
+flag; the host persists only a normalized batch result in the tenant-scoped
+operation receipt. Replays never issue a second provider request, and an
+ambiguous transport outcome stays pending until reconciliation. Postal handoff
+and separate return shipment operations remain fail-closed.
+
+## Почта России — передача партии в работу
+
+Task 185 is repository-complete: the qualified `logistics.batches.submit`
+capability now calls the official Russian Post check-in endpoint through an
+approval-bound `POST /api/v1/logistics/batches/{batch_id}/submit` route. The
+adapter sends no body, optionally enables `useOnlineBalance=true`, and accepts
+only a response confirming `f103-sent`. The tenant-scoped operation receipt
+prevents duplicate handoff and keeps ambiguous outcomes pending until
+reconciliation. Separate return shipments remain qualification-gated.
+
 ## Robokassa merchant refund runtime
 
 Task 176 is repository-complete: Robokassa refunds now use the official

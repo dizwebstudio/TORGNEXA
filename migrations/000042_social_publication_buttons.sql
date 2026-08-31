@@ -17,7 +17,7 @@ BEGIN
   END IF;
   FOR item IN SELECT jsonb_array_elements_text(value) LOOP
     IF item NOT IN (
-      ''social.post.text'',''social.post.media'',''social.post.video'',''social.post.buttons'',''social.post.edit'',''
+      ''social.post.text'',''social.post.media'',''social.post.video'',''social.post.buttons'',''social.post.edit'',
       ''social.post.delete'',''social.comments.read'',''social.comments.reply'',''social.analytics.read''
     ) THEN RETURN false; END IF;
     IF item = ANY(seen) THEN RETURN false; END IF;
@@ -55,7 +55,7 @@ BEGIN
 END';
 
 ALTER TABLE social_content_variants
-  ADD COLUMN buttons jsonb NOT NULL DEFAULT ''[]''::jsonb;
+  ADD COLUMN buttons jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE social_content_variants
   ADD CONSTRAINT social_variants_buttons_chk CHECK (social_valid_buttons(buttons));
 

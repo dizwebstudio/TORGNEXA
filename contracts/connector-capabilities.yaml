@@ -58,6 +58,8 @@ capabilities:
   payments.create: Create payment/QR/link
   payments.refund: Refund payment
   payments.reconcile: Read/reconcile settlements
+  logistics.batches.create: Form a provider batch from existing orders
+  logistics.batches.submit: Hand a formed provider batch to carrier processing
   logistics.batches.read: Read provider batch directory
   logistics.rates.read: Calculate delivery rates/SLA
   logistics.shipment.create: Create shipment

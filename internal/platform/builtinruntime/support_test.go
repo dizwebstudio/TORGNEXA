@@ -101,7 +101,7 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 			} else if connectorID == "pek" {
 				wantCapabilities = 6
 			} else if connectorID == "pochta-russia" {
-				wantCapabilities = 8
+				wantCapabilities = 10
 			}
 			if len(carrier.OperationalCapabilities) != wantCapabilities || !SupportsCapability(connectorID, "pickup.points.read") {
 				t.Fatalf("%s pickup-point support is inaccurate: %+v", connectorID, carrier)
@@ -707,6 +707,32 @@ func TestLogisticsCreatorAdmissionIsExact(t *testing.T) {
 	for _, connectorID := range []string{"fivepost", "ozon-delivery"} {
 		if _, err := registry.LogisticsCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("%s unqualified shipment creator resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsBatchCreatorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	creator, err := registry.LogisticsBatchCreator(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || creator == nil {
+		t.Fatalf("Russian Post batch creator unavailable: creator=%T err=%v", creator, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsBatchCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified batch creator resolved: %v", connectorID, err)
+		}
+	}
+}
+
+func TestLogisticsBatchSubmitterAdmissionIsExact(t *testing.T) {
+	registry := New()
+	submitter, err := registry.LogisticsBatchSubmitter(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || submitter == nil {
+		t.Fatalf("Russian Post batch submitter unavailable: submitter=%T err=%v", submitter, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsBatchSubmitter(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified batch submitter resolved: %v", connectorID, err)
 		}
 	}
 }

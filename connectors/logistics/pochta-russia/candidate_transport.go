@@ -71,3 +71,11 @@ func (candidateTransport) Batches(_ context.Context, _ []byte, query sdk.Logisti
 	now := time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)
 	return []sdk.LogisticsBatch{{RemoteID: "batch-conformance-001", Status: "CREATED", ShipmentCount: 2, ObservedAt: now}}, nil
 }
+
+func (candidateTransport) CreateBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchCreateRequest) (sdk.LogisticsBatch, error) {
+	return sdk.LogisticsBatch{RemoteID: "batch-conformance-created-001", Status: "CREATED", ShipmentCount: len(request.OrderIDs), ObservedAt: time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC)}, nil
+}
+
+func (candidateTransport) SubmitBatch(_ context.Context, _ []byte, request sdk.LogisticsBatchSubmitRequest) (sdk.LogisticsBatchSubmission, error) {
+	return sdk.LogisticsBatchSubmission{RemoteID: request.BatchID, Status: "SUBMITTED", Accepted: true, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)}, nil
+}
