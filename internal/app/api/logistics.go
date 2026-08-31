@@ -31,6 +31,7 @@ const (
 	logisticsLabelsPath         = "/api/v1/logistics/labels"
 	logisticsShipmentCreatePath = "/api/v1/logistics/shipments"
 	logisticsShipmentsPath      = "/api/v1/logistics/shipments/"
+	logisticsSeparateReturnPath = "/api/v1/logistics/returns/separate"
 )
 
 var logisticsRemoteIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
@@ -69,6 +70,10 @@ type logisticsBatchCreateRuntime interface {
 
 type logisticsBatchSubmitRuntime interface {
 	LogisticsBatchSubmitter(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsBatchSubmitter, error)
+}
+
+type logisticsSeparateReturnRuntime interface {
+	LogisticsSeparateReturnCreator(context.Context, sdk.Account, sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error)
 }
 
 type logisticsOperationStore interface {
@@ -187,6 +192,25 @@ type logisticsBatchSubmitInput struct {
 	UseOnlineBalance   bool   `json:"use_online_balance"`
 }
 
+type logisticsSeparateReturnInput struct {
+	ConnectorAccountID string                 `json:"connector_account_id"`
+	From               logisticsAddressInput  `json:"from"`
+	To                 *logisticsAddressInput `json:"to"`
+	InsuredValueMinor  int64                  `json:"insured_value_minor"`
+	MailType           string                 `json:"mail_type"`
+	OrderNumber        string                 `json:"order_number"`
+	PostOfficeCode     string                 `json:"postoffice_code"`
+	RecipientName      string                 `json:"recipient_name"`
+	SenderName         string                 `json:"sender_name"`
+}
+
+type logisticsSeparateReturnView struct {
+	RemoteID       string    `json:"remote_id"`
+	Status         string    `json:"status"`
+	TrackingNumber string    `json:"tracking_number"`
+	ObservedAt     time.Time `json:"observed_at"`
+}
+
 func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secrets.SecretProvider, runtime logisticsRuntime, dependencies ...logisticsRouteDependency) []ProtectedRoute {
 	api := logisticsAPI{accounts: accounts, secrets: secretProvider, runtime: runtime}
 	if len(dependencies) > 0 {
@@ -204,6 +228,7 @@ func newLogisticsRoutes(accounts logisticsCapabilityStore, secretProvider secret
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentCreatePath, Permission: "logistics.shipment.create", Handler: http.HandlerFunc(api.createShipment)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchesPath, Permission: "logistics.batches.create", Handler: http.HandlerFunc(api.createBatch)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsBatchSubmitPath, PathPrefix: true, Permission: "logistics.batches.submit", Handler: http.HandlerFunc(api.submitBatch)})
+	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsSeparateReturnPath, Permission: "logistics.return.separate.create", Handler: http.HandlerFunc(api.createSeparateReturn)})
 	routes = append(routes, ProtectedRoute{Method: http.MethodPost, Path: logisticsShipmentsPath, PathPrefix: true, Permission: "logistics.shipment.cancel", Handler: http.HandlerFunc(api.cancelShipment)})
 	return routes
 }
@@ -527,6 +552,126 @@ func (api logisticsAPI) submitBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := json.Marshal(view)
 	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.batch.submit", key, result) != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+func (api logisticsAPI) createSeparateReturn(w http.ResponseWriter, r *http.Request) {
+	scope, scopeOK := ScopeFromContext(r.Context())
+	principal, principalOK := PrincipalFromContext(r.Context())
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
+	if !scopeOK || !principalOK || principal.Subject == "" {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if api.accounts == nil || api.runtime == nil || api.operations == nil || api.approvals == nil || api.secrets == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
+	if !validIdempotencyKey(key) || !logisticsRemoteIDPattern.MatchString(approvalID) {
+		writeProblem(w, http.StatusBadRequest, "Idempotency-Key and Approval-Request-ID Required")
+		return
+	}
+	var input logisticsSeparateReturnInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	var trailing struct{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	accountID := strings.TrimSpace(input.ConnectorAccountID)
+	input.ConnectorAccountID = accountID
+	request := input.toSDK(key)
+	if accountID == "" || request.Validate() != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	account, err := api.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID)
+	if err != nil || account.Family != sdk.FamilyLogistics || account.Status != sdk.AccountActive {
+		writeProblem(w, http.StatusConflict, "Logistics connector account unavailable")
+		return
+	}
+	const capability = sdk.Capability("logistics.return.separate.create")
+	if !supportsLogisticsCapability(api.runtime, account, capability) {
+		writeProblem(w, http.StatusConflict, "Separate return creation is unavailable")
+		return
+	}
+	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+	if err != nil || !sdk.CapabilityEnabled(settings, capability) {
+		writeProblem(w, http.StatusConflict, "Separate return capability is not enabled")
+		return
+	}
+	digest, err := logisticsSeparateReturnDigest(input)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	requested, err := api.approvals.Request(r.Context(), scope, approvalID)
+	if err != nil || requested.Action != "fulfillment.return.separate.create" || requested.ResourceType != "logistics_return" || requested.ResourceID != logisticsSeparateReturnApprovalResourceID(digest) || requested.Risk != approval.RiskWriteSensitive || requested.State != approval.StateApproved {
+		writeProblem(w, http.StatusConflict, "Approved matching request required")
+		return
+	}
+	creatorRuntime, runtimeOK := api.runtime.(logisticsSeparateReturnRuntime)
+	if !runtimeOK {
+		writeProblem(w, http.StatusConflict, "Separate return creation is unavailable")
+		return
+	}
+	runtime, err := connectorruntime.New(api.secrets, scope)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	creator, err := creatorRuntime.LogisticsSeparateReturnCreator(r.Context(), account, runtime)
+	if err != nil || creator == nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	receipt, fresh, err := api.operations.BeginOperation(r.Context(), scope, "fulfillment.return.separate.create", key, digest)
+	if err != nil {
+		if errors.Is(err, logistics.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		if errors.Is(err, logistics.ErrInvalidRecord) || errors.Is(err, logistics.ErrInvalidScope) {
+			writeProblem(w, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if !fresh {
+		if receipt.State == "pending" {
+			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "pending": true, "fresh": false})
+			return
+		}
+		var view logisticsSeparateReturnView
+		if receipt.State != "completed" || json.Unmarshal(receipt.Result, &view) != nil || !logisticsSeparateReturnViewValid(view) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+		return
+	}
+	result, err := creator.CreateLogisticsSeparateReturn(r.Context(), account, runtime, request)
+	if err != nil {
+		writeLogisticsError(w, err)
+		return
+	}
+	view := logisticsSeparateReturnView{RemoteID: result.RemoteID, Status: result.Status, TrackingNumber: result.TrackingNumber, ObservedAt: result.ObservedAt}
+	if result.RemoteID == "" || result.TrackingNumber != result.RemoteID || result.Cost.Validate() != nil || !logisticsSeparateReturnViewValid(view) {
+		writeProblem(w, http.StatusBadGateway, "Logistics provider unavailable")
+		return
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil || api.operations.CompleteOperation(r.Context(), scope, "fulfillment.return.separate.create", key, encoded) != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -931,6 +1076,22 @@ func (input logisticsBatchSubmitInput) toSDK(batchID, idempotencyKey string) sdk
 	return sdk.LogisticsBatchSubmitRequest{BatchID: strings.TrimSpace(batchID), UseOnlineBalance: input.UseOnlineBalance, IdempotencyKey: idempotencyKey}
 }
 
+func (input logisticsSeparateReturnInput) toSDK(idempotencyKey string) sdk.LogisticsSeparateReturnRequest {
+	address := func(value logisticsAddressInput) sdk.Address {
+		return sdk.Address{Country: strings.ToUpper(strings.TrimSpace(value.Country)), PostalCode: strings.TrimSpace(value.PostalCode), City: strings.TrimSpace(value.City), Line1: strings.TrimSpace(value.Line1)}
+	}
+	var to *sdk.Address
+	if input.To != nil {
+		value := address(*input.To)
+		to = &value
+	}
+	return sdk.LogisticsSeparateReturnRequest{
+		From: address(input.From), To: to, InsuredValueMinor: input.InsuredValueMinor,
+		MailType: strings.TrimSpace(input.MailType), OrderNumber: strings.TrimSpace(input.OrderNumber), PostOfficeCode: strings.TrimSpace(input.PostOfficeCode),
+		RecipientName: strings.TrimSpace(input.RecipientName), SenderName: strings.TrimSpace(input.SenderName), IdempotencyKey: idempotencyKey,
+	}
+}
+
 func logisticsBatchCreateDigest(input logisticsBatchCreateInput) ([32]byte, error) {
 	orderIDs := make([]string, len(input.OrderIDs))
 	for index, orderID := range input.OrderIDs {
@@ -970,12 +1131,43 @@ func logisticsBatchSubmitApprovalResourceID(digest [32]byte) string {
 	return "batch-submit:" + hex.EncodeToString(digest[:])
 }
 
+func logisticsSeparateReturnDigest(input logisticsSeparateReturnInput) ([32]byte, error) {
+	canonical := struct {
+		ConnectorAccountID string                 `json:"connector_account_id"`
+		From               logisticsAddressInput  `json:"from"`
+		To                 *logisticsAddressInput `json:"to,omitempty"`
+		InsuredValueMinor  int64                  `json:"insured_value_minor"`
+		MailType           string                 `json:"mail_type"`
+		OrderNumber        string                 `json:"order_number,omitempty"`
+		PostOfficeCode     string                 `json:"postoffice_code,omitempty"`
+		RecipientName      string                 `json:"recipient_name"`
+		SenderName         string                 `json:"sender_name"`
+	}{
+		ConnectorAccountID: strings.TrimSpace(input.ConnectorAccountID), From: input.From, To: input.To, InsuredValueMinor: input.InsuredValueMinor,
+		MailType: strings.ToUpper(strings.TrimSpace(input.MailType)), OrderNumber: strings.TrimSpace(input.OrderNumber), PostOfficeCode: strings.TrimSpace(input.PostOfficeCode),
+		RecipientName: strings.TrimSpace(input.RecipientName), SenderName: strings.TrimSpace(input.SenderName),
+	}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(payload), nil
+}
+
+func logisticsSeparateReturnApprovalResourceID(digest [32]byte) string {
+	return "separate-return:" + hex.EncodeToString(digest[:])
+}
+
 func logisticsBatchViewValid(view logisticsBatchView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.ShipmentCount >= 0 && view.ShipmentCount <= 1000000 && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
 
 func logisticsBatchSubmissionViewValid(view logisticsBatchSubmissionView) bool {
 	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.Accepted && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
+}
+
+func logisticsSeparateReturnViewValid(view logisticsSeparateReturnView) bool {
+	return logisticsRemoteIDPattern.MatchString(view.RemoteID) && safeLogisticsStatus(view.Status) && view.Status == "created" && view.TrackingNumber == view.RemoteID && !view.ObservedAt.IsZero() && view.ObservedAt.Location() == time.UTC
 }
 
 func safeLogisticsStatus(value string) bool {

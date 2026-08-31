@@ -93,6 +93,27 @@ func (c *Connector) CreateLogisticsReturn(ctx context.Context, account sdk.Accou
 	return out, nil
 }
 
+// CreateLogisticsSeparateReturn creates one Russian Post return shipment
+// without an existing direct shipment barcode.
+func (c *Connector) CreateLogisticsSeparateReturn(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error) {
+	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || request.Validate() != nil {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInvalidRequest, "request_rejected")
+	}
+	var out sdk.ShipmentResult
+	err := useSecret(ctx, runtime, account, func(secret []byte) error {
+		var callErr error
+		out, callErr = c.transport.CreateSeparateReturn(ctx, secret, request)
+		return callErr
+	})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if out.RemoteID == "" || out.Status != "created" || out.Cost.Validate() != nil || out.ObservedAt.IsZero() || out.TrackingNumber != out.RemoteID {
+		return sdk.ShipmentResult{}, remote(sdk.ErrorInternal, "invalid_remote_response")
+	}
+	return out, nil
+}
+
 // ReadPickupPoints reads a bounded Russian Post office directory by city.
 // Provider postal indexes remain remote references and never become Core
 // warehouse identifiers.
@@ -241,6 +262,7 @@ var _ sdk.LogisticsRateReader = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCreator = (*Connector)(nil)
 var _ sdk.LogisticsShipmentCanceler = (*Connector)(nil)
 var _ sdk.LogisticsReturnCreator = (*Connector)(nil)
+var _ sdk.LogisticsSeparateReturnCreator = (*Connector)(nil)
 var _ sdk.LogisticsTracker = (*Connector)(nil)
 var _ sdk.LogisticsLabelReader = (*Connector)(nil)
 var _ sdk.LogisticsBatchReader = (*Connector)(nil)

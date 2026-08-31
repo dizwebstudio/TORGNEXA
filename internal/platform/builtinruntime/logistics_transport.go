@@ -2804,6 +2804,101 @@ func (transport pochtarussiaHTTP) Return(ctx context.Context, secret []byte, req
 	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
 }
 
+type pochtarussiaSeparateReturnAddress struct {
+	AddressType string `json:"address-type"`
+	Index       string `json:"index"`
+	Place       string `json:"place"`
+	Region      string `json:"region"`
+	Street      string `json:"street"`
+	House       string `json:"house"`
+}
+
+type pochtarussiaSeparateReturnPayload struct {
+	AddressFrom    pochtarussiaSeparateReturnAddress  `json:"address-from"`
+	AddressTo      *pochtarussiaSeparateReturnAddress `json:"address-to,omitempty"`
+	InsuredValue   int64                              `json:"insr-value"`
+	MailType       string                             `json:"mail-type"`
+	OrderNumber    string                             `json:"order-num,omitempty"`
+	PostOfficeCode string                             `json:"postoffice-code,omitempty"`
+	RecipientName  string                             `json:"recipient-name"`
+	SenderName     string                             `json:"sender-name"`
+}
+
+type pochtarussiaSeparateReturnResponse struct {
+	Errors        []json.RawMessage `json:"errors"`
+	Position      int               `json:"position"`
+	ReturnBarcode json.RawMessage   `json:"return-barcode"`
+}
+
+func pochtarussiaSeparateReturnAddressFromSDK(value sdk.Address) (pochtarussiaSeparateReturnAddress, error) {
+	postalCode, err := pochtarussiaRequestPostalCode(value.PostalCode)
+	if err != nil {
+		return pochtarussiaSeparateReturnAddress{}, err
+	}
+	street, house, err := pochtarussiaStreetHouse(value.Line1)
+	if err != nil {
+		return pochtarussiaSeparateReturnAddress{}, err
+	}
+	city := strings.TrimSpace(value.City)
+	return pochtarussiaSeparateReturnAddress{
+		AddressType: "DEFAULT", Index: postalCode, Place: city, Region: city, Street: street, House: house,
+	}, nil
+}
+
+// CreateSeparateReturn creates one standalone return shipment through the
+// official Russian Post return-without-direct endpoint. The provider accepts
+// an array; this bounded operation deliberately sends exactly one item and
+// requires the matching position in the response.
+func (transport pochtarussiaHTTP) CreateSeparateReturn(ctx context.Context, secret []byte, request sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error) {
+	mailType := strings.ToUpper(strings.TrimSpace(request.MailType))
+	if transport.h == nil || request.Validate() != nil || !strings.EqualFold(request.From.Country, "RU") || !pochtarussiaReturnMailType(mailType) || request.InsuredValueMinor%100 != 0 {
+		return sdk.ShipmentResult{}, errors.New("Почта России separate return request rejected")
+	}
+	from, err := pochtarussiaSeparateReturnAddressFromSDK(request.From)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	var to *pochtarussiaSeparateReturnAddress
+	if request.To != nil {
+		if !strings.EqualFold(request.To.Country, "RU") {
+			return sdk.ShipmentResult{}, errors.New("Почта России separate return destination country is unsupported")
+		}
+		address, addressErr := pochtarussiaSeparateReturnAddressFromSDK(*request.To)
+		if addressErr != nil {
+			return sdk.ShipmentResult{}, addressErr
+		}
+		to = &address
+	}
+	credentials, err := readPochtaRussiaCredentials(secret)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	payload, err := json.Marshal([]pochtarussiaSeparateReturnPayload{{
+		AddressFrom: from, AddressTo: to, InsuredValue: request.InsuredValueMinor / 100,
+		MailType: mailType, OrderNumber: strings.TrimSpace(request.OrderNumber), PostOfficeCode: strings.TrimSpace(request.PostOfficeCode),
+		RecipientName: strings.TrimSpace(request.RecipientName), SenderName: strings.TrimSpace(request.SenderName),
+	}})
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	status, responseBody, _, _, _, err := transport.h.do(ctx, http.MethodPut, "otpravka-api.pochta.ru", "/1.0/returns/return-without-direct", url.Values{}, payload, pochtarussiaHeaders(credentials), nil, nil)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return sdk.ShipmentResult{}, fmt.Errorf("Почта России separate return creation rejected with status %d", status)
+	}
+	var response []pochtarussiaSeparateReturnResponse
+	if json.Unmarshal(responseBody, &response) != nil || len(response) != 1 || response[0].Position != 0 || len(response[0].Errors) != 0 || len(response[0].ReturnBarcode) == 0 {
+		return sdk.ShipmentResult{}, errors.New("Почта России separate return response rejected")
+	}
+	remoteID, err := pochtarussiaReturnID(response[0].ReturnBarcode)
+	if err != nil {
+		return sdk.ShipmentResult{}, err
+	}
+	return sdk.ShipmentResult{RemoteID: remoteID, Status: "created", Cost: sdk.LogisticsMoney{Currency: "RUB"}, TrackingNumber: remoteID, ObservedAt: time.Now().UTC()}, nil
+}
+
 func pochtarussiaReturnMailType(value string) bool {
 	switch value {
 	case "UNDEFINED", "POSTAL_PARCEL", "ONLINE_PARCEL", "EMS", "EMS_OPTIMAL", "FIRST_CLASS":

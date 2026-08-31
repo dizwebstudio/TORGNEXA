@@ -1591,6 +1591,51 @@ func TestRussianPostBatchSubmissionUsesCheckinEndpoint(t *testing.T) {
 	}
 }
 
+func TestRussianPostSeparateReturnUsesOfficialEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/1.0/returns/return-without-direct" || r.Header.Get("Authorization") != "AccessToken token-1" || r.Header.Get("X-User-Authorization") != "Basic dXNlcjpwYXNz" {
+			t.Fatalf("unexpected Почта России separate return request: method=%s path=%s", r.Method, r.URL.Path)
+		}
+		var payload []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || len(payload) != 1 {
+			t.Fatalf("unexpected separate return payload: %v", err)
+		}
+		if payload[0]["mail-type"] != "ONLINE_PARCEL" || payload[0]["insr-value"] != float64(1299) || payload[0]["recipient-name"] != "Пётр Петров" || payload[0]["sender-name"] != "Иван Иванов" {
+			t.Fatalf("unexpected separate return fields: %#v", payload[0])
+		}
+		from, ok := payload[0]["address-from"].(map[string]any)
+		if !ok || from["index"] != "101000" || from["place"] != "Москва" || from["street"] != "Мясницкая" || from["house"] != "1" {
+			t.Fatalf("unexpected separate return address: %#v", payload[0]["address-from"])
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"position": 0, "return-barcode": "RA644000003RU"}})
+	}))
+	defer server.Close()
+	transport := pochtarussiaHTTP{h: testTLSTransport(t, server)}
+	result, err := transport.CreateSeparateReturn(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsSeparateReturnRequest{
+		From:              sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"},
+		To:                &sdk.Address{Country: "RU", PostalCode: "190000", City: "Санкт-Петербург", Line1: "Невский, 1"},
+		InsuredValueMinor: 129900, MailType: "online_parcel", OrderNumber: "return-001", PostOfficeCode: "101000",
+		RecipientName: "Пётр Петров", SenderName: "Иван Иванов", IdempotencyKey: "separate-return-001",
+	})
+	if err != nil {
+		t.Fatalf("Почта России separate return failed: %v", err)
+	}
+	if result.RemoteID != "RA644000003RU" || result.TrackingNumber != result.RemoteID || result.Status != "created" {
+		t.Fatalf("unexpected normalized separate return: %+v", result)
+	}
+
+	invalidServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"position": 0, "errors": []map[string]string{{"code": "INVALID"}}}})
+	}))
+	defer invalidServer.Close()
+	if _, err := (pochtarussiaHTTP{h: testTLSTransport(t, invalidServer)}).CreateSeparateReturn(context.Background(), []byte(`{"token":"token-1","key":"dXNlcjpwYXNz"}`), sdk.LogisticsSeparateReturnRequest{
+		From: sdk.Address{Country: "RU", PostalCode: "101000", City: "Москва", Line1: "Мясницкая, 1"}, MailType: "ONLINE_PARCEL",
+		RecipientName: "Пётр Петров", SenderName: "Иван Иванов", IdempotencyKey: "separate-return-002",
+	}); err == nil {
+		t.Fatal("separate return provider error accepted")
+	}
+}
+
 func TestOzonPayCredentialProbe(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/product/list" || r.Method != http.MethodPost || r.Header.Get("Client-Id") != "client-1" || r.Header.Get("Api-Key") != "key-1" {

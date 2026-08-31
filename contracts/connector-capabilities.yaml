@@ -66,6 +66,7 @@ capabilities:
   logistics.track.read: Track shipment
   logistics.webhooks.verify: Verify and normalize logistics webhook
   logistics.return.create: Create return
+  logistics.return.separate.create: Create a return shipment without an existing carrier RPO
   pickup.points.read: Read pickup points
   pickup.capacity.read: Read PUDO capacity
   pickup.orders.write: Receive/issue/return PUDO orders

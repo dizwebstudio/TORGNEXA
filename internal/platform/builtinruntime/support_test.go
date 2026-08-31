@@ -769,6 +769,19 @@ func TestLogisticsReturnCreatorAdmissionIsExact(t *testing.T) {
 	}
 }
 
+func TestLogisticsSeparateReturnCreatorAdmissionIsExact(t *testing.T) {
+	registry := New()
+	creator, err := registry.LogisticsSeparateReturnCreator(context.Background(), supportTestAccount(t, "pochta-russia"), supportTestRuntime{})
+	if err != nil || creator == nil {
+		t.Fatalf("Russian Post separate return creator unavailable: creator=%T err=%v", creator, err)
+	}
+	for _, connectorID := range []string{"cdek", "dellin", "pek", "fivepost", "ozon-delivery"} {
+		if _, err := registry.LogisticsSeparateReturnCreator(context.Background(), supportTestAccount(t, connectorID), supportTestRuntime{}); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s unqualified separate return creator resolved: %v", connectorID, err)
+		}
+	}
+}
+
 func TestOzonPayHealthRegistryAdmissionIsExact(t *testing.T) {
 	registry := New()
 	connector, err := registry.healthConnector(supportTestAccount(t, "ozon-pay"), nil)

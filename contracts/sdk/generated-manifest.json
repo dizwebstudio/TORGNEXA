@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "2203760a9dac210c43ba7b9206a0e1617d2f7f780af06a9c7e459c1231161689",
+    "sha256": "1c07a3fc58175018c30de2023d9becc609b436a6c779f81060adc2a38523b6d1",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -153,6 +153,11 @@
       "operation_id": "createLogisticsBatch",
       "method": "POST",
       "path": "/logistics/batches"
+    },
+    {
+      "operation_id": "createLogisticsSeparateReturn",
+      "method": "POST",
+      "path": "/logistics/returns/separate"
     },
     {
       "operation_id": "createLogisticsShipment",

@@ -45,6 +45,13 @@ func (candidateTransport) Return(_ context.Context, _ []byte, request sdk.Return
 	}, nil
 }
 
+func (candidateTransport) CreateSeparateReturn(_ context.Context, _ []byte, request sdk.LogisticsSeparateReturnRequest) (sdk.ShipmentResult, error) {
+	return sdk.ShipmentResult{
+		RemoteID: "RA644000003RU", Status: "created", TrackingNumber: "RA644000003RU",
+		Cost: sdk.LogisticsMoney{Currency: "RUB"}, ObservedAt: time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
 func (candidateTransport) Track(_ context.Context, _ []byte, request sdk.ShipmentStatusRequest) (sdk.ShipmentResult, error) {
 	return sdk.ShipmentResult{
 		RemoteID: request.RemoteID, Status: "in_transit", TrackingNumber: request.RemoteID,

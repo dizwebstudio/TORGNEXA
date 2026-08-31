@@ -349,6 +349,18 @@ func (r *Registry) LogisticsReturnCreator(ctx context.Context, account sdk.Accou
 	}
 }
 
+// LogisticsSeparateReturnCreator resolves the qualified standalone return
+// shipment surface. It is currently admitted only for Russian Post.
+func (r *Registry) LogisticsSeparateReturnCreator(ctx context.Context, account sdk.Account, runtime sdk.Runtime) (sdk.LogisticsSeparateReturnCreator, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "logistics.return.separate.create") {
+		return nil, ErrUnavailable
+	}
+	if account.ConnectorID != "pochta-russia" {
+		return nil, ErrUnavailable
+	}
+	return pochtarussia.New(pochtarussiaHTTP{r.http}, nil), nil
+}
+
 type Registry struct {
 	http    *httpTransport
 	localAI *localAIHTTP

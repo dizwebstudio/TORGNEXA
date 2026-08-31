@@ -150,6 +150,25 @@ paths:
         '403': {description: Caller lacks logistics.batches.submit}
         '409': {description: 'Batch capability, approval or idempotency conflict'}
         '502': {description: Logistics provider unavailable}
+  /logistics/returns/separate:
+    post:
+      operationId: createLogisticsSeparateReturn
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogisticsSeparateReturnRequest'}
+      responses:
+        '201': {description: Standalone return shipment created, content: {application/json: {schema: {$ref: '#/components/schemas/LogisticsSeparateReturn'}}}}
+        '202': {description: Standalone return operation is pending and must not be retried automatically}
+        '400': {description: Invalid return address, value or idempotency key}
+        '403': {description: Caller lacks logistics.return.separate.create}
+        '409': {description: 'Return capability, approval or idempotency conflict'}
+        '502': {description: Logistics provider unavailable}
   /logistics/rates:
     post:
       operationId: calculateLogisticsRates
@@ -3119,6 +3138,29 @@ components:
         remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         status: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
         accepted: {type: boolean}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    LogisticsSeparateReturnRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, from, insured_value_minor, mail_type, recipient_name, sender_name]
+      properties:
+        connector_account_id: {type: string, minLength: 1, maxLength: 128}
+        from: {$ref: '#/components/schemas/LogisticsAddress'}
+        to: {$ref: '#/components/schemas/LogisticsAddress'}
+        insured_value_minor: {type: integer, minimum: 0, multipleOf: 100, default: 0}
+        mail_type: {type: string, minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'}
+        order_number: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        postoffice_code: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        recipient_name: {type: string, minLength: 1, maxLength: 300}
+        sender_name: {type: string, minLength: 1, maxLength: 300}
+    LogisticsSeparateReturn:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, tracking_number, observed_at]
+      properties:
+        remote_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        status: {type: string, const: created}
+        tracking_number: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         observed_at: {type: string, format: date-time, pattern: 'Z$'}
     LogisticsAddress:
       type: object

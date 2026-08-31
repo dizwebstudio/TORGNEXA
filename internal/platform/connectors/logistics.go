@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 var ErrInvalidLogisticsRequest = errors.New("connectors: invalid logistics request")
@@ -125,6 +128,21 @@ type ReturnCreateRequest struct {
 	// the selected return service does not use a tariff code.
 	TariffCode     int    `json:"tariff_code,omitempty"`
 	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// LogisticsSeparateReturnRequest describes one return shipment that is not
+// linked to an existing carrier RPO. Addresses and names are request-scoped
+// PII and must not be persisted in operation receipts or logs.
+type LogisticsSeparateReturnRequest struct {
+	From              Address  `json:"from"`
+	To                *Address `json:"to,omitempty"`
+	InsuredValueMinor int64    `json:"insured_value_minor"`
+	MailType          string   `json:"mail_type"`
+	OrderNumber       string   `json:"order_number,omitempty"`
+	PostOfficeCode    string   `json:"postoffice_code,omitempty"`
+	RecipientName     string   `json:"recipient_name"`
+	SenderName        string   `json:"sender_name"`
+	IdempotencyKey    string   `json:"idempotency_key"`
 }
 type LabelRequest struct{ RemoteID, Format string }
 type LabelResult struct {
@@ -267,6 +285,33 @@ func (r ReturnCreateRequest) Validate() error {
 	return nil
 }
 
+// Validate checks the bounded, provider-neutral separate-return request.
+func (r LogisticsSeparateReturnRequest) Validate() error {
+	if r.From.Validate() != nil || (r.To != nil && r.To.Validate() != nil) || r.InsuredValueMinor < 0 || r.InsuredValueMinor%100 != 0 || !logisticsReturnCodePattern.MatchString(strings.ToUpper(strings.TrimSpace(r.MailType))) || !logisticsRefPattern.MatchString(r.IdempotencyKey) || !validLogisticsText(r.RecipientName, 300) || !validLogisticsText(r.SenderName, 300) {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.OrderNumber != "" && !logisticsRefPattern.MatchString(r.OrderNumber) {
+		return ErrInvalidLogisticsRequest
+	}
+	if r.PostOfficeCode != "" && !logisticsRefPattern.MatchString(r.PostOfficeCode) {
+		return ErrInvalidLogisticsRequest
+	}
+	return nil
+}
+
+func validLogisticsText(value string, maxRunes int) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || utf8.RuneCountInString(value) > maxRunes {
+		return false
+	}
+	for _, symbol := range value {
+		if unicode.IsControl(symbol) {
+			return false
+		}
+	}
+	return true
+}
+
 type LogisticsRateReader interface {
 	ReadLogisticsRates(context.Context, Account, Runtime, RateRequest) ([]RateQuote, error)
 }
@@ -281,6 +326,9 @@ type LogisticsShipmentCanceler interface {
 }
 type LogisticsReturnCreator interface {
 	CreateLogisticsReturn(context.Context, Account, Runtime, ReturnCreateRequest) (ShipmentResult, error)
+}
+type LogisticsSeparateReturnCreator interface {
+	CreateLogisticsSeparateReturn(context.Context, Account, Runtime, LogisticsSeparateReturnRequest) (ShipmentResult, error)
 }
 type LogisticsLabelReader interface {
 	ReadLogisticsLabel(context.Context, Account, Runtime, LabelRequest) (LabelResult, error)

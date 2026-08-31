@@ -42,6 +42,7 @@ export const capabilityLabels: Readonly<Record<string, string>> = {
 	"logistics.label.read": "Просмотр транспортных этикеток",
   "logistics.rates.read": "Просмотр тарифов доставки",
   "logistics.return.create": "Создание возвратов доставки",
+  "logistics.return.separate.create": "Создание отдельной возвратной отправки",
   "logistics.shipment.cancel": "Отмена отправлений",
   "logistics.shipment.create": "Создание отправлений",
   "logistics.track.read": "Отслеживание отправлений",
