@@ -43,12 +43,12 @@ func TestReplySeparatesAIAndInternalNotes(t *testing.T) {
 }
 
 func TestBusinessDueAtSkipsWeekendAndHoliday(t *testing.T) {
-	start := time.Date(2026, 9, 4, 16, 0, 0, 0, time.UTC) // Friday
+	start := time.Date(2026, 9, 4, 23, 0, 0, 0, time.UTC) // Friday
 	due, err := BusinessDueAt(start, 120, "UTC", []string{"2026-09-07"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
+	want := time.Date(2026, 9, 8, 1, 0, 0, 0, time.UTC)
 	if !due.Equal(want) {
 		t.Fatalf("due=%s want=%s", due, want)
 	}

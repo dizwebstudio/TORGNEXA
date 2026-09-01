@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/customerservice"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
@@ -62,6 +63,23 @@ type FinancialCompletenessInput struct {
 // FinancialCompletenessReader exposes only the redacted completeness summary.
 type FinancialCompletenessReader interface {
 	ReadFinancialCompleteness(context.Context, Identity, FinancialCompletenessInput) (any, error)
+}
+
+// CustomerServiceInput selects a bounded, read-only inbox or timeline view.
+type CustomerServiceInput struct {
+	View           string                            `json:"view,omitempty"`
+	ConversationID string                            `json:"conversation_id,omitempty"`
+	CustomerRefID  string                            `json:"customer_ref_id,omitempty"`
+	State          customerservice.ConversationState `json:"state,omitempty"`
+	Type           customerservice.ConversationType  `json:"type,omitempty"`
+	Search         string                            `json:"search,omitempty"`
+	Limit          int                               `json:"limit,omitempty"`
+}
+
+// CustomerServiceReader exposes sanitized customer-service context to MCP.
+// It never sends replies, changes assignments or mutates claims.
+type CustomerServiceReader interface {
+	ReadCustomerService(context.Context, Identity, CustomerServiceInput) (any, error)
 }
 
 type toolDescriptor struct {
@@ -198,6 +216,23 @@ func financialCompletenessTool(available bool) toolDescriptor {
 			"to":                 map[string]any{"type": "string", "format": "date-time"},
 			"reporting_currency": map[string]any{"type": "string", "pattern": "^[A-Z]{3}$"},
 		}, nil),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
+	}}
+}
+
+func customerServiceTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionCustomerServiceRead, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.customer_service.get", Title: "Read customer service inbox",
+		Description: "Read sanitized tenant-scoped inbox threads, reviews, questions, findings or Customer 360 timeline. This tool never replies, assigns, closes cases or exposes raw provider payloads.",
+		InputSchema: objectSchema(map[string]any{
+			"view":            enumProp("summary", "inbox", "thread", "timeline", "findings"),
+			"conversation_id": stringProp("Conversation reference for thread view", 0, 192),
+			"customer_ref_id": stringProp("Minimized customer reference for timeline view", 0, 192),
+			"state":           enumProp("unread", "open", "pending_customer", "pending_internal", "resolved", "closed", "spam"),
+			"type":            enumProp("message", "review", "question", "claim", "return_request", "delivery_failure"),
+			"search":          stringProp("Safe queue search", 0, 160),
+			"limit":           integerProp(1, 200),
+		}, []string{"view"}),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
 	}}
 }

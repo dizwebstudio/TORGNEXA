@@ -49,13 +49,13 @@ func (v ConversationType) Valid() bool {
 type ConversationState string
 
 const (
-	StateUnread           ConversationState = "unread"
-	StateOpen             ConversationState = "open"
-	StatePendingCustomer  ConversationState = "pending_customer"
-	StatePendingInternal  ConversationState = "pending_internal"
-	StateResolved         ConversationState = "resolved"
-	StateClosed           ConversationState = "closed"
-	StateSpam             ConversationState = "spam"
+	StateUnread          ConversationState = "unread"
+	StateOpen            ConversationState = "open"
+	StatePendingCustomer ConversationState = "pending_customer"
+	StatePendingInternal ConversationState = "pending_internal"
+	StateResolved        ConversationState = "resolved"
+	StateClosed          ConversationState = "closed"
+	StateSpam            ConversationState = "spam"
 )
 
 func (v ConversationState) Valid() bool {
@@ -185,33 +185,33 @@ func (v CustomerRef) Validate() error {
 // Conversation is the unified operator thread. Linked IDs reference canonical
 // order, product, return and claim aggregates and are never copied aggregates.
 type Conversation struct {
-	ID                 string           `json:"id"`
-	SourceSystem       string           `json:"source_system"`
-	AccountID          string           `json:"account_id"`
-	RemoteThreadID     string           `json:"remote_thread_id"`
-	Type               ConversationType `json:"type"`
+	ID                 string            `json:"id"`
+	SourceSystem       string            `json:"source_system"`
+	AccountID          string            `json:"account_id"`
+	RemoteThreadID     string            `json:"remote_thread_id"`
+	Type               ConversationType  `json:"type"`
 	State              ConversationState `json:"state"`
-	Priority           Priority         `json:"priority"`
-	CustomerRefID      string           `json:"customer_ref_id,omitempty"`
-	IdentityState      IdentityState    `json:"identity_state"`
-	Subject            string           `json:"subject,omitempty"`
-	OrderID            string           `json:"order_id,omitempty"`
-	OrderItemID        string           `json:"order_item_id,omitempty"`
-	ProductID          string           `json:"product_id,omitempty"`
-	OfferID            string           `json:"offer_id,omitempty"`
-	ReturnID           string           `json:"return_id,omitempty"`
-	ClaimID            string           `json:"claim_id,omitempty"`
-	AssigneeID         string           `json:"assignee_id,omitempty"`
-	TeamID             string           `json:"team_id,omitempty"`
-	SLAState           string           `json:"sla_state"`
-	FirstResponseDueAt time.Time        `json:"first_response_due_at,omitempty"`
-	ResolutionDueAt    time.Time        `json:"resolution_due_at,omitempty"`
-	LastMessageAt      time.Time        `json:"last_message_at"`
-	SourceQuality      SourceQuality    `json:"source_quality"`
-	ModerationState    ModerationState  `json:"moderation_state"`
-	Version            int64            `json:"version"`
-	CreatedAt          time.Time        `json:"created_at"`
-	UpdatedAt          time.Time        `json:"updated_at"`
+	Priority           Priority          `json:"priority"`
+	CustomerRefID      string            `json:"customer_ref_id,omitempty"`
+	IdentityState      IdentityState     `json:"identity_state"`
+	Subject            string            `json:"subject,omitempty"`
+	OrderID            string            `json:"order_id,omitempty"`
+	OrderItemID        string            `json:"order_item_id,omitempty"`
+	ProductID          string            `json:"product_id,omitempty"`
+	OfferID            string            `json:"offer_id,omitempty"`
+	ReturnID           string            `json:"return_id,omitempty"`
+	ClaimID            string            `json:"claim_id,omitempty"`
+	AssigneeID         string            `json:"assignee_id,omitempty"`
+	TeamID             string            `json:"team_id,omitempty"`
+	SLAState           string            `json:"sla_state"`
+	FirstResponseDueAt time.Time         `json:"first_response_due_at,omitempty"`
+	ResolutionDueAt    time.Time         `json:"resolution_due_at,omitempty"`
+	LastMessageAt      time.Time         `json:"last_message_at"`
+	SourceQuality      SourceQuality     `json:"source_quality"`
+	ModerationState    ModerationState   `json:"moderation_state"`
+	Version            int64             `json:"version"`
+	CreatedAt          time.Time         `json:"created_at"`
+	UpdatedAt          time.Time         `json:"updated_at"`
 }
 
 func (v Conversation) Validate() error {
@@ -233,22 +233,22 @@ func (v Conversation) Validate() error {
 // Message is immutable normalized content. SafeText is sanitized before it is
 // persisted; ContentDigest permits reconciliation without retaining raw HTML.
 type Message struct {
-	ID                  string           `json:"id"`
-	ConversationID      string           `json:"conversation_id"`
-	RemoteMessageID     string           `json:"remote_message_id,omitempty"`
-	Direction           MessageDirection `json:"direction"`
-	Visibility          Visibility       `json:"visibility"`
-	DeliveryState       DeliveryState    `json:"delivery_state"`
-	SafeText            string           `json:"safe_text"`
-	ContentDigest       string           `json:"content_digest"`
-	Language            string           `json:"language,omitempty"`
-	ModerationState     ModerationState  `json:"moderation_state"`
-	IdentityState       IdentityState    `json:"identity_state"`
-	OrderID             string           `json:"order_id,omitempty"`
-	ProductID           string           `json:"product_id,omitempty"`
-	OccurredAt          time.Time        `json:"occurred_at"`
-	ReceivedAt          time.Time        `json:"received_at"`
-	CreatedAt           time.Time        `json:"created_at"`
+	ID              string           `json:"id"`
+	ConversationID  string           `json:"conversation_id"`
+	RemoteMessageID string           `json:"remote_message_id,omitempty"`
+	Direction       MessageDirection `json:"direction"`
+	Visibility      Visibility       `json:"visibility"`
+	DeliveryState   DeliveryState    `json:"delivery_state"`
+	SafeText        string           `json:"safe_text"`
+	ContentDigest   string           `json:"content_digest"`
+	Language        string           `json:"language,omitempty"`
+	ModerationState ModerationState  `json:"moderation_state"`
+	IdentityState   IdentityState    `json:"identity_state"`
+	OrderID         string           `json:"order_id,omitempty"`
+	ProductID       string           `json:"product_id,omitempty"`
+	OccurredAt      time.Time        `json:"occurred_at"`
+	ReceivedAt      time.Time        `json:"received_at"`
+	CreatedAt       time.Time        `json:"created_at"`
 }
 
 func (v Message) Validate() error {
@@ -264,21 +264,21 @@ func (v Message) Validate() error {
 // Reply is the durable outbound intent/receipt. Internal notes are never
 // eligible for remote delivery.
 type Reply struct {
-	ID              string        `json:"id"`
-	ConversationID  string        `json:"conversation_id"`
-	Visibility      Visibility    `json:"visibility"`
-	Origin          string        `json:"origin"`
-	SafeText        string        `json:"safe_text"`
-	ContentDigest   string        `json:"content_digest"`
-	TemplateID      string        `json:"template_id,omitempty"`
-	ApprovalRef     string        `json:"approval_ref,omitempty"`
-	IdempotencyKey  string        `json:"idempotency_key"`
-	DeliveryState   DeliveryState `json:"delivery_state"`
-	RemoteReceipt   string        `json:"remote_receipt,omitempty"`
-	ErrorCode       string        `json:"error_code,omitempty"`
-	CreatedAt       time.Time     `json:"created_at"`
-	UpdatedAt       time.Time     `json:"updated_at"`
-	Version         int64         `json:"version"`
+	ID             string        `json:"id"`
+	ConversationID string        `json:"conversation_id"`
+	Visibility     Visibility    `json:"visibility"`
+	Origin         string        `json:"origin"`
+	SafeText       string        `json:"safe_text"`
+	ContentDigest  string        `json:"content_digest"`
+	TemplateID     string        `json:"template_id,omitempty"`
+	ApprovalRef    string        `json:"approval_ref,omitempty"`
+	IdempotencyKey string        `json:"idempotency_key"`
+	DeliveryState  DeliveryState `json:"delivery_state"`
+	RemoteReceipt  string        `json:"remote_receipt,omitempty"`
+	ErrorCode      string        `json:"error_code,omitempty"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
+	Version        int64         `json:"version"`
 }
 
 func (v Reply) Validate() error {
@@ -296,13 +296,13 @@ func (v Reply) Validate() error {
 
 // Assignment is an append-only ownership transition.
 type Assignment struct {
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	AssigneeID     string    `json:"assignee_id,omitempty"`
-	TeamID         string    `json:"team_id,omitempty"`
-	Reason         string    `json:"reason,omitempty"`
-	ExpectedVersion int64   `json:"expected_version"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	ConversationID  string    `json:"conversation_id"`
+	AssigneeID      string    `json:"assignee_id,omitempty"`
+	TeamID          string    `json:"team_id,omitempty"`
+	Reason          string    `json:"reason,omitempty"`
+	ExpectedVersion int64     `json:"expected_version"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 func (v Assignment) Validate() error {
@@ -315,15 +315,15 @@ func (v Assignment) Validate() error {
 // SLAPolicy stores versioned working-time values. Holidays use YYYY-MM-DD and
 // are interpreted in the selected IANA timezone.
 type SLAPolicy struct {
-	ID                   string    `json:"id"`
-	Version              int64     `json:"version"`
+	ID                   string           `json:"id"`
+	Version              int64            `json:"version"`
 	ConversationType     ConversationType `json:"conversation_type"`
-	Priority             Priority  `json:"priority"`
-	Timezone             string    `json:"timezone"`
-	FirstResponseMinutes int       `json:"first_response_minutes"`
-	ResolutionMinutes    int       `json:"resolution_minutes"`
-	Holidays             []string  `json:"holidays,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
+	Priority             Priority         `json:"priority"`
+	Timezone             string           `json:"timezone"`
+	FirstResponseMinutes int              `json:"first_response_minutes"`
+	ResolutionMinutes    int              `json:"resolution_minutes"`
+	Holidays             []string         `json:"holidays,omitempty"`
+	CreatedAt            time.Time        `json:"created_at"`
 }
 
 func (v SLAPolicy) Validate() error {
@@ -388,24 +388,24 @@ func (v InboundRecord) Validate() error {
 
 // Filter controls bounded cursor queries in the inbox.
 type Filter struct {
-	State            ConversationState
-	Type             ConversationType
-	Priority         Priority
-	AssigneeID       string
-	TeamID           string
-	CustomerRefID    string
-	Unresolved       bool
-	SLAState         string
-	Search           string
-	AfterID          string
-	Limit            int
+	State         ConversationState
+	Type          ConversationType
+	Priority      Priority
+	AssigneeID    string
+	TeamID        string
+	CustomerRefID string
+	Unresolved    bool
+	SLAState      string
+	Search        string
+	AfterID       string
+	Limit         int
 }
 
 // InboxPage is a cursor-paginated queue response.
 type InboxPage struct {
-	Items    []Conversation `json:"items"`
-	NextCursor string        `json:"next_cursor,omitempty"`
-	HasMore  bool            `json:"-"`
+	Items      []Conversation `json:"items"`
+	NextCursor string         `json:"next_cursor,omitempty"`
+	HasMore    bool           `json:"-"`
 }
 
 // Thread contains safe thread detail and immutable message/reply history.
@@ -428,16 +428,16 @@ type TimelineEvent struct {
 
 // Summary contains explainable queue/quality counters.
 type Summary struct {
-	Total         int            `json:"total"`
-	Unread        int            `json:"unread"`
-	Open          int            `json:"open"`
-	Pending       int            `json:"pending"`
-	Breached      int            `json:"breached"`
-	Reviews       int            `json:"reviews"`
-	Questions     int            `json:"questions"`
-	Claims        int            `json:"claims"`
+	Total          int           `json:"total"`
+	Unread         int           `json:"unread"`
+	Open           int           `json:"open"`
+	Pending        int           `json:"pending"`
+	Breached       int           `json:"breached"`
+	Reviews        int           `json:"reviews"`
+	Questions      int           `json:"questions"`
+	Claims         int           `json:"claims"`
 	UnknownReplies int           `json:"unknown_replies"`
-	Quality       SourceQuality  `json:"quality"`
+	Quality        SourceQuality `json:"quality"`
 }
 
 // Digest returns a stable SHA-256 digest for safe content and reconciliation.
@@ -576,7 +576,9 @@ func validRef(value string) bool {
 
 func validOptionalRef(value string) bool { return value == "" || validRef(value) }
 
-func validText(value string) bool { return value != "" && len(value) <= MaxTextLength && safeText(value) }
+func validText(value string) bool {
+	return value != "" && len(value) <= MaxTextLength && safeText(value)
+}
 
 func safeText(value string) bool {
 	return !strings.ContainsRune(value, '\x00') && !strings.Contains(value, "<script") && !strings.Contains(value, "javascript:")

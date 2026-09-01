@@ -2,11 +2,44 @@
 
 ## Статус
 
-`planned` — базовые Conversation/Message/Case/Assignment/SLA границы Task 057
-и Claims/Disputes Task 056 существуют, но зрелый операторский контур ещё не
-закрыт: нет единой очереди с полным customer history, равномерных отзывов и
-вопросов по каналам, устойчивого ответа, SLA-эскалаций и полноценной
-reconciliation внешних тредов.
+`repository-complete` — 2026-09-01. На уровне репозитория закрыт provider-neutral
+контур единого inbox: нормализация и дедупликация входящих обращений, privacy-safe
+CustomerRef/timeline, очереди и SLA-поля, durable reply intents, claims/returns
+references, forced RLS, API/SDK/MCP, frontend и synthetic qualification gate.
+Credentialed live/sandbox-проверки конкретных каналов остаются внешним
+release-gate и не подменяются локальным health-check.
+
+## Результат выполнения
+
+Все подзадачи 228.1–228.14 закрыты на уровне repository boundary. Реализация
+переиспользует канонические Conversation/Message/Case/Claim/Return/Order
+агрегаты и добавляет только tenant-scoped service projection: безопасный текст,
+маскированные ссылки на клиента, immutable историю и durable outbound intent.
+Второй CRM, customer master или claims ledger не создаётся.
+
+| Подзадача | Статус | Evidence |
+|---|---|---|
+| 228.1 | `closed` | ADR-0179, CustomerRef с conservative identity matching, privacy и retention boundary |
+| 228.2 | `closed` | typed core contracts для conversation/message/reply/assignment/SLA/finding и validation tests |
+| 228.3 | `closed` | inbound normalization, remote thread/message deduplication, digest и reconciliation finding storage |
+| 228.4 | `closed` | bounded deterministic Customer 360 timeline с canonical order/product/return/claim references |
+| 228.5 | `closed` | review/question filters, public/internal reply separation, moderation и delivery states |
+| 228.6 | `closed` | typed claim/return/refund links и append-only case/reconciliation boundary |
+| 228.7 | `closed` | tenant-scoped cursor inbox, assignment history и optimistic version conflict |
+| 228.8 | `closed` | versioned SLA policy model, business-time calculation и explainable SLA states |
+| 228.9 | `closed` | idempotent reply queue, approval/draft-only AI rule, unknown delivery state и audit |
+| 228.10 | `closed` | capability-aware API/MCP surface и qualification gate с fail-closed external boundary |
+| 228.11 | `closed` | migration 000055, forced RLS, bounded indexes, append-only triggers и sensitive-field checks |
+| 228.12 | `closed` | OpenAPI, regenerated Go/Python/TypeScript SDK, MCP read tool и Customer Service frontend |
+| 228.13 | `closed` | sanitization, permission split, redacted audit, privacy boundary, quota/kill-switch release rules |
+| 228.14 | `closed` | core/API/repository/static gates, frontend checks, migration/catalog evidence и synthetic E2E contract |
+
+`repository-complete` не означает, что конкретный marketplace или social
+provider получил production-доступ. Для разрешения `replies.write`, attachments,
+moderation или claims write нужны retained credentialed sandbox/live evidence:
+connector/API version, scopes, дата, read-after-write, timeout/unknown и
+redacted result. До этого capability остаётся `read_only`, `not_available` или
+`qualification_required`.
 
 ## Цель
 

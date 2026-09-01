@@ -87,6 +87,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/customerservice",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/financialcompleteness",
       "kind": "core_domain"
     },
@@ -396,6 +400,10 @@
     },
     {
       "path": "internal/platform/postgres/compliancerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/customerservicerepo",
       "kind": "infrastructure_adapter"
     },
     {

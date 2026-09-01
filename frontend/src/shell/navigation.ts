@@ -25,7 +25,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 ]);
 
 export const navigationSections = [
-  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "marketplace-listing", "returns", "incidents", "marking", "replenishment", "pricing"]},
+  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "marketplace-listing", "returns", "customer-service", "incidents", "marking", "replenishment", "pricing"]},
   {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "marketplace-operations", "social"]},
   {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "financial-analytics", "advertising", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
@@ -39,6 +39,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "marketplace-listing", label: "Карточки marketplace", path: "/marketplace-listings", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "catalog"},
   {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G O"},
   {id: "returns", label: "Возвраты", path: "/returns", capability: "orders.returns.read", risk: "WRITE_SENSITIVE", icon: "orders"},
+  {id: "customer-service", label: "Клиентский сервис", path: "/customer-service", capability: "customer_service.read", risk: "WRITE_SAFE", icon: "notifications"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},
   {id: "replenishment", label: "Прогноз и пополнение", path: "/replenishment", capability: "stock.read", risk: "WRITE_SENSITIVE", icon: "inventory"},
   {id: "pricing", label: "Цены и repricing", path: "/pricing", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "finance"},

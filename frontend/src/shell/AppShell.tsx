@@ -30,6 +30,7 @@ const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then
 const ProcurementPage = lazy(() => import("../pages/ProcurementPage").then(module => ({default: module.ProcurementPage})));
 const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
 const FinancialAnalyticsPage = lazy(() => import("../pages/FinancialAnalyticsPage").then(module => ({default: module.FinancialAnalyticsPage})));
+const CustomerServicePage = lazy(() => import("../pages/CustomerServicePage").then(module => ({default: module.CustomerServicePage})));
 const AdvertisingPage = lazy(() => import("../pages/AdvertisingPage").then(module => ({default: module.AdvertisingPage})));
 const CompliancePage = lazy(() => import("../pages/CompliancePage").then(module => ({default: module.CompliancePage})));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then(module => ({default: module.SettingsPage})));
@@ -71,6 +72,7 @@ function content(path: string) {
   if (path === "/procurement") return <ProcurementPage />;
   if (path === "/finance") return <FinancePage />;
   if (path === "/finance/analytics") return <FinancialAnalyticsPage />;
+  if (path === "/customer-service" || path.startsWith("/customer-service/")) return <CustomerServicePage />;
   if (path === "/advertising") return <AdvertisingPage />;
   if (path === "/approvals") return <ApprovalsPage />;
   if (path === "/workflows") return <WorkflowsPage />;

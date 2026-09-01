@@ -243,7 +243,7 @@ CREATE TABLE customer_service_findings (
   organization_id text NOT NULL,
   workspace_id text NOT NULL,
   finding_id text NOT NULL,
-  conversation_id text NOT NULL DEFAULT '',
+  conversation_id text,
   kind text NOT NULL,
   severity text NOT NULL,
   status text NOT NULL DEFAULT 'open',

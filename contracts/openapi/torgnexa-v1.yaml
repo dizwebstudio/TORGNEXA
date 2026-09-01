@@ -2865,6 +2865,133 @@ paths:
         '201': {description: Calculation status and immutable snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/SellerFinancialRun'}}}}
         '400': {description: Invalid calculation request}
         '403': {description: Caller lacks finance.reports.write}
+  /customer-service/summary:
+    get:
+      operationId: getCustomerServiceSummary
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: "Tenant-scoped inbox counters and delivery quality", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceSummary'}}}}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/inbox:
+    get:
+      operationId: listCustomerServiceInbox
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: state, in: query, required: false, schema: {type: string, enum: [unread, open, pending_customer, pending_internal, resolved, closed, spam]}}
+        - {name: type, in: query, required: false, schema: {type: string, enum: [message, review, question, claim, return_request, delivery_failure]}}
+        - {name: priority, in: query, required: false, schema: {type: string, enum: [low, normal, high, urgent]}}
+        - {name: sla_state, in: query, required: false, schema: {type: string, enum: [new, in_progress, waiting, escalated, breached, met]}}
+        - {name: assignee_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: team_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: customer_ref_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: unresolved, in: query, required: false, schema: {type: boolean}}
+        - {name: search, in: query, required: false, schema: {type: string, maxLength: 160}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]+$'}}
+      responses:
+        '200': {description: "Cursor-paginated unified customer-service queue", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceInboxPage'}}}}
+        '400': {description: Invalid inbox filter}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/reviews:
+    get:
+      operationId: listCustomerServiceReviews
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      responses:
+        '200': {description: "Cursor-paginated review queue", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceInboxPage'}}}}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/questions:
+    get:
+      operationId: listCustomerServiceQuestions
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      responses:
+        '200': {description: "Cursor-paginated product-question queue", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceInboxPage'}}}}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/findings:
+    get:
+      operationId: listCustomerServiceFindings
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      responses:
+        '200': {description: "Cursor-paginated inbox reconciliation findings", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceFindingPage'}}}}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/threads/{conversation_id}:
+    get:
+      operationId: getCustomerServiceThread
+      security: [{bearerAuth: []}]
+      parameters: [{name: conversation_id, in: path, required: true, schema: {type: string, maxLength: 192}}]
+      responses:
+        '200': {description: "Thread with sanitized messages, replies and minimized customer reference", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceThread'}}}}
+        '403': {description: Caller lacks customer_service.read}
+        '404': {description: Conversation not found}
+  /customer-service/customers/{customer_ref_id}:
+    get:
+      operationId: getCustomerServiceCustomerTimeline
+      security: [{bearerAuth: []}]
+      parameters: [{name: customer_ref_id, in: path, required: true, schema: {type: string, maxLength: 192}}]
+      responses:
+        '200': {description: "Privacy-safe Customer 360 timeline", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceTimelinePage'}}}}
+        '403': {description: Caller lacks customer_service.read}
+  /customer-service/inbound:
+    post:
+      operationId: ingestCustomerServiceInbound
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomerServiceInboundWrite'}
+      responses:
+        '202': {description: "Sanitized inbound message accepted or deduplicated", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceIngestResult'}}}}
+        '400': {description: "Invalid, cross-tenant or unsafe inbound message"}
+        '403': {description: Caller lacks customer_service.write}
+  /customer-service/replies:
+    post:
+      operationId: queueCustomerServiceReply
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomerServiceReplyWrite'}
+      responses:
+        '202': {description: "Durable draft or qualified outbound reply intent", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceReply'}}}}
+        '400': {description: Invalid or unsafe reply}
+        '403': {description: Caller lacks customer_service.reply}
+        '409': {description: Idempotency conflict}
+  /customer-service/assignments:
+    post:
+      operationId: assignCustomerServiceConversation
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomerServiceAssignmentWrite'}
+      responses:
+        '200': {description: Conversation with new ownership, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceConversation'}}}}
+        '400': {description: Invalid assignment}
+        '403': {description: Caller lacks customer_service.assign}
+        '409': {description: Optimistic version conflict}
+  /customer-service/transitions:
+    post:
+      operationId: transitionCustomerServiceConversation
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomerServiceTransitionWrite'}
+      responses:
+        '200': {description: Conversation with new lifecycle state, content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceConversation'}}}}
+        '400': {description: Invalid transition}
+        '403': {description: Caller lacks customer_service.write}
+        '409': {description: Optimistic version conflict}
   /financial-completeness:
     get:
       operationId: getFinancialCompleteness
@@ -3782,6 +3909,10 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
     Cursor:
       name: cursor
       in: query
@@ -3792,6 +3923,214 @@ components:
       required: true
       schema: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
   schemas:
+    CustomerServiceCustomerRef:
+      type: object
+      additionalProperties: false
+      required: [id, source_system, remote_customer_ref, identity_state, confidence_bps, source, created_at, updated_at, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        source_system: {type: string, maxLength: 192}
+        remote_customer_ref: {type: string, maxLength: 192}
+        display_name_mask: {type: string, maxLength: 160}
+        contact_mask: {type: string, maxLength: 160}
+        identity_state: {type: string, enum: [verified, ambiguous, unmatched]}
+        confidence_bps: {type: integer, minimum: 0, maximum: 10000}
+        source: {type: string, maxLength: 192}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        version: {type: integer, format: int64, minimum: 1}
+    CustomerServiceConversation:
+      type: object
+      additionalProperties: false
+      required: [id, source_system, account_id, remote_thread_id, type, state, priority, identity_state, sla_state, last_message_at, source_quality, moderation_state, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        source_system: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        remote_thread_id: {type: string, maxLength: 192}
+        type: {type: string, enum: [message, review, question, claim, return_request, delivery_failure]}
+        state: {type: string, enum: [unread, open, pending_customer, pending_internal, resolved, closed, spam]}
+        priority: {type: string, enum: [low, normal, high, urgent]}
+        customer_ref_id: {type: string, maxLength: 192}
+        identity_state: {type: string, enum: [verified, ambiguous, unmatched]}
+        subject: {type: string, maxLength: 500}
+        order_id: {type: string, maxLength: 192}
+        order_item_id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        return_id: {type: string, maxLength: 192}
+        claim_id: {type: string, maxLength: 192}
+        assignee_id: {type: string, maxLength: 192}
+        team_id: {type: string, maxLength: 192}
+        sla_state: {type: string, enum: [new, in_progress, waiting, escalated, breached, met]}
+        first_response_due_at: {type: string, format: date-time}
+        resolution_due_at: {type: string, format: date-time}
+        last_message_at: {type: string, format: date-time}
+        source_quality: {type: string, enum: [observed, confirmed, partial, stale, unknown]}
+        moderation_state: {type: string, enum: [pending, approved, blocked, spam]}
+        version: {type: integer, format: int64, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CustomerServiceMessage:
+      type: object
+      additionalProperties: false
+      required: [id, conversation_id, direction, visibility, delivery_state, safe_text, content_digest, moderation_state, identity_state, occurred_at, received_at, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        remote_message_id: {type: string, maxLength: 192}
+        direction: {type: string, enum: [inbound, outbound]}
+        visibility: {type: string, enum: [public, internal]}
+        delivery_state: {type: string, enum: [observed, draft, queued, sent, accepted, failed, unknown]}
+        safe_text: {type: string, minLength: 1, maxLength: 16000}
+        content_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        language: {type: string, maxLength: 16}
+        moderation_state: {type: string, enum: [pending, approved, blocked, spam]}
+        identity_state: {type: string, enum: [verified, ambiguous, unmatched]}
+        order_id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        occurred_at: {type: string, format: date-time}
+        received_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    CustomerServiceReply:
+      type: object
+      additionalProperties: false
+      required: [id, conversation_id, visibility, origin, safe_text, content_digest, idempotency_key, delivery_state, created_at, updated_at, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        visibility: {type: string, enum: [public, internal]}
+        origin: {type: string, enum: [human, template, ai_draft]}
+        safe_text: {type: string, minLength: 1, maxLength: 16000}
+        content_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        template_id: {type: string, maxLength: 192}
+        approval_ref: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        delivery_state: {type: string, enum: [observed, draft, queued, sent, accepted, failed, unknown]}
+        remote_receipt: {type: string, maxLength: 192}
+        error_code: {type: string, maxLength: 128}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        version: {type: integer, format: int64, minimum: 1}
+    CustomerServiceFinding:
+      type: object
+      additionalProperties: false
+      required: [id, kind, severity, status, explanation, detected_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        kind: {type: string, maxLength: 64}
+        severity: {type: string, enum: [info, warn, block]}
+        status: {type: string, enum: [open, acknowledged, resolved]}
+        explanation: {type: string, minLength: 1, maxLength: 500}
+        expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observed_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        detected_at: {type: string, format: date-time}
+        resolved_at: {type: string, format: date-time}
+    CustomerServiceSummary:
+      type: object
+      additionalProperties: false
+      required: [total, unread, open, pending, breached, reviews, questions, claims, unknown_replies, quality]
+      properties:
+        total: {type: integer, minimum: 0}
+        unread: {type: integer, minimum: 0}
+        open: {type: integer, minimum: 0}
+        pending: {type: integer, minimum: 0}
+        breached: {type: integer, minimum: 0}
+        reviews: {type: integer, minimum: 0}
+        questions: {type: integer, minimum: 0}
+        claims: {type: integer, minimum: 0}
+        unknown_replies: {type: integer, minimum: 0}
+        quality: {type: string, enum: [observed, confirmed, partial, stale, unknown]}
+    CustomerServiceInboxPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/CustomerServiceConversation'}}
+        next_cursor: {type: string, maxLength: 2048}
+    CustomerServiceFindingPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/CustomerServiceFinding'}}
+        next_cursor: {type: string, maxLength: 2048}
+    CustomerServiceThread:
+      type: object
+      additionalProperties: false
+      required: [conversation, messages, replies]
+      properties:
+        conversation: {$ref: '#/components/schemas/CustomerServiceConversation'}
+        customer: {$ref: '#/components/schemas/CustomerServiceCustomerRef'}
+        messages: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/CustomerServiceMessage'}}
+        replies: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/CustomerServiceReply'}}
+    CustomerServiceTimelineEvent:
+      type: object
+      additionalProperties: false
+      required: [id, kind, reference_id, summary, occurred_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        kind: {type: string, maxLength: 64}
+        reference_id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        summary: {type: string, maxLength: 500}
+        occurred_at: {type: string, format: date-time}
+    CustomerServiceTimelinePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 500, items: {$ref: '#/components/schemas/CustomerServiceTimelineEvent'}}
+    CustomerServiceIngestResult:
+      type: object
+      additionalProperties: false
+      required: [conversation, message, duplicate]
+      properties:
+        conversation: {$ref: '#/components/schemas/CustomerServiceConversation'}
+        message: {$ref: '#/components/schemas/CustomerServiceMessage'}
+        customer: {$ref: '#/components/schemas/CustomerServiceCustomerRef'}
+        duplicate: {type: boolean}
+    CustomerServiceInboundWrite:
+      type: object
+      additionalProperties: false
+      required: [conversation, message]
+      properties:
+        conversation: {$ref: '#/components/schemas/CustomerServiceConversation'}
+        message: {$ref: '#/components/schemas/CustomerServiceMessage'}
+        customer: {$ref: '#/components/schemas/CustomerServiceCustomerRef'}
+    CustomerServiceReplyWrite:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, visibility, origin, safe_text]
+      properties:
+        id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        visibility: {type: string, enum: [public, internal]}
+        origin: {type: string, enum: [human, template, ai_draft]}
+        safe_text: {type: string, minLength: 1, maxLength: 16000}
+        template_id: {type: string, maxLength: 192}
+        approval_ref: {type: string, maxLength: 192}
+    CustomerServiceAssignmentWrite:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, expected_version, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        conversation_id: {type: string, maxLength: 192}
+        assignee_id: {type: string, maxLength: 192}
+        team_id: {type: string, maxLength: 192}
+        reason: {type: string, maxLength: 500}
+        expected_version: {type: integer, format: int64, minimum: 1}
+        created_at: {type: string, format: date-time}
+    CustomerServiceTransitionWrite:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, state, expected_version]
+      properties:
+        conversation_id: {type: string, maxLength: 192}
+        state: {type: string, enum: [unread, open, pending_customer, pending_internal, resolved, closed, spam]}
+        expected_version: {type: integer, format: int64, minimum: 1}
     ReportData:
       type: object
       additionalProperties: false

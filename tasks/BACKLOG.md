@@ -1183,7 +1183,7 @@ See `tasks/issues/227-financial-completeness.md`.
 
 ## Epic 183 — Клиентский сервис и единый inbox
 
-Task 228 is planned as the operational maturity closure for customer service.
+Task 228 is repository-complete as the operational maturity closure for customer service.
 Task 057 already provides the provider-neutral Conversation/Message/Case/
 Assignment/SLA foundation, Task 056 provides claims/disputes, and Task 009
 provides inbox idempotency. Task 228 adds the unified inbox, reviews, product

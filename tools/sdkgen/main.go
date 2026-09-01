@@ -129,6 +129,8 @@ func run(root string, check bool) error {
 // shapes can never silently diverge again.
 func resolveParameterRef(name string) (parameter, error) {
 	switch name {
+	case "Limit":
+		return parameter{Name: "limit", Location: "query", Type: "integer", Required: false}, nil
 	case "Cursor":
 		return parameter{Name: "cursor", Location: "query", Type: "string", Required: false}, nil
 	case "IdempotencyKey":

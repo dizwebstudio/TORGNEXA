@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/customerservice"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
@@ -31,6 +32,7 @@ import (
 	connectorSDK "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/customerservicerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
@@ -60,6 +62,7 @@ const (
 	permissionGrowthPreview             = "commerce.marketplace.growth.preview"
 	permissionConnectorReadinessRead    = "commerce.connectors.readiness.read"
 	permissionFinancialCompletenessRead = "commerce.finance.completeness.read"
+	permissionCustomerServiceRead       = "commerce.customer_service.read"
 )
 
 type Identity struct {
@@ -140,6 +143,7 @@ type Dependencies struct {
 	GrowthPreviewer             GrowthPreviewer
 	ReadinessReader             ConnectorReadinessReader
 	FinancialCompletenessReader FinancialCompletenessReader
+	CustomerServiceReader       CustomerServiceReader
 	AllowedOrigins              []string
 	Edge                        securityedge.Config
 	Limiter                     *securityedge.Limiter
@@ -158,6 +162,7 @@ type Server struct {
 	growthPreview         GrowthPreviewer
 	readiness             ConnectorReadinessReader
 	financialCompleteness FinancialCompletenessReader
+	customerService       CustomerServiceReader
 	edge                  securityedge.Config
 	limiter               *securityedge.Limiter
 }
@@ -188,7 +193,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, customerService: deps.CustomerServiceReader, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -231,6 +236,52 @@ func (localReadinessReader) Readiness(_ context.Context, identity Identity) (con
 
 type postgresFinancialCompletenessReader struct {
 	repository *financialcompletenessrepo.Repository
+}
+
+type postgresCustomerServiceReader struct {
+	repository *customerservicerepo.Repository
+}
+
+func (r postgresCustomerServiceReader) ReadCustomerService(ctx context.Context, identity Identity, input CustomerServiceInput) (any, error) {
+	if r.repository == nil || !identity.Valid() {
+		return nil, ErrUnavailable
+	}
+	view := input.View
+	if view == "" {
+		view = "summary"
+	}
+	switch view {
+	case "summary":
+		return r.repository.Summary(ctx, identity.Tenant)
+	case "inbox":
+		limit := input.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		if limit < 1 || limit > 200 || customerservice.ValidateCursorRef(input.ConversationID) != nil {
+			return nil, ErrInvalid
+		}
+		return r.repository.ListInbox(ctx, identity.Tenant, customerservice.Filter{State: input.State, Type: input.Type, Search: input.Search, Limit: limit})
+	case "thread":
+		if input.ConversationID == "" {
+			return nil, ErrInvalid
+		}
+		return r.repository.GetThread(ctx, identity.Tenant, input.ConversationID)
+	case "timeline":
+		if input.CustomerRefID == "" {
+			return nil, ErrInvalid
+		}
+		return r.repository.Timeline(ctx, identity.Tenant, input.CustomerRefID)
+	case "findings":
+		limit := input.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		items, more, err := r.repository.ListFindings(ctx, identity.Tenant, "", limit)
+		return map[string]any{"items": items, "has_more": more}, err
+	default:
+		return nil, ErrInvalid
+	}
 }
 
 func (r postgresFinancialCompletenessReader) ReadFinancialCompleteness(ctx context.Context, identity Identity, input FinancialCompletenessInput) (any, error) {
@@ -552,6 +603,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.financialCompleteness.ReadFinancialCompleteness(ctx, identity, input)
+	case "commerce.customer_service.get":
+		if s.customerService == nil {
+			return nil, ErrUnavailable
+		}
+		var input CustomerServiceInput
+		if err := decodeArguments(raw, &input); err != nil {
+			return nil, ErrInvalid
+		}
+		return s.customerService.ReadCustomerService(ctx, identity, input)
 	default:
 		return nil, ErrInvalid
 	}
@@ -567,6 +627,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		growthPreviewTool(s.growthPreview != nil),
 		connectorReadinessTool(s.readiness != nil),
 		financialCompletenessTool(s.financialCompleteness != nil),
+		customerServiceTool(s.customerService != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -604,7 +665,7 @@ func toolText(outputKind string, result any) string {
 
 func governanceMetrics(name string, raw json.RawMessage) (agentgovernance.ActionMetrics, error) {
 	switch name {
-	case "commerce.products.search", "commerce.orders.list", "party.counterparties.search":
+	case "commerce.products.search", "commerce.orders.list", "party.counterparties.search", "commerce.customer_service.get":
 		return agentgovernance.ActionMetrics{}, nil
 	case "commerce.price.change.request":
 		var input PriceChangeInput
@@ -668,6 +729,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("mcp financial completeness repository: %w", err)
 	}
+	customerServiceRepository, err := customerservicerepo.New(db)
+	if err != nil {
+		return fmt.Errorf("mcp customer service repository: %w", err)
+	}
 	auditRepository, err := auditrepo.New(db)
 	if err != nil {
 		return fmt.Errorf("mcp audit repository: %w", err)
@@ -685,7 +750,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

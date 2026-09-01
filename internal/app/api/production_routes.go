@@ -18,6 +18,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorconfigrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/customerservicerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
@@ -82,6 +83,7 @@ type productionRouteDependencies struct {
 	reports                reportReader
 	financialReports       *financialrepo.Repository
 	financialCompleteness  *financialcompletenessrepo.Repository
+	customerService        *customerservicerepo.Repository
 	lineage                lineage.Reader
 	legalParties           LegalPartySearcher
 	counterparties         counterpartyLister
@@ -161,6 +163,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, logisticsRoutes...)
 	routes = append(routes, newPaymentsRoutes(deps.payments, deps.accounts, deps.connectorConfigs, deps.secretProvider, deps.aiRegistry)...)
 	routes = append(routes, newReturnsRoutes(deps.returns)...)
+	routes = append(routes, newCustomerServiceRoutes(deps.customerService, deps.auditService)...)
 	routes = append(routes, newFinancialReportRoutes(deps.financialReports, deps.auditService)...)
 	routes = append(routes, newFinancialCompletenessRoutes(deps.financialCompleteness, deps.auditService)...)
 	routes = append(routes, newAdvertisingRoutes(deps.advertising)...)

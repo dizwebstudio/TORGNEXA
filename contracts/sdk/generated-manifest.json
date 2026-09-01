@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "eec9ed1b054adbb67a9997657b6cc5de2818684aaffe9dde42d4c28f13ec2374",
+    "sha256": "386046faeaa27b11f78dfa7feb3aea13538fcc4f21173bcc0d67e35271acc860",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -83,6 +83,11 @@
       "operation_id": "archiveWorkflow",
       "method": "POST",
       "path": "/workflow-commands/archive"
+    },
+    {
+      "operation_id": "assignCustomerServiceConversation",
+      "method": "POST",
+      "path": "/customer-service/assignments"
     },
     {
       "operation_id": "assignProductCategory",
@@ -525,6 +530,21 @@
       "path": "/me/profile"
     },
     {
+      "operation_id": "getCustomerServiceCustomerTimeline",
+      "method": "GET",
+      "path": "/customer-service/customers/{customer_ref_id}"
+    },
+    {
+      "operation_id": "getCustomerServiceSummary",
+      "method": "GET",
+      "path": "/customer-service/summary"
+    },
+    {
+      "operation_id": "getCustomerServiceThread",
+      "method": "GET",
+      "path": "/customer-service/threads/{conversation_id}"
+    },
+    {
       "operation_id": "getFinancialCompleteness",
       "method": "GET",
       "path": "/financial-completeness"
@@ -790,6 +810,11 @@
       "path": "/inventory/import"
     },
     {
+      "operation_id": "ingestCustomerServiceInbound",
+      "method": "POST",
+      "path": "/customer-service/inbound"
+    },
+    {
       "operation_id": "installMCPAccountPolicy",
       "method": "POST",
       "path": "/settings/mcp-accounts/{account_id}:install-policy"
@@ -893,6 +918,26 @@
       "operation_id": "listCounterparties",
       "method": "GET",
       "path": "/counterparties"
+    },
+    {
+      "operation_id": "listCustomerServiceFindings",
+      "method": "GET",
+      "path": "/customer-service/findings"
+    },
+    {
+      "operation_id": "listCustomerServiceInbox",
+      "method": "GET",
+      "path": "/customer-service/inbox"
+    },
+    {
+      "operation_id": "listCustomerServiceQuestions",
+      "method": "GET",
+      "path": "/customer-service/questions"
+    },
+    {
+      "operation_id": "listCustomerServiceReviews",
+      "method": "GET",
+      "path": "/customer-service/reviews"
     },
     {
       "operation_id": "listFXRates",
@@ -1240,6 +1285,11 @@
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
     },
     {
+      "operation_id": "queueCustomerServiceReply",
+      "method": "POST",
+      "path": "/customer-service/replies"
+    },
+    {
       "operation_id": "readAfterWriteMarketplaceListing",
       "method": "POST",
       "path": "/marketplace-listings/read-after-write"
@@ -1448,6 +1498,11 @@
       "operation_id": "syncConnectorAccount",
       "method": "POST",
       "path": "/connector-accounts:sync"
+    },
+    {
+      "operation_id": "transitionCustomerServiceConversation",
+      "method": "POST",
+      "path": "/customer-service/transitions"
     },
     {
       "operation_id": "unarchiveLogisticsBatch",
