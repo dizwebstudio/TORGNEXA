@@ -131,6 +131,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newIntegrationCenterRoutes(deps.integrationCenter)...)
+	routes = append(routes, newConnectorReadinessRoutes()...)
 	routes = append(routes, newMarketplaceOperationsRoutes(marketplaceOperationsSource{center: deps.integrationCenter}, deps.marketplaceFlows)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService, deps.profiles)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)

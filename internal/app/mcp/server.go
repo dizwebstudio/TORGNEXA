@@ -27,6 +27,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/config"
+	connectorSDK "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
@@ -50,11 +51,12 @@ var (
 )
 
 const (
-	permissionProductsRead       = "commerce.products.read"
-	permissionOrdersRead         = "commerce.orders.read"
-	permissionCounterpartiesRead = "party.counterparties.read"
-	permissionPriceChangeRequest = "commerce.price.change.request"
-	permissionGrowthPreview      = "commerce.marketplace.growth.preview"
+	permissionProductsRead           = "commerce.products.read"
+	permissionOrdersRead             = "commerce.orders.read"
+	permissionCounterpartiesRead     = "party.counterparties.read"
+	permissionPriceChangeRequest     = "commerce.price.change.request"
+	permissionGrowthPreview          = "commerce.marketplace.growth.preview"
+	permissionConnectorReadinessRead = "commerce.connectors.readiness.read"
 )
 
 type Identity struct {
@@ -133,6 +135,7 @@ type Dependencies struct {
 	PriceChanges     PriceChangeRequester
 	ListingPreviewer ListingPreviewer
 	GrowthPreviewer  GrowthPreviewer
+	ReadinessReader  ConnectorReadinessReader
 	AllowedOrigins   []string
 	Edge             securityedge.Config
 	Limiter          *securityedge.Limiter
@@ -149,6 +152,7 @@ type Server struct {
 	priceChanges   PriceChangeRequester
 	listingPreview ListingPreviewer
 	growthPreview  GrowthPreviewer
+	readiness      ConnectorReadinessReader
 	edge           securityedge.Config
 	limiter        *securityedge.Limiter
 }
@@ -179,7 +183,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -209,6 +213,15 @@ func (localGrowthPreviewer) PreviewGrowth(_ context.Context, identity Identity, 
 	}
 	digest := sha256.Sum256([]byte(compactText(input)))
 	return marketplacegrowth.BuildPreview("mcp.growth."+hex.EncodeToString(digest[:])[:32], input, 1, time.Now().UTC())
+}
+
+type localReadinessReader struct{}
+
+func (localReadinessReader) Readiness(_ context.Context, identity Identity) (connectorSDK.ReadinessMatrix, error) {
+	if !identity.Valid() {
+		return connectorSDK.ReadinessMatrix{}, ErrForbidden
+	}
+	return connectorSDK.ReadinessSnapshot()
 }
 
 func (s *Server) Handler() http.Handler {
@@ -490,6 +503,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.growthPreview.PreviewGrowth(ctx, identity, input)
+	case "commerce.connectors.readiness.list":
+		if s.readiness == nil {
+			return nil, ErrUnavailable
+		}
+		var input map[string]any
+		if err := decodeArguments(raw, &input); err != nil || len(input) != 0 {
+			return nil, ErrInvalid
+		}
+		return s.readiness.Readiness(ctx, identity)
 	default:
 		return nil, ErrInvalid
 	}
@@ -503,6 +525,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		priceChangeTool(s.priceChanges != nil),
 		listingPreviewTool(s.listingPreview != nil),
 		growthPreviewTool(s.growthPreview != nil),
+		connectorReadinessTool(s.readiness != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -617,7 +640,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

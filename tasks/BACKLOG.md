@@ -1158,14 +1158,13 @@ release gates; without that evidence the operation stays
 
 ## Epic 181 — Глубина интеграций и readiness коннекторов
 
-Task 226 is planned to make connector depth truthful and measurable. The
-repository currently contains 61 manifests, 18 `ready` connectors and 17
-health-only connectors. The task adds a capability-level readiness model, full
-manifest audit, Task-064 conformance admission, a decision for every
-health-only connector, prioritized read/write qualification waves, durable
-sync/reconciliation, Integration Center status, quotas and release evidence.
-Manifest, SDK presence or health-check alone cannot promote a connector to
-`ready` or `qualified`. See
+Task 226 is repository-complete. The readiness matrix covers all 61 manifests:
+18 `ready`, 16 explicit `health_only` and 2 `manifest_only` specialized
+surfaces. It adds capability-level evidence, Task-064 admission checks, an
+owner/priority/next-action audit, health-only decisions, qualification waves,
+API/SDK/MCP, Integration Center UI and a reproducible release gate. Manifest,
+SDK presence or health-check alone cannot promote a connector to `ready` or
+`qualified`; credentialed sandbox/live evidence remains an external gate. See
 `tasks/issues/226-connector-depth-and-readiness.md`.
 
 ## Epic 182 — Финансовая полнота
@@ -1221,8 +1220,9 @@ channel writes remain `read_only` or `qualification_required`. See
 Task 231 is planned as the ecosystem/support release closure. The repository
 has a governed plugin marketplace, Connector SDK/conformance and Community
 deployment foundations, but not a comparable ready-integration catalog,
-partner implementation program, mobile product or hosted SLA. Task 231 adds
-connector portfolio tiers, app marketplace operations, partner enablement,
+partner implementation program, mobile product or hosted SLA. Task 019 already
+provides the external n8n package; Task 231 adds connector portfolio tiers,
+app marketplace operations, n8n distribution/support, partner enablement,
 mobile delivery, cloud SLO/SLA, support tooling and customer-facing evidence;
 it does not inflate health-only or manifest-only integrations into `ready`.
 See `tasks/issues/231-ecosystem-support.md`.

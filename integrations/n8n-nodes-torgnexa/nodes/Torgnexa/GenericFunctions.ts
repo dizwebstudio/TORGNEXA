@@ -1,7 +1,7 @@
 import type { IExecuteFunctions, IHookFunctions } from 'n8n-workflow';
 
 export type ApiContext = IExecuteFunctions | IHookFunctions;
-export type HttpMethod = 'GET' | 'POST' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface SearchPage<T = Record<string, unknown>> {
   items: T[];
@@ -49,7 +49,12 @@ export async function torgnexaApiRequest<T>(
   context: ApiContext,
   method: HttpMethod,
   path: string,
-  options: { qs?: Record<string, unknown>; body?: Record<string, unknown>; expectedStatuses?: number[] } = {},
+  options: {
+    qs?: Record<string, unknown>;
+    body?: Record<string, unknown>;
+    headers?: Record<string, string>;
+    expectedStatuses?: number[];
+  } = {},
 ): Promise<T> {
   if (!path.startsWith('/') || path.includes('://')) throw new Error('TORGNEXA API path must be relative to /api/v1');
   const credentials = await context.getCredentials('torgnexaApi');
@@ -65,6 +70,7 @@ export async function torgnexaApiRequest<T>(
   };
   if (options.qs) request.qs = cleanQuery(options.qs);
   if (options.body !== undefined) request.body = options.body;
+  if (options.headers !== undefined) request.headers = options.headers;
 
   const response = await context.helpers.httpRequestWithAuthentication.call(context, 'torgnexaApi', request) as {
     statusCode?: number;

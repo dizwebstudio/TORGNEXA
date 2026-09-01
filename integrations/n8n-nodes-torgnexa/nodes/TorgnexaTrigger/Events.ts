@@ -3,11 +3,22 @@ export const EVENT_TYPE_PATTERN = /^[a-z][a-z0-9]*(_[a-z0-9]+)*\.[a-z][a-z0-9]*(
 export const commonEventOptions = [
   { name: 'Approval Required', value: 'governance.approval.requested.v1' },
   { name: 'Compliance Document Status Changed', value: 'compliance.document.status_changed.v1' },
+  { name: 'Product Changed', value: 'commerce.catalog.product_changed.v1' },
+  { name: 'Offer Changed', value: 'commerce.catalog.offer_changed.v1' },
   { name: 'Order Changed', value: 'commerce.orders.order_changed.v1' },
   { name: 'Order Created', value: 'commerce.orders.order_created.v1' },
+  { name: 'Fulfillment Allocation Changed', value: 'commerce.fulfillment.allocation_changed.v1' },
+  { name: 'Fulfillment Task Changed', value: 'commerce.fulfillment.task_changed.v1' },
+  { name: 'Fulfillment Batch Changed', value: 'commerce.fulfillment.batch_changed.v1' },
+  { name: 'Shipment Changed', value: 'commerce.fulfillment.shipment_changed.v1' },
+  { name: 'Inventory Position Changed', value: 'commerce.inventory.position_changed.v1' },
   { name: 'Price Changed', value: 'commerce.pricing.price_changed.v1' },
-  { name: 'Publication Status Changed', value: 'commerce.social.publication_status_changed.v1' },
   { name: 'Stock Changed', value: 'commerce.inventory.stock_changed.v1' },
+  { name: 'Warehouse State Changed (incident)', value: 'commerce.inventory.warehouse_changed.v1' },
+  { name: 'Return Requested', value: 'commerce.returns.requested.v1' },
+  { name: 'Return State Changed', value: 'commerce.returns.state_changed.v1' },
+  { name: 'Warehouse Stock Moved', value: 'warehouse.stock.moved.v1' },
+  { name: 'Publication Status Changed', value: 'commerce.social.publication_status_changed.v1' },
   { name: 'Upload Quarantined', value: 'security.upload.quarantined.v1' },
 ];
 

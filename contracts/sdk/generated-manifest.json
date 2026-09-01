@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "0a64603243068f55139345fa71a7a732afd6a614e0d6f279a8a33f31949b5063",
+    "sha256": "78bef883b31606fe5419128ecfd61e04f22c97ac63446af0f4b1161b5abce319",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -490,6 +490,11 @@
       "path": "/connector-accounts:bootstrap"
     },
     {
+      "operation_id": "getConnectorReadiness",
+      "method": "GET",
+      "path": "/connector-readiness/{connector_id}"
+    },
+    {
       "operation_id": "getConnectorRuntimeConfig",
       "method": "GET",
       "path": "/connector-accounts:runtime-config"
@@ -848,6 +853,11 @@
       "operation_id": "listConnectorAccounts",
       "method": "GET",
       "path": "/connector-accounts"
+    },
+    {
+      "operation_id": "listConnectorReadiness",
+      "method": "GET",
+      "path": "/connector-readiness"
     },
     {
       "operation_id": "listConnectors",

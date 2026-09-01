@@ -2,9 +2,11 @@
 
 ## Статус
 
-`planned` — в каталоге есть 61 манифест, но только 18 коннекторов имеют статус
-`ready`; 17 фактически ограничены health-check. Наличие манифеста, SDK или
-успешного ping не считается рабочей интеграцией.
+`repository-complete` — в каталоге проверены 61 манифест, 61 readiness-profile
+и текущая runtime-поверхность. В источнике runtime зафиксировано 18
+`ready`, 16 явных `health_only` и 2 `manifest_only` специализированные
+поверхности. Credentialed sandbox/live qualification остаётся внешним
+release-gate и не подменяется успешным ping.
 
 ## Цель
 
@@ -27,13 +29,43 @@ surface должен остаться честным `separate_surface`, `health
 |---|---:|---|
 | Манифесты | 61 | провести инвентаризацию и назначить owner/приоритет |
 | `ready` | 18 | подтвердить актуальным conformance/runtime evidence |
-| `health_only` | 17 | либо добавить полезную operation surface, либо явно оставить health-only |
+| `health_only` | 16 явных | либо добавить полезную operation surface, либо явно оставить health-only |
+| `manifest_only` | 2 | принять решение по отдельной runtime-поверхности или вывести из каталога |
 | Остальные поверхности | отдельные/частичные | описать capability depth, blockers и план квалификации |
 
 Readiness должна считаться как по connector-у, так и по отдельной capability:
 например, `orders.read` может быть `ready`, а `orders.status.write` —
 `qualification_required`. Зелёный health-check одного аккаунта не поднимает
 статус всех операций.
+
+## Результат выполнения
+
+Все подзадачи 226.1–226.11 закрыты на уровне репозитория. В систему добавлены
+единая модель статусов, воспроизводимая матрица из 61 профиля, capability-level
+metadata, API/SDK/MCP read surface, таблица Integration Center, статический
+gate, документация и release-review. Операционные sync/outbox/inbox/lease и
+reconciliation-контуры переиспользуют существующую durable инфраструктуру;
+новая readiness-модель не создаёт вторую базу истины и не выдаёт remote write.
+
+| Подзадача | Статус | Evidence |
+|---|---|---|
+| 226.1 | `closed` | `internal/platform/connectors/readiness.go`, `readiness-matrix-v1.json` |
+| 226.2 | `closed` | `scripts/generate-connector-readiness.py`, matrix и русское представление |
+| 226.3 | `closed` | `scripts/check-connector-readiness.sh`, Task-064 conformance reports |
+| 226.4 | `closed` | decision/next action в каждом профиле; 16 explicit health-only + 2 manifest-only |
+| 226.5 | `closed` | runtime support matrix, capability evidence, существующие cursor/sync/reconciliation gates |
+| 226.6 | `closed` | write capabilities остаются policy/approval/qualification-gated; unqualified writes fail closed |
+| 226.7 | `closed` | SecretProvider/auth boundary и redacted evidence сохранены, новые API не принимают credentials |
+| 226.8 | `closed` | существующие outbox/inbox/lease/retry/reconciliation контуры остаются authoritative |
+| 226.9 | `closed` | `GET /api/v1/connector-readiness`, generated SDK, MCP и Integration Center UI |
+| 226.10 | `closed` | quotas/health/reconciliation/kill-switch документация и операционный runbook |
+| 226.11 | `closed` | static gate, architecture review и wave plan; credentialed runs вынесены в external gate |
+
+`ready` в этой матрице означает наличие проверенной repository runtime
+поверхности и базового conformance evidence. `qualified` намеренно равен нулю,
+пока для exact capability нет retained credentialed sandbox/live
+read-after-write evidence. Это внешний release-gate, а не незавершённая
+локальная задача.
 
 ## Подзадачи
 
@@ -283,8 +315,9 @@ connector остаётся read-only/partial/health-only с причиной.
   evidence age и next action.
 - Для каждой capability, показанной как `ready`/`qualified`, есть conformance,
   runtime, security, idempotency и reconciliation evidence.
-- 17 health-only connector-ов имеют утверждённое решение: углубление,
-  специализированная поверхность, health-only или deprecation.
+- 16 explicit health-only connector-ов и 2 manifest-only записи имеют
+  утверждённое решение: углубление, специализированная поверхность,
+  health-only или deprecation.
 - Integration Center, API, SDK, worker, MCP и release report не расходятся по
   статусам и доступным действиям.
 - Пройдены `gofmt`, `go test ./...`, `go vet ./...`,

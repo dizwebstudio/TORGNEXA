@@ -1746,6 +1746,37 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
         '404': {description: Account is not visible in the resolved tenant}
+  /connector-readiness:
+    get:
+      operationId: listConnectorReadiness
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: family, in: query, schema: {type: string, maxLength: 64}}
+        - {name: surface, in: query, schema: {type: string, maxLength: 64}}
+        - {name: status, in: query, schema: {type: string, enum: [manifest_only, health_only, read_only, partially_supported, ready, qualified, degraded, reauthorization_required, not_available]}}
+        - {name: priority, in: query, schema: {type: string, enum: [P0, P1, P2, P3]}}
+      responses:
+        '200':
+          description: Catalog-wide connector depth snapshot; no remote calls or credentials are exposed
+          content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorReadinessPage'}}}
+        '400': {description: "Invalid cursor, filter or limit"}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+  /connector-readiness/{connector_id}:
+    get:
+      operationId: getConnectorReadiness
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: connector_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9][a-z0-9-]{0,62}$'}}
+      responses:
+        '200':
+          description: Detailed non-secret readiness profile for one catalog connector
+          content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorReadinessProfile'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+        '404': {description: Connector is not present in the reviewed catalog}
   /marketplace-operations:
     get:
       operationId: listMarketplaceOperations
@@ -7021,6 +7052,80 @@ components:
         source_watermarks: {type: array, maxItems: 32, items: {type: string, maxLength: 192}}
         summary: {$ref: '#/components/schemas/IntegrationCenterSummary'}
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/IntegrationCenterAccount'}}
+        next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    ConnectorReadinessCapability:
+      type: object
+      additionalProperties: false
+      required: [name, status, direction, risk_class, idempotency, read_after_write, webhook_or_reconciliation, runtime_evidence]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 128}
+        status: {type: string, enum: [manifest_only, health_only, read_only, partially_supported, ready, qualified, not_available]}
+        direction: {type: string, enum: [read, write]}
+        required_scopes: {type: array, maxItems: 64, items: {type: string, maxLength: 128}}
+        risk_class: {type: string, maxLength: 64}
+        idempotency: {type: string, maxLength: 64}
+        read_after_write: {type: string, maxLength: 64}
+        webhook_or_reconciliation: {type: boolean}
+        runtime_evidence: {type: string, minLength: 1, maxLength: 192}
+    ConnectorReadinessRateLimit:
+      type: object
+      additionalProperties: false
+      required: [max_concurrency, min_interval_ms, request_timeout_ms, retry_max_attempts]
+      properties:
+        max_concurrency: {type: integer, minimum: 1, maximum: 1000}
+        min_interval_ms: {type: integer, minimum: 0, maximum: 3600000}
+        request_timeout_ms: {type: integer, minimum: 1, maximum: 3600000}
+        retry_max_attempts: {type: integer, minimum: 0, maximum: 100}
+    ConnectorReadinessProfile:
+      type: object
+      additionalProperties: false
+      required: [connector_id, display_name, family, surface, status, owner, priority, decision, next_action, official_docs_ref, official_docs_status, sandbox_status, live_qualification_status, last_verified_at, conformance_ref, runtime_ref, health_only, capabilities, blockers, rate_limit]
+      properties:
+        connector_id: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}$'}
+        display_name: {type: string, minLength: 1, maxLength: 160}
+        family: {type: string, maxLength: 64}
+        surface: {type: string, maxLength: 64}
+        status: {type: string, enum: [manifest_only, health_only, read_only, partially_supported, ready, qualified, degraded, reauthorization_required, not_available]}
+        owner: {type: string, pattern: '^[a-z][a-z0-9-]{0,63}$'}
+        priority: {type: string, enum: [P0, P1, P2, P3]}
+        decision: {type: string, enum: [deepen, keep_health_only, specialized_surface, retire, qualify]}
+        next_action: {type: string, minLength: 1, maxLength: 512}
+        official_docs_ref: {type: string, minLength: 1, maxLength: 256}
+        official_docs_status: {type: string, maxLength: 96}
+        sandbox_status: {type: string, maxLength: 64}
+        live_qualification_status: {type: string, maxLength: 64}
+        last_verified_at: {type: string, format: date-time, pattern: 'Z$'}
+        conformance_ref: {type: string, minLength: 1, maxLength: 256}
+        runtime_ref: {type: string, minLength: 1, maxLength: 256}
+        health_only: {type: boolean}
+        capabilities: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/ConnectorReadinessCapability'}}
+        blockers: {type: array, maxItems: 32, items: {type: string, minLength: 1, maxLength: 160}}
+        rate_limit: {$ref: '#/components/schemas/ConnectorReadinessRateLimit'}
+    ConnectorReadinessSummary:
+      type: object
+      additionalProperties: false
+      required: [total, manifest_only, health_only, read_only, partially_supported, ready, qualified, degraded, reauthorization_required, not_available]
+      properties:
+        total: {type: integer, minimum: 0}
+        manifest_only: {type: integer, minimum: 0}
+        health_only: {type: integer, minimum: 0}
+        read_only: {type: integer, minimum: 0}
+        partially_supported: {type: integer, minimum: 0}
+        ready: {type: integer, minimum: 0}
+        qualified: {type: integer, minimum: 0}
+        degraded: {type: integer, minimum: 0}
+        reauthorization_required: {type: integer, minimum: 0}
+        not_available: {type: integer, minimum: 0}
+    ConnectorReadinessPage:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generated_at, consistency, summary, items]
+      properties:
+        schema_version: {type: integer, minimum: 1}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        consistency: {type: string, enum: [repository_snapshot]}
+        summary: {$ref: '#/components/schemas/ConnectorReadinessSummary'}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorReadinessProfile'}}
         next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
     MarketplaceOperation:
       type: object

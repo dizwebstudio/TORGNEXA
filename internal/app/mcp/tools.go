@@ -9,6 +9,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
+	connectorSDK "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
 )
 
@@ -41,6 +42,12 @@ type ListingPreviewer interface {
 // applies a remote operation; application remains behind HTTP approval.
 type GrowthPreviewer interface {
 	PreviewGrowth(context.Context, Identity, marketplacegrowth.PreviewRequest) (marketplacegrowth.Preview, error)
+}
+
+// ConnectorReadinessReader exposes the redacted connector catalog to an
+// authorized agent. It cannot access tenant credentials or invoke a provider.
+type ConnectorReadinessReader interface {
+	Readiness(context.Context, Identity) (connectorSDK.ReadinessMatrix, error)
 }
 
 type toolDescriptor struct {
@@ -155,6 +162,15 @@ func growthPreviewTool(available bool) toolDescriptor {
 			"items":                       map[string]any{"type": "array", "minItems": 1, "maxItems": marketplacegrowth.MaxPreviewRows, "items": map[string]any{"type": "object"}},
 		}, []string{"operation", "channel_id", "account_id", "target_id", "currency", "floor_price_minor", "items"}),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
+	}}
+}
+
+func connectorReadinessTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionConnectorReadinessRead, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.connectors.readiness.list", Title: "List connector readiness",
+		Description: "Read the reviewed, non-secret readiness matrix for all TORGNEXA connectors. The catalog distinguishes health-only, read-only, partial, ready and qualified runtime depth; it never performs remote calls.",
+		InputSchema: objectSchema(map[string]any{}, nil),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
 	}}
 }
 

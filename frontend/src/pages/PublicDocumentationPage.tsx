@@ -873,6 +873,7 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
         </DocSection>
 
         <DocSection id="integration-status" title="Состояние интеграций" intro="Центр состояния показывает единый снимок кабинетов, runtime, доступности, операций и синхронизации. Чтение снимка не выполняет удалённую проверку и не изменяет кабинет.">
+          <p>В начале страницы находится каталог глубины всех 61 коннектора: <code>manifest_only</code>, <code>health_only</code>, <code>read_only</code>, <code>partially_supported</code>, <code>ready</code> и <code>qualified</code>. Сейчас runtime-источник содержит 18 готовых, 14 read-only, 11 частично доступных, 16 health-only и 2 manifest-only специализированные поверхности. <code>ready</code> означает наличие runtime и базового conformance evidence; <code>qualified</code> появляется только после точной credentialed sandbox/live-проверки capability.</p>
           <ol className="docs-steps">
             <li><strong>Начните со сводки</strong><span>Счётчики «Работают», «Внимание», «Заблокированы», «Устарели» и «Синхронизация» показывают масштаб проблемы, но не заменяют открытие конкретного кабинета.</span></li>
             <li><strong>Отфильтруйте очередь</strong><span>Используйте состояние, рабочий контур, семейство, capability или причину. Фильтры меняют только чтение снимка и сохраняют cursor пагинации.</span></li>

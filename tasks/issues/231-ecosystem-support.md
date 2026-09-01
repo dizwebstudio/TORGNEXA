@@ -128,12 +128,19 @@ impact; изменение digest требует re-consent; revoked app не з
 
 ### 231.6 — Developer platform и partner API
 
-**Зависимости:** 010, 062, 064, 231.3.
+**Зависимости:** 010, 019, 062, 064, 231.3.
 
 - Опубликовать versioned SDK/API, OpenAPI, event schemas, capability catalog,
   examples, sandbox, test tenants и conformance runner.
 - Создать partner portal: application, credentials/scopes, webhooks, rate-limit
   dashboard, evidence upload, support contact и changelog.
+- Довести внешний `n8n-nodes-torgnexa` package до поддерживаемого distribution
+  slice: versioned artifact, credential setup, Product/Order nodes, canonical
+  event trigger, webhook subscribe/disable, signed delivery, retry/error
+  guidance и compatibility matrix.
+- Не добавлять n8n privileged path: node использует только public `/api/v1`,
+  tenant/workspace берётся из authenticated identity, а sensitive writes
+  остаются approval/policy/idempotency-gated.
 - Зафиксировать semantic versioning, compatibility/deprecation policy,
   migration guides и security disclosure.
 - Разделить developer, implementation partner и publisher roles с least
@@ -142,7 +149,9 @@ impact; изменение digest требует re-consent; revoked app не з
   access и policy bypass.
 
 **Acceptance:** внешний разработчик может собрать typed connector и пройти
-sandbox conformance без доступа к repository internals или production data.
+sandbox conformance без доступа к repository internals или production data;
+n8n package устанавливается из versioned artifact, проходит проверки подписи
+webhook, replay/redirect/error handling и не может обойти host permissions.
 
 ### 231.7 — Партнёрское внедрение и certification
 
@@ -245,6 +254,9 @@ outage drills оставляют evidence; status page не раскрывает
 - Пройти authenticated E2E: developer onboarding → conformance → listing →
   install/consent → partner sandbox → mobile use → support escalation →
   incident/status → resolution/rollback.
+- Отдельно проверить n8n: credential setup → Product/Order read → canonical
+  event trigger → signed webhook delivery → duplicate/replay rejection →
+  disable/revoke → version update с compatibility check.
 - Проверить wrong scope, health-only mislabel, private listing isolation,
   partner access, cloud outage/DR, mobile offline, quota и billing correction.
 - Release claim разделить на repository readiness, Community, hosted SLA,
@@ -276,14 +288,15 @@ count не заменяет operational proof.
 
 ## Зависимости
 
-010, 025, 027, 062, 064, 078, 093, 118, 226, 229.
+010, 019, 025, 027, 062, 064, 078, 093, 118, 226, 229.
 
 ## Definition of Done
 
 - Все 12 подзадач имеют implementation, contracts/docs и success/failure/
   idempotency/security tests.
 - Есть customer-facing ecosystem/app catalog, developer/partner onboarding,
-  certification evidence, mobile vertical slice и hosted SLO/SLA tier.
+  n8n distribution, certification evidence, mobile vertical slice и hosted
+  SLO/SLA tier.
 - Support desk, case escalation, status page, usage, audit, quotas и revoke
   controls связаны в один operational path.
 - Для каждого `ready/qualified/supported` есть актуальное evidence; остальные

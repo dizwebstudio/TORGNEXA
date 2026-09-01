@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-torgnexa",
-  "version": "0.1.0",
-  "description": "Official TORGNEXA community node for public REST resources and signed webhook triggers.",
+  "version": "0.2.0",
+  "description": "Official TORGNEXA community node for catalog, orders, inventory, fulfillment, synchronization, pricing and signed webhook triggers.",
   "license": "MIT",
   "keywords": [
     "n8n-community-node-package",
@@ -13,6 +13,18 @@
   "author": {
     "name": "TORGNEXA"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/torgnexa/torgnexa.git",
+    "directory": "integrations/n8n-nodes-torgnexa"
+  },
+  "homepage": "https://docs.torgnexa.local/developer/n8n",
+  "bugs": {
+    "url": "https://github.com/torgnexa/torgnexa/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.16.0 <23"
   },
@@ -22,11 +34,16 @@
     "build:watch": "tsc -p tsconfig.release.json --watch",
     "lint": "tsc -p tsconfig.release.json --noEmit",
     "test:offline": "tsc -p tsconfig.offline.json && node --test test/*.test.cjs",
+    "test:e2e": "node ./test/e2e-installation.test.cjs",
+    "pack:verify": "npm pack --dry-run",
     "verify:package": "node ./scripts/verify-package.mjs",
-    "prepublishOnly": "npm run build && npm run test:offline && npm run verify:package"
+    "prepublishOnly": "npm run build && npm run test:offline && npm run test:e2e && npm run verify:package"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE.md",
+    "COMPATIBILITY.md"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,

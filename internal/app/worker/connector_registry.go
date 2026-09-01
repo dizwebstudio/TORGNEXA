@@ -47,6 +47,10 @@ func (registry *runtimeRegistry) Source(ctx context.Context, scope tenancy.Scope
 		return nil, ErrConnectorSourceBridgeUnavailable
 	}
 	entity := strings.TrimSuffix(policy.EntityType, "s")
+	readiness, readinessErr := sdk.ReadinessProfileFor(account.ConnectorID)
+	if readinessErr != nil || (readiness.Status != sdk.ReadinessReady && readiness.Status != sdk.ReadinessQualified) {
+		return nil, ErrConnectorSourceBridgeUnavailable
+	}
 	if entity == "order" {
 		reader, err := registry.orderReader(scope, account, runtime)
 		if err != nil {
