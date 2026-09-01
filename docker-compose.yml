@@ -56,6 +56,8 @@ x-app-common: &app-common
     args:
       VERSION: ${TORGNEXA_VERSION:-0.1.0-dev}
   restart: unless-stopped
+  # Let Docker's init process reap orphaned children and forward signals.
+  init: true
   read_only: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
@@ -68,6 +70,7 @@ services:
   postgres:
     image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: unless-stopped
+    init: true
     environment:
       POSTGRES_DB: torgnexa
       POSTGRES_USER: torgnexa
@@ -144,6 +147,7 @@ services:
   kafka:
     image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
     restart: unless-stopped
+    init: true
     ports:
       - 127.0.0.1:${KAFKA_PORT:-9092}:9092
     environment:
@@ -190,6 +194,7 @@ services:
   valkey:
     image: valkey/valkey:9.1.1-alpine@sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328
     restart: unless-stopped
+    init: true
     user: "999:1000"
     command: [valkey-server, --save, "60", "1", --appendonly, "yes"]
     ports:
@@ -208,6 +213,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:26.6@sha256:a63a90ffdcb574683ebfe96e4c53e2dbe401864add7bb06dc244eb935d828e7f
     restart: unless-stopped
+    init: true
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-torgnexa}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run scripts/init-community-env.sh}
@@ -242,6 +248,7 @@ services:
   garage:
     image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
     restart: unless-stopped
+    init: true
     depends_on:
       garage-config:
         condition: service_completed_successfully
@@ -272,6 +279,7 @@ services:
   clamav:
     image: clamav/clamav:1.4.3@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4
     restart: unless-stopped
+    init: true
     networks: [backend]
     healthcheck:
       test: [CMD-SHELL, clamdcheck.sh]
@@ -283,6 +291,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     restart: unless-stopped
+    init: true
     depends_on:
       keycloak-db-init:
         condition: service_completed_successfully
@@ -411,6 +420,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile.dev
     restart: unless-stopped
+    init: true
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
