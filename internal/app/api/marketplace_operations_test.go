@@ -96,6 +96,7 @@ type marketplaceFlowStoreStub struct {
 	flows    map[string]marketplaceoperations.Flow
 	findings map[string]marketplaceoperations.Finding
 	actions  map[string]marketplaceoperations.FindingAction
+	timeline map[string][]marketplaceoperations.CommandRecord
 }
 
 func (stub *marketplaceFlowStoreStub) List(context.Context, tenancy.Scope, string, int) (marketplaceoperations.FlowPage, error) {
@@ -119,6 +120,10 @@ func (stub *marketplaceFlowStoreStub) Flow(_ context.Context, _ tenancy.Scope, i
 		return marketplaceoperations.Flow{}, marketplaceoperations.ErrFlowNotFound
 	}
 	return flow, nil
+}
+
+func (stub *marketplaceFlowStoreStub) ListCommands(_ context.Context, _ tenancy.Scope, flowID string, _ int) ([]marketplaceoperations.CommandRecord, error) {
+	return append([]marketplaceoperations.CommandRecord(nil), stub.timeline[flowID]...), nil
 }
 
 func (stub *marketplaceFlowStoreStub) Apply(_ context.Context, _ tenancy.Scope, id string, command marketplaceoperations.Command) (marketplaceoperations.Flow, bool, error) {
@@ -198,7 +203,7 @@ func (stub *marketplaceFlowStoreStub) ApplyFindingAction(_ context.Context, _ te
 
 func TestMarketplaceOperationFlowCreateAndCommandAreIdempotent(t *testing.T) {
 	scope := validTestScope(t)
-	store := &marketplaceFlowStoreStub{}
+	store := &marketplaceFlowStoreStub{timeline: map[string][]marketplaceoperations.CommandRecord{}}
 	create := httptest.NewRequest(http.MethodPost, MarketplaceOperationFlowsPath, strings.NewReader(`{"account_id":"account-1"}`)).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
 	create.Header.Set("Idempotency-Key", "flow-start")
 	create.Header.Set("Content-Type", "application/json")
@@ -240,6 +245,34 @@ func TestMarketplaceOperationFlowCreateAndCommandAreIdempotent(t *testing.T) {
 	marketplaceOperationFlowCommand(replayResponse, replay, store)
 	if replayResponse.Code != http.StatusOK || !strings.Contains(replayResponse.Body.String(), `"duplicate":true`) {
 		t.Fatalf("replay status=%d body=%s", replayResponse.Code, replayResponse.Body.String())
+	}
+}
+
+func TestMarketplaceOperationFlowCanStartAtOrderAndExposeTimeline(t *testing.T) {
+	scope := validTestScope(t)
+	store := &marketplaceFlowStoreStub{timeline: map[string][]marketplaceoperations.CommandRecord{}}
+	create := httptest.NewRequest(http.MethodPost, MarketplaceOperationFlowsPath, strings.NewReader(`{"account_id":"account-1","start_stage":"order","references":[{"kind":"order","id":"order-1"}]}`)).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	create.Header.Set("Idempotency-Key", "golden-flow")
+	create.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	marketplaceOperationFlowCreate(response, create, store)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create status=%d body=%s", response.Code, response.Body.String())
+	}
+	var created marketplaceOperationFlowCreateResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.Flow.Stage != marketplaceoperations.StageOrder || len(created.Flow.References) != 1 {
+		t.Fatalf("golden path was not seeded at order: %+v", created.Flow)
+	}
+	at := time.Now().UTC()
+	store.timeline[created.Flow.ID] = []marketplaceoperations.CommandRecord{{FlowID: created.Flow.ID, OperationID: "order.accepted", IdempotencyKey: "order-command", Stage: marketplaceoperations.StageOrder, Outcome: marketplaceoperations.OutcomeSucceeded, References: []marketplaceoperations.Reference{{Kind: "order", ID: "order-1"}}, OccurredAt: at}}
+	request := httptest.NewRequest(http.MethodGet, MarketplaceOperationFlowsPath+"/"+created.Flow.ID, nil).WithContext(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	detail := httptest.NewRecorder()
+	marketplaceOperationFlowDetail(detail, request, store, created.Flow.ID)
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), `"timeline"`) || !strings.Contains(detail.Body.String(), "order.accepted") {
+		t.Fatalf("detail status=%d body=%s", detail.Code, detail.Body.String())
 	}
 }
 

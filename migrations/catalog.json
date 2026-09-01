@@ -1033,6 +1033,26 @@
       },
       "backfill": null,
       "sha256": "7527481bf29a630a26cf907e7173eadad4d63e1c96b11e05d1020366af6a3be0"
+    },
+    {
+      "version": 51,
+      "name": "marketplace_order_fulfillment",
+      "file": "000051_marketplace_order_fulfillment.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [50],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "f435775444be35020ee40425b1a8eebb89237b11b592bbd47452963592629790"
     }
   ]
 }

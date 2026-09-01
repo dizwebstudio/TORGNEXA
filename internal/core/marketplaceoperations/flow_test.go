@@ -20,6 +20,7 @@ func TestFlowAdvancesFullMarketplaceScenarioAndDeduplicatesRetry(t *testing.T) {
 	referenceKinds := map[FlowStage]string{
 		StageAccount: "account", StageProduct: "product", StagePublication: "publication", StagePricing: "price",
 		StageInventory: "inventory", StageOrder: "order", StageReservation: "reservation", StagePickPack: "wms_task",
+		StageLabel:    "label",
 		StageShipment: "shipment", StageReturn: "return", StageSettlement: "settlement", StageProfitability: "pnl", StageReconciliation: "reconciliation",
 	}
 	for index, stage := range stages {
@@ -38,6 +39,22 @@ func TestFlowAdvancesFullMarketplaceScenarioAndDeduplicatesRetry(t *testing.T) {
 	}
 	if flow.Stage != StageComplete || flow.State != FlowComplete || len(flow.References) != len(stages) {
 		t.Fatalf("flow did not complete: %+v", flow)
+	}
+}
+
+func TestGoldenPathCanStartAfterCanonicalOrderMaterialization(t *testing.T) {
+	at := time.Date(2026, 9, 1, 14, 0, 0, 0, time.UTC)
+	flow, err := NewAtStage("flow-golden", "org-1", "workspace-1", "account-1", StageOrder, []Reference{{Kind: "order", ID: "order-1"}}, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages := GoldenPathStages()
+	if len(stages) != 9 || stages[0] != StageOrder || stages[3] != StageLabel || flow.Stage != StageOrder {
+		t.Fatalf("unexpected golden path contract: stages=%v flow=%+v", stages, flow)
+	}
+	flow, duplicate, err := Apply(flow, flowCommand(StageOrder, "order-op", "order-key", OutcomeSucceeded, at.Add(time.Minute), Reference{Kind: "order", ID: "order-1"}))
+	if err != nil || duplicate || flow.Stage != StageReservation {
+		t.Fatalf("order stage did not advance safely: duplicate=%v flow=%+v err=%v", duplicate, flow, err)
 	}
 }
 

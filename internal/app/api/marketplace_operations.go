@@ -42,6 +42,11 @@ type marketplaceOperationFlowReader interface {
 	List(context.Context, tenancy.Scope, string, int) (marketplaceoperations.FlowPage, error)
 }
 
+type marketplaceOperationFlowDetailReader interface {
+	Flow(context.Context, tenancy.Scope, string) (marketplaceoperations.Flow, error)
+	ListCommands(context.Context, tenancy.Scope, string, int) ([]marketplaceoperations.CommandRecord, error)
+}
+
 type marketplaceOperationFlowStore interface {
 	marketplaceOperationFlowReader
 	Create(context.Context, tenancy.Scope, marketplaceoperations.Flow) error
@@ -107,6 +112,10 @@ func newMarketplaceOperationsRoutes(reader marketplaceOperationsReader, flowRead
 	if candidate, ok := flowReader.(marketplaceOperationFlowStore); ok {
 		flowStore = candidate
 	}
+	var flowDetailReader marketplaceOperationFlowDetailReader
+	if candidate, ok := flowReader.(marketplaceOperationFlowDetailReader); ok {
+		flowDetailReader = candidate
+	}
 	var findingStore marketplaceOperationFindingStore
 	if candidate, ok := flowReader.(marketplaceOperationFindingStore); ok {
 		findingStore = candidate
@@ -115,7 +124,9 @@ func newMarketplaceOperationsRoutes(reader marketplaceOperationsReader, flowRead
 		ProtectedRoute{Method: http.MethodPost, Path: MarketplaceOperationFlowsPath, Permission: "marketplace.operations.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marketplaceOperationFlowCreate(w, r, flowStore) })},
 		ProtectedRoute{Method: http.MethodPost, Path: MarketplaceOperationFlowsPath + "/", PathPrefix: true, Permission: "marketplace.operations.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marketplaceOperationFlowCommand(w, r, flowStore) })},
 		ProtectedRoute{Method: http.MethodGet, Path: MarketplaceOperationFindingsPath, Permission: "integrations.center.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marketplaceOperationFindingsList(w, r, findingStore) })},
-		ProtectedRoute{Method: http.MethodGet, Path: MarketplaceOperationFlowsPath + "/", PathPrefix: true, Permission: "integrations.center.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marketplaceOperationFlowFindings(w, r, findingStore) })},
+		ProtectedRoute{Method: http.MethodGet, Path: MarketplaceOperationFlowsPath + "/", PathPrefix: true, Permission: "integrations.center.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			marketplaceOperationFlowSubroute(w, r, flowDetailReader, findingStore)
+		})},
 		ProtectedRoute{Method: http.MethodPost, Path: MarketplaceOperationFindingsPath + "/", PathPrefix: true, Permission: "marketplace.operations.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marketplaceOperationFindingAction(w, r, findingStore) })},
 	)
 	return routes
@@ -224,8 +235,10 @@ func marketplaceOperationFlowsList(w http.ResponseWriter, r *http.Request, reade
 }
 
 type marketplaceOperationFlowCreateRequest struct {
-	ID        string `json:"id,omitempty"`
-	AccountID string `json:"account_id"`
+	ID         string                            `json:"id,omitempty"`
+	AccountID  string                            `json:"account_id"`
+	StartStage marketplaceoperations.FlowStage   `json:"start_stage,omitempty"`
+	References []marketplaceoperations.Reference `json:"references,omitempty"`
 }
 
 type marketplaceOperationFlowCreateResponse struct {
@@ -255,7 +268,11 @@ func marketplaceOperationFlowCreate(w http.ResponseWriter, r *http.Request, stor
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	flow, err := marketplaceoperations.New(flowID, scope.OrganizationID().String(), scope.WorkspaceID().String(), input.AccountID, time.Now().UTC())
+	startStage := input.StartStage
+	if startStage == "" {
+		startStage = marketplaceoperations.StageAccount
+	}
+	flow, err := marketplaceoperations.NewAtStage(flowID, scope.OrganizationID().String(), scope.WorkspaceID().String(), input.AccountID, startStage, input.References, time.Now().UTC())
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
@@ -274,6 +291,40 @@ func marketplaceOperationFlowCreate(w http.ResponseWriter, r *http.Request, stor
 		return
 	}
 	writeJSON(w, http.StatusOK, marketplaceOperationFlowCreateResponse{Flow: existing, Replayed: true})
+}
+
+type marketplaceOperationFlowDetailResponse struct {
+	Flow     marketplaceoperations.Flow            `json:"flow"`
+	Timeline []marketplaceoperations.CommandRecord `json:"timeline"`
+}
+
+func marketplaceOperationFlowSubroute(w http.ResponseWriter, r *http.Request, detail marketplaceOperationFlowDetailReader, findings marketplaceOperationFindingStore) {
+	pathTail := strings.TrimPrefix(r.URL.Path, MarketplaceOperationFlowsPath+"/")
+	parts := strings.Split(pathTail, "/")
+	if len(parts) == 1 {
+		marketplaceOperationFlowDetail(w, r, detail, parts[0])
+		return
+	}
+	marketplaceOperationFlowFindings(w, r, findings)
+}
+
+func marketplaceOperationFlowDetail(w http.ResponseWriter, r *http.Request, reader marketplaceOperationFlowDetailReader, flowID string) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || reader == nil || flowID == "" || len(flowID) > 192 || strings.ContainsAny(flowID, "\r\n/") {
+		writeProblem(w, http.StatusForbidden, "Forbidden")
+		return
+	}
+	flow, err := reader.Flow(r.Context(), scope, flowID)
+	if err != nil {
+		writeMarketplaceOperationFlowError(w, err)
+		return
+	}
+	timeline, err := reader.ListCommands(r.Context(), scope, flowID, 200)
+	if err != nil {
+		writeMarketplaceOperationFlowError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, marketplaceOperationFlowDetailResponse{Flow: flow, Timeline: timeline})
 }
 
 type marketplaceOperationFlowCommandRequest struct {

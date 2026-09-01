@@ -1757,6 +1757,19 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks marketplace.operations.write}
         '409': {description: Flow identity conflict}
+  /marketplace-operations/flows/{flow_id}:
+    get:
+      operationId: getMarketplaceOperationFlow
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: flow_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}}
+      responses:
+        '200':
+          description: Tenant-scoped marketplace workflow detail with redacted command timeline
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFlowDetail'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+        '404': {description: Flow is not visible in the resolved tenant}
   /marketplace-operations/flows/{flow_id}/commands:
     post:
       operationId: applyMarketplaceOperationFlowCommand
@@ -6507,7 +6520,7 @@ components:
         organization_id: {type: string, maxLength: 192}
         workspace_id: {type: string, maxLength: 192}
         account_id: {type: string, maxLength: 192}
-        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation, complete]}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, label, shipment, return, settlement, profitability, reconciliation, complete]}
         state: {type: string, enum: [pending, unknown, blocked, complete]}
         version: {type: integer, minimum: 1}
         last_operation_id: {type: string, maxLength: 192}
@@ -6516,6 +6529,28 @@ components:
         references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
         created_at: {type: string, format: date-time, pattern: 'Z$'}
         updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceOperationFlowDetail:
+      type: object
+      additionalProperties: false
+      required: [flow, timeline]
+      properties:
+        flow: {$ref: '#/components/schemas/MarketplaceOperationFlow'}
+        timeline:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [flow_id, operation_id, idempotency_key, stage, outcome, occurred_at]
+            properties:
+              flow_id: {type: string, maxLength: 192}
+              operation_id: {type: string, maxLength: 192}
+              idempotency_key: {type: string, maxLength: 192}
+              stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, label, shipment, return, settlement, profitability, reconciliation]}
+              outcome: {type: string, enum: [succeeded, rejected, unknown]}
+              reason_code: {type: string, maxLength: 192}
+              references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
+              occurred_at: {type: string, format: date-time, pattern: 'Z$'}
     MarketplaceOperationFlowsResponse:
       type: object
       additionalProperties: false
@@ -6533,6 +6568,8 @@ components:
       properties:
         id: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}
         account_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}
+        start_stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, label, shipment, return, settlement, profitability, reconciliation]}
+        references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
     MarketplaceOperationFlowCreateResponse:
       type: object
       additionalProperties: false
@@ -6546,7 +6583,7 @@ components:
       required: [operation_id, stage, outcome, occurred_at]
       properties:
         operation_id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
-        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation, complete]}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, label, shipment, return, settlement, profitability, reconciliation, complete]}
         outcome: {type: string, enum: [succeeded, rejected, unknown]}
         reason_code: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
         references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
@@ -6568,7 +6605,7 @@ components:
         workspace_id: {type: string, maxLength: 192}
         flow_id: {type: string, maxLength: 192}
         account_id: {type: string, maxLength: 192}
-        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation]}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, label, shipment, return, settlement, profitability, reconciliation]}
         kind: {type: string, enum: [unknown_remote_outcome, stale_data, missing_mapping, duplicate_order, price_stock_mismatch, marketplace_health, dead_letter, partial_response, status_drift]}
         entity_kind: {type: string, maxLength: 192}
         entity_id: {type: string, maxLength: 192}

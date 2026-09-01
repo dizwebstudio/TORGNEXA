@@ -22,6 +22,7 @@ var stageContracts = []StageContract{
 	{Stage: StageOrder, Owner: "orders", RequiredReferenceKinds: []string{"order"}},
 	{Stage: StageReservation, Owner: "inventory", RequiredReferenceKinds: []string{"reservation"}},
 	{Stage: StagePickPack, Owner: "wms", RequiredReferenceKinds: []string{"wms_task"}},
+	{Stage: StageLabel, Owner: "logistics", RequiredReferenceKinds: []string{"label"}},
 	{Stage: StageShipment, Owner: "logistics", RequiredReferenceKinds: []string{"shipment"}},
 	{Stage: StageReturn, Owner: "returns", RequiredReferenceKinds: []string{"return"}},
 	{Stage: StageSettlement, Owner: "settlements", RequiredReferenceKinds: []string{"settlement"}},
