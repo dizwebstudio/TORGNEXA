@@ -2,11 +2,12 @@
 
 ## Статус
 
-`planned` — P&L, unit economics, settlement ledger, reconciliation и
-детерминированный FIFO helper уже существуют. Полный финансовый контур ещё не
-закрыт: нет подключённого live bank-receipt source, полного потока marketplace/
-acquirer payouts, исторической себестоимости для всех заказов и стабильной
-атрибуции рекламных расходов.
+`repository-complete` — добавлены provider-neutral source evidence, masked bank
+account/statement boundary, completeness matrix/evaluation, API/SDK, RLS и
+frontend financial completeness center. Существующие Order, Payment, Settlement,
+FX, COGS/FIFO и advertising projections переиспользуются; второй ledger не
+создан. Credentialed live bank/acquirer, marketplace payout и advertising
+qualification остаются внешними release-gates и не подменяются health-check.
 
 ## Цель
 
@@ -23,6 +24,38 @@ acquirer payouts, исторической себестоимости для в�
 подтверждённого источника, корректной даты и валюты, правила распределения и
 coverage evidence. Если факт не найден, отчёт обязан показать
 `missing`/`unmatched`/`unattributed`/`stale`, а не подставить ноль.
+
+## Результат выполнения
+
+Все подзадачи 227.1–227.14 закрыты на уровне repository boundary: source
+matrix, append-only evidence, bank account/statement preview и commit,
+идемпотентный source import, completeness evaluation, findings queue, API,
+generated SDK, frontend, RLS/audit controls, migration catalog, documentation
+и synthetic qualification gate подключены. Существующие financial runs не
+переписываются и не получают скрытых нулевых значений; новый слой служит
+evidence/quality projection вокруг канонических ledgers.
+
+| Подзадача | Статус | Evidence |
+|---|---|---|
+| 227.1 | `closed` | ADR-0178, source matrix JSON и typed `Matrix()` |
+| 227.2 | `closed` | migration 000054, `BankAccount`/`BankStatement`, masked balances, RLS и preview/commit API |
+| 227.3 | `closed` | lifecycle/status boundary, cursor/SecretProvider reference и release gate для первого live connector |
+| 227.4 | `closed` | payout/source kinds, stable provider refs, idempotent append и separate payout quality |
+| 227.5 | `closed` | Payment/refund/payout source taxonomy, dedup/conflict handling и findings projection |
+| 227.6 | `closed` | existing FIFO/as-of cost snapshots reused; missing COGS remains explicit in evaluation |
+| 227.7 | `closed` | bounded backfill job model/API/UI, preview→queue flow and immutable new-run policy |
+| 227.8 | `closed` | existing immutable FX 089/131 facts reused; foreign evidence requires FX coverage |
+| 227.9 | `closed` | advertising/promotion source kinds, attribution status and conservation warning boundary |
+| 227.10 | `closed` | deterministic completeness evaluator with basis, coverage, quality and no zero-fill |
+| 227.11 | `closed` | typed findings storage/read queue with tenant RLS and immutable source evidence |
+| 227.12 | `closed` | `/financial-completeness` API, Go/Python/TypeScript SDK, MCP и Financial Analytics UI |
+| 227.13 | `closed` | forced RLS, append-only triggers, masked fields, SecretProvider pointer and sensitive audit |
+| 227.14 | `closed` | synthetic core/API/static gates, OpenAPI parity, frontend wiring and release-gate documentation |
+
+`repository-complete` не означает, что у репозитория появились реальные
+банковские или marketplace credentials. Для production claim дополнительно
+нужны retained credentialed sandbox/live evidence с connector version, scopes,
+датой и redacted result.
 
 ## Что уже есть и что закрывает этот task
 

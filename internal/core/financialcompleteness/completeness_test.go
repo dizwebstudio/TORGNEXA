@@ -80,3 +80,30 @@ func TestSourceRecordRejectsFullAccountNumber(t *testing.T) {
 		t.Fatal("full account number accepted")
 	}
 }
+
+func TestEvaluationKeepsEstimatedEvidenceOutOfCompleteCoverage(t *testing.T) {
+	records := []SourceRecord{completenessRecord("order", SourceOrder, 100, "RUB")}
+	records[0].Quality = QualityEstimated
+	evaluation, err := Evaluate(BasisOrderAccrual, completenessTestTime, completenessTestTime.Add(24*time.Hour), "RUB", records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evaluation.Status != EvaluationPartial || evaluation.CoveragePercent >= 100 {
+		t.Fatalf("estimated evidence was treated as confirmed: %+v", evaluation)
+	}
+}
+
+func TestBankAccountAndStatementRemainRedactedAndTyped(t *testing.T) {
+	account := BankAccount{ID: "bank-1", Provider: "statement_api", MaskedReference: "account-*42", Currency: "RUB", Status: "active", SecretReference: "vault://finance/bank-1"}
+	if err := account.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	account.MaskedReference = "40817810000000000001"
+	if !errors.Is(account.Validate(), ErrInvalid) {
+		t.Fatal("raw bank account number accepted")
+	}
+	statement := BankStatement{ID: "statement-1", AccountID: "bank-1", PeriodFrom: completenessTestTime, PeriodTo: completenessTestTime.Add(24 * time.Hour), SourceReference: "statement-1", SourceDigest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", State: "posted", TransactionCount: 2, ImportedCount: 2}
+	if err := statement.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

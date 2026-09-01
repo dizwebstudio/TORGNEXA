@@ -200,6 +200,12 @@ export function SettingsPage() {
         <small className="settings-note">TORGNEXA не видит и не сохраняет ваш пароль.</small>
       </section>
       </div>
+      <WorkspaceSettings />
+      <IntegrationCatalog />
+      <AIProviderSettings />
+      {isAdmin?<section className="panel settings-card danger-zone"><div><p className="eyebrow">Демо-данные</p><h2>Удалить демонстрационный набор</h2><p className="settings-copy">Операция чувствительная: сначала создаётся запрос, затем его нужно одобрить и выполнить в разделе «Согласования».</p></div><button className="button danger" disabled={deleteDemo.isPending} onClick={()=>deleteDemo.mutate()}>{deleteDemo.isPending?"Создаём запрос…":"Запросить удаление"}</button>{deleteDemo.isSuccess?<span className="status status-active">Запрос создан в «Согласованиях»</span>:null}{deleteDemo.isError?<ErrorBlock>Создайте активную политику удаления в разделе «Согласования».</ErrorBlock>:null}</section>:null}
+    </div>
+    <div id="settings-panel-access" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-access" tabIndex={0} hidden={activeTab !== "access"}>
       <section className="panel settings-card settings-access-card">
       <div className="settings-access-heading"><div><p className="eyebrow">УПРАВЛЕНИЕ ДОСТУПОМ</p><h2>Роли и права</h2><p className="settings-copy">Доступ собран из ролей текущего рабочего пространства и проверяется сервером при каждом действии.</p></div><span className="settings-access-source"><span className="settings-access-source-dot"/>Единый вход</span></div>
       <div className="settings-access-summary" aria-label="Сводка доступа"><div><strong>{roles.length}</strong><span>ролей назначено</span></div><div><strong>{capabilities.length}</strong><span>прав доступно</span></div><div><strong>OIDC</strong><span>источник авторизации</span></div></div>
@@ -208,11 +214,7 @@ export function SettingsPage() {
       <div className="settings-access-section-heading settings-capabilities-heading"><div><h3>Разрешения</h3><span>Что можно просматривать и изменять в рабочем контуре</span></div><button type="button" className="button ghost compact-action" onClick={() => setShowTechnicalAccess((value) => !value)}>{showTechnicalAccess ? "Скрыть коды" : "Показать технические коды"}</button></div>
       <div className="settings-capability-groups">{groupedCapabilities.map((group) => <section className="settings-capability-group" key={group.id}><header><span className="settings-capability-icon"><Icon name={group.icon} size={16}/></span><div><h4>{group.title}</h4><small>{group.description}</small></div><b>{group.items.length}</b></header><div className="settings-capability-list">{group.items.map((capability) => <div className="settings-capability-item" title={capability} key={capability}><span className="settings-capability-check"><Icon name="check" size={13}/></span><span><strong>{capabilityLabels[capability] ?? capability}</strong>{showTechnicalAccess ? <code>{capability}</code> : null}</span></div>)}</div></section>)}</div>
       </section>
-      <WorkspaceSettings />
       <MemberSettings />
-      <IntegrationCatalog />
-      <AIProviderSettings />
-      {isAdmin?<section className="panel settings-card danger-zone"><div><p className="eyebrow">Демо-данные</p><h2>Удалить демонстрационный набор</h2><p className="settings-copy">Операция чувствительная: сначала создаётся запрос, затем его нужно одобрить и выполнить в разделе «Согласования».</p></div><button className="button danger" disabled={deleteDemo.isPending} onClick={()=>deleteDemo.mutate()}>{deleteDemo.isPending?"Создаём запрос…":"Запросить удаление"}</button>{deleteDemo.isSuccess?<span className="status status-active">Запрос создан в «Согласованиях»</span>:null}{deleteDemo.isError?<ErrorBlock>Создайте активную политику удаления в разделе «Согласования».</ErrorBlock>:null}</section>:null}
     </div>
     <div id="settings-panel-identity" className="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-identity" tabIndex={0} hidden={activeTab !== "identity"}>
       <IdentityProviderSettings />

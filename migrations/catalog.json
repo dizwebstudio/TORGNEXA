@@ -1104,7 +1104,7 @@
       "policy": "v1",
       "history_mode": "atomic",
       "requires_backup": true,
-      "dependencies": [46, 47],
+      "dependencies": [46, 47, 53],
       "compatibility": {
         "old_readers": true,
         "old_writers": true,
@@ -1112,7 +1112,7 @@
         "contract_preconditions": []
       },
       "backfill": null,
-      "sha256": "6031894fe69874dc380a01847a54d666ed01a52ca69c258e39d11458d1854594"
+      "sha256": "e80bedb9d7487396207effc731e54e54f20f09c0f119b123a920730fd5c1a0b7"
     }
   ]
 }

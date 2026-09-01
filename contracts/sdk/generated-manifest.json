@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "619148dcae11a02568d84044935fe1ab7db767611b63c5a10f6eb6417f860799",
+    "sha256": "eec9ed1b054adbb67a9997657b6cc5de2818684aaffe9dde42d4c28f13ec2374",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,21 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "appendFinancialBankAccount",
+      "method": "POST",
+      "path": "/financial-completeness/accounts"
+    },
+    {
+      "operation_id": "appendFinancialBankStatement",
+      "method": "POST",
+      "path": "/financial-completeness/statements"
+    },
+    {
+      "operation_id": "appendFinancialCOGSBackfill",
+      "method": "POST",
+      "path": "/financial-completeness/cogs-backfills"
     },
     {
       "operation_id": "appendFinancialSource",
@@ -885,6 +900,16 @@
       "path": "/fx/rates"
     },
     {
+      "operation_id": "listFinancialBankAccounts",
+      "method": "GET",
+      "path": "/financial-completeness/accounts"
+    },
+    {
+      "operation_id": "listFinancialCOGSBackfills",
+      "method": "GET",
+      "path": "/financial-completeness/cogs-backfills"
+    },
+    {
       "operation_id": "listFinancialCompletenessFindings",
       "method": "GET",
       "path": "/financial-completeness/findings"
@@ -1158,6 +1183,16 @@
       "operation_id": "previewConnectorBootstrap",
       "method": "POST",
       "path": "/connector-accounts:bootstrap-preview"
+    },
+    {
+      "operation_id": "previewFinancialBankStatement",
+      "method": "POST",
+      "path": "/financial-completeness/statements:preview"
+    },
+    {
+      "operation_id": "previewFinancialCOGSBackfill",
+      "method": "POST",
+      "path": "/financial-completeness/cogs-backfills:preview"
     },
     {
       "operation_id": "previewMarketplaceListingBatch",

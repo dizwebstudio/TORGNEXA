@@ -49,6 +49,7 @@ func TestRepositoryCatalogPasses(t *testing.T) {
 		"marketplace_order_fulfillment",
 		"marketplace_listing_workspace",
 		"marketplace_growth_management",
+		"financial_completeness_sources",
 	}
 	if len(catalog.Migrations) != len(expected) {
 		t.Fatalf("catalog migration count = %d, want %d", len(catalog.Migrations), len(expected))

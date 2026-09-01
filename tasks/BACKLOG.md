@@ -1169,15 +1169,17 @@ SDK presence or health-check alone cannot promote a connector to `ready` or
 
 ## Epic 182 — Финансовая полнота
 
-Task 227 is planned as the release closure for the remaining financial gaps.
-Tasks 167 and 219 already provide channel unit economics, P&L, cash/report
-quality and FIFO foundations; Tasks 058–059 provide settlement/reconciliation;
-Tasks 089/131 provide historical FX; Task 220 provides read-only advertising
-facts. Task 227 adds bank receipts, complete marketplace/acquirer payouts,
-historical COGS backfill, FX integration into financial runs, advertising
-attribution, completeness-aware reporting, reconciliation, UI and live/sandbox
-qualification. Missing facts remain visible and are never zero-filled. See
-`tasks/issues/227-financial-completeness.md`.
+Task 227 is repository-complete as the release closure for the remaining
+financial gaps. It adds the redacted bank/source evidence boundary,
+completeness matrix/evaluation, statement preview/commit, findings queue,
+OpenAPI/SDK, frontend center, forced RLS and append-only controls without a
+second ledger. Credentialed live bank/acquirer, marketplace payout and
+advertising qualification remain external release-gates; missing facts are
+visible and never zero-filled.
+Tasks 167 and 219 provide channel unit economics, P&L, cash/report quality and
+FIFO foundations; Tasks 058–059 provide settlement/reconciliation; Tasks
+089/131 provide historical FX; Task 220 provides read-only advertising facts.
+See `tasks/issues/227-financial-completeness.md`.
 
 ## Epic 183 — Клиентский сервис и единый inbox
 

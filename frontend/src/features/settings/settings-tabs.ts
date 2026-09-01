@@ -1,5 +1,6 @@
 export const settingsTabs = [
   {id: "general", label: "Основные"},
+  {id: "access", label: "Доступ"},
   {id: "identity", label: "Провайдеры входа"},
   {id: "notifications", label: "Каналы и важность"},
   {id: "mcp", label: "MCP-агенты"},

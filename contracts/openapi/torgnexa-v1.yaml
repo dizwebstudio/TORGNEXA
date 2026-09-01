@@ -2876,7 +2876,94 @@ paths:
         - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
       responses:
         '200': {description: Evidence-backed financial completeness summary, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialCompletenessSummary'}}}}
-        '400': {description: Invalid basis, period or reporting currency}
+        '400': {description: "Invalid basis, period or reporting currency"}
+        '403': {description: Caller lacks finance.reports.read}
+  /financial-completeness/accounts:
+    get:
+      operationId: listFinancialBankAccounts
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Redacted tenant-scoped bank account bindings, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialBankAccountPage'}}}}
+        '403': {description: Caller lacks finance.reports.read}
+    post:
+      operationId: appendFinancialBankAccount
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialBankAccountWrite'}
+      responses:
+        '201': {description: Redacted bank account binding accepted, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialBankAccount'}}}}
+        '400': {description: Invalid or unsafe bank account binding}
+        '403': {description: Caller lacks finance.sources.write}
+        '409': {description: Existing account binding conflicts}
+  /financial-completeness/statements:
+    post:
+      operationId: appendFinancialBankStatement
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialBankStatement'}
+      responses:
+        '201': {description: Immutable bank statement manifest accepted, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialBankStatement'}}}}
+        '400': {description: Invalid statement manifest}
+        '403': {description: Caller lacks finance.sources.write}
+        '409': {description: Existing statement conflicts}
+  /financial-completeness/statements:preview:
+    post:
+      operationId: previewFinancialBankStatement
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialBankStatement'}
+      responses:
+        '200': {description: Validated non-persistent statement preview, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialBankStatementPreview'}}}}
+        '400': {description: Invalid statement manifest}
+        '403': {description: Caller lacks finance.reports.read}
+  /financial-completeness/cogs-backfills:
+    get:
+      operationId: listFinancialCOGSBackfills
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {description: Bounded tenant-scoped COGS remediation jobs, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialCOGSBackfillPage'}}}}
+        '400': {description: Invalid cursor or limit}
+        '403': {description: Caller lacks finance.reports.read}
+    post:
+      operationId: appendFinancialCOGSBackfill
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialCOGSBackfillJob'}
+      responses:
+        '201': {description: Bounded COGS backfill queued after preview, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialCOGSBackfillJob'}}}}
+        '400': {description: Invalid bounded backfill}
+        '403': {description: Caller lacks finance.sources.write}
+        '409': {description: Existing backfill conflicts}
+  /financial-completeness/cogs-backfills:preview:
+    post:
+      operationId: previewFinancialCOGSBackfill
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialCOGSBackfillJob'}
+      responses:
+        '200': {description: Non-persistent bounded COGS backfill preview, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialCOGSBackfillPreview'}}}}
+        '400': {description: Invalid bounded backfill}
         '403': {description: Caller lacks finance.reports.read}
   /financial-completeness/sources:
     get:
@@ -3800,6 +3887,101 @@ components:
         posted_at: {type: string, format: date-time}
         source_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         created_at: {type: string, format: date-time}
+    FinancialBankAccount:
+      type: object
+      additionalProperties: false
+      required: [id, provider, masked_reference, currency, status, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        provider: {type: string, maxLength: 64}
+        masked_reference: {type: string, maxLength: 128, description: Masked account reference only}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {type: string, enum: [active, disabled, reauthorization_required, degraded]}
+        next_cursor: {type: string, maxLength: 2048}
+        last_observed_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    FinancialBankAccountWrite:
+      type: object
+      additionalProperties: false
+      required: [provider, masked_reference, currency, status, secret_reference]
+      properties:
+        id: {type: string, maxLength: 192}
+        provider: {type: string, maxLength: 64}
+        masked_reference: {type: string, maxLength: 128, description: Masked account reference only}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {type: string, enum: [active, disabled, reauthorization_required, degraded]}
+        secret_reference: {type: string, maxLength: 192, description: Opaque SecretProvider locator; never a credential}
+        next_cursor: {type: string, maxLength: 2048}
+        last_observed_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    FinancialBankAccountPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/FinancialBankAccount'}}
+    FinancialBankStatement:
+      type: object
+      additionalProperties: false
+      required: [account_id, period_from, period_to, source_reference, source_digest, state, transaction_count, imported_count, rejected_count]
+      properties:
+        id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        period_from: {type: string, format: date-time}
+        period_to: {type: string, format: date-time}
+        source_reference: {type: string, maxLength: 192}
+        source_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        state: {type: string, enum: [preview, posted, partial, rejected, unknown]}
+        transaction_count: {type: integer, minimum: 0}
+        imported_count: {type: integer, minimum: 0}
+        rejected_count: {type: integer, minimum: 0}
+        opening_balance_minor_units: {type: integer, format: int64}
+        closing_balance_minor_units: {type: integer, format: int64}
+        reconciliation_ref: {type: string, maxLength: 192}
+        created_at: {type: string, format: date-time}
+    FinancialBankStatementPreview:
+      type: object
+      additionalProperties: false
+      required: [state, statement, commit_required]
+      properties:
+        state: {type: string, enum: [preview]}
+        statement: {$ref: '#/components/schemas/FinancialBankStatement'}
+        commit_required: {type: boolean, const: true}
+    FinancialCOGSBackfillJob:
+      type: object
+      additionalProperties: false
+      required: [from, to, preview_digest, status, total_rows, valued_rows, missing_rows]
+      properties:
+        id: {type: string, maxLength: 192}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        sku: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        channel_ref: {type: string, maxLength: 192}
+        preview_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, enum: [preview, queued, running, completed, partial, failed]}
+        total_rows: {type: integer, minimum: 0}
+        valued_rows: {type: integer, minimum: 0}
+        missing_rows: {type: integer, minimum: 0}
+        created_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+    FinancialCOGSBackfillPreview:
+      type: object
+      additionalProperties: false
+      required: [state, job, commit_required]
+      properties:
+        state: {type: string, enum: [preview]}
+        job: {$ref: '#/components/schemas/FinancialCOGSBackfillJob'}
+        commit_required: {type: boolean, const: true}
+    FinancialCOGSBackfillPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/FinancialCOGSBackfillJob'}}
+        next_cursor: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]+$'}
     FinancialSourcePage:
       type: object
       additionalProperties: false

@@ -80,6 +80,116 @@ func (q Quality) Valid() bool {
 	}
 }
 
+// BankAccount is a redacted account binding. SecretReference points to a
+// SecretProvider entry and is never a credential value.
+type BankAccount struct {
+	ID              string    `json:"id"`
+	Provider        string    `json:"provider"`
+	MaskedReference string    `json:"masked_reference"`
+	Currency        string    `json:"currency"`
+	Status          string    `json:"status"`
+	SecretReference string    `json:"secret_reference,omitempty"`
+	NextCursor      string    `json:"next_cursor,omitempty"`
+	LastObservedAt  time.Time `json:"last_observed_at,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// Validate checks the redacted account boundary and rejects raw-looking bank
+// identifiers. SecretReference is only an opaque SecretProvider locator.
+func (a BankAccount) Validate() error {
+	accountSystem := a.Provider
+	if !refPattern.MatchString(a.ID) || !refPattern.MatchString(accountSystem) || !maskedReferencePattern.MatchString(a.MaskedReference) || !currencyPattern.MatchString(a.Currency) || !bankAccountStatus(a.Status) || !refPattern.MatchString(a.SecretReference) || (a.NextCursor != "" && len(a.NextCursor) > 2048) || (!a.LastObservedAt.IsZero() && !utc(a.LastObservedAt)) || (!a.CreatedAt.IsZero() && !utc(a.CreatedAt)) || (!a.UpdatedAt.IsZero() && !utc(a.UpdatedAt)) {
+		return ErrInvalid
+	}
+	if digitsOnly(a.MaskedReference) && len(a.MaskedReference) >= 12 {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func bankAccountStatus(value string) bool {
+	switch value {
+	case "active", "disabled", "reauthorization_required", "degraded":
+		return true
+	default:
+		return false
+	}
+}
+
+var maskedReferencePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9* .:/_-]{0,127}$`)
+
+// BankStatement is an immutable import manifest. Transactions are stored as
+// SourceRecord rows linked by StatementID.
+type BankStatement struct {
+	ID                  string    `json:"id"`
+	AccountID           string    `json:"account_id"`
+	PeriodFrom          time.Time `json:"period_from"`
+	PeriodTo            time.Time `json:"period_to"`
+	SourceReference     string    `json:"source_reference"`
+	SourceDigest        string    `json:"source_digest"`
+	State               string    `json:"state"`
+	TransactionCount    int       `json:"transaction_count"`
+	ImportedCount       int       `json:"imported_count"`
+	RejectedCount       int       `json:"rejected_count"`
+	OpeningBalanceMinor *int64    `json:"opening_balance_minor_units,omitempty"`
+	ClosingBalanceMinor *int64    `json:"closing_balance_minor_units,omitempty"`
+	ReconciliationRef   string    `json:"reconciliation_ref,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+// Validate checks a statement manifest before it is committed.
+func (s BankStatement) Validate() error {
+	if !refPattern.MatchString(s.ID) || !refPattern.MatchString(s.AccountID) || s.PeriodFrom.IsZero() || s.PeriodTo.IsZero() || !s.PeriodTo.After(s.PeriodFrom) || !utc(s.PeriodFrom) || !utc(s.PeriodTo) || !refPattern.MatchString(s.SourceReference) || !digestPattern.MatchString(s.SourceDigest) || !bankStatementState(s.State) || s.TransactionCount < 0 || s.ImportedCount < 0 || s.RejectedCount < 0 || s.ImportedCount+s.RejectedCount > s.TransactionCount || (s.ReconciliationRef != "" && !refPattern.MatchString(s.ReconciliationRef)) || (!s.CreatedAt.IsZero() && !utc(s.CreatedAt)) {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func bankStatementState(value string) bool {
+	switch value {
+	case "preview", "posted", "partial", "rejected", "unknown":
+		return true
+	default:
+		return false
+	}
+}
+
+// COGSBackfillJob is a bounded, versioned remediation request. It records the
+// preview scope and counts; it never rewrites a published financial snapshot.
+type COGSBackfillJob struct {
+	ID            string    `json:"id"`
+	From          time.Time `json:"from"`
+	To            time.Time `json:"to"`
+	SKU           string    `json:"sku,omitempty"`
+	WarehouseID   string    `json:"warehouse_id,omitempty"`
+	ChannelRef    string    `json:"channel_ref,omitempty"`
+	PreviewDigest string    `json:"preview_digest"`
+	Status        string    `json:"status"`
+	TotalRows     int       `json:"total_rows"`
+	ValuedRows    int       `json:"valued_rows"`
+	MissingRows   int       `json:"missing_rows"`
+	CreatedAt     time.Time `json:"created_at"`
+	CompletedAt   time.Time `json:"completed_at,omitempty"`
+}
+
+// Validate checks a bounded COGS backfill request.
+func (j COGSBackfillJob) Validate() error {
+	if !refPattern.MatchString(j.ID) || j.From.IsZero() || j.To.IsZero() || !j.To.After(j.From) || !utc(j.From) || !utc(j.To) || len(j.SKU) > 192 || len(j.WarehouseID) > 192 || len(j.ChannelRef) > 192 || !digestPattern.MatchString(j.PreviewDigest) || !cogsBackfillStatus(j.Status) || j.TotalRows < 0 || j.ValuedRows < 0 || j.MissingRows < 0 || j.ValuedRows+j.MissingRows > j.TotalRows || (!j.CreatedAt.IsZero() && !utc(j.CreatedAt)) || (!j.CompletedAt.IsZero() && !utc(j.CompletedAt)) || (!j.CompletedAt.IsZero() && !j.CreatedAt.IsZero() && j.CompletedAt.Before(j.CreatedAt)) {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func cogsBackfillStatus(value string) bool {
+	switch value {
+	case "preview", "queued", "running", "completed", "partial", "failed":
+		return true
+	default:
+		return false
+	}
+}
+
 // EvaluationStatus is the report-level completeness state.
 type EvaluationStatus string
 
@@ -280,11 +390,8 @@ func Evaluate(basis Basis, from, to time.Time, reportingCurrency string, records
 				if component.Currency == "" {
 					component.Currency = item.Currency
 				}
-				if item.Quality == QualityConflict || item.Quality == QualityDisputed {
+				if qualityRank(item.Quality) > qualityRank(component.Quality) {
 					component.Quality = item.Quality
-				}
-				if item.Quality == QualityStale && component.Quality == QualityObserved {
-					component.Quality = QualityStale
 				}
 			}
 		} else {
@@ -332,6 +439,27 @@ func Evaluate(basis Basis, from, to time.Time, reportingCurrency string, records
 		}
 	}
 	return Evaluation{Basis: basis, From: from, To: to, ReportingCurrency: reportingCurrency, Status: status, CoveragePercent: coverage, Components: components, MissingCodes: missing, Warnings: warnings, SourceRefs: refs}, nil
+}
+
+func qualityRank(value Quality) int {
+	switch value {
+	case QualityConflict:
+		return 7
+	case QualityDisputed:
+		return 6
+	case QualityStale:
+		return 5
+	case QualityUnmatched:
+		return 4
+	case QualityMissing:
+		return 3
+	case QualityEstimated:
+		return 2
+	case QualityConfirmed, QualityObserved:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // Digest returns a stable digest for redacted source evidence and is suitable

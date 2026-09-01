@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
@@ -48,6 +49,19 @@ type GrowthPreviewer interface {
 // authorized agent. It cannot access tenant credentials or invoke a provider.
 type ConnectorReadinessReader interface {
 	Readiness(context.Context, Identity) (connectorSDK.ReadinessMatrix, error)
+}
+
+// FinancialCompletenessInput selects a bounded, read-only completeness view.
+type FinancialCompletenessInput struct {
+	Basis             financialcompleteness.Basis `json:"basis,omitempty"`
+	From              time.Time                   `json:"from,omitempty"`
+	To                time.Time                   `json:"to,omitempty"`
+	ReportingCurrency string                      `json:"reporting_currency,omitempty"`
+}
+
+// FinancialCompletenessReader exposes only the redacted completeness summary.
+type FinancialCompletenessReader interface {
+	ReadFinancialCompleteness(context.Context, Identity, FinancialCompletenessInput) (any, error)
 }
 
 type toolDescriptor struct {
@@ -170,6 +184,20 @@ func connectorReadinessTool(available bool) toolDescriptor {
 		Name: "commerce.connectors.readiness.list", Title: "List connector readiness",
 		Description: "Read the reviewed, non-secret readiness matrix for all TORGNEXA connectors. The catalog distinguishes health-only, read-only, partial, ready and qualified runtime depth; it never performs remote calls.",
 		InputSchema: objectSchema(map[string]any{}, nil),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
+	}}
+}
+
+func financialCompletenessTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionFinancialCompletenessRead, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.finance.completeness.get", Title: "Get financial completeness",
+		Description: "Read the tenant-scoped financial evidence coverage for order accrual, settlement or cash basis. Missing bank, COGS, FX, advertising and promotion facts remain explicit; this tool never imports, adjusts or declares a report complete.",
+		InputSchema: objectSchema(map[string]any{
+			"basis":              enumProp("order_accrual", "settlement", "cash"),
+			"from":               map[string]any{"type": "string", "format": "date-time"},
+			"to":                 map[string]any{"type": "string", "format": "date-time"},
+			"reporting_currency": map[string]any{"type": "string", "pattern": "^[A-Z]{3}$"},
+		}, nil),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
 	}}
 }

@@ -5,6 +5,7 @@ import {isSettingsTabID, settingsTabs} from "../.repository-test/features/settin
 test("notification preferences have a dedicated settings tab", () => {
   assert.deepEqual(settingsTabs, [
     {id: "general", label: "Основные"},
+    {id: "access", label: "Доступ"},
     {id: "identity", label: "Провайдеры входа"},
     {id: "notifications", label: "Каналы и важность"},
     {id: "mcp", label: "MCP-агенты"},
@@ -13,5 +14,6 @@ test("notification preferences have a dedicated settings tab", () => {
     {id: "plugins", label: "Плагины"},
   ]);
   assert.equal(isSettingsTabID("notifications"), true);
+  assert.equal(isSettingsTabID("access"), true);
   assert.equal(isSettingsTabID("security"), false);
 });

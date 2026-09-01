@@ -366,7 +366,7 @@ test("public documentation follows current navigation, settings and sign-in beha
   const navigationLabels = [...navigationItems.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   const settingsLabels = [...settings.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   assert.equal(navigationLabels.length, 31);
-  assert.equal(settingsLabels.length, 7);
+  assert.equal(settingsLabels.length, 8);
   for (const label of [...navigationLabels, ...settingsLabels]) assert.ok(docs.includes(label), label);
   for (const route of ["/catalog", "/publication-quality", "/marketplace-publications", "/marketplace-listings", "/orders", "/returns", "/inventory", "/replenishment", "/pricing", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/procurement", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/security", "/audit", "/settings"]) {
     assert.ok(docs.includes(route), route);

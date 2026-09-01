@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
@@ -31,6 +32,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/runtimeposture"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
@@ -51,12 +53,13 @@ var (
 )
 
 const (
-	permissionProductsRead           = "commerce.products.read"
-	permissionOrdersRead             = "commerce.orders.read"
-	permissionCounterpartiesRead     = "party.counterparties.read"
-	permissionPriceChangeRequest     = "commerce.price.change.request"
-	permissionGrowthPreview          = "commerce.marketplace.growth.preview"
-	permissionConnectorReadinessRead = "commerce.connectors.readiness.read"
+	permissionProductsRead              = "commerce.products.read"
+	permissionOrdersRead                = "commerce.orders.read"
+	permissionCounterpartiesRead        = "party.counterparties.read"
+	permissionPriceChangeRequest        = "commerce.price.change.request"
+	permissionGrowthPreview             = "commerce.marketplace.growth.preview"
+	permissionConnectorReadinessRead    = "commerce.connectors.readiness.read"
+	permissionFinancialCompletenessRead = "commerce.finance.completeness.read"
 )
 
 type Identity struct {
@@ -126,35 +129,37 @@ type PriceChangeRequester interface {
 }
 
 type Dependencies struct {
-	IdentityResolver IdentityResolver
-	Authorizer       Authorizer
-	Governor         AgentGovernor
-	Auditor          Auditor
-	Search           search.Provider
-	LegalParties     LegalPartySearcher
-	PriceChanges     PriceChangeRequester
-	ListingPreviewer ListingPreviewer
-	GrowthPreviewer  GrowthPreviewer
-	ReadinessReader  ConnectorReadinessReader
-	AllowedOrigins   []string
-	Edge             securityedge.Config
-	Limiter          *securityedge.Limiter
+	IdentityResolver            IdentityResolver
+	Authorizer                  Authorizer
+	Governor                    AgentGovernor
+	Auditor                     Auditor
+	Search                      search.Provider
+	LegalParties                LegalPartySearcher
+	PriceChanges                PriceChangeRequester
+	ListingPreviewer            ListingPreviewer
+	GrowthPreviewer             GrowthPreviewer
+	ReadinessReader             ConnectorReadinessReader
+	FinancialCompletenessReader FinancialCompletenessReader
+	AllowedOrigins              []string
+	Edge                        securityedge.Config
+	Limiter                     *securityedge.Limiter
 }
 
 type Server struct {
-	logger         *slog.Logger
-	resolver       IdentityResolver
-	authorizer     Authorizer
-	governor       AgentGovernor
-	auditor        Auditor
-	search         search.Provider
-	legalParties   LegalPartySearcher
-	priceChanges   PriceChangeRequester
-	listingPreview ListingPreviewer
-	growthPreview  GrowthPreviewer
-	readiness      ConnectorReadinessReader
-	edge           securityedge.Config
-	limiter        *securityedge.Limiter
+	logger                *slog.Logger
+	resolver              IdentityResolver
+	authorizer            Authorizer
+	governor              AgentGovernor
+	auditor               Auditor
+	search                search.Provider
+	legalParties          LegalPartySearcher
+	priceChanges          PriceChangeRequester
+	listingPreview        ListingPreviewer
+	growthPreview         GrowthPreviewer
+	readiness             ConnectorReadinessReader
+	financialCompleteness FinancialCompletenessReader
+	edge                  securityedge.Config
+	limiter               *securityedge.Limiter
 }
 
 func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
@@ -183,7 +188,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -222,6 +227,32 @@ func (localReadinessReader) Readiness(_ context.Context, identity Identity) (con
 		return connectorSDK.ReadinessMatrix{}, ErrForbidden
 	}
 	return connectorSDK.ReadinessSnapshot()
+}
+
+type postgresFinancialCompletenessReader struct {
+	repository *financialcompletenessrepo.Repository
+}
+
+func (r postgresFinancialCompletenessReader) ReadFinancialCompleteness(ctx context.Context, identity Identity, input FinancialCompletenessInput) (any, error) {
+	if r.repository == nil || !identity.Valid() {
+		return nil, ErrUnavailable
+	}
+	basis := input.Basis
+	if basis == "" {
+		basis = financialcompleteness.BasisOrderAccrual
+	}
+	to := input.To
+	if to.IsZero() {
+		to = time.Now().UTC()
+	}
+	from := input.From
+	if from.IsZero() {
+		from = to.Add(-30 * 24 * time.Hour)
+	}
+	if !to.Equal(to.UTC()) || !from.Equal(from.UTC()) || !to.After(from) || to.Sub(from) > 366*24*time.Hour || !basis.Valid() {
+		return nil, ErrInvalid
+	}
+	return r.repository.Summary(ctx, identity.Tenant, basis, from, to, strings.ToUpper(strings.TrimSpace(input.ReportingCurrency)))
 }
 
 func (s *Server) Handler() http.Handler {
@@ -512,6 +543,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.readiness.Readiness(ctx, identity)
+	case "commerce.finance.completeness.get":
+		if s.financialCompleteness == nil {
+			return nil, ErrUnavailable
+		}
+		var input FinancialCompletenessInput
+		if err := decodeArguments(raw, &input); err != nil {
+			return nil, ErrInvalid
+		}
+		return s.financialCompleteness.ReadFinancialCompleteness(ctx, identity, input)
 	default:
 		return nil, ErrInvalid
 	}
@@ -526,6 +566,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		listingPreviewTool(s.listingPreview != nil),
 		growthPreviewTool(s.growthPreview != nil),
 		connectorReadinessTool(s.readiness != nil),
+		financialCompletenessTool(s.financialCompleteness != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -623,6 +664,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("mcp accounts repository: %w", err)
 	}
+	financialCompletenessRepository, err := financialcompletenessrepo.New(db)
+	if err != nil {
+		return fmt.Errorf("mcp financial completeness repository: %w", err)
+	}
 	auditRepository, err := auditrepo.New(db)
 	if err != nil {
 		return fmt.Errorf("mcp audit repository: %w", err)
@@ -640,7 +685,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

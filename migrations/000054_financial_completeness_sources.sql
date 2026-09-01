@@ -46,6 +46,9 @@ CREATE TABLE financial_bank_statements (
   transaction_count integer NOT NULL DEFAULT 0,
   imported_count integer NOT NULL DEFAULT 0,
   rejected_count integer NOT NULL DEFAULT 0,
+  opening_balance_minor_units bigint,
+  closing_balance_minor_units bigint,
+  reconciliation_ref text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (organization_id,workspace_id,statement_id),
   UNIQUE (organization_id,workspace_id,account_id,source_reference),
@@ -56,6 +59,7 @@ CREATE TABLE financial_bank_statements (
     source_digest ~ '^[0-9a-f]{64}$' AND period_from < period_to AND
     state IN ('preview','posted','partial','rejected','unknown') AND
     transaction_count >= 0 AND imported_count >= 0 AND rejected_count >= 0 AND
+    char_length(reconciliation_ref) <= 192 AND
     imported_count + rejected_count <= transaction_count
   )
 );
@@ -141,6 +145,7 @@ CREATE TABLE financial_cogs_backfill_jobs (
   to_at timestamptz NOT NULL,
   sku text NOT NULL DEFAULT '',
   warehouse_id text NOT NULL DEFAULT '',
+  channel_ref text NOT NULL DEFAULT '',
   preview_digest char(64) NOT NULL,
   status text NOT NULL DEFAULT 'preview',
   total_rows integer NOT NULL DEFAULT 0,
@@ -151,6 +156,7 @@ CREATE TABLE financial_cogs_backfill_jobs (
   PRIMARY KEY (organization_id,workspace_id,job_id),
   CONSTRAINT financial_cogs_backfill_job_chk CHECK (
     job_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND from_at < to_at AND
+    char_length(sku) <= 192 AND char_length(warehouse_id) <= 192 AND char_length(channel_ref) <= 192 AND
     preview_digest ~ '^[0-9a-f]{64}$' AND status IN ('preview','queued','running','completed','partial','failed') AND
     total_rows >= 0 AND valued_rows >= 0 AND missing_rows >= 0 AND valued_rows + missing_rows <= total_rows AND
     (completed_at IS NULL OR completed_at >= created_at)
