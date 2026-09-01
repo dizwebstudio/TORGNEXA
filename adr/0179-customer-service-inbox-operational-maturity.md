@@ -50,12 +50,20 @@ Customer 360 показывает только минимизированные 
   `read_only`/`not_available`/`qualification_required`. Локальная проверка
   репозитория не объявляет канал production-qualified.
 
-## Compatibility and migration impact
+## Compatibility impact
 
 Изменение аддитивное. Новая migration 000055 создаёт отдельные service
 projection tables, foreign-key references к workspace и forced RLS. Existing
 Order, Product, Return, Claim, Payment и inbox/outbox contracts не меняются.
 OpenAPI и generated SDK расширяются новыми customer-service operations.
+
+## Migration and data impact
+
+Migration 000055 — expand-only. Она добавляет отдельные tenant-scoped
+projection tables и не переносит raw provider payload или полный customer
+profile. Existing commerce ledgers и Task 056/057 aggregates не переписываются;
+correction, redaction и retention выполняются через отдельные policy-aware
+операции.
 
 ## Security and privacy impact
 
@@ -66,7 +74,7 @@ provider payloads, full payment credentials и необязательные cust
 логах, событиях, audit и обычных API-ответах. Attachments проходят общую
 quarantine/release policy.
 
-## Operational and release boundary
+## Operational impact
 
 Локальный gate: `make customer-service-qualification`. Он проверяет migration
 catalog/hash, OpenAPI/SDK/UI/MCP wiring, RLS, append-only history и secret

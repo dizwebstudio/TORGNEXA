@@ -380,7 +380,7 @@ func (v InboundRecord) Validate() error {
 	if v.Customer != nil && v.Customer.Validate() != nil {
 		return ErrInvalid
 	}
-	if v.Fingerprint != Digest(v.Conversation.RemoteThreadID+"\x00"+v.Message.RemoteMessageID+"\x00"+v.Message.ContentDigest) {
+	if v.Fingerprint != Digest(v.Conversation.SourceSystem+"\x00"+v.Conversation.AccountID+"\x00"+v.Conversation.RemoteThreadID+"\x00"+v.Message.RemoteMessageID+"\x00"+v.Message.ContentDigest) {
 		return ErrInvalid
 	}
 	return nil
@@ -495,7 +495,7 @@ func NewInbound(conversation Conversation, message Message, customer *CustomerRe
 		message.OccurredAt = now
 	}
 	record := InboundRecord{Conversation: conversation, Message: message, Customer: customer}
-	record.Fingerprint = Digest(conversation.RemoteThreadID + "\x00" + message.RemoteMessageID + "\x00" + message.ContentDigest)
+	record.Fingerprint = Digest(conversation.SourceSystem + "\x00" + conversation.AccountID + "\x00" + conversation.RemoteThreadID + "\x00" + message.RemoteMessageID + "\x00" + message.ContentDigest)
 	if err := record.Validate(); err != nil {
 		return InboundRecord{}, err
 	}

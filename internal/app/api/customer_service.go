@@ -13,17 +13,17 @@ import (
 )
 
 const (
-	CustomerServiceSummaryPath     = "/api/v1/customer-service/summary"
-	CustomerServiceInboxPath       = "/api/v1/customer-service/inbox"
-	CustomerServiceReviewsPath     = "/api/v1/customer-service/reviews"
-	CustomerServiceQuestionsPath   = "/api/v1/customer-service/questions"
-	CustomerServiceFindingsPath    = "/api/v1/customer-service/findings"
-	CustomerServiceThreadsPath     = "/api/v1/customer-service/threads/"
-	CustomerServiceCustomersPath   = "/api/v1/customer-service/customers/"
-	CustomerServiceInboundPath     = "/api/v1/customer-service/inbound"
-	CustomerServiceRepliesPath     = "/api/v1/customer-service/replies"
-	CustomerServiceAssignmentsPath = "/api/v1/customer-service/assignments"
-	CustomerServiceTransitionsPath = "/api/v1/customer-service/transitions"
+	CustomerServiceSummaryPath             = "/api/v1/customer-service/summary"
+	CustomerServiceInboxPath               = "/api/v1/customer-service/inbox"
+	CustomerServiceReviewsPath             = "/api/v1/customer-service/reviews"
+	CustomerServiceQuestionsPath           = "/api/v1/customer-service/questions"
+	CustomerServiceFindingsPath            = "/api/v1/customer-service/findings"
+	CustomerServiceConversationDetailsPath = "/api/v1/customer-service/threads/"
+	CustomerServiceCustomersPath           = "/api/v1/customer-service/customers/"
+	CustomerServiceInboundPath             = "/api/v1/customer-service/inbound"
+	CustomerServiceRepliesPath             = "/api/v1/customer-service/replies"
+	CustomerServiceAssignmentsPath         = "/api/v1/customer-service/assignments"
+	CustomerServiceTransitionsPath         = "/api/v1/customer-service/transitions"
 )
 
 type customerServiceAPI struct {
@@ -39,7 +39,7 @@ func newCustomerServiceRoutes(repository *customerservicerepo.Repository, audito
 		{Method: http.MethodGet, Path: CustomerServiceReviewsPath, Permission: "customer_service.read", Handler: http.HandlerFunc(api.reviews)},
 		{Method: http.MethodGet, Path: CustomerServiceQuestionsPath, Permission: "customer_service.read", Handler: http.HandlerFunc(api.questions)},
 		{Method: http.MethodGet, Path: CustomerServiceFindingsPath, Permission: "customer_service.read", Handler: http.HandlerFunc(api.findings)},
-		{Method: http.MethodGet, Path: CustomerServiceThreadsPath, PathPrefix: true, Permission: "customer_service.read", Handler: http.HandlerFunc(api.thread)},
+		{Method: http.MethodGet, Path: CustomerServiceConversationDetailsPath, PathPrefix: true, Permission: "customer_service.read", Handler: http.HandlerFunc(api.thread)},
 		{Method: http.MethodGet, Path: CustomerServiceCustomersPath, PathPrefix: true, Permission: "customer_service.read", Handler: http.HandlerFunc(api.customerTimeline)},
 		{Method: http.MethodPost, Path: CustomerServiceInboundPath, Permission: "customer_service.write", Handler: http.HandlerFunc(api.inbound)},
 		{Method: http.MethodPost, Path: CustomerServiceRepliesPath, Permission: "customer_service.reply", Handler: http.HandlerFunc(api.reply)},
@@ -126,7 +126,7 @@ func (api customerServiceAPI) findings(w http.ResponseWriter, r *http.Request) {
 
 func (api customerServiceAPI) thread(w http.ResponseWriter, r *http.Request) {
 	scope, ok := ScopeFromContext(r.Context())
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, CustomerServiceThreadsPath), "/")
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, CustomerServiceConversationDetailsPath), "/")
 	if !ok || api.repository == nil || id == "" || strings.Contains(id, "/") {
 		writeProblem(w, http.StatusBadRequest, "Invalid conversation id")
 		return

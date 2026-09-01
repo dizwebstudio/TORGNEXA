@@ -2896,7 +2896,9 @@ paths:
     get:
       operationId: listCustomerServiceReviews
       security: [{bearerAuth: []}]
-      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
       responses:
         '200': {description: "Cursor-paginated review queue", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceInboxPage'}}}}
         '403': {description: Caller lacks customer_service.read}
@@ -2904,7 +2906,9 @@ paths:
     get:
       operationId: listCustomerServiceQuestions
       security: [{bearerAuth: []}]
-      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
       responses:
         '200': {description: "Cursor-paginated product-question queue", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceInboxPage'}}}}
         '403': {description: Caller lacks customer_service.read}
@@ -2912,7 +2916,9 @@ paths:
     get:
       operationId: listCustomerServiceFindings
       security: [{bearerAuth: []}]
-      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
       responses:
         '200': {description: "Cursor-paginated inbox reconciliation findings", content: {application/json: {schema: {$ref: '#/components/schemas/CustomerServiceFindingPage'}}}}
         '403': {description: Caller lacks customer_service.read}

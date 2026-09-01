@@ -41,7 +41,7 @@ for text, required in [
     (api, ["customer_service.read", "Idempotency-Key", "NewInbound", "QueueReply", "Transition"]),
     (repo, ["customer_service_messages", "ON CONFLICT", "set_config('app.organization_id'", "Timeline", "QueueReply"]),
     (core, ["SanitizeText", "IdentityAmbiguous", "BusinessDueAt", "DeliveryUnknown"]),
-    (frontend, ["Единый inbox", "Отзывы", "Вопросы", "Внутренняя заметка", "getCustomerServiceThread"]),
+    (frontend, ["Единый inbox", "Отзывы", "Вопросы", "Внутренняя заметка", "История клиента", "Сверка и доставка", "getCustomerServiceThread", "getCustomerServiceCustomerTimeline", "listCustomerServiceFindings"]),
     (mcp, ["commerce.customer_service.get", "CustomerServiceReader", "never replies"]),
     ((root / "sdk/typescript/src/client.gen.mjs").read_text(), ["getCustomerServiceSummary", "listCustomerServiceInbox", "queueCustomerServiceReply"]),
 ]:

@@ -97,6 +97,7 @@ CREATE TABLE customer_service_messages (
   message_id text NOT NULL,
   conversation_id text NOT NULL,
   remote_message_id text NOT NULL DEFAULT '',
+  inbound_fingerprint char(64) NOT NULL,
   direction text NOT NULL,
   visibility text NOT NULL,
   delivery_state text NOT NULL,
@@ -116,12 +117,13 @@ CREATE TABLE customer_service_messages (
     message_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND conversation_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND
     char_length(remote_message_id) <= 192 AND direction IN ('inbound','outbound') AND visibility IN ('public','internal') AND
     delivery_state IN ('observed','draft','queued','sent','accepted','failed','unknown') AND char_length(safe_text) BETWEEN 1 AND 16000 AND
-    content_digest ~ '^[0-9a-f]{64}$' AND language ~ '^[A-Za-z-]{0,16}$' AND
+    content_digest ~ '^[0-9a-f]{64}$' AND inbound_fingerprint ~ '^[0-9a-f]{64}$' AND language ~ '^[A-Za-z-]{0,16}$' AND
     moderation_state IN ('pending','approved','blocked','spam') AND identity_state IN ('verified','ambiguous','unmatched') AND
     char_length(order_id) <= 192 AND char_length(product_id) <= 192
   )
 );
 CREATE UNIQUE INDEX customer_service_messages_remote_uq ON customer_service_messages(organization_id,workspace_id,conversation_id,remote_message_id) WHERE remote_message_id <> '';
+CREATE UNIQUE INDEX customer_service_messages_fingerprint_uq ON customer_service_messages(organization_id,workspace_id,inbound_fingerprint);
 CREATE INDEX customer_service_messages_conversation_idx ON customer_service_messages(organization_id,workspace_id,conversation_id,occurred_at,message_id);
 
 CREATE TABLE customer_service_replies (

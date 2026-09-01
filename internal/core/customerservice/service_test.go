@@ -30,6 +30,29 @@ func TestNewInboundSanitizesAndFingerprints(t *testing.T) {
 	}
 }
 
+func TestInboundFingerprintIncludesChannelAndAccount(t *testing.T) {
+	now := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	message := Message{ID: "message-1", ConversationID: "conv-1", SafeText: "без remote id"}
+	first, err := NewInbound(validConversation(now), message, nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondConversation := validConversation(now)
+	secondConversation.SourceSystem = "storefront"
+	secondConversation.AccountID = "account-2"
+	second, err := NewInbound(secondConversation, message, nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Fingerprint == second.Fingerprint {
+		t.Fatal("different connector accounts shared an inbound fingerprint")
+	}
+	first.Fingerprint = Digest(first.Conversation.RemoteThreadID + "\x00" + first.Message.RemoteMessageID + "\x00" + first.Message.ContentDigest)
+	if err := first.Validate(); err == nil {
+		t.Fatal("legacy unscoped fingerprint was accepted")
+	}
+}
+
 func TestReplySeparatesAIAndInternalNotes(t *testing.T) {
 	now := time.Now().UTC()
 	reply := Reply{ID: "reply-1", ConversationID: "conv-1", Visibility: VisibilityInternal, Origin: "ai_draft", SafeText: "Проверить возврат", ContentDigest: Digest("Проверить возврат"), IdempotencyKey: "idem-1", DeliveryState: DeliveryDraft, CreatedAt: now, UpdatedAt: now, Version: 1}

@@ -30,6 +30,8 @@ func TestCustomerServiceMigrationKeepsHistoryTenantScopedAndRedacted(t *testing.
 		"create table customer_service_findings",
 		"force row level security",
 		"customer_service_messages_no_mutation",
+		"inbound_fingerprint",
+		"customer_service_messages_fingerprint_uq",
 		"idempotency_key",
 		"insert into migration_history",
 	} {

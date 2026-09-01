@@ -81,15 +81,27 @@ func (r *Repository) Ingest(ctx context.Context, scope tenancy.Scope, record cor
 		message.ConversationID = existingID
 		inserted := true
 		var insertedID string
-		err = tx.QueryRowContext(ctx, `INSERT INTO customer_service_messages(organization_id,workspace_id,message_id,conversation_id,remote_message_id,direction,visibility,delivery_state,safe_text,content_digest,language,moderation_state,identity_state,order_id,product_id,occurred_at,received_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT(organization_id,workspace_id,conversation_id,remote_message_id) WHERE remote_message_id<>'' DO NOTHING RETURNING message_id`, org, workspace, message.ID, existingID, message.RemoteMessageID, message.Direction, message.Visibility, message.DeliveryState, message.SafeText, message.ContentDigest, message.Language, message.ModerationState, message.IdentityState, message.OrderID, message.ProductID, message.OccurredAt, message.ReceivedAt, message.CreatedAt).Scan(&insertedID)
+		err = tx.QueryRowContext(ctx, `INSERT INTO customer_service_messages(organization_id,workspace_id,message_id,conversation_id,remote_message_id,inbound_fingerprint,direction,visibility,delivery_state,safe_text,content_digest,language,moderation_state,identity_state,order_id,product_id,occurred_at,received_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT DO NOTHING RETURNING message_id`, org, workspace, message.ID, existingID, message.RemoteMessageID, record.Fingerprint, message.Direction, message.Visibility, message.DeliveryState, message.SafeText, message.ContentDigest, message.Language, message.ModerationState, message.IdentityState, message.OrderID, message.ProductID, message.OccurredAt, message.ReceivedAt, message.CreatedAt).Scan(&insertedID)
 		if errors.Is(err, sql.ErrNoRows) {
 			inserted = false
 		} else if err != nil {
 			return fmt.Errorf("insert inbound message: %w", err)
 		}
 		if !inserted {
-			if err := tx.QueryRowContext(ctx, `SELECT message_id,conversation_id,remote_message_id,direction,visibility,delivery_state,safe_text,content_digest,language,moderation_state,identity_state,order_id,product_id,occurred_at,received_at,created_at FROM customer_service_messages WHERE organization_id=$1 AND workspace_id=$2 AND conversation_id=$3 AND remote_message_id=$4`, org, workspace, existingID, message.RemoteMessageID).Scan(messageScanner(&message)...); err != nil {
-				return fmt.Errorf("read duplicate inbound message: %w", err)
+			if err := tx.QueryRowContext(ctx, `SELECT message_id,conversation_id,remote_message_id,direction,visibility,delivery_state,safe_text,content_digest,language,moderation_state,identity_state,order_id,product_id,occurred_at,received_at,created_at FROM customer_service_messages WHERE organization_id=$1 AND workspace_id=$2 AND inbound_fingerprint=$3`, org, workspace, record.Fingerprint).Scan(messageScanner(&message)...); err != nil {
+				if errors.Is(err, sql.ErrNoRows) && message.RemoteMessageID != "" {
+					err = tx.QueryRowContext(ctx, `SELECT message_id,conversation_id,remote_message_id,direction,visibility,delivery_state,safe_text,content_digest,language,moderation_state,identity_state,order_id,product_id,occurred_at,received_at,created_at FROM customer_service_messages WHERE organization_id=$1 AND workspace_id=$2 AND conversation_id=$3 AND remote_message_id=$4`, org, workspace, existingID, message.RemoteMessageID).Scan(messageScanner(&message)...)
+				}
+				if err != nil {
+					return fmt.Errorf("read duplicate inbound message: %w", err)
+				}
+			}
+			if message.ContentDigest != record.Message.ContentDigest {
+				findingID := "message-conflict-" + record.Fingerprint[:32]
+				_, findingErr := tx.ExecContext(ctx, `INSERT INTO customer_service_findings(organization_id,workspace_id,finding_id,conversation_id,kind,severity,status,explanation,expected_digest,observed_digest,detected_at) VALUES($1,$2,$3,$4,'message_content_conflict','block','open','Remote message identity was observed with a different sanitized content digest',$5,$6,$7) ON CONFLICT(organization_id,workspace_id,finding_id) DO NOTHING`, org, workspace, findingID, existingID, message.ContentDigest, record.Message.ContentDigest, record.Message.CreatedAt)
+				if findingErr != nil {
+					return fmt.Errorf("record inbound message conflict: %w", findingErr)
+				}
 			}
 		}
 		result.Message = message
