@@ -1649,7 +1649,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlanAdvanceWrite'}}}}
       responses:
         '200': {description: Plan stage receipt, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
-        '409': {description: Ownership, version or stage conflict}
+        '409': {description: 'Ownership, version or stage conflict'}
   /warehouse-mobile/plans/{plan_id}/pick-batches:
     parameters: [{name: plan_id, in: path, required: true, schema: {type: string}}]
     post:
@@ -1685,7 +1685,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileScanWrite'}}}}
       responses:
         '200': {description: Scan receipt with digest-only evidence, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileScan'}}}}
-        '409': {description: Version, assignment, duplicate or device conflict}
+        '409': {description: 'Version, assignment, duplicate or device conflict'}
   /warehouse-mobile/packs:
     get:
       operationId: listWarehouseMobilePacks
@@ -1739,7 +1739,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintStatusWrite'}}}}
       responses:
         '200': {description: Printer receipt state, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintJob'}}}}
-        '409': {description: Print version, duplicate or unknown state conflict}
+        '409': {description: 'Print version, duplicate or unknown state conflict'}
   /warehouse-mobile/devices:
     get:
       operationId: listWarehouseMobileDevices
@@ -1783,7 +1783,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileOfflineReplayWrite'}}}}
       responses:
         '200': {description: Reconnect receipt with no retained raw scan value, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileOfflineIntent'}}}}
-        '409': {description: Offline version, device or duplicate conflict}
+        '409': {description: 'Offline version, device or duplicate conflict'}
   /warehouse-mobile/observations:
     post:
       operationId: recordWarehouseMobileRemoteObservation

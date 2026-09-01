@@ -1351,6 +1351,53 @@
       }
     },
     {
+      "schema": "events/fulfillment-mobile-print-job-changed-v1.schema.json",
+      "valid": {
+        "print_job_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
+        "plan_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+        "pack_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003",
+        "printer_id": "printer-a",
+        "document": "label",
+        "state": "queued",
+        "error_code": "",
+        "copies": 1,
+        "reprint": false,
+        "version": 1,
+        "change": "queued"
+      },
+      "invalid": {"print_job_id": "not-an-id", "state": "queued"}
+    },
+    {
+      "schema": "events/fulfillment-mobile-scan-recorded-v1.schema.json",
+      "valid": {
+        "scan_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
+        "plan_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+        "task_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003",
+        "device_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0004",
+        "kind": "product",
+        "code_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "location_code": "A-01",
+        "quantity": {"value": "1", "unit": "PCS"},
+        "result": "applied"
+      },
+      "invalid": {"scan_id": "not-an-id", "code_digest": "raw-code"}
+    },
+    {
+      "schema": "events/fulfillment-mobile-task-changed-v1.schema.json",
+      "valid": {
+        "plan_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001",
+        "mode": "fbs",
+        "owner": "seller_warehouse",
+        "stage": "pick",
+        "state": "active",
+        "warehouse_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002",
+        "local_execution": true,
+        "version": 1,
+        "change": "created"
+      },
+      "invalid": {"mode": "fbo", "owner": "seller_warehouse", "local_execution": true}
+    },
+    {
       "schema": "events/fulfillment-task-changed-v1.schema.json",
       "valid": {
         "task_id": "018f0000-0000-7000-8000-000000000701",
