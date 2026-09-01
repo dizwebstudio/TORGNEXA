@@ -1211,3 +1211,14 @@ preview/diff, approval, per-row apply, read-after-write, reconciliation and
 authenticated E2E in one interface. PIM remains canonical and unsupported
 channel writes remain `read_only` or `qualification_required`. See
 `tasks/issues/230-mass-catalog-management.md`.
+
+## Epic 186 — Экосистема и поддержка
+
+Task 231 is planned as the ecosystem/support release closure. The repository
+has a governed plugin marketplace, Connector SDK/conformance and Community
+deployment foundations, but not a comparable ready-integration catalog,
+partner implementation program, mobile product or hosted SLA. Task 231 adds
+connector portfolio tiers, app marketplace operations, partner enablement,
+mobile delivery, cloud SLO/SLA, support tooling and customer-facing evidence;
+it does not inflate health-only or manifest-only integrations into `ready`.
+See `tasks/issues/231-ecosystem-support.md`.
