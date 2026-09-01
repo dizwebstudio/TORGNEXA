@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 // FulfillmentMode describes who owns the physical execution of a plan.
@@ -130,7 +132,7 @@ type MobileScanInput struct {
 
 // Validate checks the scan command before it reaches a repository.
 func (input MobileScanInput) Validate() error {
-	if !validSortableID(input.TaskID) || !validSortableID(input.DeviceID) || input.ExpectedVersion < 1 || input.Quantity.Validate() != nil || input.Quantity.Value.IsZero() || ValidateMobileCode(input.Code) != nil || ValidateMobileLocation(input.LocationCode) != nil {
+	if !domain.ValidSortableID(input.TaskID) || !domain.ValidSortableID(input.DeviceID) || input.ExpectedVersion < 1 || input.Quantity.Validate() != nil || input.Quantity.Value.IsZero() || ValidateMobileCode(input.Code) != nil || ValidateMobileLocation(input.LocationCode) != nil {
 		return ErrInvalidRecord
 	}
 	switch input.Kind {
@@ -175,7 +177,7 @@ func ValidateMobilePrintRequest(document MobilePrintDocument, copies int) error 
 
 // ValidateMobilePlan enforces the canonical mode/owner relationship.
 func ValidateMobilePlan(mode FulfillmentMode, owner FulfillmentOwner, localExecution bool, warehouseID string) error {
-	if !MobileFulfillmentModeValid(mode) || owner == "" || !validSortableID(warehouseID) && localExecution {
+	if !MobileFulfillmentModeValid(mode) || owner == "" || !domain.ValidSortableID(warehouseID) && localExecution {
 		return ErrInvalidRecord
 	}
 	if mode == FulfillmentFBO && (owner != OwnerMarketplace || localExecution) {

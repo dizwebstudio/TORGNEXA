@@ -1,26 +1,25 @@
 import {useState} from "react";
 import {useMutation,useQuery} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems as items} from "../api/decoders";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {EmptyState} from "../components/EmptyState";
 import {StatusBadge} from "../components/StatusBadge";
 import {Page} from "./Page";
+import {formatMoneyMinor as money, formatPercentBasisPoints as percent} from "../lib/formatters";
 
 interface Campaign {id:string;account_id:string;channel:string;remote_id:string;name:string;status:string;currency:string;daily_budget_minor:number;total_budget_minor:number;observed_at:string}
 interface Metric {channel:string;campaign_id:string;sku?:string;currency:string;spend_minor:number;impressions:number;clicks:number;orders:number;revenue_minor:number;roas_basis_points:number;romi_basis_points:number;drr_basis_points:number;order_cost_minor:number;quality:string}
 interface Finding {id:string;kind:string;campaign_id?:string;expected_minor:number;actual_minor:number;severity:string;explanation:string;observed_at:string}
 const statuses:Record<string,string>={draft:"Черновик",active:"Активна",paused:"Пауза",stopped:"Остановлена",archived:"Архив",unknown:"Неизвестно"};
-function items<T>(value:unknown):T[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid advertising response");return root.items as T[]}
-function money(minor:number,currency:string){return new Intl.NumberFormat("ru-RU",{style:"currency",currency:currency||"RUB",maximumFractionDigits:2}).format(minor/100)}
-function percent(basisPoints:number){return `${(basisPoints/100).toLocaleString("ru-RU",{maximumFractionDigits:2})}%`}
 function dateValue(days:number){const end=new Date();const start=new Date(end);start.setUTCDate(end.getUTCDate()-days);return {from:start.toISOString().slice(0,10),to:end.toISOString().slice(0,10)}}
 
 export function AdvertisingPage(){
  const api=useApi();const [channel,setChannel]=useState("");const [campaignID,setCampaignID]=useState("");const [from,setFrom]=useState(()=>dateValue(30).from);const [to,setTo]=useState(()=>dateValue(30).to);const [tab,setTab]=useState<"metrics"|"campaigns"|"promotions"|"bids"|"bulk"|"findings">("metrics");
  const range={from:new Date(`${from}T00:00:00Z`).toISOString(),to:new Date(`${to}T23:59:59Z`).toISOString(),channel:channel||undefined,campaignId:campaignID||undefined,limit:200};
- const campaigns=useQuery({queryKey:["advertising","campaigns",channel],queryFn:async()=>items<Campaign>((await api.listAdvertisingCampaigns({channel:channel||undefined,limit:200})).body),staleTime:30_000});
- const metrics=useQuery({queryKey:["advertising","metrics",from,to,channel,campaignID],queryFn:async()=>items<Metric>((await api.listAdvertisingMetrics(range)).body),staleTime:30_000});
- const findings=useQuery({queryKey:["advertising","findings"],queryFn:async()=>items<Finding>((await api.listAdvertisingReconciliationFindings({limit:100})).body),staleTime:30_000});
+ const campaigns=useQuery({queryKey:["advertising","campaigns",channel],queryFn:async()=>items<Campaign>((await api.listAdvertisingCampaigns({channel:channel||undefined,limit:200})).body,"invalid advertising response"),staleTime:30_000});
+ const metrics=useQuery({queryKey:["advertising","metrics",from,to,channel,campaignID],queryFn:async()=>items<Metric>((await api.listAdvertisingMetrics(range)).body,"invalid advertising response"),staleTime:30_000});
+ const findings=useQuery({queryKey:["advertising","findings"],queryFn:async()=>items<Finding>((await api.listAdvertisingReconciliationFindings({limit:100})).body,"invalid advertising response"),staleTime:30_000});
  const preset=(days:number)=>{const value=dateValue(days);setFrom(value.from);setTo(value.to)};
  return <Page eyebrow="Продвижение" title="Реклама" description="Расходы и эффективность кампаний WB и Ozon. Показатели считаются по нормализованным фактам, а качество данных видно рядом с результатом.">
   <section className="panel report-result">

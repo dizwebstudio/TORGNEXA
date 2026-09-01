@@ -4,6 +4,7 @@ import {useApi} from "../api/ApiProvider";
 import {EmptyState} from "../components/EmptyState";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {Page} from "./Page";
+import {formatReportMoney as money} from "../lib/formatters";
 
 interface Column {key:string;label:string}
 interface Report {id:string;generated_at:string;source:string;columns:Column[];rows:string[][]}
@@ -14,7 +15,6 @@ type Tab="pnl"|"cash"|"unit"|"quality"|"completeness";
 
 function read(value:unknown):Report {const report=value as Report;if(!report||!Array.isArray(report.columns)||!Array.isArray(report.rows))throw new Error("invalid financial report");return report}
 function readCompleteness(value:unknown):Completeness {const summary=value as Completeness;if(!summary?.evaluation||!Array.isArray(summary.evaluation.components))throw new Error("invalid financial completeness");return summary}
-function money(value:string,currency:string){if(value==="—"||value==="")return "—";return new Intl.NumberFormat("ru-RU",{style:"currency",currency:currency||"RUB",maximumFractionDigits:2}).format(Number(value)/100)}
 function amount(value:number,currency:string,quality:string){return quality==="missing"||quality==="unmatched"?"Нет подтверждённых данных":money(String(value),currency||"RUB")}
 function qualityLabel(value:string){return ({observed:"Наблюдается",confirmed:"Подтверждено",estimated:"Оценка",missing:"Нет источника",unmatched:"Не сопоставлено",stale:"Устарело",disputed:"Оспаривается",conflict:"Конфликт"} as Record<string,string>)[value]??value}
 function statusLabel(value:string){return ({complete:"Полный контур",partial:"Неполный контур",stale:"Есть устаревшие данные",unmatched:"Есть несопоставленные данные",disputed:"Есть спорные данные",conflict:"Есть конфликт источников"} as Record<string,string>)[value]??value}

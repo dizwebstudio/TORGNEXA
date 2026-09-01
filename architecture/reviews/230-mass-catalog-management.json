@@ -38,7 +38,6 @@
     "internal/platform/postgres/catalogbulkrepo/repository.go",
     "migrations/000057_mass_catalog_management.sql",
     "migrations/catalog.json",
-    "migrations/catalog.json",
     "scripts/check-mass-catalog.sh",
     "sdk/go/torgnexa/client.gen.go",
     "sdk/python/torgnexa_sdk/client_gen.py",

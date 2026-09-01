@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -74,7 +75,7 @@ type Money struct {
 }
 
 func (m Money) Validate() error {
-	if !validCurrency(m.Currency) || m.MinorUnits < 0 {
+	if !domain.ValidCurrencyCode(m.Currency) || m.MinorUnits < 0 {
 		return ErrInvalid
 	}
 	return nil
@@ -542,17 +543,6 @@ func validText(v string, max int) bool {
 	}
 	for _, r := range v {
 		if r < 0x20 || r == 0x7f {
-			return false
-		}
-	}
-	return true
-}
-func validCurrency(v string) bool {
-	if len(v) != 3 {
-		return false
-	}
-	for _, r := range v {
-		if r < 'A' || r > 'Z' {
 			return false
 		}
 	}

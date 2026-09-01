@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -235,7 +237,7 @@ type OfferID string
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(o, w string) (Scope, error) {
-	if !validSortableID(o) || !validSortableID(w) {
+	if !domain.ValidTenantScope(o, w) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{o, w}, nil
@@ -243,14 +245,14 @@ func ParseScope(o, w string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 func (id WarehouseID) String() string { return string(id) }
-func (id WarehouseID) Valid() bool    { return validSortableID(string(id)) }
+func (id WarehouseID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 func (id PositionID) String() string  { return string(id) }
-func (id PositionID) Valid() bool     { return validSortableID(string(id)) }
+func (id PositionID) Valid() bool     { return domain.ValidSortableID(string(id)) }
 func (id OfferID) String() string     { return string(id) }
-func (id OfferID) Valid() bool        { return validSortableID(string(id)) }
+func (id OfferID) Valid() bool        { return domain.ValidSortableID(string(id)) }
 
 type WarehouseStatus string
 
@@ -270,7 +272,7 @@ type Warehouse struct {
 }
 
 func (w Warehouse) Validate() error {
-	if !w.ID.Valid() || !validSortableID(w.OrganizationID) || !validSortableID(w.WorkspaceID) || !validCode(w.Code) || !validName(w.Name) || !w.Status.Valid() || w.Version < 1 || !isUTC(w.CreatedAt) || !isUTC(w.UpdatedAt) || w.UpdatedAt.Before(w.CreatedAt) {
+	if !w.ID.Valid() || !domain.ValidSortableID(w.OrganizationID) || !domain.ValidSortableID(w.WorkspaceID) || !validCode(w.Code) || !validName(w.Name) || !w.Status.Valid() || w.Version < 1 || !isUTC(w.CreatedAt) || !isUTC(w.UpdatedAt) || w.UpdatedAt.Before(w.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -287,7 +289,7 @@ type Position struct {
 }
 
 func (p Position) Validate() error {
-	if !p.ID.Valid() || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) || !p.OfferID.Valid() || !p.WarehouseID.Valid() || p.OnHand.Validate() != nil || p.Reserved.Validate() != nil || p.OnHand.Unit != p.Reserved.Unit || p.Version < 1 || !isUTC(p.CreatedAt) || !isUTC(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) {
+	if !p.ID.Valid() || !domain.ValidSortableID(p.OrganizationID) || !domain.ValidSortableID(p.WorkspaceID) || !p.OfferID.Valid() || !p.WarehouseID.Valid() || p.OnHand.Validate() != nil || p.Reserved.Validate() != nil || p.OnHand.Unit != p.Reserved.Unit || p.Version < 1 || !isUTC(p.CreatedAt) || !isUTC(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	oh, _ := p.OnHand.Value.Cmp(mustZero())
@@ -369,7 +371,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validSortableID(m.AuditID) || !validToken(m.ActorID) || !validSource(m.Source) || !validToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidSortableID(m.AuditID) || !domain.ValidToken(m.ActorID) || !validSource(m.Source) || !domain.ValidToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -407,41 +409,8 @@ func validSource(v string) bool {
 	}
 	return true
 }
-func validToken(v string) bool {
-	return len(v) >= 1 && len(v) <= 128 && identifierPattern.MatchString(v)
-}
-func validOptionalToken(v string) bool { return v == "" || validToken(v) }
+func validOptionalToken(v string) bool { return v == "" || domain.ValidToken(v) }
 func isUTC(v time.Time) bool           { return !v.IsZero() && v.Location() == time.UTC }
-func validSortableID(v string) bool    { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' {
-		return false
-	}
-	if !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
-}
 
 // OperationalState is independent from the administrative warehouse status.
 // UNAVAILABLE and LOST are hard allocation stops; DEGRADED stays eligible for
@@ -560,16 +529,16 @@ type FulfillmentAllocation struct {
 }
 
 func (a FulfillmentAllocation) Validate() error {
-	if !validSortableID(a.ID) || !validToken(a.IdempotencyKey) || !validSortableID(a.OrderID) || !validSortableID(a.OrderItemID) || !a.OfferID.Valid() || !a.WarehouseID.Valid() || a.Quantity.Validate() != nil || !a.Status.Valid() || a.Version < 1 || !isUTC(a.CreatedAt) || !isUTC(a.UpdatedAt) || a.UpdatedAt.Before(a.CreatedAt) {
+	if !domain.ValidSortableID(a.ID) || !domain.ValidToken(a.IdempotencyKey) || !domain.ValidSortableID(a.OrderID) || !domain.ValidSortableID(a.OrderItemID) || !a.OfferID.Valid() || !a.WarehouseID.Valid() || a.Quantity.Validate() != nil || !a.Status.Valid() || a.Version < 1 || !isUTC(a.CreatedAt) || !isUTC(a.UpdatedAt) || a.UpdatedAt.Before(a.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	if a.ReasonCode != "" && !validReason(a.ReasonCode) {
 		return ErrInvalidRecord
 	}
-	if a.IncidentID != "" && !validToken(a.IncidentID) {
+	if a.IncidentID != "" && !domain.ValidToken(a.IncidentID) {
 		return ErrInvalidRecord
 	}
-	if a.ReplacesID != "" && (!validSortableID(a.ReplacesID) || a.ReplacesID == a.ID) {
+	if a.ReplacesID != "" && (!domain.ValidSortableID(a.ReplacesID) || a.ReplacesID == a.ID) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -581,7 +550,7 @@ type ReserveOrderItem struct {
 }
 
 func (c ReserveOrderItem) Validate() error {
-	if !validSortableID(c.AllocationID) || !validSortableID(c.OrderItemID) || !validToken(c.IdempotencyKey) || !c.WarehouseID.Valid() {
+	if !domain.ValidSortableID(c.AllocationID) || !domain.ValidSortableID(c.OrderItemID) || !domain.ValidToken(c.IdempotencyKey) || !c.WarehouseID.Valid() {
 		return ErrInvalidRecord
 	}
 	return nil

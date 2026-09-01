@@ -1,12 +1,15 @@
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems as items} from "../api/decoders";
 import {DataTable} from "../components/DataTable";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {EmptyState} from "../components/EmptyState";
 import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
+import {formatAmountWithCurrency as money} from "../lib/formatters";
+import {idempotencyKey as idempotency} from "../lib/ids";
 
 type Response={body:any};
 type Client={
@@ -24,10 +27,7 @@ type Offer={id:string;supplier_id:string;sku:string;supplier_sku?:string;gtin?:s
 type Order={id:string;supplier_id:string;warehouse_id:string;status:string;currency:string;version:number;lines:any[];send_state:string;expected_receipt_at?:string};
 type Finding={id:string;kind:string;purchase_order_id?:string;expected:string;observed:string;status:string;detected_at:string};
 
-function items<T>(body:unknown):T[]{const value=body as {items?:unknown};return Array.isArray(value?.items)?value.items as T[]:[];}
-function idempotency(){return crypto.randomUUID();}
 const statusLabels:Record<string,string>={active:"Активен",blocked:"Заблокирован",archived:"Архив",draft:"Черновик",approved:"Согласован",sent:"Отправлен",partially_received:"Частично принят",received:"Принят",cancelled:"Отменён",open:"Открыто",unknown_send_outcome:"Неизвестный результат"};
-function money(minor:number|undefined,currency:string|undefined){return `${((minor??0)/100).toLocaleString("ru-RU",{minimumFractionDigits:2})} ${currency??""}`.trim();}
 
 export function ProcurementPage(){
  const api=useApi() as unknown as Client;

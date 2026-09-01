@@ -26,11 +26,98 @@ const (
 
 var (
 	currencyPattern        = regexp.MustCompile(`^[A-Z]{3}$`)
+	resourceTokenPattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	countryPattern         = regexp.MustCompile(`^[A-Z]{2}$`)
 	unitPattern            = regexp.MustCompile(`^[A-Z][A-Z0-9._-]{0,15}$`)
 	codePattern            = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,62}$`)
 	taxJurisdictionPattern = regexp.MustCompile(`^[A-Z]{2}(?:-[A-Z0-9]{1,8})*$`)
 )
+
+// ValidCurrencyCode reports whether value is a canonical three-letter
+// uppercase currency code. It validates shape only; it deliberately does not
+// embed a mutable ISO-4217 registry.
+func ValidCurrencyCode(value string) bool {
+	return currencyPattern.MatchString(value)
+}
+
+// ValidToken reports whether value is a provider-neutral opaque identifier.
+// Domain packages can apply their own narrower patterns where their contract
+// requires it, but this is the shared 1..128 byte token shape used by the
+// canonical records and event metadata.
+func ValidToken(value string) bool {
+	return resourceTokenPattern.MatchString(value)
+}
+
+// ValidText validates trimmed UTF-8 text by rune count and rejects control
+// characters. Layout controls are optionally allowed for multiline fields.
+func ValidText(value string, minRunes, maxRunes int, allowLayoutControls bool) bool {
+	if value != strings.TrimSpace(value) || !utf8.ValidString(value) {
+		return false
+	}
+	count := utf8.RuneCountInString(value)
+	if count < minRunes || count > maxRunes {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			if allowLayoutControls && (r == '\n' || r == '\r' || r == '\t') {
+				continue
+			}
+			return false
+		}
+	}
+	return true
+}
+
+// ValidUUIDv7 validates the canonical lowercase textual UUIDv7 form.
+func ValidUUIDv7(value string) bool {
+	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' || value[14] != '7' {
+		return false
+	}
+	if value[19] != '8' && value[19] != '9' && value[19] != 'a' && value[19] != 'b' {
+		return false
+	}
+	for index, character := range []byte(value) {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			continue
+		}
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidULID validates the canonical Crockford-base32 ULID form.
+func ValidULID(value string) bool {
+	if len(value) != 26 || value[0] < '0' || value[0] > '7' {
+		return false
+	}
+	for _, character := range []byte(value) {
+		if (character >= '0' && character <= '9') ||
+			(character >= 'A' && character <= 'H') ||
+			(character >= 'J' && character <= 'K') ||
+			(character >= 'M' && character <= 'N') ||
+			(character >= 'P' && character <= 'T') ||
+			(character >= 'V' && character <= 'Z') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// ValidSortableID accepts either of the sortable identifier formats used by
+// TORGNEXA tenant-scoped records.
+func ValidSortableID(value string) bool {
+	return ValidUUIDv7(value) || ValidULID(value)
+}
+
+// ValidTenantScope validates the two identifiers that form the mandatory
+// organization/workspace boundary on tenant-scoped records.
+func ValidTenantScope(organizationID, workspaceID string) bool {
+	return ValidSortableID(organizationID) && ValidSortableID(workspaceID)
+}
 
 func decodeStrictJSON(data []byte, target any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))

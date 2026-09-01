@@ -10,12 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -27,8 +27,6 @@ const (
 	MaxPageSize   = 100
 	MaxCursorSize = 2048
 )
-
-var sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
 
 type ProductQuery struct {
 	Text   string
@@ -81,7 +79,7 @@ type ProductHit struct {
 }
 
 func (h ProductHit) Validate() error {
-	if !sortableIDPattern.MatchString(h.ID) || !validCode(h.Code) || !validTitle(h.Title) || !validDescription(h.Description) || (h.Status != "draft" && h.Status != "active" && h.Status != "archived") || !isUTC(h.UpdatedAt) {
+	if !domain.ValidSortableID(h.ID) || !validCode(h.Code) || !validTitle(h.Title) || !validDescription(h.Description) || (h.Status != "draft" && h.Status != "active" && h.Status != "archived") || !isUTC(h.UpdatedAt) {
 		return ErrInvalid
 	}
 	if h.Price != nil && h.Price.Validate() != nil {
@@ -99,7 +97,7 @@ type ProductPrice struct {
 }
 
 func (p ProductPrice) Validate() error {
-	if p.MinorUnits < 0 || !validCurrency(p.Currency) {
+	if p.MinorUnits < 0 || !domain.ValidCurrencyCode(p.Currency) {
 		return ErrInvalid
 	}
 	return nil
@@ -136,7 +134,7 @@ type OrderHit struct {
 }
 
 func (h OrderHit) Validate() error {
-	if !sortableIDPattern.MatchString(h.ID) || !validCode(h.OrderNumber) || (h.Status != "pending" && h.Status != "confirmed" && h.Status != "processing" && h.Status != "fulfilled" && h.Status != "cancelled") || !validCurrency(h.Currency) || h.GrandMinorUnits < 0 || !isUTC(h.PlacedAt) || !isUTC(h.UpdatedAt) {
+	if !domain.ValidSortableID(h.ID) || !validCode(h.OrderNumber) || (h.Status != "pending" && h.Status != "confirmed" && h.Status != "processing" && h.Status != "fulfilled" && h.Status != "cancelled") || !domain.ValidCurrencyCode(h.Currency) || h.GrandMinorUnits < 0 || !isUTC(h.PlacedAt) || !isUTC(h.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -183,7 +181,7 @@ type encodedCursor struct {
 }
 
 func NewCursor(priority int, updatedAt time.Time, id, fingerprint string) (string, error) {
-	if priority < 0 || priority > 2 || !isUTC(updatedAt) || !sortableIDPattern.MatchString(id) || !validFingerprint(fingerprint) {
+	if priority < 0 || priority > 2 || !isUTC(updatedAt) || !domain.ValidSortableID(id) || !validFingerprint(fingerprint) {
 		return "", ErrInvalid
 	}
 	raw, err := json.Marshal(encodedCursor{Version: 1, Priority: priority, UpdatedAt: updatedAt.Format(time.RFC3339Nano), ID: id, Fingerprint: fingerprint})
@@ -211,7 +209,7 @@ func ParseCursor(raw, fingerprint string) (Cursor, error) {
 	var in encodedCursor
 	dec := json.NewDecoder(strings.NewReader(string(payload)))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil || in.Version != 1 || in.Priority < 0 || in.Priority > 2 || !sortableIDPattern.MatchString(in.ID) || in.Fingerprint != fingerprint {
+	if err := dec.Decode(&in); err != nil || in.Version != 1 || in.Priority < 0 || in.Priority > 2 || !domain.ValidSortableID(in.ID) || in.Fingerprint != fingerprint {
 		return Cursor{}, ErrInvalid
 	}
 	var trailing any
@@ -314,17 +312,6 @@ func validDescription(v string) bool {
 	}
 	for _, r := range v {
 		if r < 0x20 && r != '\n' && r != '\r' && r != '\t' || r == 0x7f {
-			return false
-		}
-	}
-	return true
-}
-func validCurrency(v string) bool {
-	if len(v) != 3 {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if c < 'A' || c > 'Z' {
 			return false
 		}
 	}

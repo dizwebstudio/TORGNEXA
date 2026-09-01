@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -18,9 +20,8 @@ var (
 )
 
 var (
-	sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
-	accountIDPattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
-	secretRefPattern  = regexp.MustCompile(`^sec:v1:[0-9a-f]{32}$`)
+	accountIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+	secretRefPattern = regexp.MustCompile(`^sec:v1:[0-9a-f]{32}$`)
 )
 
 type AccountStatus string
@@ -73,7 +74,7 @@ type Account struct {
 
 func (account Account) Validate() error {
 	bindingID := account.ConnectorID
-	if !accountIDPattern.MatchString(account.ID) || !sortableIDPattern.MatchString(account.OrganizationID) || !sortableIDPattern.MatchString(account.WorkspaceID) ||
+	if !accountIDPattern.MatchString(account.ID) || !domain.ValidTenantScope(account.OrganizationID, account.WorkspaceID) ||
 		!manifestIDPattern.MatchString(bindingID) || !account.Family.Valid() || !account.Status.Valid() || !account.SecretReference.Valid() || account.Version < 1 ||
 		account.CreatedAt.IsZero() || account.UpdatedAt.IsZero() || account.CreatedAt.Location() != time.UTC || account.UpdatedAt.Location() != time.UTC || account.UpdatedAt.Before(account.CreatedAt) {
 		return ErrInvalidAccount
@@ -97,7 +98,7 @@ type AccountCreate struct {
 
 func (command AccountCreate) Validate() error {
 	bindingID := command.ConnectorID
-	if !accountIDPattern.MatchString(command.ID) || !sortableIDPattern.MatchString(command.OrganizationID) || !sortableIDPattern.MatchString(command.WorkspaceID) || !manifestIDPattern.MatchString(bindingID) || !command.SecretReference.Valid() {
+	if !accountIDPattern.MatchString(command.ID) || !domain.ValidTenantScope(command.OrganizationID, command.WorkspaceID) || !manifestIDPattern.MatchString(bindingID) || !command.SecretReference.Valid() {
 		return ErrInvalidAccount
 	}
 	return nil
@@ -112,7 +113,7 @@ type AccountStatusChange struct {
 }
 
 func (command AccountStatusChange) Validate() error {
-	if !sortableIDPattern.MatchString(command.OrganizationID) || !sortableIDPattern.MatchString(command.WorkspaceID) || !accountIDPattern.MatchString(command.AccountID) || !command.Status.Valid() || command.ExpectedVersion < 1 {
+	if !domain.ValidTenantScope(command.OrganizationID, command.WorkspaceID) || !accountIDPattern.MatchString(command.AccountID) || !command.Status.Valid() || command.ExpectedVersion < 1 {
 		return ErrInvalidAccount
 	}
 	return nil
@@ -127,7 +128,7 @@ type AccountHealthUpdate struct {
 }
 
 func (command AccountHealthUpdate) Validate() error {
-	if !sortableIDPattern.MatchString(command.OrganizationID) || !sortableIDPattern.MatchString(command.WorkspaceID) || !accountIDPattern.MatchString(command.AccountID) || command.ExpectedVersion < 1 {
+	if !domain.ValidTenantScope(command.OrganizationID, command.WorkspaceID) || !accountIDPattern.MatchString(command.AccountID) || command.ExpectedVersion < 1 {
 		return ErrInvalidAccount
 	}
 	return command.Health.Validate()

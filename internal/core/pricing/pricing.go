@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -24,7 +26,7 @@ type OfferID string
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{org, ws}, nil
@@ -32,24 +34,24 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 func ParsePriceID(v string) (PriceID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return PriceID(v), nil
 }
 func ParseOfferID(v string) (OfferID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return OfferID(v), nil
 }
 func (id PriceID) String() string { return string(id) }
-func (id PriceID) Valid() bool    { return validSortableID(string(id)) }
+func (id PriceID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 func (id OfferID) String() string { return string(id) }
-func (id OfferID) Valid() bool    { return validSortableID(string(id)) }
+func (id OfferID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 
 type Currency string
 
@@ -105,7 +107,7 @@ type Price struct {
 }
 
 func (p Price) Validate() error {
-	if !p.ID.Valid() || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) || !p.OfferID.Valid() || !p.Kind.Valid() || p.Amount.Validate() != nil || p.Amount.MinorUnits() < 0 || p.Version < 1 || !isUTC(p.CreatedAt) || !isUTC(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) {
+	if !p.ID.Valid() || !domain.ValidSortableID(p.OrganizationID) || !domain.ValidSortableID(p.WorkspaceID) || !p.OfferID.Valid() || !p.Kind.Valid() || p.Amount.Validate() != nil || p.Amount.MinorUnits() < 0 || p.Version < 1 || !isUTC(p.CreatedAt) || !isUTC(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -145,7 +147,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validSortableID(m.AuditID) || !validToken(m.ActorID) || !validSource(m.Source) || !validToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidSortableID(m.AuditID) || !domain.ValidToken(m.ActorID) || !validSource(m.Source) || !domain.ValidToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -170,38 +172,5 @@ func validSource(v string) bool {
 	}
 	return true
 }
-func validToken(v string) bool {
-	return len(v) >= 1 && len(v) <= 128 && identifierPattern.MatchString(v)
-}
-func validOptionalToken(v string) bool { return v == "" || validToken(v) }
+func validOptionalToken(v string) bool { return v == "" || domain.ValidToken(v) }
 func isUTC(v time.Time) bool           { return !v.IsZero() && v.Location() == time.UTC }
-func validSortableID(v string) bool    { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' {
-		return false
-	}
-	if !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
-}

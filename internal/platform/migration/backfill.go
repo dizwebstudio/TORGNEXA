@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 const (
@@ -21,11 +22,7 @@ const (
 )
 
 var (
-	workerIDPattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$`)
-	sortableIDPattern = regexp.MustCompile(
-		`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`,
-	)
-
+	workerIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$`)
 	// ErrInvalidBackfill means runner configuration, persisted lease data, or a
 	// processor result violated the bounded backfill contract.
 	ErrInvalidBackfill = errors.New("invalid backfill state")
@@ -97,7 +94,7 @@ type BackfillJob struct {
 }
 
 func (job BackfillJob) valid() bool {
-	return sortableIDPattern.MatchString(job.ID) && jobKeyPattern.MatchString(job.Key) &&
+	return domain.ValidSortableID(job.ID) && jobKeyPattern.MatchString(job.Key) &&
 		job.Scope.valid() && job.BatchSize >= 1 && job.BatchSize <= maxBatchSize
 }
 

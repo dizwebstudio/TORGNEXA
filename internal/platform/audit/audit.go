@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/privacy"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
@@ -151,7 +152,7 @@ func (service *Service) Capture(ctx context.Context, scope tenancy.Scope, entry 
 		return Record{}, err
 	}
 	id, err := service.ids.NewID()
-	if err != nil || !validSortableID(id) {
+	if err != nil || !domain.ValidSortableID(id) {
 		return Record{}, fmt.Errorf("audit service: generate id: %w", ErrInvalidRecord)
 	}
 	record := Record{
@@ -200,7 +201,7 @@ func SanitizeSummary(summary Summary) (Summary, error) {
 // is already sanitized. Repository adapters call this defensively so unsafe
 // records cannot bypass Service.Capture.
 func ValidateRecord(record Record) error {
-	if !validSortableID(record.ID) || !record.OrganizationID.Valid() || !record.WorkspaceID.Valid() ||
+	if !domain.ValidSortableID(record.ID) || !record.OrganizationID.Valid() || !record.WorkspaceID.Valid() ||
 		!validRequiredText(record.ActorID, 256) || !validIdentifierText(record.Source, 128) ||
 		!validIdentifierText(record.Action, 160) || !validIdentifierText(record.ResourceType, 128) ||
 		!validRequiredText(record.ResourceID, 512) || !validRequiredText(record.CorrelationID, 256) ||
@@ -388,30 +389,4 @@ func newUUIDv7(now time.Time, random io.Reader) (string, error) {
 	encoded[23] = '-'
 	hex.Encode(encoded[24:36], raw[10:16])
 	return string(encoded[:]), nil
-}
-
-func validSortableID(value string) bool {
-	if len(value) == 36 && value[8] == '-' && value[13] == '-' && value[18] == '-' && value[23] == '-' && value[14] == '7' && strings.Contains("89ab", value[19:20]) {
-		for index, character := range []byte(value) {
-			if index == 8 || index == 13 || index == 18 || index == 23 {
-				continue
-			}
-			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
-				return false
-			}
-		}
-		return true
-	}
-	if len(value) != 26 || value[0] < '0' || value[0] > '7' {
-		return false
-	}
-	for _, character := range []byte(value) {
-		if (character >= '0' && character <= '9') || (character >= 'A' && character <= 'H') ||
-			(character >= 'J' && character <= 'K') || (character >= 'M' && character <= 'N') ||
-			(character >= 'P' && character <= 'T') || (character >= 'V' && character <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
 }

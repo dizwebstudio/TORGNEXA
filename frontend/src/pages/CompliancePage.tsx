@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems as decode} from "../api/decoders";
 import {useAuth} from "../auth/AuthProvider";
 import {EmptyState} from "../components/EmptyState";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
@@ -27,7 +28,6 @@ function PrivacyRequestForm(){
  </section>
 }
 interface Document {id:string;document_type:string;number:string;jurisdiction:string;issuer:string;registry_source:string;registry_reference:string;status:string;issued_at:string;expires_at?:string;verification_source:string;verified_at?:string;version:number}
-function decode(value:unknown):Document[]{const root=value as {items?:unknown};if(!root||!Array.isArray(root.items))throw new Error("invalid compliance documents");return root.items as Document[]}
 const documentTypes:Record<string,string>={declaration:"Декларация соответствия",certificate:"Сертификат соответствия",eac_evidence:"Документ ЕАЭС",state_registration:"Свидетельство о госрегистрации",veterinary:"Ветеринарный документ",sanitary:"Санитарный документ",refusal_letter:"Отказное письмо",information_letter:"Информационное письмо",other:"Другой документ"};
 const statuses:Record<string,string>={draft:"Черновик",valid:"Действует",suspended:"Приостановлен",revoked:"Отозван",expired:"Истёк",verification_failed:"Проверка не пройдена"};
 const complianceOperations:Record<string,string>={publication:"Публикация",sale:"Продажа",advertising:"Реклама",shipping:"Доставка"};

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -24,12 +26,12 @@ var tokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$`)
 type Scope struct{ organizationID, workspaceID string }
 
 func NewScope(organizationID, workspaceID string) (Scope, error) {
-	if !validID(organizationID) || !validID(workspaceID) {
+	if !domain.ValidTenantScope(organizationID, workspaceID) {
 		return Scope{}, ErrInvalid
 	}
 	return Scope{organizationID: organizationID, workspaceID: workspaceID}, nil
 }
-func (s Scope) Valid() bool            { return validID(s.organizationID) && validID(s.workspaceID) }
+func (s Scope) Valid() bool            { return domain.ValidTenantScope(s.organizationID, s.workspaceID) }
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 
@@ -111,7 +113,7 @@ type Record struct {
 }
 
 func (r Record) Validate() error {
-	if !validToken(r.ID) || !validID(r.OrganizationID) || !validID(r.WorkspaceID) || !validToken(r.Source) || !validOptionalText(r.ActorID, 256) || !validToken(r.Operation) || r.Output.Validate() != nil || r.Transformation.Validate() != nil || !validText(r.CorrelationID, 256) || !validOptionalText(r.CausationID, 256) || !validText(r.AuditID, 160) || !validText(r.EventID, 160) || !r.Result.Valid() || !isUTC(r.OccurredAt) {
+	if !validToken(r.ID) || !domain.ValidSortableID(r.OrganizationID) || !domain.ValidSortableID(r.WorkspaceID) || !validToken(r.Source) || !validOptionalText(r.ActorID, 256) || !validToken(r.Operation) || r.Output.Validate() != nil || r.Transformation.Validate() != nil || !validText(r.CorrelationID, 256) || !validOptionalText(r.CausationID, 256) || !validText(r.AuditID, 160) || !validText(r.EventID, 160) || !r.Result.Valid() || !isUTC(r.OccurredAt) {
 		return ErrInvalid
 	}
 	if len(r.Inputs) > 32 {
@@ -202,33 +204,6 @@ func validText(v string, max int) bool {
 }
 func validOptionalText(v string, max int) bool { return v == "" || validText(v, max) }
 func isUTC(v time.Time) bool                   { return !v.IsZero() && v.Location() == time.UTC }
-func validID(v string) bool                    { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' || !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
-}
 
 func (r Record) String() string {
 	return fmt.Sprintf("%s:%s/%s@%s", r.Output.System, r.Output.EntityType, r.Output.EntityID, r.Output.Version)

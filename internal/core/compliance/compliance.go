@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -25,25 +27,25 @@ var docNumberPattern = regexp.MustCompile(`^[A-Za-z0-9А-Яа-яЁё][A-Za-z0-9�
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validID(org) || !validID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalid
 	}
 	return Scope{org, ws}, nil
 }
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
-func (s Scope) Valid() bool            { return validID(s.organizationID) && validID(s.workspaceID) }
+func (s Scope) Valid() bool            { return domain.ValidTenantScope(s.organizationID, s.workspaceID) }
 
 type ID string
 
 func ParseID(v string) (ID, error) {
-	if !validID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalid
 	}
 	return ID(v), nil
 }
 func (id ID) String() string { return string(id) }
-func (id ID) Valid() bool    { return validID(string(id)) }
+func (id ID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 
 type DocumentType string
 
@@ -110,7 +112,7 @@ type ComplianceDocument struct {
 }
 
 func (d ComplianceDocument) Validate() error {
-	if !d.ID.Valid() || !validID(d.OrganizationID) || !validID(d.WorkspaceID) || !d.Type.Valid() || !docNumberPattern.MatchString(d.Number) || !country(d.Jurisdiction) || !text(d.Issuer, 1, 300) || !token(d.RegistrySource) || !d.Status.Valid() || !utc(d.IssuedAt) || d.Version < 1 || !utc(d.CreatedAt) || !utc(d.UpdatedAt) || d.UpdatedAt.Before(d.CreatedAt) {
+	if !d.ID.Valid() || !domain.ValidTenantScope(d.OrganizationID, d.WorkspaceID) || !d.Type.Valid() || !docNumberPattern.MatchString(d.Number) || !country(d.Jurisdiction) || !text(d.Issuer, 1, 300) || !token(d.RegistrySource) || !d.Status.Valid() || !utc(d.IssuedAt) || d.Version < 1 || !utc(d.CreatedAt) || !utc(d.UpdatedAt) || d.UpdatedAt.Before(d.CreatedAt) {
 		return ErrInvalid
 	}
 	if !d.ExpiresAt.IsZero() && (!utc(d.ExpiresAt) || d.ExpiresAt.Before(d.IssuedAt)) {
@@ -119,7 +121,7 @@ func (d ComplianceDocument) Validate() error {
 	if d.RegistryReference != "" && !safeText(d.RegistryReference, 256) {
 		return ErrInvalid
 	}
-	if d.HolderPartyType != "" && (!token(d.HolderPartyType) || !validID(d.HolderPartyID)) {
+	if d.HolderPartyType != "" && (!token(d.HolderPartyType) || !domain.ValidSortableID(d.HolderPartyID)) {
 		return ErrInvalid
 	}
 	if d.EvidenceObjectID != "" && !token(d.EvidenceObjectID) {
@@ -163,7 +165,7 @@ type Binding struct {
 }
 
 func (b Binding) Validate() error {
-	if !b.ID.Valid() || !validID(b.OrganizationID) || !validID(b.WorkspaceID) || !b.DocumentID.Valid() || !b.SubjectType.Valid() || b.Version < 1 || !utc(b.CreatedAt) || !utc(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
+	if !b.ID.Valid() || !domain.ValidTenantScope(b.OrganizationID, b.WorkspaceID) || !b.DocumentID.Valid() || !b.SubjectType.Valid() || b.Version < 1 || !utc(b.CreatedAt) || !utc(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
 		return ErrInvalid
 	}
 	if b.SubjectType == SubjectGTIN {
@@ -174,7 +176,7 @@ func (b Binding) Validate() error {
 		if strings.TrimSpace(b.SubjectID) == "" || len(b.SubjectID) > 128 {
 			return ErrInvalid
 		}
-	} else if !validID(b.SubjectID) {
+	} else if !domain.ValidSortableID(b.SubjectID) {
 		return ErrInvalid
 	}
 	return nil
@@ -248,7 +250,7 @@ type Policy struct {
 }
 
 func (p Policy) Validate() error {
-	if !p.ID.Valid() || !validID(p.OrganizationID) || !validID(p.WorkspaceID) || !token(p.Code) || !country(p.Jurisdiction) || !p.Operation.Valid() || p.Version < 1 || !utc(p.EffectiveFrom) || !utc(p.CreatedAt) || !utc(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) || len(p.Requirements) == 0 || len(p.Requirements) > 32 {
+	if !p.ID.Valid() || !domain.ValidTenantScope(p.OrganizationID, p.WorkspaceID) || !token(p.Code) || !country(p.Jurisdiction) || !p.Operation.Valid() || p.Version < 1 || !utc(p.EffectiveFrom) || !utc(p.CreatedAt) || !utc(p.UpdatedAt) || p.UpdatedAt.Before(p.CreatedAt) || len(p.Requirements) == 0 || len(p.Requirements) > 32 {
 		return ErrInvalid
 	}
 	if !p.EffectiveUntil.IsZero() && (!utc(p.EffectiveUntil) || !p.EffectiveUntil.After(p.EffectiveFrom)) {
@@ -319,7 +321,7 @@ func (c EvaluationContext) Validate() error {
 	if c.SKU != "" && !safeText(c.SKU, 128) {
 		return ErrInvalid
 	}
-	if c.SellerPartyID != "" && !validID(c.SellerPartyID) {
+	if c.SellerPartyID != "" && !domain.ValidSortableID(c.SellerPartyID) {
 		return ErrInvalid
 	}
 	if c.SellerRole != "" && !token(c.SellerRole) {
@@ -582,33 +584,6 @@ func text(v string, min, max int) bool {
 }
 func safeText(v string, max int) bool { return len(v) <= max && !strings.ContainsAny(v, "\x00\r\n") }
 func utc(v time.Time) bool            { return !v.IsZero() && v.Location() == time.UTC }
-func validID(v string) bool           { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' || !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
-}
 func itoa(v int64) string {
 	if v == 0 {
 		return "0"

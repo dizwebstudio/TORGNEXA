@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
+import {decodeItems as decode} from "../../api/decoders";
 import {useAuth} from "../../auth/AuthProvider";
 import {ErrorBlock,LoadingBlock} from "../../components/ApiState";
 import {Dialog} from "../../components/Dialog";
@@ -10,7 +11,6 @@ import {useToast} from "../../components/Toast";
 
 interface Subscription{id:string;endpoint:string;event_types:string[];status:string;consecutive_failures:number;version:number;created_at:string;updated_at:string}
 interface DeliveryAttempt{delivery_id:string;attempt:number;outcome:string;http_status?:number;duration_ms:number;error_code?:string;completed_at:string}
-function decode(value:unknown):Subscription[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid webhook subscription response");return root.items as Subscription[]}
 function decodeHistory(value:unknown):DeliveryAttempt[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid webhook delivery history response");return root.items as DeliveryAttempt[]}
 function randomSecret():string{const bytes=crypto.getRandomValues(new Uint8Array(32));return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("")}
 const outcomeLabels:Record<string,string>={succeeded:"Доставлено",retry:"Повтор запланирован",dlq:"В очереди отказов"};
@@ -34,7 +34,7 @@ export function WebhookSettings(){
  const valid=!!id.trim()&&/^https:\/\//.test(endpoint.trim())&&!!eventTypes.trim()&&secret.length>=32;
  return <section className="panel settings-card">
   <div className="settings-card-heading"><div><p className="eyebrow">Интеграции</p><h2>Webhook-подписки</h2><p className="settings-copy">Внешние получатели событий TORGNEXA. Секрет подписи известен только вам и получателю — TORGNEXA хранит только его ссылку и не показывает значение повторно.</p></div>{query.data?<StatusBadge value={`${query.data.length}`}/>:null}</div>
-  {query.isPending?<LoadingBlock/>:query.isError?<ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить подписки.</ErrorBlock>:query.data.length===0?<EmptyState title="Подписок пока нет" text="Добавьте первую в форме ниже."/>:<div className="settings-grid">{query.data.map(sub=><article className="connector-account" key={sub.id}><header><div><strong className="mono">{sub.id}</strong><small>{sub.endpoint}</small></div><StatusBadge value={sub.status}/></header><div className="chip-list">{sub.event_types.map(t=><span className="chip" key={t}>{t}</span>)}</div>{sub.consecutive_failures>0?<small className="danger-text">Подряд неудач: {sub.consecutive_failures}</small>:null}{sub.status==="active"&&canWrite?<div className="account-actions"><button className="button ghost" onClick={()=>{setRotateSecret(randomSecret());setOverlap(3600);setRotating(sub)}}>Сменить секрет</button><button className="button ghost danger-text" disabled={disable.isPending} onClick={()=>disable.mutate(sub)}>Отключить</button></div>:null}</article>)}</div>}
+  {query.isPending?<LoadingBlock/>:query.isError?<ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить подписки.</ErrorBlock>:query.data.length===0?<EmptyState title="Подписок пока нет" text="Добавьте первую в форме ниже."/>:<div className="settings-grid">{query.data.map(sub=><article className="connector-account" key={sub.id}><header><div><strong className="mono">{sub.id}</strong><small>{sub.endpoint}</small></div><StatusBadge value={sub.status}/></header><div className="chip-list">{sub.event_types.map((t:string)=><span className="chip" key={t}>{t}</span>)}</div>{sub.consecutive_failures>0?<small className="danger-text">Подряд неудач: {sub.consecutive_failures}</small>:null}{sub.status==="active"&&canWrite?<div className="account-actions"><button className="button ghost" onClick={()=>{setRotateSecret(randomSecret());setOverlap(3600);setRotating(sub)}}>Сменить секрет</button><button className="button ghost danger-text" disabled={disable.isPending} onClick={()=>disable.mutate(sub)}>Отключить</button></div>:null}</article>)}</div>}
   {canWrite?<section className="drawer-section">
     <h3>Добавить подписку</h3>
     <div className="settings-grid">

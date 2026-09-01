@@ -42,7 +42,9 @@ function object(value: unknown): Record<string, unknown> | undefined {
 function text(value: unknown): string | undefined { return typeof value === "string" ? value : undefined; }
 function integer(value: unknown): number | undefined { return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined; }
 
-export function decodeItems<T>(value: unknown, message = "invalid list response"): T[] {
+// Callers that need a typed row pass T explicitly. Legacy list screens use the
+// decoder as a runtime envelope check and refine the row shape locally.
+export function decodeItems<T = any>(value: unknown, message = "invalid list response"): T[] {
   const root = object(value);
   if (!root || !Array.isArray(root.items)) throw new Error(message);
   return root.items as T[];

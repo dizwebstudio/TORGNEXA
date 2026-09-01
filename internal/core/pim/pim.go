@@ -11,7 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -28,7 +29,7 @@ var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9._:/-]{0,127}$`)
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalid
 	}
 	return Scope{org, ws}, nil
@@ -36,19 +37,19 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 type ID string
 
 func ParseID(v string) (ID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalid
 	}
 	return ID(v), nil
 }
 func (id ID) String() string { return string(id) }
-func (id ID) Valid() bool    { return validSortableID(string(id)) }
+func (id ID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 
 type Status string
 
@@ -93,7 +94,7 @@ type Brand struct {
 }
 
 func (v Brand) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -109,7 +110,7 @@ type Category struct {
 }
 
 func (v Category) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.ParentID != "" && (!v.ParentID.Valid() || v.ParentID == v.ID) {
@@ -149,7 +150,7 @@ type Attribute struct {
 }
 
 func (v Attribute) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.ValueType.Valid() || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validName(v.Name) || !v.ValueType.Valid() || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -168,7 +169,7 @@ type ProductBrand struct {
 }
 
 func (v ProductBrand) Validate() error {
-	if !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.BrandID.Valid() || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.BrandID.Valid() || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -188,7 +189,7 @@ type ProductCategory struct {
 }
 
 func (v ProductCategory) Validate() error {
-	if !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.CategoryID.Valid() || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.CategoryID.Valid() || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -210,7 +211,7 @@ type AttributeValue struct {
 }
 
 func (v AttributeValue) Validate(kind ValueType, multi bool) error {
-	if !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.AttributeID.Valid() || v.Ordinal < 0 || v.Ordinal > 255 || (!multi && v.Ordinal != 0) || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) || len(v.Value) == 0 || len(v.Value) > 8192 {
+	if !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.ProductID.Valid() || !v.AttributeID.Valid() || v.Ordinal < 0 || v.Ordinal > 255 || (!multi && v.Ordinal != 0) || !sourcePattern.MatchString(v.Source) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) || len(v.Value) == 0 || len(v.Value) > 8192 {
 		return ErrInvalid
 	}
 	return validateTypedJSON(v.Value, kind)
@@ -229,7 +230,7 @@ type FieldAuthority struct {
 }
 
 func (v FieldAuthority) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.EntityType.Valid() || !fieldPattern.MatchString(v.FieldPath) || !sourcePattern.MatchString(v.Source) || v.Priority < 0 || v.Priority > 10000 || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.EntityType.Valid() || !fieldPattern.MatchString(v.FieldPath) || !sourcePattern.MatchString(v.Source) || v.Priority < 0 || v.Priority > 10000 || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -273,7 +274,7 @@ type DuplicateCandidate struct {
 }
 
 func (v DuplicateCandidate) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.EntityType.Valid() || !v.LeftID.Valid() || !v.RightID.Valid() || v.LeftID == v.RightID || v.LeftID.String() >= v.RightID.String() || v.ScoreBPS < 0 || v.ScoreBPS > 10000 || len(v.Signals) < 1 || len(v.Signals) > 16 || !v.State.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.EntityType.Valid() || !v.LeftID.Valid() || !v.RightID.Valid() || v.LeftID == v.RightID || v.LeftID.String() >= v.RightID.String() || v.ScoreBPS < 0 || v.ScoreBPS > 10000 || len(v.Signals) < 1 || len(v.Signals) > 16 || !v.State.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	for _, s := range v.Signals {
@@ -296,7 +297,7 @@ type MasterSnapshot struct {
 }
 
 func (s MasterSnapshot) Validate() error {
-	if !validSortableID(s.OrganizationID) || !validSortableID(s.WorkspaceID) || !s.EntityType.Valid() || !s.EntityID.Valid() || !sourcePattern.MatchString(s.Source) || len(s.Version) < 1 || len(s.Version) > 128 || len(s.Fields) > 128 {
+	if !domain.ValidSortableID(s.OrganizationID) || !domain.ValidSortableID(s.WorkspaceID) || !s.EntityType.Valid() || !s.EntityID.Valid() || !sourcePattern.MatchString(s.Source) || len(s.Version) < 1 || len(s.Version) > 128 || len(s.Fields) > 128 {
 		return ErrInvalid
 	}
 	for k, v := range s.Fields {
@@ -332,7 +333,7 @@ type MergePreview struct {
 }
 
 func (p MergePreview) Validate() error {
-	if !regexp.MustCompile(`^merge\.[0-9a-f]{64}$`).MatchString(p.ID) || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) || !p.EntityType.Valid() || !p.TargetID.Valid() || !p.SourceID.Valid() || p.TargetID == p.SourceID || len(p.TargetVersion) < 1 || len(p.TargetVersion) > 128 || len(p.SourceVersion) < 1 || len(p.SourceVersion) > 128 || len(p.Fields) < 1 || len(p.Fields) > 128 || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(p.FingerprintSHA256) {
+	if !regexp.MustCompile(`^merge\.[0-9a-f]{64}$`).MatchString(p.ID) || !domain.ValidSortableID(p.OrganizationID) || !domain.ValidSortableID(p.WorkspaceID) || !p.EntityType.Valid() || !p.TargetID.Valid() || !p.SourceID.Valid() || p.TargetID == p.SourceID || len(p.TargetVersion) < 1 || len(p.TargetVersion) > 128 || len(p.SourceVersion) < 1 || len(p.SourceVersion) > 128 || len(p.Fields) < 1 || len(p.Fields) > 128 || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(p.FingerprintSHA256) {
 		return ErrInvalid
 	}
 	conflicts := false
@@ -490,21 +491,9 @@ type Repository interface {
 }
 
 func validCode(v string) bool { return codePattern.MatchString(v) }
-func validName(v string) bool { return validText(v, 1, 300) }
+func validName(v string) bool { return domain.ValidText(v, 1, 300, false) }
 func validText(v string, min, max int) bool {
-	if v != strings.TrimSpace(v) || !utf8.ValidString(v) {
-		return false
-	}
-	n := utf8.RuneCountInString(v)
-	if n < min || n > max {
-		return false
-	}
-	for _, r := range v {
-		if r < 0x20 || r == 0x7f {
-			return false
-		}
-	}
-	return true
+	return domain.ValidText(v, min, max, false)
 }
 func validMeta(v int64, c, u time.Time) bool { return v >= 1 && isUTC(c) && isUTC(u) && !u.Before(c) }
 func isUTC(v time.Time) bool                 { return !v.IsZero() && v.Location() == time.UTC }
@@ -542,34 +531,4 @@ func validateTypedJSON(raw json.RawMessage, kind ValueType) error {
 		return ErrInvalid
 	}
 	return nil
-}
-func validSortableID(value string) bool { return validUUIDv7(value) || validULID(value) }
-func validUUIDv7(value string) bool {
-	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' || value[14] != '7' {
-		return false
-	}
-	if !strings.ContainsRune("89ab", rune(value[19])) {
-		return false
-	}
-	for i, c := range []byte(value) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(value string) bool {
-	if len(value) != 26 || value[0] < '0' || value[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(value) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
 }

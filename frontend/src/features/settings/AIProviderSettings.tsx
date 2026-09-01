@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
+import {decodeItems as decode} from "../../api/decoders";
 import {useAuth} from "../../auth/AuthProvider";
 import {ErrorBlock,LoadingBlock} from "../../components/ApiState";
 import {EmptyState} from "../../components/EmptyState";
@@ -13,7 +14,6 @@ const providerLabels:Readonly<Record<ProviderID,string>>={"openai-compatible":"O
 const providerKeys=Object.keys(providerLabels) as ProviderID[];
 const hostOverrideProviders:ReadonlySet<ProviderID>=new Set(["openai-compatible","kimi","qwen","deepseek","claude","grok","ollama","lm-studio","open-webui"]);
 const localBaseURLPlaceholders:Readonly<Record<"ollama"|"lm-studio"|"open-webui",string>>={ollama:"http://ollama:11434/v1","lm-studio":"http://host.docker.internal:1234/v1","open-webui":"http://open-webui:3000/api"};
-function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}
 
 export function AIProviderSettings(){
  const api=useApi(),auth=useAuth(),cache=useQueryClient(),toast=useToast();
@@ -29,7 +29,7 @@ export function AIProviderSettings(){
  const valid=!!label.trim()&&!!model.trim()&&!!credential&&(provider!=="yandexgpt"||!!folderId.trim());
  return <section id="ai-provider-settings" className="panel settings-card">
   <div className="settings-card-heading"><div><p className="eyebrow">ИИ</p><h2>Провайдеры ИИ</h2><p className="settings-copy">Подключите внешнюю модель ИИ, чтобы отправлять ей аналитические запросы из отчётов. Ключ шифруется и хранится только в SecretProvider — TORGNEXA его не показывает повторно.</p></div>{query.data?<StatusBadge value={`${query.data.length}`}/>:null}</div>
-  {query.isPending?<LoadingBlock/>:query.isError?<ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить провайдеров ИИ.</ErrorBlock>:query.data.length===0?<EmptyState title="Провайдеры ИИ не настроены" text="Добавьте первый аккаунт провайдера ИИ в форме ниже."/>:<div className="settings-grid ai-provider-accounts">{query.data.map(account=><article className="connector-account" key={account.id}><header><div><strong>{account.label}</strong><small>{providerLabels[account.provider]} · {account.model}</small></div><StatusBadge value={account.enabled?"active":"disabled"}/></header>{account.folder_id?<small>Идентификатор папки: {account.folder_id}</small>:null}{account.base_url?<small>Адрес API: {account.base_url}</small>:null}{account.enabled&&canWrite?<div className="account-actions"><button className="button ghost danger-text" disabled={disable.isPending} onClick={()=>disable.mutate(account)}>Отключить</button></div>:null}</article>)}</div>}
+  {query.isPending?<LoadingBlock/>:query.isError?<ErrorBlock retry={()=>void query.refetch()}>Не удалось загрузить провайдеров ИИ.</ErrorBlock>:query.data.length===0?<EmptyState title="Провайдеры ИИ не настроены" text="Добавьте первый аккаунт провайдера ИИ в форме ниже."/>:<div className="settings-grid ai-provider-accounts">{query.data.map(account=><article className="connector-account" key={account.id}><header><div><strong>{account.label}</strong><small>{providerLabels[account.provider as ProviderID]} · {account.model}</small></div><StatusBadge value={account.enabled?"active":"disabled"}/></header>{account.folder_id?<small>Идентификатор папки: {account.folder_id}</small>:null}{account.base_url?<small>Адрес API: {account.base_url}</small>:null}{account.enabled&&canWrite?<div className="account-actions"><button className="button ghost danger-text" disabled={disable.isPending} onClick={()=>disable.mutate(account)}>Отключить</button></div>:null}</article>)}</div>}
   {canWrite?<section className="drawer-section">
     <h3>Добавить аккаунт провайдера ИИ</h3>
     <div className="settings-grid ai-provider-form">

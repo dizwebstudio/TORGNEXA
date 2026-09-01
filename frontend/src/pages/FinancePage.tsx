@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems} from "../api/decoders";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {DataTable} from "../components/DataTable";
 import {EmptyState} from "../components/EmptyState";
@@ -9,6 +10,8 @@ import {useToast} from "../components/Toast";
 import {connectorCatalog} from "../generated/connector-catalog";
 import {Page} from "./Page";
 import {Drawer} from "../components/Drawer";
+import {formatMoneyValue as money} from "../lib/formatters";
+import {uuidV7} from "../lib/ids";
 
 interface Settlement{id:string;source_system:string;source_account_id:string;source_entry_ref:string;order_id?:string;adjusts_entry_id?:string;fee_code?:string;fx_rate_ref?:string;kind:string;amount:{minor_units:number;currency:string};occurred_at:string;imported_at:string;disputed:boolean}
 interface FXRate{id:string;base_currency:string;quote_currency:string;rate:string;source:string;source_reference?:string;rate_type:string;observed_at:string;effective_at:string}
@@ -26,13 +29,9 @@ type Client={
 function decodeSettlements(value:unknown):Settlement[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid settlement response");return root.items as Settlement[]}
 function decodeFX(value:unknown):FXRate[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid FX rate response");return root.items as FXRate[]}
 function decodePayments(value:unknown):Payment[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid payment response");return root.items as Payment[]}
-function decodeAccounts(value:unknown):ConnectorAccount[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid connector account response");return root.items as ConnectorAccount[]}
 const kindLabels:Record<string,string>={sale:"Продажа",fee:"Комиссия",refund:"Возврат",payout:"Выплата",adjustment:"Корректировка"};
 const rateTypeLabels:Record<string,string>={official:"Официальный",mid:"Средний",bid:"Bid",ask:"Ask",closing:"Закрытие",indicative:"Индикативный"};
 const paymentStatusLabels:Record<string,string>={pending:"В обработке",created:"Ожидает оплаты",succeeded:"Оплачен",failed:"Отклонён",canceled:"Отменён",refunded:"Возвращён",partially_refunded:"Частично возвращён"};
-function money(v:{minor_units:number;currency:string}){return new Intl.NumberFormat("ru-RU",{style:"currency",currency:v.currency}).format(v.minor_units/100)}
-function uuidV7(){const bytes=crypto.getRandomValues(new Uint8Array(16)),millis=BigInt(Date.now());for(let index=5;index>=0;index--)bytes[5-index]=Number((millis>>BigInt(index*8))&255n);bytes[6]=(bytes[6]&15)|112;bytes[8]=(bytes[8]&63)|128;const raw=[...bytes].map(value=>value.toString(16).padStart(2,"0")).join("");return `${raw.slice(0,8)}-${raw.slice(8,12)}-${raw.slice(12,16)}-${raw.slice(16,20)}-${raw.slice(20)}`}
-
 export function FinancePage(){
  const api=useApi() as unknown as Client;
  const [tab,setTab]=useState<"settlements"|"fx"|"payments">("settlements");
@@ -80,7 +79,7 @@ function FXRates({api}:{api:Client}){
 function Payments({api}:{api:Client}){
  const cache=useQueryClient(),toast=useToast();
  const [accountId,setAccountId]=useState(""),[purpose,setPurpose]=useState(""),[amount,setAmount]=useState(""),[currency,setCurrency]=useState("RUB"),[selected,setSelected]=useState<Payment|null>(null);
- const accounts=useQuery({queryKey:["payments","connector-accounts"],queryFn:async()=>decodeAccounts((await api.listConnectorAccounts({limit:100})).body),staleTime:10_000});
+ const accounts=useQuery({queryKey:["payments","connector-accounts"],queryFn:async()=>decodeItems<ConnectorAccount>((await api.listConnectorAccounts({limit:100})).body,"invalid connector account response"),staleTime:10_000});
  const payments=useQuery({queryKey:["payments"],queryFn:async()=>decodePayments((await api.listPayments({limit:200})).body),refetchInterval:10_000});
  const detail=useQuery({queryKey:["payment",selected?.id],enabled:!!selected,queryFn:async()=>((await api.getPayment({paymentId:selected!.id})).body as Payment)});
  const paymentAccounts=(accounts.data??[]).filter(value=>value.family==="payment"&&value.status==="active"&&value.health_status==="healthy"&&value.capabilities.some(c=>c.capability==="payments.create"&&c.enabled));

@@ -1266,6 +1266,35 @@
       }
     },
     {
+      "schema": "events/compliance-document-status-changed-v1.schema.json",
+      "valid": {
+        "event_id": "evt_test_002",
+        "document_id": "doc_test_001",
+        "status": "valid"
+      },
+      "invalid": {
+        "event_id": "evt_test_002",
+        "document_id": "doc_test_001",
+        "status": "valid",
+        "expires_at": "not-a-date"
+      }
+    },
+    {
+      "schema": "events/counterparty-updated-v1.schema.json",
+      "valid": {
+        "event_id": "evt_test_003",
+        "counterparty_id": "party_test_001",
+        "changed_fields": [
+          "status"
+        ]
+      },
+      "invalid": {
+        "event_id": "evt_test_003",
+        "counterparty_id": "party_test_001",
+        "changed_fields": "status"
+      }
+    },
+    {
       "schema": "events/ecosystem-onboarding-run-created-v1.schema.json",
       "valid": {
         "run_id": "onboard_fixture_001",
@@ -1301,35 +1330,6 @@
         "state": "certified",
         "version": 0,
         "updated_at": "bad"
-      }
-    },
-    {
-      "schema": "events/compliance-document-status-changed-v1.schema.json",
-      "valid": {
-        "event_id": "evt_test_002",
-        "document_id": "doc_test_001",
-        "status": "valid"
-      },
-      "invalid": {
-        "event_id": "evt_test_002",
-        "document_id": "doc_test_001",
-        "status": "valid",
-        "expires_at": "not-a-date"
-      }
-    },
-    {
-      "schema": "events/counterparty-updated-v1.schema.json",
-      "valid": {
-        "event_id": "evt_test_003",
-        "counterparty_id": "party_test_001",
-        "changed_fields": [
-          "status"
-        ]
-      },
-      "invalid": {
-        "event_id": "evt_test_003",
-        "counterparty_id": "party_test_001",
-        "changed_fields": "status"
       }
     },
     {

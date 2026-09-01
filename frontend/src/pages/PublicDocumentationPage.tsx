@@ -10,6 +10,7 @@ export const documentationSections = [
   ["marking", "Маркировка и УПД"],
   ["integrations", "Интеграции"],
   ["integration-status", "Состояние интеграций"],
+  ["ecosystem", "Экосистема"],
   ["social", "Публикации"],
   ["sync", "Синхронизация"],
   ["master-data", "Контрагенты и финансы"],
@@ -30,7 +31,7 @@ const documentationSection = (id: DocumentationNavigationItem[0]): Documentation
 
 const documentationNavigation = [
   {title: "Начало", items: [documentationSection("start"), documentationSection("interface"), documentationSection("overview")]},
-  {title: "Операционная работа", items: [documentationSection("catalog-orders"), documentationSection("inventory-incidents"), documentationSection("marking"), documentationSection("integrations"), documentationSection("integration-status"), documentationSection("social"), documentationSection("sync"), documentationSection("master-data"), documentationSection("control"), documentationSection("monitoring")]},
+  {title: "Операционная работа", items: [documentationSection("catalog-orders"), documentationSection("inventory-incidents"), documentationSection("marking"), documentationSection("integrations"), documentationSection("integration-status"), documentationSection("ecosystem"), documentationSection("social"), documentationSection("sync"), documentationSection("master-data"), documentationSection("control"), documentationSection("monitoring")]},
   {title: "Администрирование и поддержка", items: [documentationSection("settings"), documentationSection("automation"), documentationSection("assistant"), documentationSection("security"), documentationSection("environment"), documentationSection("operations"), documentationSection("troubleshooting")]},
   {title: "Для разработчиков", items: [documentationSection("developer")]},
 ] as const;
@@ -46,6 +47,7 @@ export const documentationPages = [
   {id: "marking", path: "/docs/marking", heading: "Маркировка и УПД", title: "Маркировка и УПД — документация TORGNEXA", description: "Как безопасно проверять коды, вести партии и упаковки, обрабатывать расхождения и готовить УПД."},
   {id: "integrations", path: "/docs/integrations", heading: "Интеграции", title: "Интеграции — документация TORGNEXA", description: "Пошаговое подключение маркетплейсов, интернет-магазинов, платежей, CRM и других внешних систем."},
   {id: "integration-status", path: "/docs/integration-status", heading: "Состояние интеграций", title: "Состояние интеграций — документация TORGNEXA", description: "Как читать фактическое состояние кабинетов, health history, ошибки, unknown и рекомендации по восстановлению."},
+  {id: "ecosystem", path: "/docs/ecosystem", heading: "Экосистема", title: "Экосистема и поддержка — документация TORGNEXA", description: "Как читать портфель интеграций, onboarding, партнёрские статусы, mobile/cloud surfaces и внешние release-gates."},
   {id: "social", path: "/docs/publications", heading: "Публикации", title: "Публикации — документация TORGNEXA", description: "Как создавать и планировать публикации в подключённых социальных каналах с контролем статуса и прав."},
   {id: "sync", path: "/docs/synchronization", heading: "Синхронизация", title: "Синхронизация — документация TORGNEXA", description: "Как настроить направления обмена, расписание, импорт, сверку и разбор расхождений."},
   {id: "master-data", path: "/docs/counterparties-and-finance", heading: "Контрагенты и финансы", title: "Контрагенты и финансы — документация TORGNEXA", description: "Как вести единые справочники юридических лиц, банковские реквизиты, платежи, курсы и расчёты."},
@@ -127,6 +129,12 @@ const documentationGuides: Record<DocumentationSectionId, DocumentationGuide> = 
     before: "Созданный кабинет, доступ к истории проверок и идентификатор внешней операции",
     outcome: "Вы отличите отключённый кабинет от временной ошибки и выберете безопасное восстановление",
     next: {id: "sync", label: "Настроить синхронизацию"},
+  },
+  ecosystem: {
+    audience: "Для руководителя интеграций, партнёра и первой линии поддержки",
+    before: "Рабочее пространство и доступ к сводке ecosystem",
+    outcome: "Вы отличите runtime readiness от qualification/support claim и выберете следующий проверяемый шаг",
+    next: {id: "integrations", label: "Открыть каталог интеграций"},
   },
   social: {
     audience: "Для контент-команды",
@@ -547,6 +555,7 @@ const routes = [
   ["Инциденты", "/incidents", "Отклонения, сбои складов и действия оператора"],
   ["Маркировка", "/marking", "Проверка кодов, партии, упаковки и УПД"],
   ["Состояние интеграций", "/integrations/status", "Состояние подключений, проверки и история доступности"],
+  ["Экосистема", "/ecosystem", "Портфель интеграций, apps, partners, mobile/cloud surfaces и support evidence"],
   ["Интеграции", "/integrations", "Подключения маркетплейсов и внешних систем"],
   ["Публикации", "/social", "Текстовые публикации в подключённые социальные каналы"],
   ["Синхронизация", "/sync", "Политики, запуски и расхождения"],
@@ -893,6 +902,25 @@ export function PublicDocumentationPage({sectionId}: {sectionId?: DocumentationS
           </tbody></table></div>
           <DocsScreenshot src="/docs/integration-status.png" width={1265} height={712} alt="Центр состояния интеграций TORGNEXA со сводкой и фильтрами" caption="Центр состояния: сначала сводка и фильтры, затем карточка конкретного кабинета с измерениями и рекомендациями."/>
           <Callout title="Не путайте чтение и проверку" tone="info">Центр показывает сохранённый snapshot с generated_at и digest. Кнопку реальной проверки запускайте в карточке «Интеграции» только после проверки scope и параметров среды.</Callout>
+        </DocSection>
+
+        <DocSection id="ecosystem" title="Экосистема" intro="Раздел «Экосистема» объединяет портфель интеграций, приложения, onboarding, партнёрские статусы, mobile/cloud surfaces и поддержку, но не подменяет фактическую квалификацию внешней системы.">
+          <p>Откройте <code>/ecosystem</code>, чтобы увидеть один tenant-scoped снимок: сколько ресурсов интегрировано, проверено, готово к runtime, квалифицировано или поддерживается, какие onboarding-проверки заблокированы, сколько приложений видно рабочему пространству и есть ли открытые support cases.</p>
+          <div className="docs-table-wrap"><table className="docs-route-table"><thead><tr><th>Статус</th><th>Что он доказывает</th><th>Чего он не доказывает</th></tr></thead><tbody>
+            <tr><td><code>integrated</code></td><td>Контракт и регистрация поверхности существуют.</td><td>Что бизнес-операция выполняется во внешней системе.</td></tr>
+            <tr><td><code>verified</code></td><td>Пройдены репозиторные conformance, security и supply-chain проверки.</td><td>Что есть live-кабинет или поддержка production.</td></tr>
+            <tr><td><code>ready</code></td><td>Конкретная capability доступна в runtime с сохранённым evidence.</td><td>Что её можно объявить qualified/support без внешнего proof.</td></tr>
+            <tr><td><code>qualified</code></td><td>Точный сценарий прошёл credentialed sandbox/live qualification.</td><td>Что другая capability или другой account имеют тот же результат.</td></tr>
+            <tr><td><code>supported</code></td><td>Есть owner, версия/совместимость и подтверждённый support response target.</td><td>Что Community installation получает hosted SLA.</td></tr>
+          </tbody></table></div>
+          <ol className="docs-steps compact">
+            <li><strong>Начните с портфеля</strong><span>Проверьте owner, priority, next action и evidence date. Число manifest не считается outcome-метрикой.</span></li>
+            <li><strong>Запустите onboarding</strong><span>Передайте bounded checks через API с <code>Idempotency-Key</code>. Pending означает running, failed — blocked; onboarding ready не повышает connector status.</span></li>
+            <li><strong>Проверяйте партнёра</strong><span>Сертификация хранит только redacted evidence с expiry. Production claim требует UAT, cutover и rollback evidence.</span></li>
+            <li><strong>Отдельно смотрите mobile и cloud</strong><span>Responsive/PWA и Community surfaces показывают repository readiness. Hosted SLA/RPO/RTO появятся только после подтверждения topology, SLO и DR.</span></li>
+            <li><strong>Разбирайте внешние gates</strong><span>Credentialed connector, partner UAT, hosted DR, device matrix и production support перечислены внизу страницы. Пока gate не пройден, не выполняйте remote write вслепую.</span></li>
+          </ol>
+          <Callout title="Единый контур, отдельные владельцы" tone="info">Экосистема только агрегирует readiness, plugin marketplace, customer service, mobile WMS, Cloud billing и SLO/DR. Она не создаёт второй CRM, subscription/settlement ledger или мобильный backend.</Callout>
         </DocSection>
 
         <DocSection id="social" title="Публикации" intro="Social Core хранит контент, канал, расписание и историю статусов независимо от конкретной социальной сети.">

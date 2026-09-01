@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -56,7 +58,7 @@ func BuildPreview(runID string, inputs []CandidateInput, now time.Time) (Preview
 	ordered := append([]CandidateInput(nil), inputs...)
 	seen := make(map[string]struct{}, len(ordered))
 	for _, input := range ordered {
-		if !validRef(input.ID) || !validRef(input.OfferID) || !validText(input.SKU, 200) || !validCurrency(input.Currency) || input.CurrentMinor < 0 || input.ProposedMinor < 0 || input.FloorMinor < 0 || input.MaxChangeBPS < 0 || input.MaxChangeBPS > 10000 {
+		if !validRef(input.ID) || !validRef(input.OfferID) || !validText(input.SKU, 200) || !domain.ValidCurrencyCode(input.Currency) || input.CurrentMinor < 0 || input.ProposedMinor < 0 || input.FloorMinor < 0 || input.MaxChangeBPS < 0 || input.MaxChangeBPS > 10000 {
 			return Preview{}, ErrInvalid
 		}
 		if _, ok := seen[input.ID]; ok {
@@ -138,15 +140,4 @@ func validRef(value string) bool {
 }
 func validText(value string, max int) bool {
 	return len(value) > 0 && len(value) <= max && value == strings.TrimSpace(value)
-}
-func validCurrency(value string) bool {
-	if len(value) != 3 {
-		return false
-	}
-	for _, r := range value {
-		if r < 'A' || r > 'Z' {
-			return false
-		}
-	}
-	return true
 }

@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -22,14 +23,13 @@ var (
 
 var codePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 var countryPattern = regexp.MustCompile(`^[A-Z]{2}$`)
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 var bicPattern = regexp.MustCompile(`^[0-9]{9}$`)
 var accountPattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9 -]{5,63}$`)
 
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalid
 	}
 	return Scope{org, ws}, nil
@@ -37,19 +37,19 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 type ID string
 
 func ParseID(v string) (ID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalid
 	}
 	return ID(v), nil
 }
 func (v ID) String() string { return string(v) }
-func (v ID) Valid() bool    { return validSortableID(string(v)) }
+func (v ID) Valid() bool    { return domain.ValidSortableID(string(v)) }
 
 type Status string
 
@@ -148,7 +148,7 @@ type LegalEntity struct {
 }
 
 func (v LegalEntity) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.LegalName, 1, 500) || !validText(v.ShortName, 0, 300) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.LegalName, 1, 500) || !validText(v.ShortName, 0, 300) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.CountryCode == "RU" {
@@ -173,7 +173,7 @@ type IndividualEntrepreneur struct {
 }
 
 func (v IndividualEntrepreneur) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.FullName, 1, 500) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.FullName, 1, 500) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.CountryCode == "RU" {
@@ -198,7 +198,7 @@ type Branch struct {
 }
 
 func (v Branch) Validate() error {
-	if !v.ID.Valid() || !v.LegalEntityID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.Name, 1, 500) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !v.LegalEntityID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !validText(v.Name, 1, 500) || !countryPattern.MatchString(v.CountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.CountryCode == "RU" && ValidateKPP(v.KPP) != nil {
@@ -223,7 +223,7 @@ type Counterparty struct {
 }
 
 func (v Counterparty) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !validCode(v.Code) || !v.PartyType.Valid() || !v.PartyID.Valid() || !v.Role.Valid() || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !validCode(v.Code) || !v.PartyType.Valid() || !v.PartyID.Valid() || !v.Role.Valid() || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -243,7 +243,7 @@ type Address struct {
 }
 
 func (v Address) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.PartyType.Valid() || !v.PartyID.Valid() || !v.Kind.Valid() || !countryPattern.MatchString(v.CountryCode) || !validText(v.PostalCode, 0, 32) || !validText(v.Region, 0, 200) || !validText(v.City, 0, 200) || !validText(v.Line1, 1, 500) || !validText(v.Line2, 0, 500) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.PartyType.Valid() || !v.PartyID.Valid() || !v.Kind.Valid() || !countryPattern.MatchString(v.CountryCode) || !validText(v.PostalCode, 0, 32) || !validText(v.Region, 0, 200) || !validText(v.City, 0, 200) || !validText(v.Line1, 1, 500) || !validText(v.Line2, 0, 500) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -261,7 +261,7 @@ type BankAccount struct {
 }
 
 func (v BankAccount) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !currencyPattern.MatchString(v.Currency) || !accountPattern.MatchString(v.AccountNumber) || !validText(v.BankName, 1, 300) || !countryPattern.MatchString(v.BankCountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !domain.ValidCurrencyCode(v.Currency) || !accountPattern.MatchString(v.AccountNumber) || !validText(v.BankName, 1, 300) || !countryPattern.MatchString(v.BankCountryCode) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.BankCountryCode == "RU" {
@@ -289,7 +289,7 @@ type Contract struct {
 }
 
 func (v Contract) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !validText(v.Number, 1, 128) || !validCode(v.ContractType) || !v.Status.Valid() || !isUTC(v.ValidFrom) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !validText(v.Number, 1, 128) || !validCode(v.ContractType) || !v.Status.Valid() || !isUTC(v.ValidFrom) || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.SignedOn != nil && !isUTC(*v.SignedOn) {
@@ -315,7 +315,7 @@ type AuthorityReference struct {
 }
 
 func (v AuthorityReference) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !v.Type.Valid() || !validText(v.ReferenceNumber, 1, 256) || !validText(v.Issuer, 0, 300) || !isUTC(v.IssuedAt) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.CounterpartyID.Valid() || !v.Type.Valid() || !validText(v.ReferenceNumber, 1, 256) || !validText(v.Issuer, 0, 300) || !isUTC(v.IssuedAt) || !v.Status.Valid() || !validMeta(v.Version, v.CreatedAt, v.UpdatedAt) {
 		return ErrInvalid
 	}
 	if v.ExpiresAt != nil && (!isUTC(*v.ExpiresAt) || v.ExpiresAt.Before(v.IssuedAt)) {
@@ -439,7 +439,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validToken(m.AuditID) || !validCode(m.Source) || !validOptional(m.ActorID) || !validOptional(m.CorrelationID) || !validOptional(m.CausationID) || !validOptional(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidToken(m.AuditID) || !validCode(m.Source) || !validOptional(m.ActorID) || !validOptional(m.CorrelationID) || !validOptional(m.CausationID) || !validOptional(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -540,24 +540,11 @@ func validRegistration(v string, max int) bool {
 }
 func validCode(v string) bool { return codePattern.MatchString(v) }
 func validText(v string, min, max int) bool {
-	if v != strings.TrimSpace(v) || !utf8.ValidString(v) {
-		return false
-	}
-	n := utf8.RuneCountInString(v)
-	if n < min || n > max {
-		return false
-	}
-	for _, r := range v {
-		if r < 0x20 || r == 0x7f {
-			return false
-		}
-	}
-	return true
+	return domain.ValidText(v, min, max, false)
 }
 func validMeta(v int64, c, u time.Time) bool { return v >= 1 && isUTC(c) && isUTC(u) && !u.Before(c) }
 func isUTC(v time.Time) bool                 { return !v.IsZero() && v.Location() == time.UTC }
-func validOptional(v string) bool            { return v == "" || validToken(v) }
-func validToken(v string) bool               { return len(v) >= 1 && len(v) <= 128 && codePattern.MatchString(v) }
+func validOptional(v string) bool            { return v == "" || domain.ValidToken(v) }
 func itoa(v int64) string {
 	if v == 0 {
 		return "0"
@@ -578,36 +565,6 @@ func itoa(v int64) string {
 		b[i] = '-'
 	}
 	return string(b[i:])
-}
-func validSortableID(v string) bool { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' {
-		return false
-	}
-	if !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
 }
 
 type MergeDecision string
@@ -642,7 +599,7 @@ type MergePreview struct {
 }
 
 func BuildMergePreview(org, ws string, kind PartyType, target, source ID, targetVersion, sourceVersion int64, targetFields, sourceFields map[string]string, at time.Time) (MergePreview, error) {
-	if !validSortableID(org) || !validSortableID(ws) || !kind.Valid() || !target.Valid() || !source.Valid() || target == source || targetVersion < 1 || sourceVersion < 1 || !isUTC(at) || len(targetFields) > 64 || len(sourceFields) > 64 {
+	if !domain.ValidSortableID(org) || !domain.ValidSortableID(ws) || !kind.Valid() || !target.Valid() || !source.Valid() || target == source || targetVersion < 1 || sourceVersion < 1 || !isUTC(at) || len(targetFields) > 64 || len(sourceFields) > 64 {
 		return MergePreview{}, ErrInvalid
 	}
 	keys := map[string]struct{}{}

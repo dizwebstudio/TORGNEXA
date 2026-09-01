@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 const (
@@ -51,7 +53,7 @@ func TestUUIDv7Generation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newUUIDv7() second error = %v", err)
 	}
-	if !validUUIDv7(first) || first[14] != '7' || !strings.Contains("89ab", first[19:20]) {
+	if !domain.ValidUUIDv7(first) || first[14] != '7' || !strings.Contains("89ab", first[19:20]) {
 		t.Fatalf("newUUIDv7() = %q, want canonical version/variant", first)
 	}
 	if first >= second {

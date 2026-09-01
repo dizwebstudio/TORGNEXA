@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var ErrInvalidSocialRequest = errors.New("connectors: invalid social request")
@@ -97,7 +99,7 @@ type SocialPublishRequest struct {
 }
 
 func (request SocialPublishRequest) Validate() error {
-	if !sortableIDPattern.MatchString(request.PublicationID) || !request.Kind.Valid() || !validSocialText(request.Text, 50000, true) || len(request.Media) > 20 || len(request.Buttons) > 8 {
+	if !domain.ValidSortableID(request.PublicationID) || !request.Kind.Valid() || !validSocialText(request.Text, 50000, true) || len(request.Media) > 20 || len(request.Buttons) > 8 {
 		return ErrInvalidSocialRequest
 	}
 	for _, button := range request.Buttons {

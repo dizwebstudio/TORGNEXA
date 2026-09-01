@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems as decodeAccounts} from "../api/decoders";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {EmptyState} from "../components/EmptyState";
 import {StatusBadge} from "../components/StatusBadge";
@@ -17,7 +18,6 @@ type Drift={id:string;run_id:string;policy_id:string;kind:string;local_entity_id
 type SyncStatus={summary:{enabled_policies:number;active_runs:number;open_drifts:number};policies:Policy[];runs:Run[];drifts:Drift[]};
 type Account={id:string;connector_id:string;status:string;health_status:string;version:number};
 function decode(value:unknown):SyncStatus{const v=value as SyncStatus;if(!v||!v.summary||!Array.isArray(v.policies)||!Array.isArray(v.runs)||!Array.isArray(v.drifts))throw new Error("invalid sync status");return v}
-function decodeAccounts(value:unknown):Account[]{const v=value as {items?:unknown};if(!v||!Array.isArray(v.items))throw new Error("invalid accounts");return v.items as Account[]}
 const entityLabels:Record<string,string>={products:"Товары",offers:"Предложения",prices:"Цены",inventory:"Остатки",orders:"Заказы"};
 const directionLabels:Record<string,string>={inbound:"Из кабинета в TORGNEXA",outbound:"Из TORGNEXA в кабинет",bidirectional:"В обе стороны"};
 const sourceLabels:Record<string,string>={local:"TORGNEXA",remote:"Внешний кабинет",manual:"Ручное разрешение"};

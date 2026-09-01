@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -169,7 +171,7 @@ func CalculateScenario(input ScenarioInput) (ScenarioResult, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.SaleCurrency = strings.ToUpper(strings.TrimSpace(input.SaleCurrency))
 	input.CostCurrency = strings.ToUpper(strings.TrimSpace(input.CostCurrency))
-	if input.Name == "" || len(input.Name) > 120 || !currency(input.SaleCurrency) || !currency(input.CostCurrency) || input.QuantityMilli < 1 || input.SaleUnitPriceMinor < 0 || input.CostUnitMinor < 0 || input.LogisticsTotalCostMinor < 0 || input.AdvertisingTotalCostMinor < 0 || input.MarketplaceFeeBasisPoints < 0 || input.MarketplaceFeeBasisPoints > 10000 || input.CostToSaleFXRateMicros < 1 {
+	if input.Name == "" || len(input.Name) > 120 || !domain.ValidCurrencyCode(input.SaleCurrency) || !domain.ValidCurrencyCode(input.CostCurrency) || input.QuantityMilli < 1 || input.SaleUnitPriceMinor < 0 || input.CostUnitMinor < 0 || input.LogisticsTotalCostMinor < 0 || input.AdvertisingTotalCostMinor < 0 || input.MarketplaceFeeBasisPoints < 0 || input.MarketplaceFeeBasisPoints > 10000 || input.CostToSaleFXRateMicros < 1 {
 		return ScenarioResult{}, ErrInvalid
 	}
 	mulDiv := func(a, b, divisor int64) (*big.Int, error) {
@@ -281,18 +283,6 @@ func validToken(value string) bool {
 	}
 	for _, char := range value {
 		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || strings.ContainsRune("._:/-", char)) {
-			return false
-		}
-	}
-	return true
-}
-
-func currency(value string) bool {
-	if len(value) != 3 {
-		return false
-	}
-	for _, char := range value {
-		if char < 'A' || char > 'Z' {
 			return false
 		}
 	}

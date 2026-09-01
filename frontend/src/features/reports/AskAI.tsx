@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useMutation,useQuery} from "@tanstack/react-query";
 import {useApi} from "../../api/ApiProvider";
+import {decodeItems as decode} from "../../api/decoders";
 import {useAuth} from "../../auth/AuthProvider";
 import {ErrorBlock} from "../../components/ApiState";
 import {Icon} from "../../components/Icon";
@@ -11,7 +12,6 @@ interface Account{id:string;label:string;provider:string;model:string;enabled:bo
 const providerLabels:Readonly<Record<string,string>>={"openai-compatible":"OpenAI-совместимый",gigachat:"GigaChat (Sber)",yandexgpt:"YandexGPT",kimi:"Kimi (Moonshot AI)",qwen:"Qwen (Alibaba Cloud)",deepseek:"DeepSeek",claude:"Claude (Anthropic)",gemini:"Google Gemini",grok:"Grok (xAI)",ollama:"Ollama", "lm-studio":"LM Studio", "open-webui":"Open WebUI"};
 const maxDigestLength=6000,maxDigestRows=150;
 const systemPrompt="Ты аналитик e-commerce платформы TORGNEXA. Отвечай кратко и по-русски, опираясь только на предоставленные данные отчёта. Если данных недостаточно для вывода — так и скажи.";
-function decode(value:unknown):Account[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid AI provider account response");return root.items as Account[]}
 function digest(report:ReportData):string{
  const header=report.columns.map(c=>c.label).join(" | ");
  const rows=report.rows.slice(0,maxDigestRows).map(row=>row.join(" | ")).join("\n");

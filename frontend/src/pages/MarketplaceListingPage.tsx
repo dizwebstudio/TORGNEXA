@@ -6,6 +6,7 @@ import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
+import {formatJson as pretty} from "../lib/formatters";
 
 type Client={
   getMarketplaceListingTaxonomy(input:{taxonomyId?:string;connectorId?:string;locale?:string;jurisdiction?:string}):Promise<{body:unknown}>;
@@ -19,7 +20,6 @@ type Preview={id:string;input_digest:string;affected_count:number;eligible_count
 type Batch={id:string;preview_id:string;state:string;input_digest:string;approval_ref?:string;created_at:string;updated_at:string};
 
 function asObject<T>(value:unknown):T{return value as T}
-function pretty(value:unknown){return JSON.stringify(value,null,2)}
 
 export function MarketplaceListingPage(){
   const api=useApi() as unknown as Client;

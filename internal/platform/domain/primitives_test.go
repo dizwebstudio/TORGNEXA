@@ -59,6 +59,31 @@ func TestCurrencyIsCanonicalAndRegistryNeutral(t *testing.T) {
 	}
 }
 
+func TestSharedValidationPrimitives(t *testing.T) {
+	validUUID := "018f0f8a-7abc-7def-8abc-0123456789ab"
+	validULID := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	if !ValidUUIDv7(validUUID) || !ValidSortableID(validUUID) {
+		t.Fatalf("expected UUIDv7 to be valid")
+	}
+	if !ValidULID(validULID) || !ValidSortableID(validULID) {
+		t.Fatalf("expected ULID to be valid")
+	}
+	for _, value := range []string{"018f0f8a-7abc-6def-8abc-0123456789ab", "01arz3ndektsv4rrffq69g5fav", "RUB1", "bad token"} {
+		if ValidSortableID(value) || ValidCurrencyCode(value) && value != "RUB1" || ValidToken(value) && value == "bad token" {
+			t.Fatalf("unexpectedly accepted invalid shared value %q", value)
+		}
+	}
+	if !ValidCurrencyCode("RUB") || !ValidToken("order:demo-1") {
+		t.Fatalf("expected shared currency/token validation to accept canonical values")
+	}
+	if !ValidText("Описание товара", 1, 64, false) || !ValidText("строка 1\nстрока 2", 1, 64, true) {
+		t.Fatalf("expected shared text validation to accept valid values")
+	}
+	if ValidText(" leading", 1, 64, false) || ValidText("line\nfeed", 1, 64, false) {
+		t.Fatalf("expected shared text validation to reject invalid values")
+	}
+}
+
 func TestMoneyUsesMinorUnitsAndRejectsCrossCurrencyArithmetic(t *testing.T) {
 	rub := mustCurrency(t, "RUB")
 	usd := mustCurrency(t, "USD")

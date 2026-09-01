@@ -25,7 +25,6 @@ var (
 )
 
 var (
-	sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
 	accountRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	tokenPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	sourcePattern     = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
@@ -38,26 +37,26 @@ type PaymentID string
 type RefundID string
 
 func ParsePaymentID(v string) (PaymentID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return PaymentID(v), nil
 }
 func ParseRefundID(v string) (RefundID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return RefundID(v), nil
 }
 func (id PaymentID) String() string { return string(id) }
 func (id RefundID) String() string  { return string(id) }
-func (id PaymentID) Valid() bool    { return validSortableID(string(id)) }
-func (id RefundID) Valid() bool     { return validSortableID(string(id)) }
+func (id PaymentID) Valid() bool    { return domain.ValidSortableID(string(id)) }
+func (id RefundID) Valid() bool     { return domain.ValidSortableID(string(id)) }
 
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{organizationID: org, workspaceID: ws}, nil
@@ -65,7 +64,7 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 // Status is TORGNEXA's canonical payment lifecycle. RemoteStatus on Payment
@@ -139,7 +138,7 @@ type Payment struct {
 
 func (p Payment) Validate() error {
 	accountRef := p.ConnectorAccountID
-	if !p.ID.Valid() || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) ||
+	if !p.ID.Valid() || !domain.ValidSortableID(p.OrganizationID) || !domain.ValidSortableID(p.WorkspaceID) ||
 		!accountRefPattern.MatchString(accountRef) || !refPattern.MatchString(p.ExternalID) ||
 		(p.RemoteID != "" && !refPattern.MatchString(p.RemoteID)) ||
 		!validOptionalText(p.Purpose, 210, false) || p.Amount.Validate() != nil ||
@@ -291,7 +290,7 @@ type Refund struct {
 }
 
 func (r Refund) Validate() error {
-	if !r.ID.Valid() || !validSortableID(r.OrganizationID) || !validSortableID(r.WorkspaceID) || !r.PaymentID.Valid() ||
+	if !r.ID.Valid() || !domain.ValidSortableID(r.OrganizationID) || !domain.ValidSortableID(r.WorkspaceID) || !r.PaymentID.Valid() ||
 		!refPattern.MatchString(r.ExternalID) || (r.RemoteRefundID != "" && !refPattern.MatchString(r.RemoteRefundID)) ||
 		r.Amount.Validate() != nil || !r.Status.Valid() || !validMetadata(r.Version, r.CreatedAt, r.UpdatedAt) {
 		return ErrInvalidRecord
@@ -363,8 +362,8 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validSortableID(m.AuditID) || !validToken(m.ActorID) || !sourcePattern.MatchString(m.Source) ||
-		!validToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidSortableID(m.AuditID) || !domain.ValidToken(m.ActorID) || !sourcePattern.MatchString(m.Source) ||
+		!domain.ValidToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -390,9 +389,7 @@ func validMetadata(version int64, createdAt, updatedAt time.Time) bool {
 	return version >= 1 && isUTC(createdAt) && isUTC(updatedAt) && !updatedAt.Before(createdAt)
 }
 func isUTC(v time.Time) bool           { return !v.IsZero() && v.Location() == time.UTC }
-func validSortableID(v string) bool    { return sortableIDPattern.MatchString(v) }
-func validToken(v string) bool         { return tokenPattern.MatchString(v) }
-func validOptionalToken(v string) bool { return v == "" || validToken(v) }
+func validOptionalToken(v string) bool { return v == "" || domain.ValidToken(v) }
 func validReason(v string) bool        { return v == "" || reasonPattern.MatchString(v) }
 func validOptionalText(v string, max int, layout bool) bool {
 	if v == "" {

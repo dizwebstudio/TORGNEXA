@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 // ErrInvalidID means a tenant identifier is not a canonical UUIDv7 or ULID.
@@ -42,7 +44,7 @@ func NewStoreID() (StoreID, error) {
 
 // ParseOrganizationID validates and returns an organization ID.
 func ParseOrganizationID(value string) (OrganizationID, error) {
-	if !validSortableID(value) {
+	if !domain.ValidSortableID(value) {
 		return "", ErrInvalidID
 	}
 	return OrganizationID(value), nil
@@ -50,7 +52,7 @@ func ParseOrganizationID(value string) (OrganizationID, error) {
 
 // ParseWorkspaceID validates and returns a workspace ID.
 func ParseWorkspaceID(value string) (WorkspaceID, error) {
-	if !validSortableID(value) {
+	if !domain.ValidSortableID(value) {
 		return "", ErrInvalidID
 	}
 	return WorkspaceID(value), nil
@@ -58,7 +60,7 @@ func ParseWorkspaceID(value string) (WorkspaceID, error) {
 
 // ParseStoreID validates and returns a store ID.
 func ParseStoreID(value string) (StoreID, error) {
-	if !validSortableID(value) {
+	if !domain.ValidSortableID(value) {
 		return "", ErrInvalidID
 	}
 	return StoreID(value), nil
@@ -68,19 +70,19 @@ func ParseStoreID(value string) (StoreID, error) {
 func (id OrganizationID) String() string { return string(id) }
 
 // Valid reports whether the organization ID is canonical.
-func (id OrganizationID) Valid() bool { return validSortableID(string(id)) }
+func (id OrganizationID) Valid() bool { return domain.ValidSortableID(string(id)) }
 
 // String returns the canonical identifier text.
 func (id WorkspaceID) String() string { return string(id) }
 
 // Valid reports whether the workspace ID is canonical.
-func (id WorkspaceID) Valid() bool { return validSortableID(string(id)) }
+func (id WorkspaceID) Valid() bool { return domain.ValidSortableID(string(id)) }
 
 // String returns the canonical identifier text.
 func (id StoreID) String() string { return string(id) }
 
 // Valid reports whether the store ID is canonical.
-func (id StoreID) Valid() bool { return validSortableID(string(id)) }
+func (id StoreID) Valid() bool { return domain.ValidSortableID(string(id)) }
 
 func newUUIDv7(now time.Time, random io.Reader) (string, error) {
 	milliseconds := now.UTC().UnixMilli()
@@ -109,44 +111,4 @@ func newUUIDv7(now time.Time, random io.Reader) (string, error) {
 	encoded[23] = '-'
 	hex.Encode(encoded[24:36], raw[10:16])
 	return string(encoded[:]), nil
-}
-
-func validSortableID(value string) bool {
-	return validUUIDv7(value) || validULID(value)
-}
-
-func validUUIDv7(value string) bool {
-	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' || value[14] != '7' {
-		return false
-	}
-	if value[19] != '8' && value[19] != '9' && value[19] != 'a' && value[19] != 'b' {
-		return false
-	}
-	for index, character := range []byte(value) {
-		if index == 8 || index == 13 || index == 18 || index == 23 {
-			continue
-		}
-		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-
-func validULID(value string) bool {
-	if len(value) != 26 || value[0] < '0' || value[0] > '7' {
-		return false
-	}
-	for _, character := range []byte(value) {
-		if (character >= '0' && character <= '9') ||
-			(character >= 'A' && character <= 'H') ||
-			(character >= 'J' && character <= 'K') ||
-			(character >= 'M' && character <= 'N') ||
-			(character >= 'P' && character <= 'T') ||
-			(character >= 'V' && character <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
 }

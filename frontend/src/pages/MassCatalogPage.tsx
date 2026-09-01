@@ -6,6 +6,7 @@ import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
+import {formatJson as pretty} from "../lib/formatters";
 
 type Client={
   listCatalogBulkChannels():Promise<{body:unknown}>;
@@ -25,7 +26,6 @@ type Run={id:string;preview_id:string;state:string;partitions:string[];results:A
 type KillSwitch={enabled:boolean;reason:string;version:number;updated_at:string};
 
 function object<T>(value:unknown):T{return value as T}
-function pretty(value:unknown){return JSON.stringify(value,null,2)}
 function digestTemplate(){return "0".repeat(64)}
 
 export function MassCatalogPage(){

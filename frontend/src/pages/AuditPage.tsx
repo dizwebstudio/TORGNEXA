@@ -1,5 +1,6 @@
 import {useQuery} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems as decode} from "../api/decoders";
 import {EmptyState} from "../components/EmptyState";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {StatusBadge} from "../components/StatusBadge";
@@ -7,7 +8,6 @@ import {auditActionLabel,auditResourceLabel,auditSourceLabel,humanizeTechnicalVa
 import {Page} from "./Page";
 
 interface AuditRecord {id:string;actor_id:string;source:string;action:string;resource_type:string;resource_id:string;correlation_id:string;risk:string;summary:Record<string,unknown>;created_at:string}
-function decode(value:unknown):AuditRecord[]{const root=value as {items?:unknown};if(!root||!Array.isArray(root.items))throw new Error("invalid audit page");return root.items as AuditRecord[]}
 const summaryLabels:Readonly<Record<string,string>>={actor_id:"Субъект",account_id:"Кабинет",code:"Код",connector_id:"Интеграция",enabled:"Включено",error_code:"Код ошибки",expires_at:"Срок действия",interval_minutes:"Интервал, мин.",job_id:"Задание",mode:"Режим",new_status:"Новое состояние",old_status:"Предыдущее состояние",policy_count:"Политик",preview_id:"Предпросмотр",reason:"Причина",schedule_version:"Версия расписания",status:"Состояние",version:"Версия",warehouse_id:"Склад"};
 function summary(value:Record<string,unknown>){const entries=Object.entries(value);return entries.length===0?"—":entries.map(([key,item])=>`${summaryLabels[key]??humanizeTechnicalValue(key)}: ${typeof item==="object"?JSON.stringify(item):String(item)}`).join(" · ")}
 

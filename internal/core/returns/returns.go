@@ -24,7 +24,6 @@ var (
 	ErrQuotaExceeded = errors.New("returns: quota exceeded")
 )
 
-var sortableIDPattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
 var refPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 var reasonPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 var safeReturnCodePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
@@ -42,7 +41,7 @@ type ReturnLogisticsOperationID string
 
 func parseID[T ~string](value string) (T, error) {
 	var zero T
-	if !sortableIDPattern.MatchString(value) {
+	if !domain.ValidSortableID(value) {
 		return zero, ErrInvalidRecord
 	}
 	return T(value), nil
@@ -64,17 +63,17 @@ func (v ReturnItemID) String() string               { return string(v) }
 func (v RefundAllocationID) String() string         { return string(v) }
 func (v EvidenceID) String() string                 { return string(v) }
 func (v ReturnLogisticsOperationID) String() string { return string(v) }
-func (v CancellationID) Valid() bool                { return sortableIDPattern.MatchString(string(v)) }
-func (v ReturnID) Valid() bool                      { return sortableIDPattern.MatchString(string(v)) }
-func (v ReturnItemID) Valid() bool                  { return sortableIDPattern.MatchString(string(v)) }
-func (v RefundAllocationID) Valid() bool            { return sortableIDPattern.MatchString(string(v)) }
-func (v EvidenceID) Valid() bool                    { return sortableIDPattern.MatchString(string(v)) }
-func (v ReturnLogisticsOperationID) Valid() bool    { return sortableIDPattern.MatchString(string(v)) }
+func (v CancellationID) Valid() bool                { return domain.ValidSortableID(string(v)) }
+func (v ReturnID) Valid() bool                      { return domain.ValidSortableID(string(v)) }
+func (v ReturnItemID) Valid() bool                  { return domain.ValidSortableID(string(v)) }
+func (v RefundAllocationID) Valid() bool            { return domain.ValidSortableID(string(v)) }
+func (v EvidenceID) Valid() bool                    { return domain.ValidSortableID(string(v)) }
+func (v ReturnLogisticsOperationID) Valid() bool    { return domain.ValidSortableID(string(v)) }
 
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, workspace string) (Scope, error) {
-	if !sortableIDPattern.MatchString(org) || !sortableIDPattern.MatchString(workspace) {
+	if !domain.ValidTenantScope(org, workspace) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{organizationID: org, workspaceID: workspace}, nil
@@ -82,7 +81,7 @@ func ParseScope(org, workspace string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return sortableIDPattern.MatchString(s.organizationID) && sortableIDPattern.MatchString(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 type CancellationStatus string
@@ -266,7 +265,7 @@ type CancellationRequest struct {
 }
 
 func (c CancellationRequest) Validate() error {
-	if !c.ID.Valid() || !sortableIDPattern.MatchString(c.OrganizationID) || !sortableIDPattern.MatchString(c.WorkspaceID) || !refPattern.MatchString(c.OrderID) || !c.Status.Valid() || !reasonPattern.MatchString(c.ReasonCode) || !refPattern.MatchString(c.Source) || c.Version < 1 || !utc(c.CreatedAt) || !utc(c.UpdatedAt) || c.UpdatedAt.Before(c.CreatedAt) || !refPattern.MatchString(c.IdempotencyKey) {
+	if !c.ID.Valid() || !domain.ValidTenantScope(c.OrganizationID, c.WorkspaceID) || !refPattern.MatchString(c.OrderID) || !c.Status.Valid() || !reasonPattern.MatchString(c.ReasonCode) || !refPattern.MatchString(c.Source) || c.Version < 1 || !utc(c.CreatedAt) || !utc(c.UpdatedAt) || c.UpdatedAt.Before(c.CreatedAt) || !refPattern.MatchString(c.IdempotencyKey) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -290,7 +289,7 @@ type ReturnRequest struct {
 }
 
 func (r ReturnRequest) Validate() error {
-	if !r.ID.Valid() || !sortableIDPattern.MatchString(r.OrganizationID) || !sortableIDPattern.MatchString(r.WorkspaceID) || !refPattern.MatchString(r.OrderID) || !r.Status.Valid() || !reasonPattern.MatchString(r.ReasonCode) || !refPattern.MatchString(r.Source) || r.Currency.Validate() != nil || r.RequestedShippingMinor < 0 || r.RequestedTaxMinor < 0 || r.Version < 1 || !utc(r.CreatedAt) || !utc(r.UpdatedAt) || r.UpdatedAt.Before(r.CreatedAt) || !refPattern.MatchString(r.IdempotencyKey) {
+	if !r.ID.Valid() || !domain.ValidTenantScope(r.OrganizationID, r.WorkspaceID) || !refPattern.MatchString(r.OrderID) || !r.Status.Valid() || !reasonPattern.MatchString(r.ReasonCode) || !refPattern.MatchString(r.Source) || r.Currency.Validate() != nil || r.RequestedShippingMinor < 0 || r.RequestedTaxMinor < 0 || r.Version < 1 || !utc(r.CreatedAt) || !utc(r.UpdatedAt) || r.UpdatedAt.Before(r.CreatedAt) || !refPattern.MatchString(r.IdempotencyKey) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -342,7 +341,7 @@ type ReturnLogisticsOperation struct {
 }
 
 func (o ReturnLogisticsOperation) Validate() error {
-	if !o.ID.Valid() || !sortableIDPattern.MatchString(o.OrganizationID) || !sortableIDPattern.MatchString(o.WorkspaceID) || !o.ReturnID.Valid() || !refPattern.MatchString(o.ConnectorAccountID) || !refPattern.MatchString(o.OriginalRemoteID) || !refPattern.MatchString(o.ExternalID) || !safeReturnCodePattern.MatchString(o.MailType) || o.TariffCode < 0 || !o.Status.Valid() || (o.RemoteID != "" && !refPattern.MatchString(o.RemoteID)) || (o.TrackingNumber != "" && !refPattern.MatchString(o.TrackingNumber)) || (o.FailureCode != "" && !reasonPattern.MatchString(o.FailureCode)) || o.Version < 1 || !refPattern.MatchString(o.IdempotencyKey) || !utc(o.CreatedAt) || !utc(o.UpdatedAt) || o.UpdatedAt.Before(o.CreatedAt) {
+	if !o.ID.Valid() || !domain.ValidTenantScope(o.OrganizationID, o.WorkspaceID) || !o.ReturnID.Valid() || !refPattern.MatchString(o.ConnectorAccountID) || !refPattern.MatchString(o.OriginalRemoteID) || !refPattern.MatchString(o.ExternalID) || !safeReturnCodePattern.MatchString(o.MailType) || o.TariffCode < 0 || !o.Status.Valid() || (o.RemoteID != "" && !refPattern.MatchString(o.RemoteID)) || (o.TrackingNumber != "" && !refPattern.MatchString(o.TrackingNumber)) || (o.FailureCode != "" && !reasonPattern.MatchString(o.FailureCode)) || o.Version < 1 || !refPattern.MatchString(o.IdempotencyKey) || !utc(o.CreatedAt) || !utc(o.UpdatedAt) || o.UpdatedAt.Before(o.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	if o.Status == ReturnLogisticsSucceeded && o.RemoteID == "" {
@@ -368,7 +367,7 @@ type ReturnLogisticsCommand struct {
 }
 
 func (c ReturnLogisticsCommand) Validate() error {
-	if !c.ID.Valid() || !sortableIDPattern.MatchString(c.OrganizationID) || !sortableIDPattern.MatchString(c.WorkspaceID) || !c.ReturnID.Valid() || !refPattern.MatchString(c.ConnectorAccountID) || !refPattern.MatchString(c.OriginalRemoteID) || !refPattern.MatchString(c.ExternalID) || !safeReturnCodePattern.MatchString(c.MailType) || c.TariffCode < 0 || !refPattern.MatchString(c.IdempotencyKey) {
+	if !c.ID.Valid() || !domain.ValidTenantScope(c.OrganizationID, c.WorkspaceID) || !c.ReturnID.Valid() || !refPattern.MatchString(c.ConnectorAccountID) || !refPattern.MatchString(c.OriginalRemoteID) || !refPattern.MatchString(c.ExternalID) || !safeReturnCodePattern.MatchString(c.MailType) || c.TariffCode < 0 || !refPattern.MatchString(c.IdempotencyKey) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -469,7 +468,7 @@ type RefundAllocation struct {
 }
 
 func (a RefundAllocation) Validate() error {
-	if !a.ID.Valid() || !sortableIDPattern.MatchString(a.OrganizationID) || !sortableIDPattern.MatchString(a.WorkspaceID) || !refPattern.MatchString(a.PaymentID) || !refPattern.MatchString(a.RefundID) || !a.ReturnID.Valid() || (a.OrderItemID != "" && !refPattern.MatchString(a.OrderItemID)) || !a.Component.Valid() || a.Amount.Validate() != nil || a.Amount.MinorUnits() <= 0 || a.Currency.Validate() != nil || a.Amount.Currency() != a.Currency || !refPattern.MatchString(a.IdempotencyKey) || a.Version < 1 || !utc(a.CreatedAt) {
+	if !a.ID.Valid() || !domain.ValidTenantScope(a.OrganizationID, a.WorkspaceID) || !refPattern.MatchString(a.PaymentID) || !refPattern.MatchString(a.RefundID) || !a.ReturnID.Valid() || (a.OrderItemID != "" && !refPattern.MatchString(a.OrderItemID)) || !a.Component.Valid() || a.Amount.Validate() != nil || a.Amount.MinorUnits() <= 0 || a.Currency.Validate() != nil || a.Amount.Currency() != a.Currency || !refPattern.MatchString(a.IdempotencyKey) || a.Version < 1 || !utc(a.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -517,7 +516,7 @@ type OperationEvidence struct {
 }
 
 func (e OperationEvidence) Validate() error {
-	if !e.ID.Valid() || !sortableIDPattern.MatchString(e.OrganizationID) || !sortableIDPattern.MatchString(e.WorkspaceID) || !reasonPattern.MatchString(e.OperationType) || !refPattern.MatchString(e.OperationID) || !reasonPattern.MatchString(e.Outcome) || (e.ReasonCode != "" && !reasonPattern.MatchString(e.ReasonCode)) || (e.RemoteID != "" && !refPattern.MatchString(e.RemoteID)) || len(e.Digest) != 64 || !hexDigest(e.Digest) || !refPattern.MatchString(e.CorrelationID) || (e.CausationID != "" && !refPattern.MatchString(e.CausationID)) || !utc(e.OccurredAt) {
+	if !e.ID.Valid() || !domain.ValidTenantScope(e.OrganizationID, e.WorkspaceID) || !reasonPattern.MatchString(e.OperationType) || !refPattern.MatchString(e.OperationID) || !reasonPattern.MatchString(e.Outcome) || (e.ReasonCode != "" && !reasonPattern.MatchString(e.ReasonCode)) || (e.RemoteID != "" && !refPattern.MatchString(e.RemoteID)) || len(e.Digest) != 64 || !hexDigest(e.Digest) || !refPattern.MatchString(e.CorrelationID) || (e.CausationID != "" && !refPattern.MatchString(e.CausationID)) || !utc(e.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -529,7 +528,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !refPattern.MatchString(m.EventID) || !sortableIDPattern.MatchString(m.AuditID) || !refPattern.MatchString(m.ActorID) || !refPattern.MatchString(m.Source) || !refPattern.MatchString(m.CorrelationID) || (m.CausationID != "" && !refPattern.MatchString(m.CausationID)) || !utc(m.OccurredAt) {
+	if !refPattern.MatchString(m.EventID) || !domain.ValidSortableID(m.AuditID) || !refPattern.MatchString(m.ActorID) || !refPattern.MatchString(m.Source) || !refPattern.MatchString(m.CorrelationID) || (m.CausationID != "" && !refPattern.MatchString(m.CausationID)) || !utc(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil

@@ -3,6 +3,8 @@ package connectors
 import (
 	"context"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 // SocialCommentReadRequest is the provider-neutral bounded comments read
@@ -77,7 +79,7 @@ type SocialCommentReplyRequest struct {
 
 func (request SocialCommentReplyRequest) Validate() error {
 	if !validRemoteReadID(request.RemotePublicationID) || (request.ReplyToCommentID != "" && !validRemoteReadID(request.ReplyToCommentID)) ||
-		!validSocialText(request.Text, 10000, false) || !sortableIDPattern.MatchString(request.IdempotencyKey) {
+		!validSocialText(request.Text, 10000, false) || !domain.ValidSortableID(request.IdempotencyKey) {
 		return ErrInvalidSocialRequest
 	}
 	return nil

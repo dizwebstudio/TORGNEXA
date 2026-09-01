@@ -7,7 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -33,7 +34,7 @@ type Scope struct {
 }
 
 func ParseScope(organizationID, workspaceID string) (Scope, error) {
-	if !validSortableID(organizationID) || !validSortableID(workspaceID) {
+	if !domain.ValidTenantScope(organizationID, workspaceID) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{organizationID: organizationID, workspaceID: workspaceID}, nil
@@ -41,25 +42,25 @@ func ParseScope(organizationID, workspaceID string) (Scope, error) {
 func (scope Scope) OrganizationID() string { return scope.organizationID }
 func (scope Scope) WorkspaceID() string    { return scope.workspaceID }
 func (scope Scope) Valid() bool {
-	return validSortableID(scope.organizationID) && validSortableID(scope.workspaceID)
+	return domain.ValidTenantScope(scope.organizationID, scope.workspaceID)
 }
 
 func ParseProductID(value string) (ProductID, error) {
-	if !validSortableID(value) {
+	if !domain.ValidSortableID(value) {
 		return "", ErrInvalidRecord
 	}
 	return ProductID(value), nil
 }
 func ParseOfferID(value string) (OfferID, error) {
-	if !validSortableID(value) {
+	if !domain.ValidSortableID(value) {
 		return "", ErrInvalidRecord
 	}
 	return OfferID(value), nil
 }
 func (id ProductID) String() string { return string(id) }
-func (id ProductID) Valid() bool    { return validSortableID(string(id)) }
+func (id ProductID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 func (id OfferID) String() string   { return string(id) }
-func (id OfferID) Valid() bool      { return validSortableID(string(id)) }
+func (id OfferID) Valid() bool      { return domain.ValidSortableID(string(id)) }
 
 type Status string
 
@@ -104,7 +105,7 @@ type Offer struct {
 }
 
 func (product Product) Validate() error {
-	if !product.ID.Valid() || !validSortableID(product.OrganizationID) || !validSortableID(product.WorkspaceID) ||
+	if !product.ID.Valid() || !domain.ValidSortableID(product.OrganizationID) || !domain.ValidSortableID(product.WorkspaceID) ||
 		!validCode(product.Code) || !validTitle(product.Title) || !validDescription(product.Description) ||
 		!product.Status.Valid() || !validMetadata(product.Version, product.CreatedAt, product.UpdatedAt) {
 		return ErrInvalidRecord
@@ -112,7 +113,7 @@ func (product Product) Validate() error {
 	return nil
 }
 func (offer Offer) Validate() error {
-	if !offer.ID.Valid() || !validSortableID(offer.OrganizationID) || !validSortableID(offer.WorkspaceID) || !offer.ProductID.Valid() ||
+	if !offer.ID.Valid() || !domain.ValidSortableID(offer.OrganizationID) || !domain.ValidSortableID(offer.WorkspaceID) || !offer.ProductID.Valid() ||
 		!validCode(offer.SKU) || !validGTIN(offer.GTIN) || !offer.Status.Valid() ||
 		!validMetadata(offer.Version, offer.CreatedAt, offer.UpdatedAt) {
 		return ErrInvalidRecord
@@ -248,31 +249,13 @@ func ValidateOfferTransition(from, to Status) error { return ValidateProductTran
 
 func validCode(value string) bool { return canonicalCodePattern.MatchString(value) }
 func validTitle(value string) bool {
-	return validText(value, 1, 300, false)
+	return domain.ValidText(value, 1, 300, false)
 }
 func validDescription(value string) bool {
 	if value == "" {
 		return true
 	}
-	return validText(value, 1, 20000, true)
-}
-func validText(value string, minRunes, maxRunes int, allowLayoutControls bool) bool {
-	if value != strings.TrimSpace(value) || !utf8.ValidString(value) {
-		return false
-	}
-	count := utf8.RuneCountInString(value)
-	if count < minRunes || count > maxRunes {
-		return false
-	}
-	for _, r := range value {
-		if r < 0x20 || r == 0x7f {
-			if allowLayoutControls && (r == '\n' || r == '\r' || r == '\t') {
-				continue
-			}
-			return false
-		}
-	}
-	return true
+	return domain.ValidText(value, 1, 20000, true)
 }
 func validMetadata(version int64, createdAt, updatedAt time.Time) bool {
 	return version >= 1 && isUTC(createdAt) && isUTC(updatedAt) && !updatedAt.Before(createdAt)
@@ -325,37 +308,4 @@ func validGTIN(value string) bool {
 	}
 	check := (10 - (sum % 10)) % 10
 	return int(value[len(value)-1]-'0') == check
-}
-
-func validSortableID(value string) bool {
-	return validUUIDv7(value) || validULID(value)
-}
-func validUUIDv7(value string) bool {
-	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' || value[14] != '7' {
-		return false
-	}
-	if value[19] != '8' && value[19] != '9' && value[19] != 'a' && value[19] != 'b' {
-		return false
-	}
-	for i, c := range []byte(value) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(value string) bool {
-	if len(value) != 26 || value[0] < '0' || value[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(value) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
 }

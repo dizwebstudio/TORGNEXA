@@ -31,6 +31,11 @@ export function formatAmountWithCurrency(minorUnits: number | undefined, currenc
   return `${((minorUnits ?? 0) / 100).toLocaleString("ru-RU", {minimumFractionDigits: 2})} ${currency ?? ""}`.trim();
 }
 
+/** Formats a percentage represented in basis points. */
+export function formatPercentBasisPoints(basisPoints: number): string {
+  return `${(basisPoints / 100).toLocaleString("ru-RU", {maximumFractionDigits: 2})}%`;
+}
+
 /** Pretty-prints diagnostic JSON consistently across catalog workspaces. */
 export function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2);

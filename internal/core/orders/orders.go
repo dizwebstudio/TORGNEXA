@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -34,7 +36,7 @@ type OfferID string
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{org, ws}, nil
@@ -42,33 +44,33 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 func ParseOrderID(v string) (OrderID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return OrderID(v), nil
 }
 func ParseOrderItemID(v string) (OrderItemID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return OrderItemID(v), nil
 }
 func ParseOfferID(v string) (OfferID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return OfferID(v), nil
 }
 func (v OrderID) String() string     { return string(v) }
-func (v OrderID) Valid() bool        { return validSortableID(string(v)) }
+func (v OrderID) Valid() bool        { return domain.ValidSortableID(string(v)) }
 func (v OrderItemID) String() string { return string(v) }
-func (v OrderItemID) Valid() bool    { return validSortableID(string(v)) }
+func (v OrderItemID) Valid() bool    { return domain.ValidSortableID(string(v)) }
 func (v OfferID) String() string     { return string(v) }
-func (v OfferID) Valid() bool        { return validSortableID(string(v)) }
+func (v OfferID) Valid() bool        { return domain.ValidSortableID(string(v)) }
 
 type Currency string
 
@@ -325,7 +327,7 @@ type Order struct {
 }
 
 func (o Order) Validate() error {
-	if !o.ID.Valid() || !validSortableID(o.OrganizationID) || !validSortableID(o.WorkspaceID) || !codePattern.MatchString(o.Number) || !o.Status.Valid() || o.Currency.Validate() != nil || len(o.Items) < 1 || len(o.Items) > 1000 || o.Version < 1 || !isUTC(o.PlacedAt) || !isUTC(o.CreatedAt) || !isUTC(o.UpdatedAt) || o.UpdatedAt.Before(o.CreatedAt) {
+	if !o.ID.Valid() || !domain.ValidSortableID(o.OrganizationID) || !domain.ValidSortableID(o.WorkspaceID) || !codePattern.MatchString(o.Number) || !o.Status.Valid() || o.Currency.Validate() != nil || len(o.Items) < 1 || len(o.Items) > 1000 || o.Version < 1 || !isUTC(o.PlacedAt) || !isUTC(o.CreatedAt) || !isUTC(o.UpdatedAt) || o.UpdatedAt.Before(o.CreatedAt) {
 		return ErrInvalidRecord
 	}
 	for _, m := range []Money{o.Subtotal, o.DiscountTotal, o.TaxTotal, o.ShippingTotal, o.GrandTotal} {
@@ -429,7 +431,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validSortableID(m.AuditID) || !validToken(m.ActorID) || !validSource(m.Source) || !validToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidSortableID(m.AuditID) || !domain.ValidToken(m.ActorID) || !validSource(m.Source) || !domain.ValidToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -528,37 +530,6 @@ func validSource(v string) bool {
 	}
 	return true
 }
-func validToken(v string) bool         { return len(v) >= 1 && len(v) <= 128 && codePattern.MatchString(v) }
-func validOptionalToken(v string) bool { return v == "" || validToken(v) }
-func validSortableID(v string) bool    { return validUUIDv7(v) || validULID(v) }
-func validUUIDv7(v string) bool {
-	if len(v) != 36 || v[8] != '-' || v[13] != '-' || v[18] != '-' || v[23] != '-' || v[14] != '7' {
-		return false
-	}
-	if !strings.ContainsRune("89ab", rune(v[19])) {
-		return false
-	}
-	for i, c := range []byte(v) {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}
-func validULID(v string) bool {
-	if len(v) != 26 || v[0] < '0' || v[0] > '7' {
-		return false
-	}
-	for _, c := range []byte(v) {
-		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'K') || (c >= 'M' && c <= 'N') || (c >= 'P' && c <= 'T') || (c >= 'V' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
-}
+func validOptionalToken(v string) bool { return v == "" || domain.ValidToken(v) }
 
 var _ = fmt.Sprintf

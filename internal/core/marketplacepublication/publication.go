@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -204,11 +206,11 @@ type Variant struct {
 }
 
 func (variant Variant) Validate() error {
-	if !refPattern.MatchString(variant.ID) || !validText(variant.SKU, 200) || len(variant.GTIN) > 32 || len(variant.Barcodes) > 100 || variant.Dimension.Validate() != nil {
+	if !refPattern.MatchString(variant.ID) || !domain.ValidText(variant.SKU, 1, 200, false) || len(variant.GTIN) > 32 || len(variant.Barcodes) > 100 || variant.Dimension.Validate() != nil {
 		return ErrInvalid
 	}
 	for _, barcode := range variant.Barcodes {
-		if !validText(barcode, 200) {
+		if !domain.ValidText(barcode, 1, 200, false) {
 			return ErrInvalid
 		}
 	}
@@ -250,7 +252,7 @@ type Snapshot struct {
 }
 
 func (snapshot Snapshot) Validate() error {
-	if !refPattern.MatchString(snapshot.ID) || snapshot.Target.Validate() != nil || snapshot.Version < 1 || !validText(snapshot.SKU, 200) || len(snapshot.GTIN) > 32 || !validText(snapshot.Title, 500) || !validOptionalText(snapshot.Description, 10000) || !validOptionalText(snapshot.Brand, 300) || !validText(snapshot.CategoryCode, 192) || snapshot.Dimension.Validate() != nil || snapshot.PriceMinor < 0 || !currencyPattern.MatchString(snapshot.Currency) || snapshot.ProductStatus != "draft" && snapshot.ProductStatus != "active" && snapshot.ProductStatus != "archived" || snapshot.CatalogVersion < 1 || snapshot.PIMVersion < 0 || snapshot.PriceVersion < 0 || snapshot.MediaVersion < 0 || snapshot.MappingVersion < 0 || snapshot.CapabilityVersion < 0 || !isUTC(snapshot.AssembledAt) || (snapshot.ComplianceDigest != "" && !digestPattern.MatchString(snapshot.ComplianceDigest)) {
+	if !refPattern.MatchString(snapshot.ID) || snapshot.Target.Validate() != nil || snapshot.Version < 1 || !domain.ValidText(snapshot.SKU, 1, 200, false) || len(snapshot.GTIN) > 32 || !domain.ValidText(snapshot.Title, 1, 500, false) || !validOptionalText(snapshot.Description, 10000) || !validOptionalText(snapshot.Brand, 300) || !domain.ValidText(snapshot.CategoryCode, 1, 192, false) || snapshot.Dimension.Validate() != nil || snapshot.PriceMinor < 0 || !currencyPattern.MatchString(snapshot.Currency) || snapshot.ProductStatus != "draft" && snapshot.ProductStatus != "active" && snapshot.ProductStatus != "archived" || snapshot.CatalogVersion < 1 || snapshot.PIMVersion < 0 || snapshot.PriceVersion < 0 || snapshot.MediaVersion < 0 || snapshot.MappingVersion < 0 || snapshot.CapabilityVersion < 0 || !isUTC(snapshot.AssembledAt) || (snapshot.ComplianceDigest != "" && !digestPattern.MatchString(snapshot.ComplianceDigest)) {
 		return ErrInvalid
 	}
 	if validateAttributes(snapshot.Attributes) != nil || len(snapshot.Attributes) > 256 || len(snapshot.Variants) > 100 || len(snapshot.Media) > 64 {
@@ -455,12 +457,8 @@ func validateAttributes(attributes []Attribute) error {
 	return nil
 }
 
-func validText(value string, max int) bool {
-	return value != "" && strings.TrimSpace(value) == value && utf8.ValidString(value) && utf8.RuneCountInString(value) <= max && !strings.ContainsAny(value, "\x00\r\n")
-}
-
 func validOptionalText(value string, max int) bool {
-	return value == "" || validText(value, max)
+	return value == "" || domain.ValidText(value, 1, max, false)
 }
 
 func validIdempotencyKey(value string) bool {

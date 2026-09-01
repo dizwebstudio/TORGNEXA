@@ -8,7 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf8"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -23,10 +24,8 @@ var (
 )
 
 var (
-	sortableIDPattern  = regexp.MustCompile(`^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$`)
 	connectorIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	uploadIDPattern    = regexp.MustCompile(`^upl_[0-9a-f]{32}$`)
-	tokenPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	sourcePattern      = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
 	reasonPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 	buttonURLPattern   = regexp.MustCompile(`^https://[^\s]+$`)
@@ -38,25 +37,25 @@ type PublicationID string
 type ChannelAccountID string
 
 func ParseContentID(v string) (ContentID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return ContentID(v), nil
 }
 func ParseVariantID(v string) (VariantID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return VariantID(v), nil
 }
 func ParsePublicationID(v string) (PublicationID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return PublicationID(v), nil
 }
 func ParseChannelAccountID(v string) (ChannelAccountID, error) {
-	if !validSortableID(v) {
+	if !domain.ValidSortableID(v) {
 		return "", ErrInvalidRecord
 	}
 	return ChannelAccountID(v), nil
@@ -65,15 +64,15 @@ func (id ContentID) String() string        { return string(id) }
 func (id VariantID) String() string        { return string(id) }
 func (id PublicationID) String() string    { return string(id) }
 func (id ChannelAccountID) String() string { return string(id) }
-func (id ContentID) Valid() bool           { return validSortableID(string(id)) }
-func (id VariantID) Valid() bool           { return validSortableID(string(id)) }
-func (id PublicationID) Valid() bool       { return validSortableID(string(id)) }
-func (id ChannelAccountID) Valid() bool    { return validSortableID(string(id)) }
+func (id ContentID) Valid() bool           { return domain.ValidSortableID(string(id)) }
+func (id VariantID) Valid() bool           { return domain.ValidSortableID(string(id)) }
+func (id PublicationID) Valid() bool       { return domain.ValidSortableID(string(id)) }
+func (id ChannelAccountID) Valid() bool    { return domain.ValidSortableID(string(id)) }
 
 type Scope struct{ organizationID, workspaceID string }
 
 func ParseScope(org, ws string) (Scope, error) {
-	if !validSortableID(org) || !validSortableID(ws) {
+	if !domain.ValidTenantScope(org, ws) {
 		return Scope{}, ErrInvalidScope
 	}
 	return Scope{organizationID: org, workspaceID: ws}, nil
@@ -81,7 +80,7 @@ func ParseScope(org, ws string) (Scope, error) {
 func (s Scope) OrganizationID() string { return s.organizationID }
 func (s Scope) WorkspaceID() string    { return s.workspaceID }
 func (s Scope) Valid() bool {
-	return validSortableID(s.organizationID) && validSortableID(s.workspaceID)
+	return domain.ValidTenantScope(s.organizationID, s.workspaceID)
 }
 
 type ContentStatus string
@@ -109,7 +108,7 @@ type Content struct {
 }
 
 func (c Content) Validate() error {
-	if !c.ID.Valid() || !validSortableID(c.OrganizationID) || !validSortableID(c.WorkspaceID) || !validOptionalText(c.Title, 300, false) || !validOptionalText(c.Body, 50000, true) || (c.Title == "" && c.Body == "") || !c.Status.Valid() || !validMetadata(c.Version, c.CreatedAt, c.UpdatedAt) {
+	if !c.ID.Valid() || !domain.ValidSortableID(c.OrganizationID) || !domain.ValidSortableID(c.WorkspaceID) || !validOptionalText(c.Title, 300, false) || !validOptionalText(c.Body, 50000, true) || (c.Title == "" && c.Body == "") || !c.Status.Valid() || !validMetadata(c.Version, c.CreatedAt, c.UpdatedAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -224,7 +223,7 @@ type ContentVariant struct {
 }
 
 func (v ContentVariant) Validate() error {
-	if !v.ID.Valid() || !validSortableID(v.OrganizationID) || !validSortableID(v.WorkspaceID) || !v.ContentID.Valid() || !v.Format.Valid() || !validOptionalText(v.Title, 300, false) || !validOptionalText(v.Body, 50000, true) || v.Version != 1 || !isUTC(v.CreatedAt) || len(v.Media) > 20 || validateButtons(v.Buttons) != nil {
+	if !v.ID.Valid() || !domain.ValidSortableID(v.OrganizationID) || !domain.ValidSortableID(v.WorkspaceID) || !v.ContentID.Valid() || !v.Format.Valid() || !validOptionalText(v.Title, 300, false) || !validOptionalText(v.Body, 50000, true) || v.Version != 1 || !isUTC(v.CreatedAt) || len(v.Media) > 20 || validateButtons(v.Buttons) != nil {
 		return ErrInvalidRecord
 	}
 	seen := map[string]struct{}{}
@@ -416,7 +415,7 @@ type ChannelAccount struct {
 func (a ChannelAccount) Validate() error {
 	caps, err := CanonicalCapabilities(a.Capabilities)
 	accountRefValid := connectorIDPattern.MatchString(a.ConnectorAccountID)
-	if !a.ID.Valid() || !validSortableID(a.OrganizationID) || !validSortableID(a.WorkspaceID) || !accountRefValid || !validText(a.DisplayName, 1, 300, false) || err != nil || !equalCapabilities(caps, a.Capabilities) || !a.Status.Valid() || !validMetadata(a.Version, a.CreatedAt, a.UpdatedAt) {
+	if !a.ID.Valid() || !domain.ValidSortableID(a.OrganizationID) || !domain.ValidSortableID(a.WorkspaceID) || !accountRefValid || !validText(a.DisplayName, 1, 300, false) || err != nil || !equalCapabilities(caps, a.Capabilities) || !a.Status.Valid() || !validMetadata(a.Version, a.CreatedAt, a.UpdatedAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -538,7 +537,7 @@ type Publication struct {
 }
 
 func (p Publication) Validate() error {
-	if !p.ID.Valid() || !validSortableID(p.OrganizationID) || !validSortableID(p.WorkspaceID) || !p.VariantID.Valid() || !p.ChannelAccountID.Valid() || p.Schedule.Validate() != nil || !p.Status.Valid() || p.Attempt < 0 || p.Attempt > 1000 || !validReason(p.ReasonCode) || !validMetadata(p.Version, p.CreatedAt, p.UpdatedAt) {
+	if !p.ID.Valid() || !domain.ValidSortableID(p.OrganizationID) || !domain.ValidSortableID(p.WorkspaceID) || !p.VariantID.Valid() || !p.ChannelAccountID.Valid() || p.Schedule.Validate() != nil || !p.Status.Valid() || p.Attempt < 0 || p.Attempt > 1000 || !validReason(p.ReasonCode) || !validMetadata(p.Version, p.CreatedAt, p.UpdatedAt) {
 		return ErrInvalidRecord
 	}
 	if p.Status == PublicationScheduled && p.Schedule.Mode != ScheduleAt {
@@ -664,7 +663,7 @@ type StatusEvent struct {
 }
 
 func (e StatusEvent) Validate() error {
-	if !validToken(e.EventID) || !e.PublicationID.Valid() || e.PublicationVersion < 1 || !e.Status.Valid() || e.Attempt < 0 || e.Attempt > 1000 || !validReason(e.ReasonCode) || !validOptionalToken(e.CorrelationID) || !isUTC(e.OccurredAt) {
+	if !domain.ValidToken(e.EventID) || !e.PublicationID.Valid() || e.PublicationVersion < 1 || !e.Status.Valid() || e.Attempt < 0 || e.Attempt > 1000 || !validReason(e.ReasonCode) || !validOptionalToken(e.CorrelationID) || !isUTC(e.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	if e.Status == PublicationFailed && e.ReasonCode == "" {
@@ -682,7 +681,7 @@ type Mutation struct {
 }
 
 func (m Mutation) Validate() error {
-	if !validToken(m.EventID) || !validSortableID(m.AuditID) || !validToken(m.ActorID) || !sourcePattern.MatchString(m.Source) || !validToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
+	if !domain.ValidToken(m.EventID) || !domain.ValidSortableID(m.AuditID) || !domain.ValidToken(m.ActorID) || !sourcePattern.MatchString(m.Source) || !domain.ValidToken(m.CorrelationID) || !validOptionalToken(m.CausationID) || !validOptionalToken(m.TraceID) || !isUTC(m.OccurredAt) {
 		return ErrInvalidRecord
 	}
 	return nil
@@ -709,27 +708,10 @@ func validMetadata(version int64, createdAt, updatedAt time.Time) bool {
 	return version >= 1 && isUTC(createdAt) && isUTC(updatedAt) && !updatedAt.Before(createdAt)
 }
 func isUTC(v time.Time) bool           { return !v.IsZero() && v.Location() == time.UTC }
-func validSortableID(v string) bool    { return sortableIDPattern.MatchString(v) }
-func validToken(v string) bool         { return tokenPattern.MatchString(v) }
-func validOptionalToken(v string) bool { return v == "" || validToken(v) }
+func validOptionalToken(v string) bool { return v == "" || domain.ValidToken(v) }
 func validReason(v string) bool        { return v == "" || reasonPattern.MatchString(v) }
 func validText(v string, min, max int, layout bool) bool {
-	if v != strings.TrimSpace(v) || !utf8.ValidString(v) {
-		return false
-	}
-	count := utf8.RuneCountInString(v)
-	if count < min || count > max {
-		return false
-	}
-	for _, r := range v {
-		if r < 0x20 || r == 0x7f {
-			if layout && (r == '\n' || r == '\r' || r == '\t') {
-				continue
-			}
-			return false
-		}
-	}
-	return true
+	return domain.ValidText(v, min, max, layout)
 }
 func validOptionalText(v string, max int, layout bool) bool {
 	return v == "" || validText(v, 1, max, layout)

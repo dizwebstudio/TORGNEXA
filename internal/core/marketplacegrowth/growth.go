@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 const MaxPreviewRows = 1000
@@ -241,7 +243,7 @@ type Rule struct {
 }
 
 func (r PreviewRequest) Validate() error {
-	if !r.Operation.Valid() || !validRef(r.ChannelID) || !validRef(r.AccountID) || !validRef(r.TargetID) || !validCurrency(r.Currency) || r.FloorPriceMinor < 0 || r.MinimumMarginBPS < 0 || r.MinimumMarginBPS > 10000 || r.ApprovalThreshold < 0 || r.ApprovalThreshold > MaxPreviewRows || r.ProposedBidMinor < 0 || r.MaximumBidMinor < 0 || r.ProposedBudgetMinor < 0 || r.MaximumBudgetMinor < 0 || len(r.Items) == 0 || len(r.Items) > MaxPreviewRows {
+	if !r.Operation.Valid() || !validRef(r.ChannelID) || !validRef(r.AccountID) || !validRef(r.TargetID) || !domain.ValidCurrencyCode(r.Currency) || r.FloorPriceMinor < 0 || r.MinimumMarginBPS < 0 || r.MinimumMarginBPS > 10000 || r.ApprovalThreshold < 0 || r.ApprovalThreshold > MaxPreviewRows || r.ProposedBidMinor < 0 || r.MaximumBidMinor < 0 || r.ProposedBudgetMinor < 0 || r.MaximumBudgetMinor < 0 || len(r.Items) == 0 || len(r.Items) > MaxPreviewRows {
 		return ErrInvalid
 	}
 	if r.FloorPriceMinor == 0 {
@@ -373,7 +375,7 @@ func digest(value any) string {
 }
 
 func (p Preview) Validate() error {
-	if !validRef(p.ID) || !p.Operation.Valid() || !validRef(p.ChannelID) || !validRef(p.AccountID) || !validRef(p.TargetID) || !validCurrency(p.Currency) || len(p.InputDigest) != 64 || p.InputDigest != strings.ToLower(p.InputDigest) || p.RuleVersion < 1 || len(p.Rows) != p.AffectedCount || p.AffectedCount < 1 || p.AffectedCount > MaxPreviewRows || p.EligibleCount < 0 || p.BlockedCount != p.AffectedCount-p.EligibleCount || p.CreatedAt.IsZero() || p.CreatedAt.Location() != time.UTC || (p.State != PreviewReady && p.State != PreviewApprovalRequired && p.State != PreviewBlocked) {
+	if !validRef(p.ID) || !p.Operation.Valid() || !validRef(p.ChannelID) || !validRef(p.AccountID) || !validRef(p.TargetID) || !domain.ValidCurrencyCode(p.Currency) || len(p.InputDigest) != 64 || p.InputDigest != strings.ToLower(p.InputDigest) || p.RuleVersion < 1 || len(p.Rows) != p.AffectedCount || p.AffectedCount < 1 || p.AffectedCount > MaxPreviewRows || p.EligibleCount < 0 || p.BlockedCount != p.AffectedCount-p.EligibleCount || p.CreatedAt.IsZero() || p.CreatedAt.Location() != time.UTC || (p.State != PreviewReady && p.State != PreviewApprovalRequired && p.State != PreviewBlocked) {
 		return ErrInvalid
 	}
 	seen := map[string]struct{}{}
@@ -435,7 +437,7 @@ func DemoRules(now time.Time) []Rule {
 
 // Validate checks a promotion rule before it is stored or shown as demo data.
 func (r Rule) Validate() error {
-	if !validRef(r.ID) || !validRef(r.Name) || !validRef(r.ChannelID) || (r.Kind != "discount" && r.Kind != "coupon" && r.Kind != "subsidy") || (r.Status != "draft" && r.Status != "preview" && r.Status != "active" && r.Status != "ended" && r.Status != "unknown") || !validCurrency(r.Currency) || r.DiscountBPS < 0 || r.DiscountBPS > 10000 || r.SubsidyMinor < 0 || r.FloorPriceMinor <= 0 || r.MinimumMarginBPS < 0 || r.MinimumMarginBPS > 10000 || r.Version < 1 || r.StartsAt.IsZero() || r.EndsAt.IsZero() || r.StartsAt.Location() != time.UTC || r.EndsAt.Location() != time.UTC || !r.EndsAt.After(r.StartsAt) {
+	if !validRef(r.ID) || !validRef(r.Name) || !validRef(r.ChannelID) || (r.Kind != "discount" && r.Kind != "coupon" && r.Kind != "subsidy") || (r.Status != "draft" && r.Status != "preview" && r.Status != "active" && r.Status != "ended" && r.Status != "unknown") || !domain.ValidCurrencyCode(r.Currency) || r.DiscountBPS < 0 || r.DiscountBPS > 10000 || r.SubsidyMinor < 0 || r.FloorPriceMinor <= 0 || r.MinimumMarginBPS < 0 || r.MinimumMarginBPS > 10000 || r.Version < 1 || r.StartsAt.IsZero() || r.EndsAt.IsZero() || r.StartsAt.Location() != time.UTC || r.EndsAt.Location() != time.UTC || !r.EndsAt.After(r.StartsAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -503,8 +505,4 @@ func ratio(denominator, numerator int64) int64 {
 
 func validRef(value string) bool {
 	return value != "" && len(value) <= 192 && value == strings.TrimSpace(value) && !strings.ContainsAny(value, "\x00\r\n/")
-}
-
-func validCurrency(value string) bool {
-	return len(value) == 3 && value == strings.ToUpper(value) && value >= "A" && value <= "ZZZ"
 }

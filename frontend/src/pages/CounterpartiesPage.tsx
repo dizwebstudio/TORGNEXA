@@ -8,6 +8,7 @@ import {EmptyState} from "../components/EmptyState";
 import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
+import {idempotencyKey as idempotency} from "../lib/ids";
 
 interface Counterparty{id:string;code:string;party_type:string;party_id:string;role:string;status:string;version:number;created_at:string;updated_at:string}
 interface LegalParty{party_type:string;party_id:string;code:string;display_name:string;inn?:string;registration_id?:string;status:string}
@@ -21,8 +22,6 @@ type Client={
 
 function decodeCounterparties(value:unknown):Counterparty[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid counterparty response");return root.items as Counterparty[]}
 function decodeLegalParties(value:unknown):LegalParty[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid legal party response");return root.items as LegalParty[]}
-function idempotency(){return crypto.randomUUID()}
-
 const partyTypeLabels:Record<string,string>={legal_entity:"Юридическое лицо",individual_entrepreneur:"Индивидуальный предприниматель",branch:"Филиал"};
 const roleLabels:Record<string,string>={customer:"Покупатель",supplier:"Поставщик",partner:"Партнёр",other:"Другое"};
 const statusLabels:Record<string,string>={draft:"Черновик",active:"Активен",archived:"В архиве"};

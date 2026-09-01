@@ -6,6 +6,7 @@ import {ErrorBlock, LoadingBlock} from "../../components/ApiState";
 import {StatusBadge} from "../../components/StatusBadge";
 import {auditResourceLabel,humanizeTechnicalValue} from "../../components/labels";
 import {useToast} from "../../components/Toast";
+import {formatMoneyMinor as money} from "../../lib/formatters";
 
 type Response={body:unknown};
 type Client={
@@ -26,7 +27,6 @@ interface Scenario{id:string;name:string;algorithm_version:string;result:{curren
 
 const object=(value:unknown):Record<string,unknown>=>{if(!value||typeof value!=="object"||Array.isArray(value))throw new Error("invalid response");return value as Record<string,unknown>};
 const split=(value:string)=>[...new Set(value.split(",").map(item=>item.trim()).filter(Boolean))];
-const money=(minor:number,currency:string)=>new Intl.NumberFormat("ru-RU",{style:"currency",currency}).format(minor/100);
 const evidenceTypeLabels:Readonly<Record<string,string>>={"ai.egress.authorized":"Разрешение передачи данных ИИ","ai.egress.denied":"Отклонение передачи данных ИИ","ai.egress.policy":"Политика передачи данных ИИ","connector.replay.completed":"Проверка интеграции завершена","mcp.tool.invoked":"Вызов инструмента MCP"};
 const evidenceDecisionLabels:Readonly<Record<string,string>>={allowed:"Разрешено",denied:"Отклонено",failed:"Ошибка",succeeded:"Успешно"};
 const evidenceTypeLabel=(value:string)=>evidenceTypeLabels[value]??humanizeTechnicalValue(value);

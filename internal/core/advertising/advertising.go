@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 var (
@@ -184,7 +186,7 @@ type Finding struct {
 }
 
 func (c Campaign) Validate() error {
-	if !validRef(c.ID) || !validRef(c.AccountID) || !validRef(c.Channel) || !validRef(c.RemoteID) || !validText(c.Name, 300) || !c.Status.Valid() || !validCurrency(c.Currency) || c.DailyBudgetMinor < 0 || c.TotalBudgetMinor < c.DailyBudgetMinor || c.ObservedAt.IsZero() || !utc(c.ObservedAt) || c.Version < 1 || (!c.EffectiveFrom.IsZero() && !utc(c.EffectiveFrom)) || (!c.EffectiveTo.IsZero() && !utc(c.EffectiveTo)) || (!c.EffectiveTo.IsZero() && !c.EffectiveFrom.IsZero() && !c.EffectiveTo.After(c.EffectiveFrom)) {
+	if !validRef(c.ID) || !validRef(c.AccountID) || !validRef(c.Channel) || !validRef(c.RemoteID) || !validText(c.Name, 300) || !c.Status.Valid() || !domain.ValidCurrencyCode(c.Currency) || c.DailyBudgetMinor < 0 || c.TotalBudgetMinor < c.DailyBudgetMinor || c.ObservedAt.IsZero() || !utc(c.ObservedAt) || c.Version < 1 || (!c.EffectiveFrom.IsZero() && !utc(c.EffectiveFrom)) || (!c.EffectiveTo.IsZero() && !utc(c.EffectiveTo)) || (!c.EffectiveTo.IsZero() && !c.EffectiveFrom.IsZero() && !c.EffectiveTo.After(c.EffectiveFrom)) {
 		return ErrInvalid
 	}
 	return nil
@@ -202,7 +204,7 @@ func (f PerformanceFact) Validate() error {
 }
 
 func validateFact(id, account, channel, campaign, remote string, start, end time.Time, amount int64, currency, source string, observed, effective time.Time, quality Quality) error {
-	if !validRef(id) || !validRef(account) || !validRef(channel) || !validRef(campaign) || !validRef(remote) || start.IsZero() || end.IsZero() || !utc(start) || !utc(end) || !end.After(start) || amount < 0 || !validCurrency(currency) || !validRef(source) || observed.IsZero() || effective.IsZero() || !utc(observed) || !utc(effective) || !quality.Valid() {
+	if !validRef(id) || !validRef(account) || !validRef(channel) || !validRef(campaign) || !validRef(remote) || start.IsZero() || end.IsZero() || !utc(start) || !utc(end) || !end.After(start) || amount < 0 || !domain.ValidCurrencyCode(currency) || !validRef(source) || observed.IsZero() || effective.IsZero() || !utc(observed) || !utc(effective) || !quality.Valid() {
 		return ErrInvalid
 	}
 	return nil
@@ -366,8 +368,5 @@ func validRef(value string) bool {
 }
 func validText(value string, max int) bool {
 	return value != "" && len(value) <= max && value == strings.TrimSpace(value) && !strings.ContainsAny(value, "\x00\r\n")
-}
-func validCurrency(value string) bool {
-	return len(value) == 3 && value == strings.ToUpper(value) && value >= "A" && value <= "ZZZ"
 }
 func utc(value time.Time) bool { return value.Location() == time.UTC }
