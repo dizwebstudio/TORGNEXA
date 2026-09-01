@@ -1,4 +1,53 @@
-# Repository validation report — Tasks through 170 — 2026-08-30
+# Repository validation report — release gates and Tasks through 170 — 2026-09-01
+
+## Release-gate status — 2026-09-01
+
+Локальная часть release qualification закрыта. Финальный disposable Docker
+прогон `scripts/check-production-qualification.sh` завершился **PASS**:
+SLO/API load (5000/5000 запросов, p99 37 ms), outbox → Kafka → inbox,
+идемпотентность, worker restart, Kafka recovery и PostgreSQL recovery.
+
+Дополнительно **PASS**:
+
+- `scripts/check-community-deployment.sh`;
+- `scripts/check-workflow-qualification.sh` (Go tests/vet, contracts, 53
+  frontend-теста и public docs);
+- `scripts/check-postgres-backup-restore.sh` (logical restore, base backup,
+  physical restore и PITR);
+- `scripts/check-postgres-upgrade.sh` (upgrade, fresh-install parity,
+  interrupted/resumed backfill);
+- `scripts/check-tenancy-postgres.sh` (RLS, audit, secrets/privacy, inbox,
+  connector SDK и event correctness).
+
+Машинные отчёты сохранены в исключённой из Git папке
+`qualification/evidence/release-gates-20260901/`. В summary не включаются
+credentials, токены, production payloads или ответы внешних API.
+
+Внешние gates остаются **BLOCKED**, потому что их нельзя подменить локальным
+тестом:
+
+- Task 065 `SC-OPS-01`: нет подтверждения protected prerelease с OIDC/Sigstore
+  на реальном GitHub-hosting и независимой проверкой скачанного bundle;
+- Task 080 `ARCH-OPS-01`: нет GitHub applied-rules evidence для protected
+  `master` (required workflow по SHA, Team reviewer, запрет force-push/delete)
+  и первого protected post-merge PR;
+- production deployment: нет выделенного production host, внешнего TLS/edge,
+  secret manager, backup/PITR и upgrade/restore rehearsal с фактическим
+  release tag;
+- WB/Ozon/прочие marketplace credentialed/live gates: в окружении нет
+  non-production seller accounts и credentials; поэтому remote writes не
+  выполнялись и не выдаются за qualification;
+- Buy Box, акции и управление рекламой: `buy_box.read`, `promotions.manage` и
+  `ads.manage` остаются capability-gated до отдельной проверки официального
+  API-контракта, provider fixture и approval-bound live smoke.
+
+Frontend отражает только реально допущенные capability surfaces (включая
+read-only/preview и причины блокировки); недопущенные live writes не скрыто
+«считаются готовыми» и не появляются как активные действия оператора.
+
+До появления перечисленных внешних доказательств 065 и 080 должны оставаться
+`operational_status: blocked`; это fail-closed состояние, а не пропущенная
+репозиторная задача.
 
 ## Task 170 follow-up repository validation
 

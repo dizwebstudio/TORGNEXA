@@ -124,6 +124,49 @@ func (r *Repository) List(ctx context.Context, scope tenancy.Scope, cursor strin
 	return page, nil
 }
 
+// ListCommands returns a bounded, tenant-scoped view of the append-only flow
+// command journal. The journal is the source for the operator timeline; it
+// contains only normalized outcomes and canonical references.
+func (r *Repository) ListCommands(ctx context.Context, scope tenancy.Scope, flowID string, limit int) ([]marketplaceoperations.CommandRecord, error) {
+	if err := r.validate(ctx, scope); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(flowID) == "" || len(flowID) > 192 || limit < 1 || limit > 200 {
+		return nil, marketplaceoperations.ErrInvalidFlow
+	}
+	items := make([]marketplaceoperations.CommandRecord, 0, limit)
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT flow_id,operation_id,idempotency_key,stage,outcome,reason_code,references_json,occurred_at FROM marketplace_operation_commands WHERE organization_id=$1 AND workspace_id=$2 AND flow_id=$3 ORDER BY occurred_at ASC,operation_id ASC LIMIT $4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), flowID, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var record marketplaceoperations.CommandRecord
+			var stage, outcome string
+			var references []byte
+			if err := rows.Scan(&record.FlowID, &record.OperationID, &record.IdempotencyKey, &stage, &outcome, &record.ReasonCode, &references, &record.OccurredAt); err != nil {
+				return err
+			}
+			if err := json.Unmarshal(references, &record.References); err != nil {
+				return marketplaceoperations.ErrInvalidFlow
+			}
+			record.Stage = marketplaceoperations.FlowStage(stage)
+			record.Outcome = marketplaceoperations.Outcome(outcome)
+			record.OccurredAt = record.OccurredAt.UTC()
+			if err := record.Validate(); err != nil {
+				return err
+			}
+			items = append(items, record)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return items, nil
+}
+
 func (r *Repository) Apply(ctx context.Context, scope tenancy.Scope, flowID string, command marketplaceoperations.Command) (marketplaceoperations.Flow, bool, error) {
 	if err := r.validate(ctx, scope); err != nil {
 		return marketplaceoperations.Flow{}, false, err

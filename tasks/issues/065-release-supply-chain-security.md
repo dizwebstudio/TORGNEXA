@@ -103,3 +103,12 @@ accepts no risk exception and fails closed.
 
 Evidence is tracked in `VALIDATION_REPORT.md`; the operational release record
 uses `templates/release-checklist.md`.
+
+### Latest qualification — 2026-09-01
+
+The repository-local Docker production runtime qualification, backup/restore,
+PITR, upgrade and workflow checks passed. This evidence is retained under
+`qualification/evidence/release-gates-20260901/` (ignored by Git). It does not
+replace `SC-OPS-01`: the protected GitHub prerelease, OIDC/Sigstore proof and
+independent downloaded-evidence verification still require the real hosting
+account and release tag.

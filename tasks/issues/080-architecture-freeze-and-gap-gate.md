@@ -83,3 +83,12 @@ The first protected post-merge pull request whose base already contains this che
 
 Run required repository checks and report results, risks, external
 qualification, and follow-ups.
+
+### Latest qualification — 2026-09-01
+
+Repository, workflow and Docker runtime checks passed and are recorded in
+`VALIDATION_REPORT.md` and the ignored
+`qualification/evidence/release-gates-20260901/` directory. `ARCH-OPS-01`
+remains blocked until GitHub applied-rules evidence proves the protected
+branch rules, SHA-pinned required workflow, Team architecture reviewer and a
+protected post-merge pull request.

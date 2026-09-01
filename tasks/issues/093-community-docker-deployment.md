@@ -34,3 +34,7 @@ Provide a reproducible local/self-hosted Community deployment that starts the TO
 
 ## Operational note
 This Compose topology is the Community single-host development/self-host baseline, not a claim of production HA. Production deployment still requires external TLS/edge, secret management, backup/PITR, restore/upgrade rehearsals, resource sizing and Task-065/080 hosted release evidence.
+
+The 2026-09-01 local Docker production runtime qualification passed, including
+API load and worker/Kafka/PostgreSQL recovery drills. It validates the
+repository topology only; it is not production-host qualification.

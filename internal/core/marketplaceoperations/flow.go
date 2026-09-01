@@ -28,6 +28,7 @@ const (
 	StageOrder          FlowStage = "order"
 	StageReservation    FlowStage = "reservation"
 	StagePickPack       FlowStage = "pick_pack"
+	StageLabel          FlowStage = "label"
 	StageShipment       FlowStage = "shipment"
 	StageReturn         FlowStage = "return"
 	StageSettlement     FlowStage = "settlement"
@@ -87,6 +88,7 @@ var flowStages = []FlowStage{
 	StageOrder,
 	StageReservation,
 	StagePickPack,
+	StageLabel,
 	StageShipment,
 	StageReturn,
 	StageSettlement,
@@ -152,11 +154,29 @@ type Command struct {
 
 // New creates a flow before the first account operation is attempted.
 func New(id, organizationID, workspaceID, accountID string, at time.Time) (Flow, error) {
-	flow := Flow{ID: id, OrganizationID: organizationID, WorkspaceID: workspaceID, AccountID: accountID, Stage: StageAccount, State: FlowPending, Version: 1, CreatedAt: at.UTC(), UpdatedAt: at.UTC()}
+	return NewAtStage(id, organizationID, workspaceID, accountID, StageAccount, nil, at)
+}
+
+// NewAtStage creates a flow at a known canonical starting point. The default
+// account-to-P&L flow uses New; the order fulfillment golden path can start at
+// StageOrder after the host has already materialized the canonical order.
+// Starting at a later stage never copies the order or remote payload into the
+// projection: references remain bounded links to authoritative aggregates.
+func NewAtStage(id, organizationID, workspaceID, accountID string, start FlowStage, references []Reference, at time.Time) (Flow, error) {
+	if start == StageComplete || !start.Valid() {
+		return Flow{}, ErrInvalidFlow
+	}
+	flow := Flow{ID: id, OrganizationID: organizationID, WorkspaceID: workspaceID, AccountID: accountID, Stage: start, State: FlowPending, Version: 1, References: mergeReferences(nil, references), CreatedAt: at.UTC(), UpdatedAt: at.UTC()}
 	if flow.validate() != nil {
 		return Flow{}, ErrInvalidFlow
 	}
 	return flow, nil
+}
+
+// GoldenPathStages returns the stable order-to-reconciliation stages used by
+// Task 224. A copy is returned so callers cannot mutate the contract.
+func GoldenPathStages() []FlowStage {
+	return append([]FlowStage(nil), []FlowStage{StageOrder, StageReservation, StagePickPack, StageLabel, StageShipment, StageReturn, StageSettlement, StageProfitability, StageReconciliation}...)
 }
 
 // Apply applies a normalized command and returns whether it was an immediate
@@ -308,6 +328,30 @@ func mergeReferences(existing, added []Reference) []Reference {
 type FlowPage struct {
 	Items      []Flow `json:"items"`
 	NextCursor string `json:"next_cursor,omitempty"`
+}
+
+// CommandRecord is the redacted append-only timeline entry for a flow. It
+// contains operation metadata and canonical references only; provider payloads
+// and credentials are intentionally not part of the record.
+type CommandRecord struct {
+	FlowID         string      `json:"flow_id"`
+	OperationID    string      `json:"operation_id"`
+	IdempotencyKey string      `json:"idempotency_key"`
+	Stage          FlowStage   `json:"stage"`
+	Outcome        Outcome     `json:"outcome"`
+	ReasonCode     string      `json:"reason_code,omitempty"`
+	References     []Reference `json:"references,omitempty"`
+	OccurredAt     time.Time   `json:"occurred_at"`
+}
+
+// Validate checks one redacted timeline entry before it is exposed to an
+// operator or used as qualification evidence.
+func (record CommandRecord) Validate() error {
+	if !flowReferencePattern.MatchString(record.FlowID) {
+		return ErrInvalidFlow
+	}
+	command := Command{OperationID: record.OperationID, IdempotencyKey: record.IdempotencyKey, Stage: record.Stage, Outcome: record.Outcome, ReasonCode: record.ReasonCode, References: record.References, OccurredAt: record.OccurredAt}
+	return command.Validate()
 }
 
 // FlowRepository persists the orchestration projection and its idempotent
