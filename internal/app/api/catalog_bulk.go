@@ -7,28 +7,35 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
+	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo"
 )
 
 const (
-	CatalogBulkPath       = "/api/v1/catalog/bulk"
-	CatalogBulkSummaryPath = CatalogBulkPath + "/summary"
-	CatalogBulkPreviewPath = CatalogBulkPath + "/previews"
-	CatalogBulkApplyPath   = CatalogBulkPath + "/apply"
-	CatalogBulkRunPath     = CatalogBulkPath + "/runs"
+	CatalogBulkPath           = "/api/v1/catalog/bulk"
+	CatalogBulkSummaryPath    = CatalogBulkPath + "/summary"
+	CatalogBulkPreviewPath    = CatalogBulkPath + "/previews"
+	CatalogBulkApplyPath      = CatalogBulkPath + "/apply"
+	CatalogBulkRunPath        = CatalogBulkPath + "/runs"
+	CatalogBulkKillSwitchPath = CatalogBulkPath + "/kill-switch"
 )
 
 type catalogBulkStore interface {
 	SavePreview(context.Context, tenancy.Scope, catalogbulk.Preview) (catalogbulk.Preview, error)
 	Preview(context.Context, tenancy.Scope, string) (catalogbulk.Preview, error)
+	ListPreviews(context.Context, tenancy.Scope, string, int) ([]catalogbulk.Preview, string, error)
 	SaveRun(context.Context, tenancy.Scope, catalogbulk.Run) (catalogbulk.Run, error)
 	Run(context.Context, tenancy.Scope, string) (catalogbulk.Run, error)
+	ListRuns(context.Context, tenancy.Scope, string, int) ([]catalogbulk.Run, string, error)
+	KillSwitch(context.Context, tenancy.Scope) (catalogbulk.KillSwitch, error)
+	SetKillSwitch(context.Context, tenancy.Scope, catalogbulk.KillSwitch) error
 }
 
 type catalogBulkAPI struct {
@@ -41,18 +48,22 @@ func newCatalogBulkRoutes(store *catalogbulkrepo.Repository, approvals marketpla
 	api := catalogBulkAPI{store: store, approvals: approvals, now: func() time.Time { return time.Now().UTC() }}
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: CatalogBulkSummaryPath, Permission: "products.read", Handler: http.HandlerFunc(api.summary)},
+		{Method: http.MethodGet, Path: CatalogBulkPreviewPath, Permission: "products.read", Handler: http.HandlerFunc(api.previews)},
 		{Method: http.MethodPost, Path: CatalogBulkPreviewPath, Permission: "products.read", Handler: http.HandlerFunc(api.preview)},
 		{Method: http.MethodGet, Path: CatalogBulkPreviewPath + "/", PathPrefix: true, Permission: "products.read", Handler: http.HandlerFunc(api.previewItem)},
 		{Method: http.MethodPost, Path: CatalogBulkApplyPath, Permission: "products.write", Handler: http.HandlerFunc(api.apply)},
+		{Method: http.MethodGet, Path: CatalogBulkRunPath, Permission: "products.read", Handler: http.HandlerFunc(api.runs)},
 		{Method: http.MethodGet, Path: CatalogBulkRunPath + "/", PathPrefix: true, Permission: "products.read", Handler: http.HandlerFunc(api.runItem)},
 		{Method: http.MethodPost, Path: CatalogBulkRunPath + "/", PathPrefix: true, Permission: "products.read", Handler: http.HandlerFunc(api.reconcile)},
+		{Method: http.MethodGet, Path: CatalogBulkKillSwitchPath, Permission: "products.read", Handler: http.HandlerFunc(api.killSwitch)},
+		{Method: http.MethodPost, Path: CatalogBulkKillSwitchPath, Permission: "products.write", Handler: http.HandlerFunc(api.setKillSwitch)},
 	}
 }
 
 type catalogBulkPreviewRequest struct {
-	Selection    catalogbulk.SelectionSnapshot `json:"selection"`
-	Projections  []catalogbulk.Projection      `json:"projections"`
-	Changes      []catalogbulk.Change          `json:"changes"`
+	Selection   catalogbulk.SelectionSnapshot `json:"selection"`
+	Projections []catalogbulk.Projection      `json:"projections"`
+	Changes     []catalogbulk.Change          `json:"changes"`
 }
 
 func (api catalogBulkAPI) summary(w http.ResponseWriter, r *http.Request) {
@@ -61,11 +72,57 @@ func (api catalogBulkAPI) summary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := api.now()
-	writeJSON(w, http.StatusOK, map[string]any{"items": []map[string]any{
-		{"channel_id": "demo", "label": "Demo channel", "state": catalogbulk.CapabilityQualified, "capabilities": []string{"products.write", "products.media.write", "products.variants.write", "prices.write", "inventory.write"}, "observed_at": now, "fresh_until": now.Add(24 * time.Hour)},
-		{"channel_id": "wb", "label": "Wildberries", "state": catalogbulk.CapabilityQualificationNeeded, "capabilities": []string{"products.read", "prices.read", "inventory.read"}, "observed_at": now, "fresh_until": now.Add(time.Hour)},
-		{"channel_id": "ozon", "label": "Ozon", "state": catalogbulk.CapabilityQualificationNeeded, "capabilities": []string{"products.read", "prices.read", "inventory.read"}, "observed_at": now, "fresh_until": now.Add(time.Hour)},
-	}})
+	items := []map[string]any{{"channel_id": "demo", "label": "Demo channel", "state": catalogbulk.CapabilityQualified, "capabilities": []string{"marketplace.listings.content.write", "marketplace.listings.attributes.write", "marketplace.listings.media.write", "prices.write", "inventory.write"}, "observed_at": now, "fresh_until": now.Add(24 * time.Hour)}}
+	snapshot, err := sdk.ReadinessSnapshot()
+	if err != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Connector readiness is unavailable")
+		return
+	}
+	for _, profile := range snapshot.Profiles {
+		if profile.Family != "marketplace" {
+			continue
+		}
+		capabilities := make([]string, 0, len(profile.Capabilities))
+		for _, capability := range profile.Capabilities {
+			capabilities = append(capabilities, capability.Name)
+		}
+		items = append(items, map[string]any{"channel_id": profile.ID, "label": profile.DisplayName, "state": catalogBulkCapabilityState(profile.Status), "capabilities": capabilities, "observed_at": now, "fresh_until": now.Add(time.Hour)})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func catalogBulkCapabilityState(status sdk.ReadinessStatus) catalogbulk.CapabilityState {
+	switch status {
+	case sdk.ReadinessQualified:
+		return catalogbulk.CapabilityQualified
+	case sdk.ReadinessPartiallySupported:
+		return catalogbulk.CapabilityPartial
+	case sdk.ReadinessReadOnly:
+		return catalogbulk.CapabilityReadOnly
+	case sdk.ReadinessNotAvailable:
+		return catalogbulk.CapabilityUnavailable
+	default:
+		return catalogbulk.CapabilityQualificationNeeded
+	}
+}
+
+func (api catalogBulkAPI) previews(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.store == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Catalog bulk workspace is unavailable")
+		return
+	}
+	limit, cursor, valid := catalogBulkPage(r)
+	if !valid {
+		writeProblem(w, http.StatusBadRequest, "Invalid catalog bulk cursor")
+		return
+	}
+	items, next, err := api.store.ListPreviews(r.Context(), scope, cursor, limit)
+	if err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
 }
 
 func (api catalogBulkAPI) preview(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +194,7 @@ type catalogBulkApplyRequest struct {
 
 func (api catalogBulkAPI) apply(w http.ResponseWriter, r *http.Request) {
 	scope, principalOK := ScopeFromContext(r.Context())
-	_, hasPrincipal := PrincipalFromContext(r.Context())
+	principal, hasPrincipal := PrincipalFromContext(r.Context())
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	approvalID := strings.TrimSpace(r.Header.Get("Approval-Request-ID"))
 	if !principalOK || !hasPrincipal || api.store == nil || api.approvals == nil || !validIdempotencyKey(key) || !safePublicationID(approvalID) {
@@ -158,12 +215,25 @@ func (api catalogBulkAPI) apply(w http.ResponseWriter, r *http.Request) {
 		writeCatalogBulkError(w, catalogbulk.ErrStale)
 		return
 	}
+	kill, err := api.store.KillSwitch(r.Context(), scope)
+	if err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	if kill.Enabled {
+		writeCatalogBulkError(w, catalogbulk.ErrKillSwitch)
+		return
+	}
 	approved, err := api.approvals.Request(r.Context(), scope, approvalID)
 	if err != nil || approved.State != approval.StateApproved || approved.Action != "catalog.bulk.apply" || approved.ResourceType != "catalog_bulk_preview" || approved.ResourceID != preview.ID {
 		writeCatalogBulkError(w, catalogbulk.ErrApproval)
 		return
 	}
-	run, err := catalogbulk.NewRun(stableID("cbr_", 32, scope, key), key, approvalID, preview, api.now())
+	actorRef := principal.SubjectRef
+	if actorRef == "" {
+		actorRef = principal.Subject
+	}
+	run, err := catalogbulk.NewRun(stableID("cbr_", 32, scope, key), key, approvalID, actorRef, preview, api.now())
 	if err != nil {
 		writeCatalogBulkError(w, err)
 		return
@@ -174,6 +244,73 @@ func (api catalogBulkAPI) apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, created)
+}
+
+func (api catalogBulkAPI) runs(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.store == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Catalog bulk workspace is unavailable")
+		return
+	}
+	limit, cursor, valid := catalogBulkPage(r)
+	if !valid {
+		writeProblem(w, http.StatusBadRequest, "Invalid catalog bulk cursor")
+		return
+	}
+	items, next, err := api.store.ListRuns(r.Context(), scope, cursor, limit)
+	if err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
+}
+
+type catalogBulkKillSwitchRequest struct {
+	Enabled bool   `json:"enabled"`
+	Reason  string `json:"reason"`
+}
+
+func (api catalogBulkAPI) killSwitch(w http.ResponseWriter, r *http.Request) {
+	scope, ok := ScopeFromContext(r.Context())
+	if !ok || api.store == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "Catalog bulk workspace is unavailable")
+		return
+	}
+	control, err := api.store.KillSwitch(r.Context(), scope)
+	if err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, control)
+}
+
+func (api catalogBulkAPI) setKillSwitch(w http.ResponseWriter, r *http.Request) {
+	scope, principalOK := ScopeFromContext(r.Context())
+	_, hasPrincipal := PrincipalFromContext(r.Context())
+	if !principalOK || !hasPrincipal || api.store == nil {
+		writeProblem(w, http.StatusForbidden, "Authenticated operator is required")
+		return
+	}
+	var request catalogBulkKillSwitchRequest
+	if decodeStrictJSON(r, &request) != nil || len(request.Reason) > 500 || strings.TrimSpace(request.Reason) != request.Reason {
+		writeProblem(w, http.StatusBadRequest, "Invalid kill switch request")
+		return
+	}
+	current, err := api.store.KillSwitch(r.Context(), scope)
+	if err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	control := catalogbulk.KillSwitch{Enabled: request.Enabled, Reason: request.Reason, Version: current.Version + 1, UpdatedAt: api.now()}
+	if control.Validate() != nil {
+		writeCatalogBulkError(w, catalogbulk.ErrInvalid)
+		return
+	}
+	if err := api.store.SetKillSwitch(r.Context(), scope, control); err != nil {
+		writeCatalogBulkError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, control)
 }
 
 func (api catalogBulkAPI) runItem(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +329,7 @@ func (api catalogBulkAPI) runItem(w http.ResponseWriter, r *http.Request) {
 }
 
 type catalogBulkReconcileRequest struct {
-	RowID       string                         `json:"row_id"`
+	RowID       string                        `json:"row_id"`
 	Observation catalogbulk.RemoteObservation `json:"observation"`
 }
 
@@ -220,7 +357,10 @@ func (api catalogBulkAPI) reconcile(w http.ResponseWriter, r *http.Request) {
 	}
 	var row catalogbulk.Row
 	for _, candidate := range preview.Rows {
-		if candidate.ID == request.RowID { row = candidate; break }
+		if candidate.ID == request.RowID {
+			row = candidate
+			break
+		}
 	}
 	if row.ID == "" {
 		writeCatalogBulkError(w, catalogbulkrepo.ErrNotFound)
@@ -236,12 +376,34 @@ func (api catalogBulkAPI) reconcile(w http.ResponseWriter, r *http.Request) {
 
 func writeCatalogBulkError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, catalogbulk.ErrInvalid): writeProblem(w, http.StatusBadRequest, "Bad Request")
-	case errors.Is(err, catalogbulk.ErrTooLarge): writeProblem(w, http.StatusRequestEntityTooLarge, "Catalog bulk selection exceeds the bounded limit")
-	case errors.Is(err, catalogbulk.ErrStale): writeProblem(w, http.StatusConflict, "Preview is stale and must be rebuilt")
-	case errors.Is(err, catalogbulk.ErrApproval): writeProblem(w, http.StatusConflict, "Matching approval is required")
-	case errors.Is(err, catalogbulk.ErrConflict), errors.Is(err, catalogbulkrepo.ErrConflict): writeProblem(w, http.StatusConflict, "Conflict")
-	case errors.Is(err, catalogbulkrepo.ErrNotFound): writeProblem(w, http.StatusNotFound, "Not Found")
-	default: writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+	case errors.Is(err, catalogbulk.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+	case errors.Is(err, catalogbulk.ErrTooLarge):
+		writeProblem(w, http.StatusRequestEntityTooLarge, "Catalog bulk selection exceeds the bounded limit")
+	case errors.Is(err, catalogbulk.ErrStale):
+		writeProblem(w, http.StatusConflict, "Preview is stale and must be rebuilt")
+	case errors.Is(err, catalogbulk.ErrApproval):
+		writeProblem(w, http.StatusConflict, "Matching approval is required")
+	case errors.Is(err, catalogbulk.ErrKillSwitch):
+		writeProblem(w, http.StatusConflict, "Mass catalog writes are stopped by the workspace kill switch")
+	case errors.Is(err, catalogbulk.ErrConflict), errors.Is(err, catalogbulkrepo.ErrConflict):
+		writeProblem(w, http.StatusConflict, "Conflict")
+	case errors.Is(err, catalogbulkrepo.ErrNotFound):
+		writeProblem(w, http.StatusNotFound, "Not Found")
+	default:
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 	}
+}
+
+func catalogBulkPage(r *http.Request) (int, string, bool) {
+	limit := 50
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, "", false
+		}
+		limit = parsed
+	}
+	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
+	return limit, cursor, limit >= 1 && limit <= 100 && len(cursor) <= 256 && cursor == r.URL.Query().Get("cursor")
 }

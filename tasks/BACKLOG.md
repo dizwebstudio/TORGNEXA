@@ -1211,14 +1211,17 @@ gate until redacted target-topology evidence is retained.
 
 ## Epic 185 — Массовое управление каталогом
 
-Task 230 is planned as the unified multi-channel bulk workspace. Task 222
+Task 230 is repository-complete as the unified multi-channel bulk workspace. Task 222
 already provides PIM/card, attributes, localized content, media and quality
 foundations; Task 221 provides price preview/guards; Task 225 covers promotion
 and advertising writes. Task 230 connects selection, channel comparison,
 bulk editing of cards/images/attributes/variants/prices/descriptions,
-preview/diff, approval, per-row apply, read-after-write, reconciliation and
-authenticated E2E in one interface. PIM remains canonical and unsupported
-channel writes remain `read_only` or `qualification_required`. See
+preview/diff, approval, per-row apply, cursor history, actor/audit evidence,
+kill switch, read-after-write, reconciliation and authenticated E2E in one
+interface. PIM remains canonical and unsupported channel writes remain
+`read_only` or `qualification_required`. Repository synthetic qualification is
+available through `make mass-catalog-qualification`; credentialed channel
+taxonomy/write/read-after-write evidence remains an external release-gate. See
 `tasks/issues/230-mass-catalog-management.md`.
 
 ## Epic 186 — Экосистема и поддержка

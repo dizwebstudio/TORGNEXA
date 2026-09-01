@@ -83,6 +83,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/catalogbulk",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/compliance",
       "kind": "core_domain"
     },
@@ -384,6 +388,10 @@
     },
     {
       "path": "internal/platform/postgres/backfillrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/catalogbulkrepo",
       "kind": "infrastructure_adapter"
     },
     {

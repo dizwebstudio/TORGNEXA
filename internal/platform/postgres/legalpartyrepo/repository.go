@@ -52,6 +52,17 @@ func (r *Repository) IndividualEntrepreneur(ctx context.Context, s legalparty.Sc
 	})
 	return out, err
 }
+
+// Branch returns a tenant-scoped canonical branch master.
+func (r *Repository) Branch(ctx context.Context, s legalparty.Scope, id legalparty.ID) (legalparty.Branch, error) {
+	var out legalparty.Branch
+	err := r.withTx(ctx, true, s, func(tx *sql.Tx) error {
+		var e error
+		out, e = scanBranch(tx.QueryRowContext(ctx, `SELECT id,organization_id,workspace_id,legal_entity_id,code,name,country_code,kpp,status,version,created_at,updated_at FROM legal_branches WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, s.OrganizationID(), s.WorkspaceID(), id.String()))
+		return e
+	})
+	return out, err
+}
 func (r *Repository) Counterparty(ctx context.Context, s legalparty.Scope, id legalparty.ID) (legalparty.Counterparty, error) {
 	var out legalparty.Counterparty
 	err := r.withTx(ctx, true, s, func(tx *sql.Tx) error {

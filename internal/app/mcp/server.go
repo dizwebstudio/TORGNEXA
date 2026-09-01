@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/customerservice"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
@@ -59,6 +60,7 @@ const (
 	permissionOrdersRead                = "commerce.orders.read"
 	permissionCounterpartiesRead        = "party.counterparties.read"
 	permissionPriceChangeRequest        = "commerce.price.change.request"
+	permissionCatalogBulkPreview        = "commerce.catalog.bulk.preview"
 	permissionGrowthPreview             = "commerce.marketplace.growth.preview"
 	permissionConnectorReadinessRead    = "commerce.connectors.readiness.read"
 	permissionFinancialCompletenessRead = "commerce.finance.completeness.read"
@@ -140,6 +142,7 @@ type Dependencies struct {
 	LegalParties                LegalPartySearcher
 	PriceChanges                PriceChangeRequester
 	ListingPreviewer            ListingPreviewer
+	CatalogBulkPreviewer        CatalogBulkPreviewer
 	GrowthPreviewer             GrowthPreviewer
 	ReadinessReader             ConnectorReadinessReader
 	FinancialCompletenessReader FinancialCompletenessReader
@@ -159,6 +162,7 @@ type Server struct {
 	legalParties          LegalPartySearcher
 	priceChanges          PriceChangeRequester
 	listingPreview        ListingPreviewer
+	catalogBulkPreview    CatalogBulkPreviewer
 	growthPreview         GrowthPreviewer
 	readiness             ConnectorReadinessReader
 	financialCompleteness FinancialCompletenessReader
@@ -193,7 +197,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, customerService: deps.CustomerServiceReader, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, catalogBulkPreview: deps.CatalogBulkPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, customerService: deps.CustomerServiceReader, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -213,6 +217,31 @@ func (localListingPreviewer) PreviewListing(_ context.Context, identity Identity
 	}
 	digest := sha256.Sum256(data)
 	return marketplacelisting.BuildBatchPreview("mcp.preview."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.ChannelAccountID, input.ChannelID, input.Taxonomy, input.Items, input.Operations, time.Now().UTC())
+}
+
+type localCatalogBulkPreviewer struct {
+	now func() time.Time
+}
+
+func (p localCatalogBulkPreviewer) PreviewCatalogBulk(_ context.Context, identity Identity, input CatalogBulkPreviewInput) (catalogbulk.Preview, error) {
+	if !identity.Valid() || len(input.Projections) == 0 || len(input.Projections) > catalogbulk.MaxRows {
+		return catalogbulk.Preview{}, ErrInvalid
+	}
+	for _, projection := range input.Projections {
+		if projection.Draft.OrganizationID != identity.Tenant.OrganizationID().String() || projection.Draft.WorkspaceID != identity.Tenant.WorkspaceID().String() {
+			return catalogbulk.Preview{}, ErrForbidden
+		}
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		return catalogbulk.Preview{}, ErrInvalid
+	}
+	digest := sha256.Sum256(data)
+	at := time.Now().UTC()
+	if p.now != nil {
+		at = p.now().UTC()
+	}
+	return catalogbulk.BuildPreview("mcp.catalog.bulk."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.Selection, input.Projections, input.Changes, at)
 }
 
 type localGrowthPreviewer struct{}
@@ -576,6 +605,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.listingPreview.PreviewListing(ctx, identity, input)
+	case "commerce.catalog.bulk.preview":
+		if s.catalogBulkPreview == nil {
+			return nil, ErrUnavailable
+		}
+		var input CatalogBulkPreviewInput
+		if err := decodeArguments(raw, &input); err != nil {
+			return nil, ErrInvalid
+		}
+		return s.catalogBulkPreview.PreviewCatalogBulk(ctx, identity, input)
 	case "commerce.marketplace.growth.preview":
 		if s.growthPreview == nil {
 			return nil, ErrUnavailable
@@ -624,6 +662,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		counterpartyTool(s.legalParties != nil),
 		priceChangeTool(s.priceChanges != nil),
 		listingPreviewTool(s.listingPreview != nil),
+		catalogBulkPreviewTool(s.catalogBulkPreview != nil),
 		growthPreviewTool(s.growthPreview != nil),
 		connectorReadinessTool(s.readiness != nil),
 		financialCompletenessTool(s.financialCompleteness != nil),
@@ -673,7 +712,7 @@ func governanceMetrics(name string, raw json.RawMessage) (agentgovernance.Action
 			return agentgovernance.ActionMetrics{}, ErrInvalid
 		}
 		return agentgovernance.ActionMetrics{Money: &agentgovernance.Money{Currency: input.Currency, MinorUnits: input.MinorUnits}}, nil
-	case "commerce.marketplace.growth.preview":
+	case "commerce.marketplace.growth.preview", "commerce.catalog.bulk.preview":
 		var input marketplacegrowth.PreviewRequest
 		if err := decodeArguments(raw, &input); err != nil || input.Validate() != nil {
 			return agentgovernance.ActionMetrics{}, ErrInvalid
@@ -750,7 +789,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, CatalogBulkPreviewer: localCatalogBulkPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

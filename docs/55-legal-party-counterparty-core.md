@@ -16,6 +16,13 @@ Remote ERP/EDO/provider identifiers stay in `connector_entity_mappings` v4. They
 
 `GET /api/v1/counterparties/search` is tenant-scoped from authenticated context and supports bounded name/INN/registration-id search. Explainable duplicate detection gives exact identifier and normalized-name signals. Merge preview is deterministic, fingerprinted, tenant-bound, and non-executing; actual destructive merge remains a later approved workflow.
 
+The UI and public API now expose the complete initial workflow. `POST
+/api/v1/legal-parties` creates a draft canonical master (legal entity, IP or
+branch), while `POST /api/v1/counterparties` assigns a role to an existing
+master. The role endpoint verifies the referenced party in the same
+organization/workspace before writing the relationship, so counterparty roles
+cannot become detached or duplicate legal-party реквизиты.
+
 ## Evidence
 
 Every repository mutation commits the canonical row together with Task-003 Audit, Task-008 Outbox event `enterprise.legal_party.record_changed.v1`, and Task-030 Lineage evidence in one transaction. Audit/event payloads contain IDs/version/change only; names, INN, bank account numbers and authority details are not copied into those logs.

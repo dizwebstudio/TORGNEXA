@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/customerservice"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
@@ -38,6 +39,21 @@ type ListingPreviewInput struct {
 // available through the authenticated HTTP approval boundary.
 type ListingPreviewer interface {
 	PreviewListing(context.Context, Identity, ListingPreviewInput) (marketplacelisting.BatchPreview, error)
+}
+
+// CatalogBulkPreviewInput is the provider-neutral bulk catalog dry-run input.
+// It deliberately contains no tenant selector, credentials or raw provider
+// payload; the authenticated MCP identity supplies the tenant scope.
+type CatalogBulkPreviewInput struct {
+	Selection   catalogbulk.SelectionSnapshot `json:"selection"`
+	Projections []catalogbulk.Projection      `json:"projections"`
+	Changes     []catalogbulk.Change          `json:"changes"`
+}
+
+// CatalogBulkPreviewer exposes the same quality and capability checks as the
+// HTTP bulk workspace, while keeping MCP strictly preview-only.
+type CatalogBulkPreviewer interface {
+	PreviewCatalogBulk(context.Context, Identity, CatalogBulkPreviewInput) (catalogbulk.Preview, error)
 }
 
 // GrowthPreviewer exposes the promotion/advertising dry-run to MCP. It never
@@ -168,6 +184,19 @@ func listingPreviewTool(available bool) toolDescriptor {
 			"items":                map[string]any{"type": "array", "minItems": 1, "maxItems": marketplacelisting.MaxBatchItems, "items": map[string]any{"type": "object"}},
 			"operations":           map[string]any{"type": "array", "maxItems": 512, "items": map[string]any{"type": "object"}},
 		}, []string{"connector_account_id", "connector_id", "taxonomy", "items"}),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
+	}}
+}
+
+func catalogBulkPreviewTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionCatalogBulkPreview, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.catalog.bulk.preview", Title: "Preview mass catalog changes",
+		Description: "Build a bounded multi-channel before/after preview for content, attributes, variants, media, prices and stock. Dry-run only; HTTP approval is the only apply boundary.",
+		InputSchema: objectSchema(map[string]any{
+			"selection":   map[string]any{"type": "object"},
+			"projections": map[string]any{"type": "array", "minItems": 1, "maxItems": catalogbulk.MaxRows, "items": map[string]any{"type": "object"}},
+			"changes":     map[string]any{"type": "array", "minItems": 1, "maxItems": 512, "items": map[string]any{"type": "object"}},
+		}, []string{"selection", "projections", "changes"}),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
 	}}
 }

@@ -26,7 +26,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 ]);
 
 export const navigationSections = [
-  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "marketplace-listing", "returns", "customer-service", "incidents", "marking", "replenishment", "pricing"]},
+  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "marketplace-listing", "mass-catalog", "returns", "customer-service", "incidents", "marking", "replenishment", "pricing"]},
   {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "marketplace-operations", "social"]},
   {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "financial-analytics", "advertising", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
@@ -35,6 +35,7 @@ export const navigationSections = [
 export const navigationItems: readonly NavigationItem[] = [
   {id: "dashboard", label: "Обзор", path: "/", risk: "READ", icon: "dashboard", shortcut: "G D"},
   {id: "catalog", label: "Каталог", path: "/catalog", capability: "products.read", risk: "READ", icon: "catalog", shortcut: "G C"},
+  {id: "mass-catalog", label: "Массовый каталог", path: "/catalog/bulk", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "catalog"},
   {id: "publication-quality", label: "Качество публикации", path: "/publication-quality", capability: "products.read", risk: "READ", icon: "compliance", shortcut: "G Q"},
   {id: "marketplace-publication", label: "Публикация товаров", path: "/marketplace-publications", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "sync"},
   {id: "marketplace-listing", label: "Карточки marketplace", path: "/marketplace-listings", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "catalog"},

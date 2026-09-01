@@ -143,6 +143,14 @@ paths:
       responses:
         '200': {description: Effective bulk catalog channel capabilities, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkChannelPage'}}}}
   /catalog/bulk/previews:
+    get:
+      operationId: listCatalogBulkPreviews
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 256}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Cursor page of immutable catalog bulk previews, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkPreviewPage'}}}}
     post:
       operationId: previewCatalogBulk
       security: [{bearerAuth: []}]
@@ -169,7 +177,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkApplyRequest'}}}}
       responses:
         '202': {description: Approved bulk operation queued by channel/account partitions, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkRun'}}}}
-        '409': {description: Preview is stale, approval is missing or a channel is not qualified}
+        '409': {description: 'Preview is stale, approval is missing or a channel is not qualified'}
   /catalog/bulk/runs/{run_id}:
     get:
       operationId: getCatalogBulkRun
@@ -179,6 +187,15 @@ paths:
       responses:
         '200': {description: Durable per-row catalog bulk result, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkRun'}}}}
         '404': {description: Run not found}
+  /catalog/bulk/runs:
+    get:
+      operationId: listCatalogBulkRuns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: cursor, in: query, required: false, schema: {type: string, maxLength: 256}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Cursor page of durable catalog bulk runs, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkRunPage'}}}}
   /catalog/bulk/runs/{run_id}/reconcile:
     post:
       operationId: reconcileCatalogBulkRun
@@ -189,6 +206,18 @@ paths:
       responses:
         '200': {description: Normalized read-after-write reconciliation result, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkReconciliation'}}}}
         '409': {description: Remote state is mismatched or unknown}
+  /catalog/bulk/kill-switch:
+    get:
+      operationId: getCatalogBulkKillSwitch
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Workspace emergency stop state, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkKillSwitch'}}}}
+    post:
+      operationId: setCatalogBulkKillSwitch
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkKillSwitchWrite'}}}}
+      responses:
+        '200': {description: Updated workspace emergency stop state, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkKillSwitch'}}}}
   /social/channels:
     get:
       operationId: listSocialChannels
@@ -1869,6 +1898,18 @@ paths:
               schema: {$ref: '#/components/schemas/LegalPartySearchPage'}
         '400': {description: Invalid legal-party search query}
         '401': {description: Authenticated tenant scope missing}
+  /legal-parties:
+    post:
+      operationId: createLegalParty
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LegalPartyCreate'}}}}
+      responses:
+        '201':
+          description: Canonical legal-party master created in draft state
+          content: {application/json: {schema: {$ref: '#/components/schemas/LegalPartyRecord'}}}
+        '400': {description: Invalid legal-party master or idempotency key}
+        '409': {description: Legal-party or idempotency conflict}
   /connectors:
     get:
       operationId: listConnectors
@@ -3765,6 +3806,18 @@ paths:
           description: Tenant-scoped canonical counterparty role page
           content: {application/json: {schema: {$ref: '#/components/schemas/CounterpartyPage'}}}
         '400': {description: Invalid limit}
+    post:
+      operationId: createCounterparty
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CounterpartyCreate'}}}}
+      responses:
+        '201':
+          description: Counterparty role created for an existing canonical legal party
+          content: {application/json: {schema: {$ref: '#/components/schemas/CounterpartyRecord'}}}
+        '400': {description: Invalid role or idempotency key}
+        '409': {description: Counterparty or idempotency conflict}
+        '422': {description: Referenced canonical legal party does not exist}
   /procurement/suppliers:
     get:
       operationId: listProcurementSuppliers
@@ -5611,6 +5664,251 @@ components:
         expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         decision: {type: string, enum: [reconciled, needs_attention]}
         drifts: {type: array, maxItems: 16, items: {type: object, additionalProperties: false}}
+    CatalogBulkChannel:
+      type: object
+      additionalProperties: false
+      required: [channel_id, label, state, capabilities, observed_at, fresh_until]
+      properties:
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        label: {type: string, minLength: 1, maxLength: 200}
+        state: {type: string, enum: [read_only, partially_supported, ready, qualified, qualification_required, not_available]}
+        capabilities: {type: array, maxItems: 64, items: {type: string, maxLength: 128}}
+        taxonomy_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        taxonomy_version: {type: integer, minimum: 0}
+        mapping_version: {type: integer, minimum: 0}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+        fresh_until: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkChannelPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/CatalogBulkChannel'}}
+    CatalogBulkSelection:
+      type: object
+      additionalProperties: false
+      required: [filter_digest, filter, skus, targets, snapshot_version, created_at, expires_at]
+      properties:
+        filter_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        filter: {type: string, pattern: '^[a-z][a-z0-9._:-]{0,127}$'}
+        product_ids: {type: array, maxItems: 1000, items: {type: string, maxLength: 192}}
+        skus: {type: array, minItems: 1, maxItems: 1000, items: {type: string, minLength: 1, maxLength: 200}}
+        targets: {type: array, minItems: 1, maxItems: 8, items: {$ref: '#/components/schemas/CatalogBulkTarget'}}
+        snapshot_version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkTarget:
+      type: object
+      additionalProperties: false
+      required: [channel_id, account_id, label, state, taxonomy_fingerprint, taxonomy_version, mapping_version, fresh_until, observed_at]
+      properties:
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        label: {type: string, minLength: 1, maxLength: 200}
+        state: {type: string, enum: [read_only, partially_supported, ready, qualified, qualification_required, not_available]}
+        capabilities: {type: array, maxItems: 64, items: {type: string, maxLength: 128}}
+        taxonomy_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        taxonomy_version: {type: integer, minimum: 1}
+        mapping_version: {type: integer, minimum: 1}
+        fresh_until: {type: string, format: date-time, pattern: 'Z$'}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkMediaEdit:
+      type: object
+      additionalProperties: false
+      required: [asset_id, asset_digest, slot, format, bytes, width, height, position, released, safe]
+      properties:
+        asset_id: {type: string, maxLength: 192}
+        asset_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        slot: {type: string, maxLength: 128}
+        format: {type: string, pattern: '^[a-z0-9]+/[a-z0-9.+-]+$', maxLength: 128}
+        bytes: {type: integer, format: int64, minimum: 1, maximum: 104857600}
+        width: {type: integer, minimum: 1, maximum: 100000}
+        height: {type: integer, minimum: 1, maximum: 100000}
+        position: {type: integer, minimum: 0, maximum: 1000}
+        released: {type: boolean, const: true}
+        safe: {type: boolean, const: true}
+    CatalogBulkChange:
+      type: object
+      additionalProperties: false
+      required: [kind, field]
+      properties:
+        kind: {type: string, enum: [set, replace, append, remove, normalize, copy, add_media, replace_media, remove_media, reorder_media, set_price, set_stock]}
+        field: {type: string, maxLength: 128}
+        value: {type: string, maxLength: 16000}
+        from_field: {type: string, maxLength: 128}
+        media: {$ref: '#/components/schemas/CatalogBulkMediaEdit'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        price_minor_units: {type: integer, format: int64, minimum: 0}
+        stock: {type: integer, format: int64, minimum: 0}
+    CatalogBulkProjection:
+      type: object
+      additionalProperties: false
+      required: [sku, product_id, channel_id, account_id, draft, currency, price_minor_units, stock, version]
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 200}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        draft: {$ref: '#/components/schemas/MarketplaceListingDraft'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        price_minor_units: {type: integer, format: int64, minimum: 0}
+        stock: {type: integer, format: int64, minimum: 0}
+        version: {type: integer, minimum: 1}
+        published_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    CatalogBulkPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [selection, projections, changes]
+      properties:
+        selection: {$ref: '#/components/schemas/CatalogBulkSelection'}
+        projections: {type: array, minItems: 1, maxItems: 8000, items: {$ref: '#/components/schemas/CatalogBulkProjection'}}
+        changes: {type: array, minItems: 1, maxItems: 512, items: {$ref: '#/components/schemas/CatalogBulkChange'}}
+    CatalogBulkDiagnostic:
+      type: object
+      additionalProperties: false
+      required: [code, severity, field_path, message, remediation]
+      properties:
+        code: {type: string, maxLength: 128}
+        severity: {type: string, enum: [block, warn]}
+        field_path: {type: string, maxLength: 256}
+        message: {type: string, maxLength: 300}
+        expected: {type: string, maxLength: 256}
+        observed: {type: string, maxLength: 256}
+        remediation: {type: string, maxLength: 300}
+    CatalogBulkRow:
+      type: object
+      additionalProperties: false
+      required: [id, sku, product_id, channel_id, account_id, capability_state, before, after, before_digest, after_digest, eligible, state, expected_version]
+      properties:
+        id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 200}
+        product_id: {type: string, maxLength: 192}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        capability_state: {type: string, enum: [read_only, partially_supported, ready, qualified, qualification_required, not_available]}
+        before: {$ref: '#/components/schemas/CatalogBulkProjection'}
+        after: {$ref: '#/components/schemas/CatalogBulkProjection'}
+        before_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        after_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        changed_fields: {type: array, maxItems: 512, items: {type: string, maxLength: 128}}
+        diagnostics: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/CatalogBulkDiagnostic'}}
+        eligible: {type: boolean}
+        state: {type: string, enum: [ready, blocked, queued, applied, rejected, conflict, unknown, skipped, manual_attention]}
+        expected_version: {type: integer, minimum: 1}
+    CatalogBulkPreview:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, selection, changes, input_digest, affected_sku_count, affected_row_count, eligible_row_count, blocked_row_count, state, rows, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        selection: {$ref: '#/components/schemas/CatalogBulkSelection'}
+        changes: {type: array, maxItems: 512, items: {$ref: '#/components/schemas/CatalogBulkChange'}}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        affected_sku_count: {type: integer, minimum: 1, maximum: 1000}
+        affected_row_count: {type: integer, minimum: 1, maximum: 8000}
+        eligible_row_count: {type: integer, minimum: 0, maximum: 8000}
+        blocked_row_count: {type: integer, minimum: 0, maximum: 8000}
+        state: {type: string, enum: [previewed]}
+        rows: {type: array, maxItems: 8000, items: {$ref: '#/components/schemas/CatalogBulkRow'}}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkPreviewPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/CatalogBulkPreview'}}
+        next_cursor: {type: string, maxLength: 256}
+    CatalogBulkApplyRequest:
+      type: object
+      additionalProperties: false
+      required: [preview_id]
+      properties:
+        preview_id: {type: string, maxLength: 192}
+    CatalogBulkRowResult:
+      type: object
+      additionalProperties: false
+      required: [row_id, sku, channel_id, account_id, state]
+      properties:
+        row_id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 200}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        state: {type: string, enum: [ready, blocked, queued, applied, rejected, conflict, unknown, skipped, manual_attention]}
+        error_code: {type: string, maxLength: 128}
+        remote_receipt_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reconciliation_ref: {type: string, maxLength: 192}
+    CatalogBulkRun:
+      type: object
+      additionalProperties: false
+      required: [id, preview_id, organization_id, workspace_id, actor_ref, idempotency_key, approval_ref, state, input_digest, partitions, results, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        preview_id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        approval_ref: {type: string, maxLength: 192}
+        state: {type: string, enum: [queued, running, partial, completed, failed, cancelled, unknown]}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        partitions: {type: array, minItems: 1, maxItems: 8000, items: {type: string, maxLength: 385}}
+        results: {type: array, maxItems: 8000, items: {$ref: '#/components/schemas/CatalogBulkRowResult'}}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+        actor_ref: {type: string, maxLength: 192}
+    CatalogBulkRunPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/CatalogBulkRun'}}
+        next_cursor: {type: string, maxLength: 256}
+    CatalogBulkKillSwitch:
+      type: object
+      additionalProperties: false
+      required: [enabled, reason, version, updated_at]
+      properties:
+        enabled: {type: boolean}
+        reason: {type: string, maxLength: 500}
+        version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkKillSwitchWrite:
+      type: object
+      additionalProperties: false
+      required: [enabled, reason]
+      properties:
+        enabled: {type: boolean}
+        reason: {type: string, maxLength: 500}
+    CatalogBulkReconcileRequest:
+      type: object
+      additionalProperties: false
+      required: [row_id, observation]
+      properties:
+        row_id: {type: string, maxLength: 192}
+        observation: {$ref: '#/components/schemas/CatalogBulkRemoteObservation'}
+    CatalogBulkRemoteObservation:
+      type: object
+      additionalProperties: false
+      required: [row_id, remote_id, observed_digest, status, observed_at]
+      properties:
+        row_id: {type: string, maxLength: 192}
+        remote_id: {type: string, maxLength: 192}
+        observed_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, maxLength: 64}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    CatalogBulkReconciliation:
+      type: object
+      additionalProperties: false
+      required: [row_id, expected_digest, observed_digest, decision, drifts]
+      properties:
+        row_id: {type: string, maxLength: 192}
+        expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observed_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        decision: {type: string, enum: [reconciled, needs_attention]}
+        drifts: {type: array, maxItems: 8, items: {type: string, maxLength: 128}}
     MarketplacePublicationTarget:
       type: object
       additionalProperties: false
@@ -7103,6 +7401,58 @@ components:
         action: {type: string, enum: [export, correct, delete, restrict]}
         status: {type: string, enum: [pending]}
         created_at: {type: string, format: date-time, pattern: 'Z$'}
+    LegalPartyCreate:
+      type: object
+      additionalProperties: false
+      required: [party_type, code, country_code]
+      properties:
+        party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+        code: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        legal_name: {type: string, maxLength: 500}
+        short_name: {type: string, maxLength: 300}
+        full_name: {type: string, maxLength: 500}
+        name: {type: string, maxLength: 500}
+        country_code: {type: string, pattern: '^[A-Z]{2}$'}
+        inn: {type: string, maxLength: 12}
+        kpp: {type: string, maxLength: 16}
+        ogrn: {type: string, maxLength: 32}
+        ogrnip: {type: string, maxLength: 32}
+        legal_entity_id: {type: string, maxLength: 64}
+    LegalPartyRecord:
+      type: object
+      additionalProperties: false
+      required: [party_type, party_id, code, display_name, status]
+      properties:
+        party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+        party_id: {type: string}
+        code: {type: string}
+        display_name: {type: string}
+        inn: {type: string}
+        registration_id: {type: string}
+        status: {type: string, enum: [draft, active, archived]}
+    CounterpartyCreate:
+      type: object
+      additionalProperties: false
+      required: [code, party_type, party_id, role]
+      properties:
+        code: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+        party_id: {type: string, minLength: 1, maxLength: 64}
+        role: {type: string, enum: [customer, supplier, partner, other]}
+    CounterpartyRecord:
+      type: object
+      additionalProperties: false
+      required: [id, code, party_type, party_id, role, status, version, created_at, updated_at]
+      properties:
+        id: {type: string}
+        code: {type: string}
+        party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
+        party_id: {type: string}
+        role: {type: string, enum: [customer, supplier, partner, other]}
+        status: {type: string, enum: [draft, active, archived]}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
     CounterpartyPage:
       type: object
       additionalProperties: false
@@ -7111,20 +7461,7 @@ components:
         items:
           type: array
           maxItems: 100
-          items:
-            type: object
-            additionalProperties: false
-            required: [id, code, party_type, party_id, role, status, version, created_at, updated_at]
-            properties:
-              id: {type: string}
-              code: {type: string}
-              party_type: {type: string, enum: [legal_entity, individual_entrepreneur, branch]}
-              party_id: {type: string}
-              role: {type: string, enum: [customer, supplier, partner, other]}
-              status: {type: string, enum: [draft, active, archived]}
-              version: {type: integer, minimum: 1}
-              created_at: {type: string, format: date-time, pattern: 'Z$'}
-              updated_at: {type: string, format: date-time, pattern: 'Z$'}
+          items: {$ref: '#/components/schemas/CounterpartyRecord'}
     FXRateFactPage:
       type: object
       additionalProperties: false

@@ -2,11 +2,22 @@
 
 ## Статус
 
-`planned` — карточка товара, PIM, quality gate, изображения, channel
+`repository-complete` — карточка товара, PIM, quality gate, изображения, channel
 projection и отдельные pricing/repricing preview уже существуют в Tasks 221 и
-222. Не закрыт единый multi-channel workspace, где одной операцией можно
-безопасно менять карточки, изображения, характеристики, цены и описания с
-различиями по каждому каналу.
+222. Единый multi-channel workspace, где одной операцией можно безопасно
+менять карточки, изображения, характеристики, цены и описания с различиями по
+каждому каналу, реализован ниже.
+
+Репозиторный контур Task 230 закрыт: реализованы единый immutable scope и
+selection snapshot, сравнение channel projections, typed bulk changes для
+контента/локализаций/категорий/характеристик/вариантов/media/цен/остатков,
+quality/compliance и capability gates, preview/diff, approval-bound partial
+apply, cursor history, actor/audit evidence, reconciliation, RLS, quotas,
+recovery и tenant-scoped kill switch. Добавлены REST/OpenAPI, Go/Python/
+TypeScript SDK, MCP dry-run, frontend workspace, synthetic qualification,
+E2E/contract fixtures и операционная документация. Реальные credentialed
+записи и read-after-write каждого marketplace остаются внешним release-gate;
+неподтверждённые каналы не получают статус `qualified`.
 
 ## Цель
 
@@ -366,8 +377,13 @@ retained evidence.
   вариантов, цен и описаний по нескольким каналам.
 - Preview/diff, quality, approval, per-row results, retry, read-after-write,
   reconciliation, RLS, audit, quotas и kill switch работают согласованно.
-- Для каждой массовой write capability есть conformance/live or sandbox
-  evidence; unsupported channels остаются read-only/qualification_required.
+- Для каждой массовой write capability в репозитории есть synthetic или
+  sandbox boundary evidence; unsupported channels остаются
+  read-only/qualification_required. Credentialed marketplace evidence
+  заполняется на целевой topology перед release.
 - Пройдены `gofmt`, `go test ./...`, `go vet ./...`,
-  `./scripts/check-contracts.sh`, `make architecture`, `make migrations`,
-  frontend typecheck/build и connector conformance на целевой topology.
+  `./scripts/check-contracts.sh`, `make migrations`,
+  frontend typecheck/build и `make mass-catalog-qualification`. Общий
+  `make architecture` остаётся отдельным legacy-gate: он сейчас сообщает о
+  старых ADR/review и provider-ветках вне Task 230; собственный ADR/review и
+  новые catalogbulk-модули соответствуют архитектурному контракту.

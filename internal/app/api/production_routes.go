@@ -12,8 +12,8 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
-	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo"
@@ -88,7 +88,9 @@ type productionRouteDependencies struct {
 	customerService        *customerservicerepo.Repository
 	lineage                lineage.Reader
 	legalParties           LegalPartySearcher
+	legalPartyWriter       legalPartyWriter
 	counterparties         counterpartyLister
+	counterpartyWriter     counterpartyWriter
 	entitlements           *entitlements.Service
 	quotas                 *entitlements.QuotaService
 	webhooks               webhookService
@@ -174,7 +176,8 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newReportRoutes(deps.reports)...)
 	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)
-	routes = append(routes, newLegalPartyRoutes(deps.legalParties)...)
+	routes = append(routes, newLegalPartyRoutes(deps.legalParties, deps.legalPartyWriter)...)
+	routes = append(routes, newCounterpartyWriteRoutes(deps.counterpartyWriter)...)
 	routes = append(routes, newEntitlementRoutes(deps.entitlements, deps.quotas)...)
 	routes = append(routes, newWebhookRoutes(deps.webhooks)...)
 	routes = append(routes, newAIAdvisoryRoutes(deps.aiAdvisory, deps.secretProvider, deps.aiRegistry, deps.auditService, deps.trustControl)...)

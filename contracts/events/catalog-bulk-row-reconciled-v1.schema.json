@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/catalog-bulk-row-reconciled-v1.json",
+  "title": "commerce.catalog.bulk_row_reconciled.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "row_id", "expected_digest", "observed_digest", "decision", "drifts", "observed_at"],
+  "properties": {
+    "run_id": {"type": "string", "maxLength": 192},
+    "row_id": {"type": "string", "maxLength": 192},
+    "expected_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "observed_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "decision": {"type": "string", "enum": ["reconciled", "needs_attention"]},
+    "drifts": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 128}},
+    "observed_at": {"type": "string", "format": "date-time"}
+  }
+}

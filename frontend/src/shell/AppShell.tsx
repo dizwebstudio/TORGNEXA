@@ -17,6 +17,7 @@ import {UserAvatar} from "../components/UserAvatar";
 // critical bundle until the operator actually opens it.
 const DashboardPage = lazy(() => import("../pages/DashboardPage").then(module => ({default: module.DashboardPage})));
 const CatalogPage = lazy(() => import("../pages/CatalogPage").then(module => ({default: module.CatalogPage})));
+const MassCatalogPage = lazy(() => import("../pages/MassCatalogPage").then(module => ({default: module.MassCatalogPage})));
 const PublicationQualityPage = lazy(() => import("../pages/PublicationQualityPage").then(module => ({default: module.PublicationQualityPage})));
 const MarketplacePublicationPage = lazy(() => import("../pages/MarketplacePublicationPage").then(module => ({default: module.MarketplacePublicationPage})));
 const MarketplaceListingPage = lazy(() => import("../pages/MarketplaceListingPage").then(module => ({default: module.MarketplaceListingPage})));
@@ -55,6 +56,7 @@ const realtimeLabels: Readonly<Record<string, string>> = {live: "Подключ�
 
 function content(path: string) {
   if (path === "/") return <DashboardPage />;
+  if (path === "/catalog/bulk") return <MassCatalogPage />;
   if (path === "/catalog" || path.startsWith("/catalog/")) return <CatalogPage />;
   if (path === "/publication-quality") return <PublicationQualityPage />;
   if (path === "/marketplace-publications") return <MarketplacePublicationPage />;

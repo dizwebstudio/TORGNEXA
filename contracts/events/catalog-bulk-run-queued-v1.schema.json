@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/catalog-bulk-run-queued-v1.json",
+  "title": "commerce.catalog.bulk_run_queued.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "preview_id", "input_digest", "partition_count", "result_count", "approval_ref", "created_at"],
+  "properties": {
+    "run_id": {"type": "string", "maxLength": 192},
+    "preview_id": {"type": "string", "maxLength": 192},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "partition_count": {"type": "integer", "minimum": 1, "maximum": 8000},
+    "result_count": {"type": "integer", "minimum": 1, "maximum": 8000},
+    "approval_ref": {"type": "string", "maxLength": 192},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

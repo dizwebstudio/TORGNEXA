@@ -62,6 +62,27 @@ test("inventory exposes warehouse incidents and fulfillment allocation lineage",
   assert.match(inventory, /Сканирование сохраняет только digest/);
 });
 
+test("counterparties page creates canonical masters before assigning roles", () => {
+  const page = read("pages/CounterpartiesPage.tsx");
+  assert.match(page, /createLegalParty/);
+  assert.match(page, /createCounterparty/);
+  assert.match(page, /Канонический мастер/);
+  assert.match(page, /Назначить роль контрагента/);
+  assert.match(page, /legal_entity/);
+  assert.match(page, /individual_entrepreneur/);
+  assert.match(page, /branch/);
+  assert.match(page, /refetch/);
+});
+
+test("sync policy creation prevents duplicate pairs and explains API failures", () => {
+  const sync = read("pages/SyncPage.tsx");
+  assert.match(sync, /existingPolicy/);
+  assert.match(sync, /!!existingPolicy/);
+  assert.match(sync, /case 409/);
+  assert.match(sync, /case 422/);
+  assert.match(sync, /Измените его в списке ниже/);
+});
+
 test("integration settings use overview cards and a focused drawer", () => {
   const integrations = read("features/settings/IntegrationCatalog.tsx");
   const css = read("styles.css");
@@ -369,10 +390,10 @@ test("public documentation follows current navigation, settings and sign-in beha
   const navigationItems = navigation.slice(navigation.indexOf("export const navigationItems"));
   const navigationLabels = [...navigationItems.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
   const settingsLabels = [...settings.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
-  assert.equal(navigationLabels.length, 33);
+  assert.equal(navigationLabels.length, 34);
   assert.equal(settingsLabels.length, 8);
   for (const label of [...navigationLabels, ...settingsLabels]) assert.ok(docs.includes(label), label);
-  for (const route of ["/catalog", "/publication-quality", "/marketplace-publications", "/marketplace-listings", "/orders", "/returns", "/customer-service", "/inventory", "/replenishment", "/pricing", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/procurement", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/security", "/audit", "/settings"]) {
+  for (const route of ["/catalog", "/catalog/bulk", "/publication-quality", "/marketplace-publications", "/marketplace-listings", "/orders", "/returns", "/customer-service", "/inventory", "/replenishment", "/pricing", "/incidents", "/integrations", "/social", "/sync", "/counterparties", "/procurement", "/finance", "/approvals", "/workflows", "/compliance", "/notifications", "/reports", "/security", "/audit", "/settings"]) {
     assert.ok(docs.includes(route), route);
   }
   assert.match(docs, /oidc\/silent-callback\.html/);
@@ -385,6 +406,16 @@ test("public documentation follows current navigation, settings and sign-in beha
   assert.match(docs, /Fail-open режима нет/);
   assert.doesNotMatch(docs, /Войти через OIDC/);
   assert.doesNotMatch(docs, /Настройки» → «Интеграции/);
+});
+
+test("mass catalog workspace exposes guarded multi-channel editing and durable recovery", () => {
+  const page = read("pages/MassCatalogPage.tsx");
+  assert.match(page, /Capability matrix/);
+  assert.match(page, /Before \/ after diff/);
+  assert.match(page, /Согласовать и применить/);
+  assert.match(page, /Read-after-write observation/);
+  assert.match(page, /Аварийная остановка/);
+  assert.doesNotMatch(page.toLowerCase(), /localstorage|sessionstorage/);
 });
 
 test("workflow operator view exposes step evidence timeline and safe recovery", () => {

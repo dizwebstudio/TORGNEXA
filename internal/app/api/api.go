@@ -24,8 +24,8 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
-	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo"
@@ -476,7 +476,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, publicationQuality: publicationQualityRepository, pim: pimRepository,
 		images: imageRepository, catalogBulk: catalogBulkRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository, financialReports: financialRepository, financialCompleteness: financialCompletenessRepository,
-		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
+		lineage: lineageRepository, legalParties: legalPartyRepository, legalPartyWriter: legalPartyRepository, counterparties: legalPartyRepository, counterpartyWriter: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		advertising: advertisingRepository, settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
 		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository, marketplaceListing: marketplaceListingRepository, marketplaceGrowth: marketplaceGrowthRepository, marketplaceFlows: marketplaceOperationsRepository, procurement: procurementRepository, replenishment: replenishmentRepository,

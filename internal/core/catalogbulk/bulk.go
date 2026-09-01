@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -17,16 +18,18 @@ import (
 )
 
 var (
-	ErrInvalid      = errors.New("catalog bulk: invalid value")
-	ErrConflict     = errors.New("catalog bulk: conflict")
-	ErrTooLarge     = errors.New("catalog bulk: selection exceeds limit")
-	ErrStale        = errors.New("catalog bulk: preview is stale")
-	ErrNotQualified = errors.New("catalog bulk: channel is not qualified")
-	ErrApproval     = errors.New("catalog bulk: approval is required")
-	refPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
-	digestPattern   = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
-	filterPattern   = regexp.MustCompile(`^[a-z][a-z0-9._:-]{0,127}$`)
+	ErrInvalid         = errors.New("catalog bulk: invalid value")
+	ErrConflict        = errors.New("catalog bulk: conflict")
+	ErrTooLarge        = errors.New("catalog bulk: selection exceeds limit")
+	ErrStale           = errors.New("catalog bulk: preview is stale")
+	ErrNotQualified    = errors.New("catalog bulk: channel is not qualified")
+	ErrApproval        = errors.New("catalog bulk: approval is required")
+	ErrKillSwitch      = errors.New("catalog bulk: mass writes are stopped")
+	refPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+	digestPattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	currencyPattern    = regexp.MustCompile(`^[A-Z]{3}$`)
+	filterPattern      = regexp.MustCompile(`^[a-z][a-z0-9._:-]{0,127}$`)
+	mediaFormatPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9.+-]+$`)
 )
 
 const (
@@ -77,6 +80,23 @@ func (s BulkState) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// KillSwitch is tenant-scoped emergency state for catalog bulk remote writes.
+// Enabling it stops new apply intents and leaves all existing evidence intact.
+type KillSwitch struct {
+	Enabled   bool      `json:"enabled"`
+	Reason    string    `json:"reason"`
+	Version   int64     `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Validate checks the explicit operator reason and append-only version.
+func (k KillSwitch) Validate() error {
+	if k.Version < 1 || len(k.Reason) > 500 || strings.TrimSpace(k.Reason) != k.Reason || (k.Enabled && k.Reason == "") || !isUTC(k.UpdatedAt) {
+		return ErrInvalid
+	}
+	return nil
 }
 
 // RowState describes the outcome of one SKU/channel partition.
@@ -183,13 +203,17 @@ type MediaEdit struct {
 	AssetID     string `json:"asset_id"`
 	AssetDigest string `json:"asset_digest"`
 	Slot        string `json:"slot"`
+	Format      string `json:"format"`
+	Bytes       int64  `json:"bytes"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
 	Position    int    `json:"position"`
 	Released    bool   `json:"released"`
 	Safe        bool   `json:"safe"`
 }
 
 func (m MediaEdit) Validate() error {
-	if !refPattern.MatchString(m.AssetID) || !digestPattern.MatchString(m.AssetDigest) || !filterPattern.MatchString(m.Slot) || m.Position < 0 || m.Position > 1000 || !m.Released || !m.Safe {
+	if !refPattern.MatchString(m.AssetID) || !digestPattern.MatchString(m.AssetDigest) || !filterPattern.MatchString(m.Slot) || !mediaFormatPattern.MatchString(strings.ToLower(m.Format)) || m.Bytes < 1 || m.Bytes > 100*1024*1024 || m.Width < 1 || m.Height < 1 || m.Position < 0 || m.Position > 1000 || !m.Released || !m.Safe {
 		return ErrInvalid
 	}
 	return nil
@@ -324,17 +348,23 @@ type Preview struct {
 }
 
 func (p Preview) Validate(now time.Time) error {
-	if !refPattern.MatchString(p.ID) || !refPattern.MatchString(p.OrganizationID) || !refPattern.MatchString(p.WorkspaceID) || p.Selection.Validate(now) != nil || len(p.Changes) == 0 || !digestPattern.MatchString(p.InputDigest) || p.AffectedSKU != len(p.Selection.SKUs) || p.AffectedRows != len(p.Rows) || p.AffectedRows < 1 || p.AffectedRows > MaxRows || p.EligibleRows < 0 || p.BlockedRows < 0 || p.EligibleRows+p.BlockedRows != p.AffectedRows || !p.State.Valid() || p.State != StatePreviewed || !isUTC(p.CreatedAt) {
-		return ErrInvalid
+	if !refPattern.MatchString(p.ID) || !refPattern.MatchString(p.OrganizationID) || !refPattern.MatchString(p.WorkspaceID) {
+		return fmt.Errorf("catalog bulk preview: identity: %w", ErrInvalid)
+	}
+	if err := p.Selection.Validate(now); err != nil {
+		return fmt.Errorf("catalog bulk preview: selection: %w", err)
+	}
+	if len(p.Changes) == 0 || !digestPattern.MatchString(p.InputDigest) || p.AffectedSKU != len(p.Selection.SKUs) || p.AffectedRows != len(p.Rows) || p.AffectedRows < 1 || p.AffectedRows > MaxRows || p.EligibleRows < 0 || p.BlockedRows < 0 || p.EligibleRows+p.BlockedRows != p.AffectedRows || !p.State.Valid() || p.State != StatePreviewed || !isUTC(p.CreatedAt) {
+		return fmt.Errorf("catalog bulk preview: envelope: %w", ErrInvalid)
 	}
 	for _, change := range p.Changes {
 		if change.Validate() != nil {
-			return ErrInvalid
+			return fmt.Errorf("catalog bulk preview: change: %w", ErrInvalid)
 		}
 	}
 	for _, row := range p.Rows {
 		if row.Validate() != nil {
-			return ErrInvalid
+			return fmt.Errorf("catalog bulk preview: row: %w", ErrInvalid)
 		}
 	}
 	return nil
@@ -366,6 +396,7 @@ type Run struct {
 	PreviewID      string      `json:"preview_id"`
 	OrganizationID string      `json:"organization_id"`
 	WorkspaceID    string      `json:"workspace_id"`
+	ActorRef       string      `json:"actor_ref"`
 	IdempotencyKey string      `json:"idempotency_key"`
 	ApprovalRef    string      `json:"approval_ref"`
 	State          BulkState   `json:"state"`
@@ -377,7 +408,7 @@ type Run struct {
 }
 
 func (r Run) Validate() error {
-	if !refPattern.MatchString(r.ID) || !refPattern.MatchString(r.PreviewID) || !refPattern.MatchString(r.OrganizationID) || !refPattern.MatchString(r.WorkspaceID) || len(r.IdempotencyKey) < 8 || len(r.IdempotencyKey) > 128 || !refPattern.MatchString(r.ApprovalRef) || !r.State.Valid() || !digestPattern.MatchString(r.InputDigest) || len(r.Partitions) == 0 || len(r.Partitions) > MaxRows || len(r.Results) > MaxRows || !isUTC(r.CreatedAt) || !isUTC(r.UpdatedAt) || r.UpdatedAt.Before(r.CreatedAt) {
+	if !refPattern.MatchString(r.ID) || !refPattern.MatchString(r.PreviewID) || !refPattern.MatchString(r.OrganizationID) || !refPattern.MatchString(r.WorkspaceID) || !refPattern.MatchString(r.ActorRef) || len(r.IdempotencyKey) < 8 || len(r.IdempotencyKey) > 128 || !refPattern.MatchString(r.ApprovalRef) || !r.State.Valid() || !digestPattern.MatchString(r.InputDigest) || len(r.Partitions) == 0 || len(r.Partitions) > MaxRows || len(r.Results) > MaxRows || !isUTC(r.CreatedAt) || !isUTC(r.UpdatedAt) || r.UpdatedAt.Before(r.CreatedAt) {
 		return ErrInvalid
 	}
 	for _, partition := range r.Partitions {
@@ -421,12 +452,18 @@ type Reconciliation struct {
 
 // BuildPreview creates a deterministic cross-channel before/after preview.
 func BuildPreview(id, organizationID, workspaceID string, selection SelectionSnapshot, projections []Projection, changes []Change, now time.Time) (Preview, error) {
-	if !refPattern.MatchString(id) || !refPattern.MatchString(organizationID) || !refPattern.MatchString(workspaceID) || selection.Validate(now) != nil || len(projections) == 0 || len(projections) > MaxRows || len(changes) == 0 || !isUTC(now) {
-		return Preview{}, ErrInvalid
+	if !refPattern.MatchString(id) || !refPattern.MatchString(organizationID) || !refPattern.MatchString(workspaceID) {
+		return Preview{}, fmt.Errorf("catalog bulk preview: identity: %w", ErrInvalid)
+	}
+	if err := selection.Validate(now); err != nil {
+		return Preview{}, fmt.Errorf("catalog bulk preview: selection: %w", err)
+	}
+	if len(projections) == 0 || len(projections) > MaxRows || len(changes) == 0 || !isUTC(now) {
+		return Preview{}, fmt.Errorf("catalog bulk preview: input bounds: %w", ErrInvalid)
 	}
 	for _, change := range changes {
-		if change.Validate() != nil {
-			return Preview{}, ErrInvalid
+		if err := change.Validate(); err != nil {
+			return Preview{}, fmt.Errorf("catalog bulk preview: change: %w", err)
 		}
 	}
 	skuSet := make(map[string]struct{}, len(selection.SKUs))
@@ -446,8 +483,8 @@ func BuildPreview(id, organizationID, workspaceID string, selection SelectionSna
 	seen := map[string]struct{}{}
 	rows := make([]Row, 0, len(rowsInput))
 	for _, before := range rowsInput {
-		if before.Validate() != nil {
-			return Preview{}, ErrInvalid
+		if err := before.Validate(); err != nil {
+			return Preview{}, fmt.Errorf("catalog bulk preview: projection: %w", err)
 		}
 		if _, ok := skuSet[before.SKU]; !ok {
 			return Preview{}, ErrConflict
@@ -523,15 +560,15 @@ func BuildPreview(id, organizationID, workspaceID string, selection SelectionSna
 		}
 	}
 	if preview.Validate(now) != nil {
-		return Preview{}, ErrInvalid
+		return Preview{}, fmt.Errorf("catalog bulk: preview validation: %w", ErrInvalid)
 	}
 	return preview, nil
 }
 
 // NewRun partitions only the qualified, valid rows by channel/account. Blocked
 // rows remain explicit skipped results and never disappear from the outcome.
-func NewRun(id, idempotencyKey, approvalRef string, preview Preview, now time.Time) (Run, error) {
-	if preview.Validate(now) != nil || !refPattern.MatchString(id) || len(idempotencyKey) < 8 || !refPattern.MatchString(approvalRef) || preview.EligibleRows == 0 || !isUTC(now) {
+func NewRun(id, idempotencyKey, approvalRef, actorRef string, preview Preview, now time.Time) (Run, error) {
+	if preview.Validate(now) != nil || !refPattern.MatchString(id) || len(idempotencyKey) < 8 || !refPattern.MatchString(approvalRef) || !refPattern.MatchString(actorRef) || preview.EligibleRows == 0 || !isUTC(now) {
 		return Run{}, ErrInvalid
 	}
 	partitionsSet := map[string]struct{}{}
@@ -549,7 +586,7 @@ func NewRun(id, idempotencyKey, approvalRef string, preview Preview, now time.Ti
 		partitions = append(partitions, partition)
 	}
 	sort.Strings(partitions)
-	run := Run{ID: id, PreviewID: preview.ID, OrganizationID: preview.OrganizationID, WorkspaceID: preview.WorkspaceID, IdempotencyKey: idempotencyKey, ApprovalRef: approvalRef, State: StateQueued, InputDigest: preview.InputDigest, Partitions: partitions, Results: results, CreatedAt: now, UpdatedAt: now}
+	run := Run{ID: id, PreviewID: preview.ID, OrganizationID: preview.OrganizationID, WorkspaceID: preview.WorkspaceID, ActorRef: actorRef, IdempotencyKey: idempotencyKey, ApprovalRef: approvalRef, State: StateQueued, InputDigest: preview.InputDigest, Partitions: partitions, Results: results, CreatedAt: now, UpdatedAt: now}
 	if run.Validate() != nil {
 		return Run{}, ErrInvalid
 	}
@@ -574,8 +611,8 @@ func Reconcile(row Row, observation RemoteObservation) (Reconciliation, error) {
 }
 
 func ApplyChanges(before Projection, changes []Change) (Projection, error) {
-	if before.Validate() != nil {
-		return Projection{}, ErrInvalid
+	if err := before.Validate(); err != nil {
+		return Projection{}, fmt.Errorf("catalog bulk apply: before projection: %w", err)
 	}
 	after := before
 	after.Draft.Attributes = cloneAttributes(before.Draft.Attributes)
@@ -583,8 +620,8 @@ func ApplyChanges(before Projection, changes []Change) (Projection, error) {
 	after.Draft.Media = append([]marketplacelisting.MediaRef(nil), before.Draft.Media...)
 	after.Draft.Variants = append([]marketplacelisting.Variant(nil), before.Draft.Variants...)
 	for _, change := range changes {
-		if change.Validate() != nil {
-			return Projection{}, ErrInvalid
+		if err := change.Validate(); err != nil {
+			return Projection{}, fmt.Errorf("catalog bulk apply: change: %w", err)
 		}
 		switch {
 		case change.Kind == "set_price":
@@ -637,8 +674,8 @@ func ApplyChanges(before Projection, changes []Change) (Projection, error) {
 			return Projection{}, ErrInvalid
 		}
 	}
-	if after.Validate() != nil {
-		return Projection{}, ErrInvalid
+	if err := after.Validate(); err != nil {
+		return Projection{}, fmt.Errorf("catalog bulk apply: after projection: %w", err)
 	}
 	return after, nil
 }
@@ -657,7 +694,7 @@ func applyMedia(media *[]marketplacelisting.MediaRef, change Change) error {
 	if change.Media == nil {
 		return ErrInvalid
 	}
-	item := marketplacelisting.MediaRef{ID: change.Media.AssetID, Slot: change.Media.Slot, ReleasedObjectRef: "upl_" + change.Media.AssetID, Digest: change.Media.AssetDigest, Format: "image/jpeg", Bytes: 1, Width: 1, Height: 1, Position: change.Media.Position, Released: change.Media.Released, Safe: change.Media.Safe}
+	item := marketplacelisting.MediaRef{ID: change.Media.AssetID, Slot: change.Media.Slot, ReleasedObjectRef: "upl_" + change.Media.AssetID, Digest: change.Media.AssetDigest, Format: change.Media.Format, Bytes: change.Media.Bytes, Width: change.Media.Width, Height: change.Media.Height, Position: change.Media.Position, Released: change.Media.Released, Safe: change.Media.Safe}
 	if change.Kind == "replace_media" {
 		for i, current := range *media {
 			if current.Slot == change.Media.Slot && current.Position == change.Media.Position {
@@ -746,9 +783,11 @@ func requiredCapability(field string) string {
 	case field == "stock":
 		return "inventory.write"
 	case strings.HasPrefix(field, "media."):
-		return "products.media.write"
-	case strings.HasPrefix(field, "variants."):
-		return "products.variants.write"
+		return "marketplace.listings.media.write"
+	case strings.HasPrefix(field, "variants."), strings.HasPrefix(field, "attributes."), field == "category_code":
+		return "marketplace.listings.attributes.write"
+	case strings.HasPrefix(field, "content."):
+		return "marketplace.listings.content.write"
 	default:
 		return "products.write"
 	}

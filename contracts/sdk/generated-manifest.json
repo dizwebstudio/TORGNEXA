@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "049312df99ed201eb4d01cb47d6e71bdde68f8bed4db2d6e82c7e6c733c33b41",
+    "sha256": "54d2d0f004cd79085ecb8e2dd19a0545f7dfaf0cfc77f50957752c9c6dd4a294",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -48,6 +48,11 @@
       "operation_id": "appendFinancialSource",
       "method": "POST",
       "path": "/financial-completeness/sources"
+    },
+    {
+      "operation_id": "applyCatalogBulk",
+      "method": "POST",
+      "path": "/catalog/bulk/apply"
     },
     {
       "operation_id": "applyMarketplaceGrowthOperation",
@@ -210,6 +215,11 @@
       "path": "/connector-accounts"
     },
     {
+      "operation_id": "createCounterparty",
+      "method": "POST",
+      "path": "/counterparties"
+    },
+    {
       "operation_id": "createCurrentUserProfilePrivacyRequest",
       "method": "POST",
       "path": "/me/profile/privacy-requests"
@@ -228,6 +238,11 @@
       "operation_id": "createInventoryWarehouse",
       "method": "POST",
       "path": "/inventory/warehouses"
+    },
+    {
+      "operation_id": "createLegalParty",
+      "method": "POST",
+      "path": "/legal-parties"
     },
     {
       "operation_id": "createLogisticsBatch",
@@ -533,6 +548,21 @@
       "operation_id": "getAssistantSession",
       "method": "GET",
       "path": "/assistant/sessions/{session_id}"
+    },
+    {
+      "operation_id": "getCatalogBulkKillSwitch",
+      "method": "GET",
+      "path": "/catalog/bulk/kill-switch"
+    },
+    {
+      "operation_id": "getCatalogBulkPreview",
+      "method": "GET",
+      "path": "/catalog/bulk/previews/{preview_id}"
+    },
+    {
+      "operation_id": "getCatalogBulkRun",
+      "method": "GET",
+      "path": "/catalog/bulk/runs/{run_id}"
     },
     {
       "operation_id": "getCloudSubscription",
@@ -925,6 +955,21 @@
       "path": "/audit"
     },
     {
+      "operation_id": "listCatalogBulkChannels",
+      "method": "GET",
+      "path": "/catalog/bulk/summary"
+    },
+    {
+      "operation_id": "listCatalogBulkPreviews",
+      "method": "GET",
+      "path": "/catalog/bulk/previews"
+    },
+    {
+      "operation_id": "listCatalogBulkRuns",
+      "method": "GET",
+      "path": "/catalog/bulk/runs"
+    },
+    {
       "operation_id": "listCatalogCategories",
       "method": "GET",
       "path": "/catalog/categories"
@@ -1295,6 +1340,11 @@
       "path": "/settings/ai-egress-policy:preview"
     },
     {
+      "operation_id": "previewCatalogBulk",
+      "method": "POST",
+      "path": "/catalog/bulk/previews"
+    },
+    {
       "operation_id": "previewConnectorBootstrap",
       "method": "POST",
       "path": "/connector-accounts:bootstrap-preview"
@@ -1393,6 +1443,11 @@
       "operation_id": "receiveSocialWebhook",
       "method": "POST",
       "path": "/webhooks/social/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
+    },
+    {
+      "operation_id": "reconcileCatalogBulkRun",
+      "method": "POST",
+      "path": "/catalog/bulk/runs/{run_id}/reconcile"
     },
     {
       "operation_id": "reconcileMarketplaceGrowthOperation",
@@ -1558,6 +1613,11 @@
       "operation_id": "sendProcurementPurchaseOrder",
       "method": "POST",
       "path": "/procurement/purchase-orders/{purchase_order_id}/send"
+    },
+    {
+      "operation_id": "setCatalogBulkKillSwitch",
+      "method": "POST",
+      "path": "/catalog/bulk/kill-switch"
     },
     {
       "operation_id": "setMCPAgentKillSwitch",

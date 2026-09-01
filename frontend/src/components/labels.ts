@@ -13,6 +13,7 @@ export const capabilityLabels: Readonly<Record<string, string>> = {
   "connectors.read": "Просмотр интеграций",
   "connectors.replay.run": "Запуск проверки интеграций",
   "counterparties.read": "Просмотр контрагентов",
+  "counterparties.write": "Управление контрагентами",
   "classified.leads.read": "Просмотр обращений",
   "classified.listings.read": "Просмотр объявлений",
   "classified.messages.read": "Просмотр сообщений",

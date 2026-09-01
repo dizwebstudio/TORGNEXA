@@ -19,10 +19,10 @@ func bulkFixture(t *testing.T, channel string, state CapabilityState) (ChannelTa
 	draft := marketplacelisting.ListingDraft{
 		ID: "listing-sku-1", OrganizationID: "org-1", WorkspaceID: "workspace-1", ProductID: "product-1", OfferID: "offer-1", SKU: "SKU-1", CategoryCode: "demo.product", TaxonomyFingerprint: fingerprint, ProductVersion: 1,
 		Attributes: map[string]marketplacelisting.AttributeValue{"color": {Value: "white"}},
-		Content: marketplacelisting.Content{Locale: "ru-RU", Title: "Товар SKU-1"},
-		Media: []marketplacelisting.MediaRef{{ID: "media-1", Slot: "main", ReleasedObjectRef: "upl_media-1", Digest: strings.Repeat("a", 64), Format: "image/jpeg", Bytes: 1024, Width: 1000, Height: 1000, Released: true, Safe: true}},
+		Content:    marketplacelisting.Content{Locale: "ru-RU", Title: "Товар SKU-1"},
+		Media:      []marketplacelisting.MediaRef{{ID: "media-1", Slot: "main", ReleasedObjectRef: "upl_media-1", Digest: strings.Repeat("a", 64), Format: "image/jpeg", Bytes: 1024, Width: 1000, Height: 1000, Released: true, Safe: true}},
 	}
-	target := ChannelTarget{ChannelID: channel, AccountID: "account-1", Label: channel + " demo", State: state, Capabilities: []string{"products.write", "prices.write", "inventory.write", "products.media.write", "products.variants.write"}, TaxonomyFingerprint: fingerprint, TaxonomyVersion: 1, MappingVersion: 1, ObservedAt: now, FreshUntil: now.Add(24 * time.Hour)}
+	target := ChannelTarget{ChannelID: channel, AccountID: "account-1", Label: channel + " demo", State: state, Capabilities: []string{"marketplace.listings.content.write", "marketplace.listings.attributes.write", "marketplace.listings.media.write", "prices.write", "inventory.write"}, TaxonomyFingerprint: fingerprint, TaxonomyVersion: 1, MappingVersion: 1, ObservedAt: now, FreshUntil: now.Add(24 * time.Hour)}
 	projection := Projection{SKU: "SKU-1", ProductID: "product-1", OfferID: "offer-1", ChannelID: channel, AccountID: "account-1", Draft: draft, Currency: "RUB", PriceMinorUnits: 10000, Stock: 5, Version: 1}
 	return target, projection, now
 }
@@ -60,11 +60,11 @@ func TestApplyChangesKeepsPIMReferencesAndSupportsMediaVariantPriceAndStock(t *t
 		{Kind: "set", Field: "content.description", Value: "Подробное описание"},
 		{Kind: "set", Field: "attributes.color", Value: "black"},
 		{Kind: "set", Field: "attributes.material", Value: "хлопок"},
-		{Kind: "replace_media", Field: "media.main", Media: &MediaEdit{AssetID: "media-2", AssetDigest: strings.Repeat("c", 64), Slot: "main", Position: 0, Released: true, Safe: true}},
+		{Kind: "replace_media", Field: "media.main", Media: &MediaEdit{AssetID: "media-2", AssetDigest: strings.Repeat("c", 64), Slot: "main", Format: "image/jpeg", Bytes: 2048, Width: 1200, Height: 1200, Position: 0, Released: true, Safe: true}},
 		{Kind: "set", Field: "variants.item", Value: `{"id":"variant-1","sku":"SKU-1-BLACK","axes":{"color":"black"}}`},
 		{Kind: "set_price", Field: "price", Currency: "RUB", PriceMinor: &price},
 		{Kind: "set_stock", Field: "stock", Stock: &stock},
-	},)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestNewRunKeepsBlockedRowsVisibleAndReconcileUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run, err := NewRun("cbr-1", "idem-12345678", "approval-1", preview, now)
+	run, err := NewRun("cbr-1", "idem-12345678", "approval-1", "operator-1", preview, now)
 	if err != nil || run.State != StateQueued || len(run.Partitions) != 1 || run.Results[0].State != RowQueued {
 		t.Fatalf("run = %+v err=%v", run, err)
 	}

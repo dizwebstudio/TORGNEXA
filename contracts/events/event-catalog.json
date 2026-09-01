@@ -26,6 +26,18 @@
       "payload_schema": "events/billing-subscription-state-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.catalog.bulk_preview_created.v1",
+      "payload_schema": "events/catalog-bulk-preview-created-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.catalog.bulk_row_reconciled.v1",
+      "payload_schema": "events/catalog-bulk-row-reconciled-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.catalog.bulk_run_queued.v1",
+      "payload_schema": "events/catalog-bulk-run-queued-v1.schema.json"
+    },
+    {
       "event_type": "commerce.catalog.offer_changed.v1",
       "payload_schema": "events/offer-changed-v1.schema.json"
     },

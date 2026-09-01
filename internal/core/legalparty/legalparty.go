@@ -448,6 +448,7 @@ func (m Mutation) Validate() error {
 type Repository interface {
 	LegalEntity(context.Context, Scope, ID) (LegalEntity, error)
 	IndividualEntrepreneur(context.Context, Scope, ID) (IndividualEntrepreneur, error)
+	Branch(context.Context, Scope, ID) (Branch, error)
 	Counterparty(context.Context, Scope, ID) (Counterparty, error)
 	Search(context.Context, Scope, SearchQuery) (SearchPage, error)
 	CreateLegalEntity(context.Context, Scope, LegalEntity, Mutation) (LegalEntity, error)

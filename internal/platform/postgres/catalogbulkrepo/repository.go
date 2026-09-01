@@ -6,10 +6,12 @@ package catalogbulkrepo
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -89,6 +91,48 @@ func (r *Repository) Preview(ctx context.Context, scope tenancy.Scope, id string
 	return result, err
 }
 
+// ListPreviews returns newest-first immutable previews using an opaque cursor.
+func (r *Repository) ListPreviews(ctx context.Context, scope tenancy.Scope, cursor string, limit int) ([]catalogbulk.Preview, string, error) {
+	if err := r.validate(ctx, scope); err != nil || limit < 1 || limit > 100 {
+		return nil, "", catalogbulk.ErrInvalid
+	}
+	position, err := decodeCursor(cursor)
+	if err != nil {
+		return nil, "", catalogbulk.ErrInvalid
+	}
+	items := make([]catalogbulk.Preview, 0, limit)
+	err = r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		query := `SELECT preview_id,preview_document,created_at FROM catalog_bulk_previews WHERE organization_id=$1 AND workspace_id=$2`
+		args := []any{scope.OrganizationID(), scope.WorkspaceID()}
+		if position.ID != "" {
+			query += ` AND (created_at,preview_id)<($3,$4)`
+			args = append(args, position.At, position.ID)
+		}
+		query += fmt.Sprintf(` ORDER BY created_at DESC,preview_id DESC LIMIT $%d`, len(args)+1)
+		args = append(args, limit+1)
+		rows, queryErr := tx.QueryContext(ctx, query, args...)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			var document []byte
+			var createdAt time.Time
+			var item catalogbulk.Preview
+			if scanErr := rows.Scan(&id, &document, &createdAt); scanErr != nil || json.Unmarshal(document, &item) != nil || item.ID != id || item.Validate(createdAt.UTC()) != nil {
+				return catalogbulk.ErrInvalid
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	return trimPreviewPage(items, limit)
+}
+
 // SaveRun queues one approval-bound apply intent. The idempotency key can
 // return only the original preview and can never select another operation.
 func (r *Repository) SaveRun(ctx context.Context, scope tenancy.Scope, run catalogbulk.Run) (catalogbulk.Run, error) {
@@ -112,7 +156,7 @@ func (r *Repository) SaveRun(ctx context.Context, scope tenancy.Scope, run catal
 		if !errors.Is(lookupErr, sql.ErrNoRows) {
 			return fmt.Errorf("catalog bulk repository: run lookup: %w", lookupErr)
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_bulk_runs(organization_id,workspace_id,run_id,preview_id,idempotency_key,approval_request_id,state,input_digest,partition_count,result_count,run_document,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13)`, scope.OrganizationID(), scope.WorkspaceID(), run.ID, run.PreviewID, run.IdempotencyKey, run.ApprovalRef, run.State, run.InputDigest, len(run.Partitions), len(run.Results), document, run.CreatedAt, run.UpdatedAt)
+		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_bulk_runs(organization_id,workspace_id,run_id,preview_id,actor_ref,idempotency_key,approval_request_id,state,input_digest,partition_count,result_count,run_document,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14)`, scope.OrganizationID(), scope.WorkspaceID(), run.ID, run.PreviewID, run.ActorRef, run.IdempotencyKey, run.ApprovalRef, run.State, run.InputDigest, len(run.Partitions), len(run.Results), document, run.CreatedAt, run.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("catalog bulk repository: run insert: %w", err)
 		}
@@ -144,6 +188,84 @@ func (r *Repository) Run(ctx context.Context, scope tenancy.Scope, id string) (c
 		return nil
 	})
 	return result, err
+}
+
+// ListRuns returns newest-first durable apply intents using an opaque cursor.
+func (r *Repository) ListRuns(ctx context.Context, scope tenancy.Scope, cursor string, limit int) ([]catalogbulk.Run, string, error) {
+	if err := r.validate(ctx, scope); err != nil || limit < 1 || limit > 100 {
+		return nil, "", catalogbulk.ErrInvalid
+	}
+	position, err := decodeCursor(cursor)
+	if err != nil {
+		return nil, "", catalogbulk.ErrInvalid
+	}
+	items := make([]catalogbulk.Run, 0, limit)
+	err = r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		query := `SELECT run_id,run_document,created_at FROM catalog_bulk_runs WHERE organization_id=$1 AND workspace_id=$2`
+		args := []any{scope.OrganizationID(), scope.WorkspaceID()}
+		if position.ID != "" {
+			query += ` AND (created_at,run_id)<($3,$4)`
+			args = append(args, position.At, position.ID)
+		}
+		query += fmt.Sprintf(` ORDER BY created_at DESC,run_id DESC LIMIT $%d`, len(args)+1)
+		args = append(args, limit+1)
+		rows, queryErr := tx.QueryContext(ctx, query, args...)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			var document []byte
+			var createdAt time.Time
+			var item catalogbulk.Run
+			if scanErr := rows.Scan(&id, &document, &createdAt); scanErr != nil || json.Unmarshal(document, &item) != nil || item.ID != id || item.Validate() != nil {
+				return catalogbulk.ErrInvalid
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	return trimRunPage(items, limit)
+}
+
+// SetKillSwitch appends a versioned workspace stop signal. Existing evidence
+// is never deleted and queued rows remain inspectable for recovery.
+func (r *Repository) SetKillSwitch(ctx context.Context, scope tenancy.Scope, control catalogbulk.KillSwitch) error {
+	if err := r.validate(ctx, scope); err != nil || control.Validate() != nil {
+		return catalogbulk.ErrInvalid
+	}
+	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO catalog_bulk_kill_switches(organization_id,workspace_id,version,enabled,reason,updated_at) VALUES($1,$2,$3,$4,$5,$6)`, scope.OrganizationID(), scope.WorkspaceID(), control.Version, control.Enabled, control.Reason, control.UpdatedAt)
+		return err
+	})
+}
+
+// KillSwitch returns the latest workspace stop signal. A new workspace starts
+// with an explicitly disabled switch at version one.
+func (r *Repository) KillSwitch(ctx context.Context, scope tenancy.Scope) (catalogbulk.KillSwitch, error) {
+	if err := r.validate(ctx, scope); err != nil {
+		return catalogbulk.KillSwitch{}, catalogbulk.ErrInvalid
+	}
+	var result catalogbulk.KillSwitch
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx, `SELECT version,enabled,reason,updated_at FROM catalog_bulk_kill_switches WHERE organization_id=$1 AND workspace_id=$2 ORDER BY version DESC LIMIT 1`, scope.OrganizationID(), scope.WorkspaceID()).Scan(&result.Version, &result.Enabled, &result.Reason, &result.UpdatedAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			result = catalogbulk.KillSwitch{Version: 1, UpdatedAt: time.Now().UTC()}
+			return nil
+		}
+		return err
+	})
+	if err != nil {
+		return catalogbulk.KillSwitch{}, err
+	}
+	if result.Validate() != nil {
+		return catalogbulk.KillSwitch{}, catalogbulk.ErrInvalid
+	}
+	return result, nil
 }
 
 func safeJSON(value any) ([]byte, error) {
@@ -187,4 +309,62 @@ func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly b
 		return fmt.Errorf("catalog bulk repository: commit: %w", err)
 	}
 	return nil
+}
+
+type bulkCursor struct {
+	At time.Time `json:"at"`
+	ID string    `json:"id"`
+}
+
+func encodeCursor(value bulkCursor) (string, error) {
+	if value.ID == "" || value.At.IsZero() || value.At.Location() != time.UTC {
+		return "", catalogbulk.ErrInvalid
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return "v1." + base64.RawURLEncoding.EncodeToString(data), nil
+}
+
+func decodeCursor(value string) (bulkCursor, error) {
+	if value == "" {
+		return bulkCursor{}, nil
+	}
+	if !strings.HasPrefix(value, "v1.") || len(value) > 256 || value != strings.TrimSpace(value) {
+		return bulkCursor{}, catalogbulk.ErrInvalid
+	}
+	data, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, "v1."))
+	if err != nil {
+		return bulkCursor{}, catalogbulk.ErrInvalid
+	}
+	var result bulkCursor
+	if json.Unmarshal(data, &result) != nil || result.ID == "" || result.At.IsZero() || result.At.Location() != time.UTC || len(result.ID) > 192 {
+		return bulkCursor{}, catalogbulk.ErrInvalid
+	}
+	return result, nil
+}
+
+func trimPreviewPage(items []catalogbulk.Preview, limit int) ([]catalogbulk.Preview, string, error) {
+	if len(items) <= limit {
+		return items, "", nil
+	}
+	last := items[limit-1]
+	next, err := encodeCursor(bulkCursor{At: last.CreatedAt, ID: last.ID})
+	if err != nil {
+		return nil, "", err
+	}
+	return items[:limit], next, nil
+}
+
+func trimRunPage(items []catalogbulk.Run, limit int) ([]catalogbulk.Run, string, error) {
+	if len(items) <= limit {
+		return items, "", nil
+	}
+	last := items[limit-1]
+	next, err := encodeCursor(bulkCursor{At: last.CreatedAt, ID: last.ID})
+	if err != nil {
+		return nil, "", err
+	}
+	return items[:limit], next, nil
 }

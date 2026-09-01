@@ -4,14 +4,15 @@ REST base `/api/v1`; contract-first OpenAPI. OIDC bearer auth; tenant/workspace 
 
 ## OpenAPI and production routing
 
-The current v1 contract contains 83 paths and 96 HTTP operations. Every
-operation is registered by the production composition root. The route registry
+The current v1 contract is the source of truth for the public HTTP operation
+inventory. Every operation is registered by the production composition root. The route registry
 is assembled in one place, and `openapi_runtime_parity_test.go` fails when an
 OpenAPI operation has no production route or a non-HEAD production route is
 absent from OpenAPI.
 
-Lineage timeline, canonical legal-party search, entitlement evaluation and the
-webhook subscription/delivery API use their existing PostgreSQL-backed
+Lineage timeline, canonical legal-party search and master creation,
+counterparty-role assignment, entitlement evaluation and the webhook
+subscription/delivery API use their existing PostgreSQL-backed
 services in production. Their organization/workspace scope is adapted only
 from the authenticated request context installed by the mandatory OIDC,
 tenant-resolution and authorization chain.
@@ -71,6 +72,13 @@ entity/page progress and drift evidence remain canonical in Task-013
 checkpoints and Task-014 reconciliation runs.
 
 MCP exposes high-level tools with normal authz/approval/audit; no DB or raw secret tools. See `contracts/mcp-tools.md`.
+
+The canonical party workflow is intentionally two-step: `POST /legal-parties`
+creates a draft legal entity, individual entrepreneur or branch, and
+`POST /counterparties` assigns a buyer, supplier, partner or other role to
+that existing master. Both mutations require `Idempotency-Key`, are
+tenant-scoped, and write audit/outbox/lineage evidence through the legal-party
+repository. A missing master is rejected before a role can be created.
 
 
 ## Task 019 n8n surface
