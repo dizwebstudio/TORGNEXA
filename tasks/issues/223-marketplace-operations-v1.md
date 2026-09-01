@@ -6,6 +6,12 @@
 runner, findings и fail-closed canonical order materialization contract; live
 qualification внешних кабинетов остаётся release-gate.
 
+```yaml
+repository_status: complete
+qualification_evidence_contract: validated
+external_release_status: pending_external_evidence
+```
+
 Репозиторный ключ этой задачи — `223`: ключи `176–222` уже заняты
 существующими задачами. Пользовательский номер Epic сохраняется как `176`;
 дублирующую нумерацию в backlog не используем.
@@ -74,6 +80,8 @@ PostgreSQL migration и операторский UI. Оставшиеся `[ ]` 
 вынесенные release-gates: полноценная запись/fulfillment/returns/ЭДО и live
 qualification требуют официальных non-production кабинетов, реальных scopes и
 redacted evidence; synthetic fixtures и наличие credentials их не заменяют.
+Структура retained evidence теперь проверяется fail-closed командой
+`make marketplace-remote-evidence`; это не выполняет live qualification.
 
 ### 176.2 — Подключение marketplace-кабинета
 
@@ -93,11 +101,17 @@ Integration Center/API; Epic не создаёт второй account aggregate.
 
 - [x] Использовать реализованный versioned publication flow: create/update
   карточки, варианты/SKU, категории, публикацию и status/reconciliation.
-- [ ] Реализовать полный provider-neutral набор карточки: характеристики,
-  изображения, штрихкоды, модерацию и архив без deferred bridges.
-- [ ] Использовать versioned publication snapshot и Product Quality gate из
+- [x] Реализовать полный provider-neutral набор карточки: характеристики,
+  изображения, штрихкоды, модерацию и архив без deferred bridges. Контур
+  закрыт задачами [217](217-marketplace-product-publication.md),
+  [222](222-marketplace-listing-content-attributes.md) и
+  [232](232-marketplace-listing-remote-runtime.md); provider-specific схема
+  канала остаётся отдельным внешним qualification gate.
+- [x] Использовать versioned publication snapshot и Product Quality gate из
   [Task 217](217-marketplace-product-publication.md).
-- [ ] Выполнять read-after-write и сохранять provider-neutral receipt и drift.
+- [x] Выполнять read-after-write и сохранять provider-neutral receipt и drift
+  через publication worker/status reader; live remote evidence остаётся
+  внешним gate.
 
 ### 176.4 — Цены и остатки
 
@@ -108,8 +122,13 @@ Integration Center/API; Epic не создаёт второй account aggregate.
   reconciliation reader.
 - [ ] Добавить reservation state, НДС, batch updates и provider-specific stock
   writer Ozon после квалификации точной remote identity.
-- [ ] Не допускать перезаписи более новой версии устаревшим worker result.
-- [ ] Сверять локальное и удалённое состояние, включая unknown remote outcome.
+- [x] Не допускать перезаписи более новой версии устаревшим worker result:
+  commerce-sync перед remote IO захватывает tenant-scoped version fence в
+  `sync_outbound_version_fences` (migration 060); повтор того же event остаётся
+  idempotent, более старая версия получает `stale_suppressed`.
+- [x] Сверять локальное и удалённое состояние, включая unknown remote outcome,
+  через существующий reconciliation engine и publication status reader;
+  внешний provider smoke остаётся qualification gate.
 
 ### 176.5 — Заказы marketplace
 
@@ -118,14 +137,17 @@ Integration Center/API; Epic не создаёт второй account aggregate.
 - [x] Сопоставлять SKU, нормализовать статусы и сохранять immutable order
   snapshot.
 - [x] Обработать неизвестные статусы и ошибки без выдачи ложного успеха.
-- [ ] Материализовать remote order в canonical `orders` через отдельный
-  tenant-scoped host importer с idempotent create/update и typed mappings.
+- [x] Материализовать remote order в canonical `orders` через отдельный
+  tenant-scoped `MarketplaceOrderImporter`: он требует заранее разрешённые
+  offer/money/tax/status evidence, создаёт или повторно использует canonical
+  order, записывает typed mapping и выполняет только forward-only status update.
 - [x] Добавить fail-closed builder `BuildMarketplaceOrderCreate`: без
   resolved OfferID, exact money/quantity/tax и canonical IDs заказ не создаётся.
 - [ ] Поддержать outbound отмену/подтверждение и частичные order responses
   после отдельной provider-specific qualification.
-- [ ] Связать order с WMS, payment, marking, shipment и settlement через
-  typed references, не объединяя их в один статус.
+- [x] Связать order с WMS, payment, marking, shipment и settlement через
+  provider-neutral typed references в marketplace flow; сами агрегаты остаются
+  владельцами своего состояния.
 
 ### 176.6 — Fulfillment и отгрузка
 
@@ -279,3 +301,8 @@ account → product → publication → price/stock → order → reserve
 `./scripts/check-migrations.sh`, `make architecture`, frontend
 typecheck/build, Docker conformance и `git diff --check`. Live credentials,
 raw marketplace responses и production PII в тесты или репозиторий не попадают.
+
+Синтетический example evidence в
+`qualification/marketplace-remote-qualification.example.json` нужен только
+для проверки формата. Он не закрывает credentialed проверки, GitHub policy,
+production topology, маркировку/ЭДО и реальные provider writes.

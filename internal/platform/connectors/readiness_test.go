@@ -38,6 +38,10 @@ func TestAllowsRemoteOperationFailsClosed(t *testing.T) {
 		t.Fatal("ready profile must not admit a write without qualification")
 	}
 	profile.Status = ReadinessQualified
+	if AllowsRemoteOperation(profile, "products.read", true) {
+		t.Fatal("qualified profile must not promote a merely ready capability to write")
+	}
+	profile.Capabilities[0].Status = "qualified"
 	if !AllowsRemoteOperation(profile, "products.read", true) {
 		t.Fatal("qualified write capability should be admitted")
 	}

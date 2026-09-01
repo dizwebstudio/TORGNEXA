@@ -5545,6 +5545,19 @@ components:
         categories: {type: array, maxItems: 50000, items: {$ref: '#/components/schemas/MarketplaceListingCategory'}}
         attributes: {type: array, maxItems: 512, items: {$ref: '#/components/schemas/MarketplaceListingAttributeDefinition'}}
         media_slots: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceListingMediaSlot'}}
+        provider_profile: {$ref: '#/components/schemas/MarketplaceListingProviderProfile'}
+    MarketplaceListingProviderProfile:
+      type: object
+      additionalProperties: false
+      required: [connector_id, schema_version, category_code_kind, attribute_key_kind, bulk_apply_mode, read_after_write_mode, qualification]
+      properties:
+        connector_id: {type: string, maxLength: 192}
+        schema_version: {type: string, minLength: 1, maxLength: 64}
+        category_code_kind: {type: string, enum: [numeric, string]}
+        attribute_key_kind: {type: string, enum: [provider_id, provider_name, normalized_code]}
+        bulk_apply_mode: {type: string, enum: [bounded_single_item_calls, provider_batch]}
+        read_after_write_mode: {type: string, enum: [catalog_read, async_status, catalog_read_or_async_status]}
+        qualification: {type: string, enum: [synthetic, qualification_required, qualified]}
     MarketplaceListingAttributeValue:
       type: object
       additionalProperties: false
@@ -5684,6 +5697,18 @@ components:
       required: [preview]
       properties:
         preview: {$ref: '#/components/schemas/MarketplaceListingBatchPreview'}
+        publications: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceListingRemotePublication'}}
+    MarketplaceListingRemotePublication:
+      type: object
+      additionalProperties: false
+      required: [sku, snapshot, operation, quality_receipt_id]
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 200}
+        snapshot: {$ref: '#/components/schemas/MarketplacePublicationSnapshot'}
+        operation: {type: string, enum: [create_product, update_product, update_variant, update_attributes, update_media, archive, unarchive, publish, unpublish, status_read]}
+        remote_id: {type: string, maxLength: 192}
+        remote_operation_id: {type: string, maxLength: 192}
+        quality_receipt_id: {type: string, maxLength: 192}
     MarketplaceListingBatchRun:
       type: object
       additionalProperties: false
@@ -5698,14 +5723,19 @@ components:
         state: {type: string, enum: [queued, processing, completed, partial, unknown, rejected]}
         input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         rows: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceListingBatchRow'}}
+        remote_operation_ids: {type: array, maxItems: 1000, items: {type: string, maxLength: 192}}
         created_at: {type: string, format: date-time, pattern: 'Z$'}
         updated_at: {type: string, format: date-time, pattern: 'Z$'}
     MarketplaceListingRemoteObservation:
       type: object
       additionalProperties: false
-      required: [remote_id, status, observed_at]
+      required: [status, observed_at]
+      oneOf:
+        - required: [remote_id]
+        - required: [remote_operation_id]
       properties:
         remote_id: {type: string, maxLength: 192}
+        remote_operation_id: {type: string, maxLength: 192}
         snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         status: {type: string, maxLength: 64}
         category_code: {type: string, maxLength: 128}
@@ -6121,6 +6151,7 @@ components:
         type: {type: string, enum: [missing_remote_product, duplicate_remote_product, content_mismatch, attribute_mismatch, media_mismatch, mapping_conflict, moderation_rejected, publication_status_mismatch, unknown_write_outcome]}
         snapshot_id: {type: string, maxLength: 192}
         remote_id: {type: string, maxLength: 192}
+        remote_operation_id: {type: string, maxLength: 192}
         expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         observed_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
         observed_state: {type: string, enum: [draft, preflight, queued, sending, accepted, processing, published, rejected, unknown, needs_attention, cancelled]}

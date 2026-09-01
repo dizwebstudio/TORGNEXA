@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.dev/contracts/qualification/marketplace-remote-evidence-v1.schema.json",
+  "title": "TORGNEXA marketplace remote qualification evidence v1",
+  "description": "Redacted evidence retained after an external marketplace qualification run. This contract does not assert that the run was live.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "environment",
+    "repository",
+    "release_commit",
+    "connector_id",
+    "account_ref",
+    "qualified_at",
+    "taxonomy",
+    "capabilities",
+    "checks",
+    "rollback"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "status": {"const": "PASS"},
+    "environment": {"enum": ["sandbox", "staging", "non-production"]},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "connector_id": {"enum": ["wildberries", "ozon", "yandex-market"]},
+    "api_version": {"type": "string", "minLength": 1},
+    "account_ref": {"type": "string", "minLength": 1, "maxLength": 192},
+    "qualified_at": {"type": "string", "minLength": 1, "maxLength": 64},
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "fingerprint", "mapping_ref", "source_ref"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "maxLength": 192},
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mapping_ref": {"type": "string", "minLength": 1, "maxLength": 192},
+        "source_ref": {"type": "string", "minLength": 1, "maxLength": 192}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,63}$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "evidence_ref"],
+          "properties": {
+            "status": {"const": "qualified"},
+            "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 192}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {
+            "enum": [
+              "taxonomy_read",
+              "taxonomy_mapping",
+              "batch_apply",
+              "rate_limit",
+              "idempotency",
+              "partial_result",
+              "read_after_write",
+              "unknown_outcome",
+              "reconciliation",
+              "rollback",
+              "order_import",
+              "reservation",
+              "pick_pack",
+              "label",
+              "shipment_handoff",
+              "return_inspection",
+              "refund_settlement",
+              "marking_edo",
+              "p_and_l"
+            ]
+          },
+          "status": {"const": "PASS"},
+          "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 192}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "evidence_ref"],
+      "properties": {
+        "verified": {"const": true},
+        "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 192}
+      }
+    }
+  }
+}

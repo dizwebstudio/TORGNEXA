@@ -53,6 +53,19 @@ release gate для marketplace, а не отдельный provider adapter. О
   используются через существующие bounded contexts, без второй модели заказа
   или товара.
 
+## Защита outbound и импорт заказов
+
+Commerce-sync перед remote IO захватывает tenant-scoped version fence из
+`sync_outbound_version_fences` (migration 060). Новая локальная версия
+вытесняет старую, а повтор того же event разрешён для idempotent retry; старый
+event получает `stale_suppressed`.
+
+Marketplace-заказ материализуется только через host-side
+`MarketplaceOrderImporter`. Он принимает уже нормализованные offer, деньги,
+налог и canonical status, записывает remote identity в обычный mapping и
+двигает статус заказа только вперёд. Провайдерские ответы, токены и raw
+payloads в canonical Orders не попадают.
+
 ## Статусы поддержки
 
 - `read_only` — разрешены только подтверждённые чтения;
@@ -108,3 +121,16 @@ Finding создаётся один раз с digest безопасного evid
 qualification evidence и дата актуальности. До прохождения полного сценария
 интерфейс обязан показывать `read_only` или `partially_supported` и скрывать
 неразрешённые mutation actions.
+
+Сохранённое evidence можно структурно проверить до внешнего release review:
+
+```bash
+TORGNEXA_MARKETPLACE_EVIDENCE_FILE=/abs/path/marketplace-remote-qualification.json \
+TORGNEXA_MARKETPLACE_EVIDENCE_SCOPE=full \
+make marketplace-remote-evidence
+```
+
+`listing` проверяет provider-specific taxonomy, массовое применение и
+read-after-write; `full` дополнительно требует order, reservation, fulfillment,
+returns/refund, marking/EDO и P&L checks. Этот валидатор не имеет сетевого
+доступа и не превращает synthetic evidence в live qualification.

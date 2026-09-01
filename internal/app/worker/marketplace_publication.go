@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/marketplacetaxonomy"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
@@ -21,6 +23,8 @@ type marketplacePublicationStore interface {
 	ListPending(context.Context, tenancy.Scope, int) ([]marketplacepublication.Operation, error)
 	Snapshot(context.Context, tenancy.Scope, string) (marketplacepublication.Snapshot, error)
 	UpdateState(context.Context, tenancy.Scope, marketplacepublication.Operation, int64) error
+	RecordObservation(context.Context, tenancy.Scope, marketplacepublication.RemoteObservation, string, string) error
+	RecordDrift(context.Context, tenancy.Scope, marketplacepublication.Drift, string, string) error
 }
 
 type marketplacePublicationAccounts interface {
@@ -74,15 +78,24 @@ func processMarketplacePublication(ctx context.Context, store marketplacePublica
 	}
 	account, err := accounts.AccountByID(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation.Target.ConnectorAccountID)
 	accountTarget := marketplacepublication.Target{OrganizationID: account.OrganizationID, WorkspaceID: account.WorkspaceID, ConnectorAccountID: account.ID, ConnectorID: account.ConnectorID}
-	if err != nil || account.Status != sdk.AccountActive || !operation.Target.SameAccount(accountTarget) || !sdk.CapabilityEnabled(mustAccountCapabilities(ctx, accounts, scope, account.ID), "products.write") {
+	requiredCapability := "products.write"
+	if operation.Kind == marketplacepublication.OperationStatusRead {
+		requiredCapability = "products.read"
+	}
+	if err != nil || account.Status != sdk.AccountActive || !operation.Target.SameAccount(accountTarget) || !sdk.CapabilityEnabled(mustAccountCapabilities(ctx, accounts, scope, account.ID), requiredCapability) {
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateNeedsAttention, "capability_unavailable")
 	}
 	runtime, err := connectorruntime.NewForAccount(secretSource, refreshCoordinator, scope, account)
 	if err != nil {
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateUnknown, "runtime_unavailable")
 	}
+	if !operation.DryRun {
+		if err := marketplacetaxonomy.RemoteOperationAdmission(operation.Target.ConnectorID, operation.Kind); err != nil {
+			return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateNeedsAttention, "provider_qualification_required")
+		}
+	}
 	if operation.Kind == marketplacepublication.OperationStatusRead {
-		return reconcileMarketplacePublicationWithReader(ctx, store, registry, scope, operation, account, runtime, operation.RemoteID, operation.RemoteOperationID)
+		return reconcileMarketplacePublicationWithReader(ctx, store, registry, scope, operation, snapshot, account, runtime, operation.RemoteID, operation.RemoteOperationID)
 	}
 	writer, err := registry.builtins.ProductPublicationWriter(account, runtime, registry.configLoader(scope))
 	if err != nil {
@@ -110,7 +123,17 @@ func processMarketplacePublication(ctx context.Context, store marketplacePublica
 		next = marketplacepublication.StateAccepted
 	}
 	operation.State, operation.RemoteID, operation.RemoteOperationID, operation.ErrorCode, operation.UpdatedAt = next, receipt.RemoteID, receipt.RemoteOperationID, receipt.ErrorCode, receipt.ObservedAt
-	return store.UpdateState(ctx, scope, operation, operation.Version)
+	if err := store.UpdateState(ctx, scope, operation, operation.Version); err != nil {
+		return err
+	}
+	if operation.RemoteID == "" && operation.RemoteOperationID == "" {
+		return nil
+	}
+	operation.Version++
+	if err := recordMarketplacePublicationEvidence(ctx, store, scope, snapshot, operation); err != nil {
+		return err
+	}
+	return reconcileMarketplacePublicationWithReader(ctx, store, registry, scope, operation, snapshot, account, runtime, operation.RemoteID, operation.RemoteOperationID)
 }
 
 func reconcileMarketplacePublication(ctx context.Context, store marketplacePublicationStore, accounts marketplacePublicationAccounts, secretSource secrets.SecretProvider, refreshCoordinator connectorauth.RefreshCoordinator, registry *runtimeRegistry, scope tenancy.Scope, operation marketplacepublication.Operation) error {
@@ -123,10 +146,14 @@ func reconcileMarketplacePublication(ctx context.Context, store marketplacePubli
 	if err != nil {
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateUnknown, "runtime_unavailable")
 	}
-	return reconcileMarketplacePublicationWithReader(ctx, store, registry, scope, operation, account, runtime, operation.RemoteID, operation.RemoteOperationID)
+	snapshot, err := store.Snapshot(ctx, scope, operation.SnapshotID)
+	if err != nil {
+		return err
+	}
+	return reconcileMarketplacePublicationWithReader(ctx, store, registry, scope, operation, snapshot, account, runtime, operation.RemoteID, operation.RemoteOperationID)
 }
 
-func reconcileMarketplacePublicationWithReader(ctx context.Context, store marketplacePublicationStore, registry *runtimeRegistry, scope tenancy.Scope, operation marketplacepublication.Operation, account sdk.Account, runtime sdk.Runtime, remoteID, remoteOperationID string) error {
+func reconcileMarketplacePublicationWithReader(ctx context.Context, store marketplacePublicationStore, registry *runtimeRegistry, scope tenancy.Scope, operation marketplacepublication.Operation, snapshot marketplacepublication.Snapshot, account sdk.Account, runtime sdk.Runtime, remoteID, remoteOperationID string) error {
 	reader, err := registry.builtins.ProductPublicationStatusReader(account, runtime, registry.configLoader(scope))
 	if err != nil {
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateNeedsAttention, "status_reader_unavailable")
@@ -166,7 +193,32 @@ func reconcileMarketplacePublicationWithReader(ctx context.Context, store market
 	if receipt.RemoteOperationID != "" {
 		operation.RemoteOperationID = receipt.RemoteOperationID
 	}
+	if err := recordMarketplacePublicationEvidence(ctx, store, scope, snapshot, operation); err != nil {
+		return err
+	}
 	return store.UpdateState(ctx, scope, operation, operation.Version)
+}
+
+func recordMarketplacePublicationEvidence(ctx context.Context, store marketplacePublicationStore, scope tenancy.Scope, snapshot marketplacepublication.Snapshot, operation marketplacepublication.Operation) error {
+	if operation.RemoteID == "" && operation.RemoteOperationID == "" {
+		return nil
+	}
+	observation := marketplacepublication.RemoteObservation{RemoteID: operation.RemoteID, RemoteOperationID: operation.RemoteOperationID, State: operation.State, Moderation: marketplacepublication.ModerationUnknown, ObservedAt: operation.UpdatedAt}
+	observationID := operation.ID + ".observation." + fmt.Sprint(operation.Version)
+	if err := store.RecordObservation(ctx, scope, observation, operation.ID, observationID); err != nil {
+		return err
+	}
+	drifts, err := marketplacepublication.Reconcile(snapshot, observation, operation.RemoteID)
+	if err != nil {
+		return err
+	}
+	for index, drift := range drifts {
+		driftID := operation.ID + ".drift." + fmt.Sprint(operation.Version) + "." + fmt.Sprint(index)
+		if err := store.RecordDrift(ctx, scope, drift, operation.ID, driftID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func updateMarketplacePublicationFailure(ctx context.Context, store marketplacePublicationStore, scope tenancy.Scope, operation marketplacepublication.Operation, state marketplacepublication.State, code string) error {

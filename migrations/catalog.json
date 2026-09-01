@@ -1193,6 +1193,48 @@
       },
       "backfill": null,
       "sha256": "a7a25311bb5c03809a35704cd8e2d7a31e60ec600877b26c48caae2a8ee91782"
+    },
+    {
+      "version": 59,
+      "name": "marketplace_publication_async_identity",
+      "file": "000059_marketplace_publication_async_identity.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [44, 58],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "991ed609d3ab74a6dc9800bbca7ea255eed7111818870290f05fe9f2c1ffa19c"
+    },
+    {
+      "version": 60,
+      "name": "sync_outbound_version_fence",
+      "file": "000060_sync_outbound_version_fence.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [6, 49],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": false,
+        "contract_preconditions": [
+          "sync outbound workers must not start before migration 60"
+        ]
+      },
+      "backfill": null,
+      "sha256": "928ab18d9ecdf302a6d1ade86dd75410f7a8c42e790d1237eb7903e71190c21a"
     }
   ]
 }

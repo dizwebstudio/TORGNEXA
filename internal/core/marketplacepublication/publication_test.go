@@ -67,6 +67,13 @@ func TestReconcileClassifiesSafeDrifts(t *testing.T) {
 	}
 }
 
+func TestRemoteObservationAcceptsAsyncOperationOnlyIdentity(t *testing.T) {
+	observation := RemoteObservation{RemoteOperationID: "remote-operation-1", State: StateProcessing, Moderation: ModerationPending, ObservedAt: time.Date(2026, 8, 31, 12, 1, 0, 0, time.UTC)}
+	if err := observation.Validate(); err != nil {
+		t.Fatalf("operation-only observation rejected: %v", err)
+	}
+}
+
 func TestMediaRejectsArbitraryURL(t *testing.T) {
 	snapshot := testSnapshot(t)
 	snapshot.Media = []MediaAsset{{ID: "image-1", ReleasedObjectRef: "https://example.invalid/image.jpg", Digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Format: "image/jpeg", Bytes: 10, Position: 0}}

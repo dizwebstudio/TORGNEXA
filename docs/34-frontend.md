@@ -17,7 +17,7 @@ chunk arrives.
 
 ### Public documentation rendering and indexing
 
-The public `/docs` hub and its 20 topical routes are prerendered during
+The public `/docs` hub and its 21 topical routes are prerendered during
 `npm run build` into `frontend/dist/docs/**/index.html`. Each page contains its
 own content, H1, title, description, canonical URL, Open Graph metadata,
 `TechArticle` and `BreadcrumbList` JSON-LD before the browser executes

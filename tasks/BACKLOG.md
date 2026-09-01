@@ -1107,6 +1107,9 @@ it does not create a second marketplace order, inventory or financial ledger.
 Each provider must expose a truthful `read_only`, `partially_supported` or
 `qualified` state backed by capability, idempotency, reconciliation and
 qualification evidence. See `tasks/issues/223-marketplace-operations-v1.md`.
+Retained redacted marketplace evidence is checked fail-closed by
+`make marketplace-remote-evidence`; this structural check does not create live
+provider evidence or promote an account to `qualified`.
 
 ## Epic 177 — Массовые цены, repricing, Buy Box и продвижение
 
@@ -1237,3 +1240,16 @@ health-only or manifest-only integrations into `ready`, `qualified` or
 topology/DR, device-matrix and production support checks are explicit external
 release-gates. See `tasks/issues/231-ecosystem-support.md` and
 `docs/operations/231-ecosystem-support.md`.
+
+## Follow-up — Provider-specific taxonomy и remote listing runtime
+
+Task 232 закрывает оставшийся runtime-разрыв Task 222/230: официальная
+provider-specific taxonomy, typed mapping для первой волны WB/Ozon/Yandex,
+approved bulk remote apply до 1 000 SKU, per-row receipts, polling,
+read-after-write и reconciliation. PIM остаётся canonical source, а raw
+provider payloads и credentials не попадают в Core или audit. Repository
+implementation и synthetic E2E должны быть закрыты до credentialed release
+qualification; официальные taxonomy/write/read-after-write evidence для каждого
+канала остаются отдельными внешними gates. Структура такого redacted evidence
+проверяется через `make marketplace-remote-evidence`. См.
+`tasks/issues/232-marketplace-listing-remote-runtime.md`.

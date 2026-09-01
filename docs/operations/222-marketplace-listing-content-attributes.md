@@ -33,10 +33,14 @@
   лимитом 1 000 и исключением blocked rows;
 - approval-gated durable batch journal, OpenAPI, Go/Python/TypeScript SDK и
   MCP dry-run preview;
+- approved remote plan до 1 000 строк, отдельные immutable publication
+  snapshots/operations и `remote_operation_ids` с per-row idempotency;
 - typed taxonomy-reader, listing-writer и status-reader ports с dry-run,
   idempotency и нормализованным unknown outcome;
 - read-after-write reconciliation для mismatch, missing, status и unknown;
-- tenant-scoped append-only persistence с RLS, idempotency и migration 52.
+- tenant-scoped append-only persistence с RLS, idempotency и migrations 52/59;
+  migration 59 добавляет безопасную асинхронную remote identity для operation
+  ID в observations и drifts.
 
 Demo taxonomy намеренно синтетическая. Для WB, Ozon и Yandex Market нельзя
 подставлять её вместо официальной схемы канала.
@@ -46,7 +50,9 @@ Demo taxonomy намеренно синтетическая. Для WB, Ozon и 
 `products.write` и batch API не являются доказательством live-поддержки. Для
 каждого коннектора отдельно нужны официальные channel-specific схемы, scope и
 rate-limit evidence, тестовый remote batch write и credentialed read-after-write.
-До этого UI показывает qualification boundary, а не успешную публикацию.
+Repository runtime закрывает очередь и автоматический status read-after-write;
+до live evidence UI показывает qualification boundary, а не успешную
+production-поддержку.
 
 MCP/OpenClaw может только запросить preview. Apply, approval и remote write
 остаются за authenticated HTTP/API boundary.

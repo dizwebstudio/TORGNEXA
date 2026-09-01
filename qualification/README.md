@@ -41,3 +41,47 @@ Live connector plans contain account/connector IDs only. Every connector account
 A successful run writes `p4-go-live.json` plus digested subordinate evidence below `qualification/evidence/p4-<UTC>/`. This directory is not source material and must remain ignored by Git and Docker build contexts.
 
 After a retained P4 PASS, public publication is a separate explicit operation: `TORGNEXA_P4_GO_LIVE_EVIDENCE=/abs/path/p4-go-live.json TORGNEXA_P4_GITHUB_RELEASE_TOKEN=... make p4-publish`. The promoter re-verifies the P4 root and every subordinate hash, requires the exact clean release tag, proves that the draft still has exactly the verified asset set with unchanged digest/size, uploads `p4-go-live.json` as the final audit asset, and only then clears the draft flag.
+
+## Marketplace remote qualification evidence
+
+Task 223/232 используют отдельный fail-closed валидатор для сохранённого
+redacted evidence. Он проверяет структуру, release SHA, taxonomy fingerprint,
+capability statuses, обязательные сценарии, rollback и отсутствие полей,
+похожих на секреты. Валидатор не обращается к WB/Ozon/Yandex Market и не
+может заменить credentialed live run.
+
+Для проверки listing-контура:
+
+```bash
+TORGNEXA_MARKETPLACE_EVIDENCE_FILE=/abs/path/marketplace-remote-qualification.json \
+TORGNEXA_MARKETPLACE_EVIDENCE_SCOPE=listing \
+make marketplace-remote-evidence
+```
+
+Для полного marketplace-цикла используется `SCOPE=full`; тогда evidence
+обязан содержать order, reservation, pick/pack, shipment, returns/refund,
+marking/EDO и P&L checks. В репозитории оставлен только синтетический пример
+`marketplace-remote-qualification.example.json` для проверки формата. Его
+нельзя выдавать за live qualification и нельзя помещать в него токены,
+Authorization-заголовки, raw provider payloads или приватные URL.
+
+## Что остаётся внешним release-gate
+
+Репозиторные части Task 223/232, включая API, SDK, frontend, durable
+publication operations, reconciliation projection и evidence validator,
+закрыты. Открытыми считаются только проверки, для которых источник истины
+находится вне Git:
+
+- credentialed non-production taxonomy, batch remote apply,
+  read-after-write и полный order → fulfillment → return → settlement/P&L
+  сценарий для каждого заявленного marketplace;
+- официальный EDO/маркировка, carrier и payment/fiscal smoke для полного
+  сценария;
+- Docker/PostgreSQL и точный Go toolchain runtime для deployment smoke;
+- GitHub applied rules, Team reviewer, protected prerelease,
+  OIDC/Sigstore/SLSA и release asset verification;
+- production topology, backup/restore, on-call, rollback и device matrix.
+
+Наличие manifest, SDK-типа, credentials или локального синтетического PASS не
+закрывает ни один из этих пунктов. Такой результат появляется только после
+сохранения redacted evidence из фактического окружения.

@@ -33,6 +33,28 @@ audit/idempotency guards и synthetic qualification. Статусы в свод�
 Поддержка и production SLA не объявлены автоматически: для них остаются
 credentialed, partner, topology/DR, device и operational evidence gates.
 
+### Матрица закрытия
+
+| Подзадача | Статус | Реализация |
+|---|---|---|
+| 231.1 | `closed` | provider-neutral portfolio, tiers, owners, priorities, journeys и Definition of Done |
+| 231.2 | `closed` | readiness matrix на 61 connector, evidence age, waves, decisions и next actions |
+| 231.3 | `closed` | повторяемый Connector SDK/conformance onboarding, sandbox fixture и admission checks |
+| 231.4 | `closed` | capability-level readiness projection и fail-closed boundary для remote writes |
+| 231.5 | `closed` | governed plugin marketplace, listing metadata, consent, revoke и private tenant scope |
+| 231.6 | `closed` | OpenAPI/SDK/MCP, partner-facing n8n package и versioned public API boundary |
+| 231.7 | `closed` | partner tiers и tenant-scoped append-only certification evidence |
+| 231.8 | `closed` | mobile WMS surface, offline-safe receipts, device/revoke и printer/scanner foundations |
+| 231.9 | `closed` | hosted subscription, SLO/DR/backup foundations и explicit SLA evidence boundary |
+| 231.10 | `closed` | customer-service inbox/cases, SLA queues, diagnostics и redacted support projection |
+| 231.11 | `closed` | Cloud billing/packaging reuse, quotas, governance, artifact consent и revoke controls |
+| 231.12 | `closed` | observed metrics, demo-safe projection, E2E/static gates, UI и external gate register |
+
+`closed` в этой таблице означает закрытие репозиторного объёма. Credentialed
+connector access, реальные партнёрские UAT, production topology/SLA и
+device-matrix остаются отдельными внешними release-gates и не могут быть
+закрыты синтетическими данными.
+
 ## Цель
 
 Построить повторяемую систему роста и поддержки:

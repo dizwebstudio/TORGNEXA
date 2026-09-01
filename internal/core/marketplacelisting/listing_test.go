@@ -159,6 +159,19 @@ func TestReconcileReportsUnknownAndRemoteDrift(t *testing.T) {
 	}
 }
 
+func TestReconcileAcceptsAsyncOperationIdentity(t *testing.T) {
+	taxonomy, now := testTaxonomy(t)
+	draft := testDraft(t, taxonomy, now, "sku-async", "white")
+	digest, err := DraftDigest(draft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drifts, err := Reconcile(draft, digest, RemoteObservation{RemoteOperationID: "operation-1", Status: "processing", ObservedAt: now})
+	if err != nil || len(drifts) != 0 {
+		t.Fatalf("async reconciliation drifts=%#v error=%v", drifts, err)
+	}
+}
+
 func hasDiagnostic(items []Diagnostic, code string) bool {
 	for _, item := range items {
 		if item.Code == code {

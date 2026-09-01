@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
+	"github.com/torgnexa/torgnexa/internal/core/marketplacepublication"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 )
@@ -92,5 +93,29 @@ func TestMarketplaceListingApplyRequiresMatchingApproval(t *testing.T) {
 	api.apply(response, request)
 	if response.Code != http.StatusAccepted || store.run.State != marketplacelisting.BatchQueued {
 		t.Fatalf("apply status=%d body=%s run=%+v", response.Code, response.Body.String(), store.run)
+	}
+}
+
+func TestMarketplaceListingRemoteIdentityMatchesOperation(t *testing.T) {
+	cases := []struct {
+		name                        string
+		kind                        marketplacepublication.OperationKind
+		remoteID                    string
+		remoteOperationID           string
+		want                        bool
+	}{
+		{name: "create has no remote identity", kind: marketplacepublication.OperationCreateProduct, want: true},
+		{name: "create rejects prefilled identity", kind: marketplacepublication.OperationCreateProduct, remoteID: "remote-1", want: false},
+		{name: "update needs product identity", kind: marketplacepublication.OperationUpdateProduct, remoteID: "remote-1", want: true},
+		{name: "update rejects operation-only identity", kind: marketplacepublication.OperationUpdateProduct, remoteOperationID: "operation-1", want: false},
+		{name: "status read accepts operation identity", kind: marketplacepublication.OperationStatusRead, remoteOperationID: "operation-1", want: true},
+		{name: "status read needs an identity", kind: marketplacepublication.OperationStatusRead, want: false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if got := validRemotePublicationIdentity(test.kind, test.remoteID, test.remoteOperationID); got != test.want {
+				t.Fatalf("validRemotePublicationIdentity() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }

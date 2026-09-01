@@ -185,22 +185,55 @@ func (m MediaSlot) Validate() error {
 }
 
 type Taxonomy struct {
-	ID           string                `json:"id"`
-	ChannelID    string                `json:"connector_id"`
-	Locale       string                `json:"locale"`
-	Jurisdiction string                `json:"jurisdiction"`
-	Version      int64                 `json:"version"`
-	Source       string                `json:"source"`
-	Fingerprint  string                `json:"fingerprint"`
-	ObservedAt   time.Time             `json:"observed_at"`
-	FreshUntil   time.Time             `json:"fresh_until"`
-	Categories   []Category            `json:"categories"`
-	Attributes   []AttributeDefinition `json:"attributes"`
-	MediaSlots   []MediaSlot           `json:"media_slots"`
+	ID              string                     `json:"id"`
+	ChannelID       string                     `json:"connector_id"`
+	Locale          string                     `json:"locale"`
+	Jurisdiction    string                     `json:"jurisdiction"`
+	Version         int64                      `json:"version"`
+	Source          string                     `json:"source"`
+	Fingerprint     string                     `json:"fingerprint"`
+	ObservedAt      time.Time                  `json:"observed_at"`
+	FreshUntil      time.Time                  `json:"fresh_until"`
+	Categories      []Category                 `json:"categories"`
+	Attributes      []AttributeDefinition      `json:"attributes"`
+	MediaSlots      []MediaSlot                `json:"media_slots"`
+	ProviderProfile *ProviderTaxonomyProfile   `json:"provider_profile,omitempty"`
+}
+
+// ProviderTaxonomyProfile records the typed adapter contract used to turn the
+// normalized taxonomy into one provider request. It is metadata only: raw
+// provider schemas and credentials never cross the connector boundary.
+type ProviderTaxonomyProfile struct {
+	ConnectorID        string `json:"connector_id"`
+	SchemaVersion      string `json:"schema_version"`
+	CategoryCodeKind   string `json:"category_code_kind"`
+	AttributeKeyKind   string `json:"attribute_key_kind"`
+	BulkApplyMode      string `json:"bulk_apply_mode"`
+	ReadAfterWriteMode string `json:"read_after_write_mode"`
+	Qualification      string `json:"qualification"`
+}
+
+func (profile ProviderTaxonomyProfile) Validate() error {
+	if !refPattern.MatchString(profile.ConnectorID) || !validText(profile.SchemaVersion, 64) || !validTaxonomyProfileCode(profile.CategoryCodeKind, "numeric", "string") || !validTaxonomyProfileCode(profile.AttributeKeyKind, "provider_id", "provider_name", "normalized_code") || !validTaxonomyProfileCode(profile.BulkApplyMode, "bounded_single_item_calls", "provider_batch") || !validTaxonomyProfileCode(profile.ReadAfterWriteMode, "catalog_read", "async_status", "catalog_read_or_async_status") || !validTaxonomyProfileCode(profile.Qualification, "synthetic", "qualification_required", "qualified") {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func validTaxonomyProfileCode(value string, allowed ...string) bool {
+	for _, item := range allowed {
+		if value == item {
+			return true
+		}
+	}
+	return false
 }
 
 func (t Taxonomy) Validate() error {
 	if !refPattern.MatchString(t.ID) || !refPattern.MatchString(t.ChannelID) || !localePattern.MatchString(t.Locale) || !countryPattern.MatchString(t.Jurisdiction) || t.Version < 1 || strings.TrimSpace(t.Source) != t.Source || t.Source == "" || len(t.Source) > 256 || !isUTC(t.ObservedAt) || !isUTC(t.FreshUntil) || !t.FreshUntil.After(t.ObservedAt) || len(t.Categories) > 50_000 || len(t.Attributes) > 512 || len(t.MediaSlots) > 64 {
+		return ErrInvalid
+	}
+	if t.ProviderProfile != nil && (t.ProviderProfile.Validate() != nil || t.ProviderProfile.ConnectorID != t.ChannelID) {
 		return ErrInvalid
 	}
 	if t.Fingerprint != "" && !isDigest(t.Fingerprint) {
@@ -287,6 +320,9 @@ func (t Taxonomy) Validate() error {
 func (t Taxonomy) ComputeFingerprint() (string, error) {
 	copyTaxonomy := t
 	copyTaxonomy.Fingerprint = ""
+	// ProviderProfile describes adapter semantics rather than remote taxonomy
+	// content, so adding it must not invalidate previously stored evidence.
+	copyTaxonomy.ProviderProfile = nil
 	data, err := json.Marshal(copyTaxonomy)
 	if err != nil {
 		return "", err
@@ -1031,22 +1067,33 @@ func (s BatchState) Valid() bool {
 }
 
 type BatchRun struct {
-	ID             string     `json:"id"`
-	PreviewID      string     `json:"preview_id"`
-	OrganizationID string     `json:"organization_id"`
-	WorkspaceID    string     `json:"workspace_id"`
-	IdempotencyKey string     `json:"idempotency_key"`
-	ApprovalRef    string     `json:"approval_ref,omitempty"`
-	State          BatchState `json:"state"`
-	InputDigest    string     `json:"input_digest"`
-	Rows           []BatchRow `json:"rows"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID                 string     `json:"id"`
+	PreviewID          string     `json:"preview_id"`
+	OrganizationID     string     `json:"organization_id"`
+	WorkspaceID        string     `json:"workspace_id"`
+	IdempotencyKey     string     `json:"idempotency_key"`
+	ApprovalRef        string     `json:"approval_ref,omitempty"`
+	State              BatchState `json:"state"`
+	InputDigest        string     `json:"input_digest"`
+	Rows               []BatchRow `json:"rows"`
+	RemoteOperationIDs []string   `json:"remote_operation_ids,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 func (b BatchRun) Validate() error {
-	if !refPattern.MatchString(b.ID) || !refPattern.MatchString(b.PreviewID) || !refPattern.MatchString(b.OrganizationID) || !refPattern.MatchString(b.WorkspaceID) || b.IdempotencyKey == "" || len(b.IdempotencyKey) > 128 || !b.State.Valid() || !isDigest(b.InputDigest) || len(b.Rows) > MaxBatchItems || !isUTC(b.CreatedAt) || !isUTC(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
+	if !refPattern.MatchString(b.ID) || !refPattern.MatchString(b.PreviewID) || !refPattern.MatchString(b.OrganizationID) || !refPattern.MatchString(b.WorkspaceID) || b.IdempotencyKey == "" || len(b.IdempotencyKey) > 128 || !b.State.Valid() || !isDigest(b.InputDigest) || len(b.Rows) > MaxBatchItems || len(b.RemoteOperationIDs) > MaxBatchItems || !isUTC(b.CreatedAt) || !isUTC(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
 		return ErrInvalid
+	}
+	seenOperations := make(map[string]struct{}, len(b.RemoteOperationIDs))
+	for _, operationID := range b.RemoteOperationIDs {
+		if !refPattern.MatchString(operationID) {
+			return ErrInvalid
+		}
+		if _, exists := seenOperations[operationID]; exists {
+			return ErrConflict
+		}
+		seenOperations[operationID] = struct{}{}
 	}
 	for _, row := range b.Rows {
 		if validText(row.SKU, 200) != true || !isDigest(row.BeforeDigest) || !isDigest(row.AfterDigest) || row.Before.Validate() != nil || row.After.Validate() != nil {
@@ -1057,11 +1104,12 @@ func (b BatchRun) Validate() error {
 }
 
 type RemoteObservation struct {
-	RemoteID       string    `json:"remote_id"`
-	SnapshotDigest string    `json:"snapshot_digest"`
-	Status         string    `json:"status"`
-	CategoryCode   string    `json:"category_code,omitempty"`
-	ObservedAt     time.Time `json:"observed_at"`
+	RemoteID          string    `json:"remote_id,omitempty"`
+	RemoteOperationID string    `json:"remote_operation_id,omitempty"`
+	SnapshotDigest    string    `json:"snapshot_digest"`
+	Status            string    `json:"status"`
+	CategoryCode      string    `json:"category_code,omitempty"`
+	ObservedAt        time.Time `json:"observed_at"`
 }
 
 type DriftType string
@@ -1086,28 +1134,29 @@ func (d DriftType) Valid() bool {
 }
 
 type Drift struct {
-	Type           DriftType `json:"type"`
-	ExpectedDigest string    `json:"expected_digest"`
-	ObservedDigest string    `json:"observed_digest,omitempty"`
-	RemoteID       string    `json:"remote_id,omitempty"`
-	ObservedStatus string    `json:"observed_status"`
-	DetectedAt     time.Time `json:"detected_at"`
+	Type              DriftType `json:"type"`
+	ExpectedDigest    string    `json:"expected_digest"`
+	ObservedDigest    string    `json:"observed_digest,omitempty"`
+	RemoteID          string    `json:"remote_id,omitempty"`
+	RemoteOperationID string    `json:"remote_operation_id,omitempty"`
+	ObservedStatus    string    `json:"observed_status"`
+	DetectedAt        time.Time `json:"detected_at"`
 }
 
 func (d Drift) Validate() error {
-	if !d.Type.Valid() || !isDigest(d.ExpectedDigest) || (d.ObservedDigest != "" && !isDigest(d.ObservedDigest)) || (d.RemoteID != "" && !refPattern.MatchString(d.RemoteID)) || d.ObservedStatus == "" || !isUTC(d.DetectedAt) {
+	if !d.Type.Valid() || !isDigest(d.ExpectedDigest) || (d.ObservedDigest != "" && !isDigest(d.ObservedDigest)) || (d.RemoteID != "" && !refPattern.MatchString(d.RemoteID)) || (d.RemoteOperationID != "" && !refPattern.MatchString(d.RemoteOperationID)) || d.ObservedStatus == "" || !isUTC(d.DetectedAt) {
 		return ErrInvalid
 	}
 	return nil
 }
 
 func Reconcile(expected ListingDraft, expectedDigest string, observation RemoteObservation) ([]Drift, error) {
-	if expected.Validate() != nil || !isDigest(expectedDigest) || !isUTC(observation.ObservedAt) || observation.RemoteID == "" || observation.Status == "" || observation.SnapshotDigest != "" && !isDigest(observation.SnapshotDigest) {
+	if expected.Validate() != nil || !isDigest(expectedDigest) || !isUTC(observation.ObservedAt) || observation.RemoteID == "" && observation.RemoteOperationID == "" || (observation.RemoteID != "" && !refPattern.MatchString(observation.RemoteID)) || (observation.RemoteOperationID != "" && !refPattern.MatchString(observation.RemoteOperationID)) || observation.Status == "" || observation.SnapshotDigest != "" && !isDigest(observation.SnapshotDigest) {
 		return nil, ErrInvalid
 	}
 	drifts := make([]Drift, 0, 3)
 	add := func(kind DriftType) {
-		drifts = append(drifts, Drift{Type: kind, ExpectedDigest: expectedDigest, ObservedDigest: observation.SnapshotDigest, RemoteID: observation.RemoteID, ObservedStatus: observation.Status, DetectedAt: observation.ObservedAt})
+		drifts = append(drifts, Drift{Type: kind, ExpectedDigest: expectedDigest, ObservedDigest: observation.SnapshotDigest, RemoteID: observation.RemoteID, RemoteOperationID: observation.RemoteOperationID, ObservedStatus: observation.Status, DetectedAt: observation.ObservedAt})
 	}
 	if observation.Status == "unknown" {
 		add(DriftUnknownOutcome)

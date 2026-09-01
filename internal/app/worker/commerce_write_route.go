@@ -371,6 +371,16 @@ func (r *commerceWriteRoute) route(ctx context.Context, scope tenancy.Scope, eve
 		if err != nil {
 			return eventbus.Retryable("commerce_sync_mapping_read_failed")
 		}
+		allowed, fenceErr := r.receipts.ClaimOutboundVersion(ctx, scope, policy.ID, mappingLocalID, event.ID, localVersion)
+		if fenceErr != nil {
+			return eventbus.Retryable("commerce_sync_version_fence_failed")
+		}
+		if !allowed {
+			if receiptErr := r.recordReceipt(ctx, scope, policy, event, mutation, fingerprint, syncengine.OutcomeStaleSuppressed); receiptErr != nil {
+				return receiptErr
+			}
+			continue
+		}
 		runtime, err := r.newRuntime(ctx, scope, account)
 		if err != nil {
 			permanentErr = eventbus.Permanent("commerce_sync_runtime_unavailable")

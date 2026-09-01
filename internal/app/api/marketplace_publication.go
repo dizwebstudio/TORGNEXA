@@ -13,6 +13,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/marketplacetaxonomy"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
@@ -117,6 +118,12 @@ func (api marketplacePublicationAPI) enqueue(w http.ResponseWriter, r *http.Requ
 	if err != nil || account.Status != sdk.AccountActive || !request.Snapshot.Target.SameAccount(accountTarget) || account.Family != sdk.FamilyMarketplace || !supportsProductsWrite {
 		writeProblem(w, http.StatusConflict, "Marketplace product publication is not enabled for this account")
 		return
+	}
+	if !request.DryRun {
+		if err := marketplacetaxonomy.RemoteOperationAdmission(request.Snapshot.Target.ConnectorID, request.Operation); err != nil {
+			writeProblem(w, http.StatusConflict, "Provider qualification is required before remote publication")
+			return
+		}
 	}
 	settings, err := api.accounts.AccountCapabilities(r.Context(), scope, account.ID)
 	if err != nil || !sdk.CapabilityEnabled(settings, "products.write") {
@@ -251,7 +258,7 @@ func qualityReceiptMatches(receipt publicationquality.PublicationGateReceipt, sn
 
 func sameQualityTarget(receipt publicationquality.Target, target marketplacepublication.Target) bool {
 	left := strings.Join([]string{receipt.OrganizationID, receipt.WorkspaceID, receipt.ProductID, receipt.OfferID, receipt.ConnectorAccountID, receipt.ConnectorID, receipt.ChannelFamily, receipt.Locale, receipt.Jurisdiction}, "\x00")
-	right := strings.Join([]string{target.OrganizationID, target.WorkspaceID, target.ProductID, target.OfferID, target.ConnectorAccountID, target.ConnectorID, target.Locale, target.Jurisdiction}, "\x00")
+	right := strings.Join([]string{target.OrganizationID, target.WorkspaceID, target.ProductID, target.OfferID, target.ConnectorAccountID, target.ConnectorID, "marketplace", target.Locale, target.Jurisdiction}, "\x00")
 	return bytes.Equal([]byte(left), []byte(right))
 }
 

@@ -151,6 +151,49 @@ func (r *Repository) EntityState(ctx context.Context, scope tenancy.Scope, polic
 	})
 	return out, err
 }
+
+// ClaimOutboundVersion advances the tenant-scoped version fence before a
+// commerce worker performs remote IO. A newer local version supersedes older
+// events; retrying the same event remains allowed because connector writes use
+// the event-scoped idempotency key. The fence is deliberately separate from
+// sync_entity_states so an in-flight remote call never makes a partial state
+// look like a successful synchronization.
+func (r *Repository) ClaimOutboundVersion(ctx context.Context, scope tenancy.Scope, policyID, localID, eventID string, localVersion int64) (bool, error) {
+	if err := r.validate(ctx, scope); err != nil {
+		return false, err
+	}
+	if !validSyncID(policyID) || !validSyncID(localID) || !validSyncID(eventID) || localVersion < 1 {
+		return false, syncengine.ErrInvalidRecord
+	}
+	allowed := false
+	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx, `INSERT INTO sync_outbound_version_fences (organization_id,workspace_id,policy_id,local_entity_id,latest_local_version,latest_event_id,claimed_at)
+VALUES ($1,$2,$3,$4,$5,$6,clock_timestamp())
+ON CONFLICT (organization_id,workspace_id,policy_id,local_entity_id) DO UPDATE
+SET latest_local_version=EXCLUDED.latest_local_version,latest_event_id=EXCLUDED.latest_event_id,claimed_at=EXCLUDED.claimed_at
+WHERE sync_outbound_version_fences.latest_local_version < EXCLUDED.latest_local_version
+   OR (sync_outbound_version_fences.latest_local_version = EXCLUDED.latest_local_version AND sync_outbound_version_fences.latest_event_id = EXCLUDED.latest_event_id)
+RETURNING true`, scope.OrganizationID().String(), scope.WorkspaceID().String(), policyID, localID, localVersion, eventID).Scan(&allowed)
+		if errors.Is(err, sql.ErrNoRows) {
+			allowed = false
+			return nil
+		}
+		return err
+	})
+	return allowed, err
+}
+
+func validSyncID(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for _, r := range value {
+		if (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '.' && r != '_' && r != ':' && r != '/' && r != '-' {
+			return false
+		}
+	}
+	return true
+}
 func (r *Repository) SaveEntityState(ctx context.Context, scope tenancy.Scope, s syncengine.EntityState, expected int64) (syncengine.EntityState, error) {
 	if err := r.validate(ctx, scope); err != nil {
 		return syncengine.EntityState{}, err

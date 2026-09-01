@@ -69,6 +69,30 @@ for text_path, required in {
         if value not in text:
             raise SystemExit(f"ecosystem qualification: {value} missing from {text_path}")
 
+for relative in (
+    "internal/platform/connectors/conformance/conformance.go",
+    "internal/platform/connectors/readiness.go",
+    "internal/platform/pluginmarketplace/governance.go",
+    "internal/core/customerservice/service.go",
+    "internal/core/inventory/mobile.go",
+    "internal/platform/cloudbilling/billing.go",
+    "internal/platform/slo/slo.go",
+    "integrations/n8n-nodes-torgnexa/package.json",
+):
+    if not (root / relative).is_file():
+        raise SystemExit(f"ecosystem qualification: canonical foundation missing {relative}")
+
+conformance = (root / "internal/platform/connectors/conformance/conformance.go").read_text()
+for value in ("requiredChecks", "func Run(", "func RequiredChecks(", "CheckProductionCredential", "CheckIsolation"):
+    if value not in conformance:
+        raise SystemExit(f"ecosystem qualification: repeatable connector factory invariant {value} missing")
+
+task = (root / "tasks/issues/231-ecosystem-support.md").read_text()
+for number in range(1, 13):
+    marker = f"| 231.{number} | `closed` |"
+    if marker not in task:
+        raise SystemExit(f"ecosystem qualification: task 231.{number} is not marked closed")
+
 policy = json.loads((root / "architecture/policy.json").read_text())
 module_paths = {item["path"] for item in policy["modules"]}
 for module in ("internal/core/ecosystem", "internal/platform/postgres/ecosystemrepo"):

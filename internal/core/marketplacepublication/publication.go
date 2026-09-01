@@ -359,7 +359,7 @@ type RemoteObservation struct {
 }
 
 func (observation RemoteObservation) Validate() error {
-	if !refPattern.MatchString(observation.RemoteID) || (observation.RemoteOperationID != "" && !refPattern.MatchString(observation.RemoteOperationID)) || !observation.State.Valid() || !observation.Moderation.Valid() || (observation.SnapshotDigest != "" && !digestPattern.MatchString(observation.SnapshotDigest)) || !isUTC(observation.ObservedAt) {
+	if observation.RemoteID == "" && observation.RemoteOperationID == "" || (observation.RemoteID != "" && !refPattern.MatchString(observation.RemoteID)) || (observation.RemoteOperationID != "" && !refPattern.MatchString(observation.RemoteOperationID)) || !observation.State.Valid() || !observation.Moderation.Valid() || (observation.SnapshotDigest != "" && !digestPattern.MatchString(observation.SnapshotDigest)) || !isUTC(observation.ObservedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -391,17 +391,18 @@ func (drift DriftType) Valid() bool {
 
 // Drift is a redacted reconciliation result, suitable for audit and UI.
 type Drift struct {
-	Type           DriftType `json:"type"`
-	SnapshotID     string    `json:"snapshot_id"`
-	RemoteID       string    `json:"remote_id,omitempty"`
-	ExpectedDigest string    `json:"expected_digest,omitempty"`
-	ObservedDigest string    `json:"observed_digest,omitempty"`
-	ObservedState  State     `json:"observed_state,omitempty"`
-	DetectedAt     time.Time `json:"detected_at"`
+	Type              DriftType `json:"type"`
+	SnapshotID        string    `json:"snapshot_id"`
+	RemoteID          string    `json:"remote_id,omitempty"`
+	RemoteOperationID string    `json:"remote_operation_id,omitempty"`
+	ExpectedDigest    string    `json:"expected_digest,omitempty"`
+	ObservedDigest    string    `json:"observed_digest,omitempty"`
+	ObservedState     State     `json:"observed_state,omitempty"`
+	DetectedAt        time.Time `json:"detected_at"`
 }
 
 func (drift Drift) Validate() error {
-	if !drift.Type.Valid() || !refPattern.MatchString(drift.SnapshotID) || (drift.RemoteID != "" && !refPattern.MatchString(drift.RemoteID)) || (drift.ExpectedDigest != "" && !digestPattern.MatchString(drift.ExpectedDigest)) || (drift.ObservedDigest != "" && !digestPattern.MatchString(drift.ObservedDigest)) || (drift.ObservedState != "" && !drift.ObservedState.Valid()) || !isUTC(drift.DetectedAt) {
+	if !drift.Type.Valid() || !refPattern.MatchString(drift.SnapshotID) || (drift.RemoteID != "" && !refPattern.MatchString(drift.RemoteID)) || (drift.RemoteOperationID != "" && !refPattern.MatchString(drift.RemoteOperationID)) || (drift.ExpectedDigest != "" && !digestPattern.MatchString(drift.ExpectedDigest)) || (drift.ObservedDigest != "" && !digestPattern.MatchString(drift.ObservedDigest)) || (drift.ObservedState != "" && !drift.ObservedState.Valid()) || !isUTC(drift.DetectedAt) {
 		return ErrInvalid
 	}
 	return nil
@@ -421,7 +422,7 @@ func Reconcile(snapshot Snapshot, observation RemoteObservation, mappingRemoteID
 	}
 	result := make([]Drift, 0, 3)
 	add := func(kind DriftType) {
-		result = append(result, Drift{Type: kind, SnapshotID: snapshot.ID, RemoteID: observation.RemoteID, ExpectedDigest: digest, ObservedDigest: observation.SnapshotDigest, ObservedState: observation.State, DetectedAt: observation.ObservedAt})
+		result = append(result, Drift{Type: kind, SnapshotID: snapshot.ID, RemoteID: observation.RemoteID, RemoteOperationID: observation.RemoteOperationID, ExpectedDigest: digest, ObservedDigest: observation.SnapshotDigest, ObservedState: observation.State, DetectedAt: observation.ObservedAt})
 	}
 	if mappingRemoteID != "" && mappingRemoteID != observation.RemoteID {
 		add(DriftMappingConflict)

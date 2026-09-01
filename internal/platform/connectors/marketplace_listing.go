@@ -104,7 +104,7 @@ type MarketplaceListingObservation struct {
 }
 
 func (observation MarketplaceListingObservation) Validate() error {
-	if !validRemoteID(observation.Observation.RemoteID) || observation.Observation.Status == "" || observation.Observation.ObservedAt.IsZero() || observation.Observation.ObservedAt.Location() != time.UTC || observation.Observation.SnapshotDigest != "" && !validDigest(observation.Observation.SnapshotDigest) {
+	if observation.Observation.RemoteID == "" && observation.Observation.RemoteOperationID == "" || observation.Observation.RemoteID != "" && !validRemoteID(observation.Observation.RemoteID) || observation.Observation.RemoteOperationID != "" && !validRemoteID(observation.Observation.RemoteOperationID) || observation.Observation.Status == "" || observation.Observation.ObservedAt.IsZero() || observation.Observation.ObservedAt.Location() != time.UTC || observation.Observation.SnapshotDigest != "" && !validDigest(observation.Observation.SnapshotDigest) {
 		return ErrInvalidMarketplaceListing
 	}
 	return nil

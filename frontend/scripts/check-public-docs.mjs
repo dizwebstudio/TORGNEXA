@@ -15,7 +15,7 @@ const siteURL = canonical.replace(/\/docs$/, "");
 const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
 const uniqueUrls = new Set(urls);
 const checks = [
-  [urls.length === 21, "sitemap contains the documentation hub and 20 topical pages"],
+  [urls.length === 22, "sitemap contains the documentation hub and 21 topical pages"],
   [uniqueUrls.size === urls.length, "sitemap URLs are unique"],
   [urls.includes(canonical), "sitemap contains the documentation hub"],
   [robots.includes("Allow: /docs") && robots.includes("Disallow: /api/"), "robots policy protects private routes"],

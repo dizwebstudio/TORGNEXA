@@ -91,7 +91,7 @@ func (r *Repository) Enqueue(ctx context.Context, scope tenancy.Scope, operation
 		} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("marketplace publication repository: operation lookup: %w", err)
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_operations(organization_id,workspace_id,operation_id,snapshot_id,connector_account_id,connector_id,operation_kind,state,idempotency_key,attempt,dry_run,approval_request_id,quality_receipt_id,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,1)`, scope.OrganizationID(), scope.WorkspaceID(), operation.ID, operation.SnapshotID, operation.Target.ConnectorAccountID, operation.Target.ConnectorID, operation.Kind, operation.State, operation.IdempotencyKey, operation.Attempt, operation.DryRun, operation.ApprovalRef, operation.QualityReceiptRef)
+		_, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_operations(organization_id,workspace_id,operation_id,snapshot_id,connector_account_id,connector_id,operation_kind,state,idempotency_key,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,1)`, scope.OrganizationID(), scope.WorkspaceID(), operation.ID, operation.SnapshotID, operation.Target.ConnectorAccountID, operation.Target.ConnectorID, operation.Kind, operation.State, operation.IdempotencyKey, operation.RemoteID, operation.RemoteOperationID, operation.Attempt, operation.DryRun, operation.ApprovalRef, operation.QualityReceiptRef)
 		if err != nil {
 			return fmt.Errorf("marketplace publication repository: insert operation: %w", err)
 		}
@@ -100,6 +100,97 @@ func (r *Repository) Enqueue(ctx context.Context, scope tenancy.Scope, operation
 	})
 	if errors.Is(err, ErrConflict) {
 		return marketplacepublication.Operation{}, marketplacepublication.ErrConflict
+	}
+	return result, err
+}
+
+// EnqueueBatch atomically stores immutable snapshots and their queued
+// operations. Replaying the same per-row idempotency keys returns the original
+// operations without creating duplicate remote effects.
+func (r *Repository) EnqueueBatch(ctx context.Context, scope tenancy.Scope, snapshots []marketplacepublication.Snapshot, operations []marketplacepublication.Operation) ([]marketplacepublication.Operation, error) {
+	if err := r.validate(ctx, scope); err != nil || len(snapshots) == 0 || len(snapshots) != len(operations) {
+		return nil, marketplacepublication.ErrInvalid
+	}
+	documents := make([][]byte, len(snapshots))
+	seenSnapshots := make(map[string]struct{}, len(snapshots))
+	seenKeys := make(map[string]struct{}, len(operations))
+	for index := range snapshots {
+		snapshot := snapshots[index]
+		if snapshot.Target.OrganizationID != scope.OrganizationID().String() || snapshot.Target.WorkspaceID != scope.WorkspaceID().String() {
+			return nil, marketplacepublication.ErrInvalid
+		}
+		digest, err := snapshot.ComputeDigest()
+		if err != nil || snapshot.Digest != "" && snapshot.Digest != digest {
+			return nil, marketplacepublication.ErrConflict
+		}
+		snapshot.Digest = digest
+		if snapshot.Validate() != nil {
+			return nil, marketplacepublication.ErrInvalid
+		}
+		document, err := json.Marshal(snapshot)
+		if err != nil || strings.Contains(strings.ToLower(string(document)), "http://") || strings.Contains(strings.ToLower(string(document)), "https://") {
+			return nil, marketplacepublication.ErrInvalid
+		}
+		if _, exists := seenSnapshots[snapshot.ID]; exists {
+			return nil, marketplacepublication.ErrConflict
+		}
+		seenSnapshots[snapshot.ID] = struct{}{}
+		documents[index] = document
+		snapshots[index] = snapshot
+
+		operation := operations[index]
+		if operation.Target != snapshot.Target || operation.SnapshotID != snapshot.ID || operation.SnapshotDigest != digest || operation.State != marketplacepublication.StateQueued || operation.Validate() != nil {
+			return nil, marketplacepublication.ErrInvalid
+		}
+		if _, exists := seenKeys[operation.Target.ConnectorAccountID+"\x00"+operation.IdempotencyKey]; exists {
+			return nil, marketplacepublication.ErrConflict
+		}
+		seenKeys[operation.Target.ConnectorAccountID+"\x00"+operation.IdempotencyKey] = struct{}{}
+	}
+
+	result := make([]marketplacepublication.Operation, len(operations))
+	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		for index, snapshot := range snapshots {
+			var existing string
+			err := tx.QueryRowContext(ctx, `SELECT snapshot_digest FROM marketplace_publication_snapshots WHERE organization_id=$1 AND workspace_id=$2 AND snapshot_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), snapshot.ID).Scan(&existing)
+			switch {
+			case err == nil:
+				if existing != snapshot.Digest {
+					return ErrConflict
+				}
+			case errors.Is(err, sql.ErrNoRows):
+				if _, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_snapshots(organization_id,workspace_id,snapshot_id,product_id,offer_id,connector_account_id,connector_id,locale,jurisdiction,snapshot_version,snapshot_digest,snapshot_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`, scope.OrganizationID(), scope.WorkspaceID(), snapshot.ID, snapshot.Target.ProductID, snapshot.Target.OfferID, snapshot.Target.ConnectorAccountID, snapshot.Target.ConnectorID, snapshot.Target.Locale, snapshot.Target.Jurisdiction, snapshot.Version, snapshot.Digest, documents[index]); err != nil {
+					return fmt.Errorf("marketplace publication repository: batch snapshot insert: %w", err)
+				}
+			default:
+				return fmt.Errorf("marketplace publication repository: batch snapshot lookup: %w", err)
+			}
+		}
+		for index, operation := range operations {
+			var existing marketplacepublication.Operation
+			err := tx.QueryRowContext(ctx, `SELECT operation_id,snapshot_id,connector_account_id,connector_id,operation_kind,state,idempotency_key,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,error_code,version,created_at,updated_at FROM marketplace_publication_operations WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND idempotency_key=$4`, scope.OrganizationID(), scope.WorkspaceID(), operation.Target.ConnectorAccountID, operation.IdempotencyKey).Scan(&existing.ID, &existing.SnapshotID, &existing.Target.ConnectorAccountID, &existing.Target.ConnectorID, &existing.Kind, &existing.State, &existing.IdempotencyKey, &existing.RemoteID, &existing.RemoteOperationID, &existing.Attempt, &existing.DryRun, &existing.ApprovalRef, &existing.QualityReceiptRef, &existing.ErrorCode, &existing.Version, &existing.CreatedAt, &existing.UpdatedAt)
+			switch {
+			case err == nil:
+				existing.Target.OrganizationID, existing.Target.WorkspaceID = scope.OrganizationID().String(), scope.WorkspaceID().String()
+				existing.Target.ProductID, existing.Target.OfferID, existing.Target.Locale, existing.Target.Jurisdiction = operation.Target.ProductID, operation.Target.OfferID, operation.Target.Locale, operation.Target.Jurisdiction
+				existing.SnapshotDigest = operation.SnapshotDigest
+				if existing.SnapshotID != operation.SnapshotID || existing.Kind != operation.Kind || !existing.Target.SameAccount(operation.Target) || existing.DryRun != operation.DryRun || existing.ID != operation.ID || existing.Validate() != nil {
+					return ErrConflict
+				}
+				result[index] = existing
+			case errors.Is(err, sql.ErrNoRows):
+				if _, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_operations(organization_id,workspace_id,operation_id,snapshot_id,connector_account_id,connector_id,operation_kind,state,idempotency_key,remote_id,remote_operation_id,attempt,dry_run,approval_request_id,quality_receipt_id,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,1)`, scope.OrganizationID(), scope.WorkspaceID(), operation.ID, operation.SnapshotID, operation.Target.ConnectorAccountID, operation.Target.ConnectorID, operation.Kind, operation.State, operation.IdempotencyKey, operation.RemoteID, operation.RemoteOperationID, operation.Attempt, operation.DryRun, operation.ApprovalRef, operation.QualityReceiptRef); err != nil {
+					return fmt.Errorf("marketplace publication repository: batch operation insert: %w", err)
+				}
+				result[index] = operation
+			default:
+				return fmt.Errorf("marketplace publication repository: batch operation lookup: %w", err)
+			}
+		}
+		return nil
+	})
+	if errors.Is(err, ErrConflict) {
+		return nil, marketplacepublication.ErrConflict
 	}
 	return result, err
 }
@@ -282,7 +373,7 @@ func (r *Repository) RecordDrift(ctx context.Context, scope tenancy.Scope, drift
 		return marketplacepublication.ErrInvalid
 	}
 	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_drifts(organization_id,workspace_id,drift_id,operation_id,snapshot_id,drift_type,remote_id,expected_digest,observed_digest,observed_state,detected_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), driftID, operationID, drift.SnapshotID, drift.Type, drift.RemoteID, drift.ExpectedDigest, drift.ObservedDigest, drift.ObservedState, drift.DetectedAt.UTC())
+		_, err := tx.ExecContext(ctx, `INSERT INTO marketplace_publication_drifts(organization_id,workspace_id,drift_id,operation_id,snapshot_id,drift_type,remote_id,remote_operation_id,expected_digest,observed_digest,observed_state,detected_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`, scope.OrganizationID(), scope.WorkspaceID(), driftID, operationID, drift.SnapshotID, drift.Type, drift.RemoteID, drift.RemoteOperationID, drift.ExpectedDigest, drift.ObservedDigest, drift.ObservedState, drift.DetectedAt.UTC())
 		return err
 	})
 }
@@ -294,14 +385,14 @@ func (r *Repository) ListDrifts(ctx context.Context, scope tenancy.Scope, operat
 	}
 	items := make([]marketplacepublication.Drift, 0, limit)
 	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT drift_type,snapshot_id,remote_id,expected_digest,observed_digest,observed_state,detected_at FROM marketplace_publication_drifts WHERE organization_id=$1 AND workspace_id=$2 AND operation_id=$3 ORDER BY detected_at DESC,drift_id DESC LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), operationID, limit)
+		rows, err := tx.QueryContext(ctx, `SELECT drift_type,snapshot_id,remote_id,remote_operation_id,expected_digest,observed_digest,observed_state,detected_at FROM marketplace_publication_drifts WHERE organization_id=$1 AND workspace_id=$2 AND operation_id=$3 ORDER BY detected_at DESC,drift_id DESC LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), operationID, limit)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var item marketplacepublication.Drift
-			if err := rows.Scan(&item.Type, &item.SnapshotID, &item.RemoteID, &item.ExpectedDigest, &item.ObservedDigest, &item.ObservedState, &item.DetectedAt); err != nil {
+			if err := rows.Scan(&item.Type, &item.SnapshotID, &item.RemoteID, &item.RemoteOperationID, &item.ExpectedDigest, &item.ObservedDigest, &item.ObservedState, &item.DetectedAt); err != nil {
 				return err
 			}
 			item.DetectedAt = item.DetectedAt.UTC()

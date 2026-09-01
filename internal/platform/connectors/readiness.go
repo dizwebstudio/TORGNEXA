@@ -179,7 +179,10 @@ func AllowsRemoteOperation(profile ReadinessProfile, capability string, write bo
 	}
 	for _, item := range profile.Capabilities {
 		if item.Name == capability && item.Status != string(ReadinessHealthOnly) && item.Status != string(ReadinessManifestOnly) {
-			return item.Status == "qualified" || item.Status == "ready" || (!write && item.Status == "read_only")
+			if write {
+				return item.Status == "qualified"
+			}
+			return item.Status == "qualified" || item.Status == "ready" || item.Status == "read_only"
 		}
 	}
 	return false

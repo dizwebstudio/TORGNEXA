@@ -32,3 +32,16 @@ func TestScanPolicyNormalizesDatabaseTimeToUTC(t *testing.T) {
 		t.Fatalf("database timestamps were not normalized to UTC: created=%v updated=%v", got.CreatedAt.Location(), got.UpdatedAt.Location())
 	}
 }
+
+func TestValidSyncIDRejectsControlAndOversizedValues(t *testing.T) {
+	for _, value := range []string{"policy-1", "evt:2026/09/01", "A_valid.id"} {
+		if !validSyncID(value) {
+			t.Fatalf("valid sync id %q was rejected", value)
+		}
+	}
+	for _, value := range []string{"", "with space", "with\nnewline", "with?query", string(make([]byte, 129))} {
+		if validSyncID(value) {
+			t.Fatalf("invalid sync id %q was accepted", value)
+		}
+	}
+}

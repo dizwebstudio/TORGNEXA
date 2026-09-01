@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
@@ -107,7 +108,7 @@ func (r *Repository) SaveBatch(ctx context.Context, scope tenancy.Scope, run mar
 		var existingDocument []byte
 		err := tx.QueryRowContext(ctx, `SELECT batch_document FROM marketplace_listing_batches WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, scope.OrganizationID(), scope.WorkspaceID(), run.IdempotencyKey).Scan(&existingDocument)
 		if err == nil {
-			if json.Unmarshal(existingDocument, &result) != nil || result.PreviewID != run.PreviewID || result.Validate() != nil {
+			if json.Unmarshal(existingDocument, &result) != nil || result.PreviewID != run.PreviewID || result.InputDigest != run.InputDigest || result.ApprovalRef != run.ApprovalRef || !reflect.DeepEqual(result.Rows, run.Rows) || !equalStrings(result.RemoteOperationIDs, run.RemoteOperationIDs) || result.Validate() != nil {
 				return ErrConflict
 			}
 			return nil
@@ -157,6 +158,18 @@ func countEligible(rows []marketplacelisting.BatchRow) int {
 		}
 	}
 	return count
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Repository) validate(ctx context.Context, scope tenancy.Scope) error {
