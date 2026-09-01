@@ -5,6 +5,7 @@
   "change_class": "pillar_change",
   "summary": "Admit a provider-neutral connector readiness matrix and catalog-wide Integration Center view without treating manifests or health probes as business qualification.",
   "scopes": [
+    ".gitignore",
     "Makefile",
     "adr/0177-connector-depth-and-readiness.md",
     "architecture/reviews/226-connector-depth-and-readiness.json",
@@ -14,6 +15,7 @@
     "docs/connectors/readiness-matrix.md",
     "docs/operations/226-connector-depth-and-readiness.md",
     "frontend/src/pages/IntegrationStatusPage.tsx",
+    "frontend/src/pages/PublicDocumentationPage.tsx",
     "frontend/src/styles.css",
     "integrations/n8n-nodes-torgnexa/nodes/Torgnexa/GenericFunctions.ts",
     "integrations/n8n-nodes-torgnexa/nodes/Torgnexa/Torgnexa.node.ts",

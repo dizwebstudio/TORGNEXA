@@ -55,7 +55,7 @@ type ReadinessRateLimit struct {
 
 // ReadinessProfile describes one connector across the catalog and runtime.
 type ReadinessProfile struct {
-	ConnectorID             string                `json:"connector_id"`
+	ID                      string                `json:"connector_id"`
 	DisplayName             string                `json:"display_name"`
 	Family                  string                `json:"family"`
 	Surface                 string                `json:"surface"`
@@ -119,13 +119,13 @@ func ReadinessCatalog() ([]ReadinessProfile, error) {
 // ReadinessProfileFor resolves one connector profile from the reviewed
 // catalog. The returned profile owns its slices and may be safely modified by
 // the caller without changing the generated snapshot.
-func ReadinessProfileFor(connectorID string) (ReadinessProfile, error) {
+func ReadinessProfileFor(profileID string) (ReadinessProfile, error) {
 	profiles, err := ReadinessCatalog()
 	if err != nil {
 		return ReadinessProfile{}, err
 	}
 	for _, profile := range profiles {
-		if profile.ConnectorID == connectorID {
+		if profile.ID == profileID {
 			return profile, nil
 		}
 	}
@@ -192,14 +192,14 @@ func validateReadinessProfiles(profiles []ReadinessProfile) error {
 	previous := ""
 	seen := make(map[string]struct{}, len(profiles))
 	for _, profile := range profiles {
-		if profile.ConnectorID == "" || profile.ConnectorID <= previous {
+		if profile.ID == "" || profile.ID <= previous {
 			return errors.New("connectors: readiness profiles are not sorted or contain an empty ID")
 		}
-		previous = profile.ConnectorID
-		if _, exists := seen[profile.ConnectorID]; exists {
+		previous = profile.ID
+		if _, exists := seen[profile.ID]; exists {
 			return errors.New("connectors: duplicate readiness profile")
 		}
-		seen[profile.ConnectorID] = struct{}{}
+		seen[profile.ID] = struct{}{}
 		if _, ok := validReadinessStatuses[profile.Status]; !ok || profile.Owner == "" || profile.Priority == "" || profile.Decision == "" || profile.NextAction == "" || profile.ConformanceRef == "" || profile.RuntimeRef == "" {
 			return errors.New("connectors: incomplete readiness profile")
 		}
@@ -227,6 +227,6 @@ func cloneReadinessProfiles(profiles []ReadinessProfile) []ReadinessProfile {
 		}
 		cloned[i].Blockers = append([]string(nil), cloned[i].Blockers...)
 	}
-	sort.Slice(cloned, func(i, j int) bool { return cloned[i].ConnectorID < cloned[j].ConnectorID })
+	sort.Slice(cloned, func(i, j int) bool { return cloned[i].ID < cloned[j].ID })
 	return cloned
 }

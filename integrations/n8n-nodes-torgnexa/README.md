@@ -39,7 +39,7 @@ The repository also provides an offline structural/unit test that does not insta
 npm run test:offline
 npm run test:e2e
 npm run pack:verify
-npm run verify-package
+npm run verify:package
 ```
 
 `test:e2e` builds a package tarball, installs that exact artifact in an isolated

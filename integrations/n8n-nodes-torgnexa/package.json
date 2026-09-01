@@ -33,7 +33,7 @@
     "build": "npm run clean && tsc -p tsconfig.release.json && node ./scripts/copy-assets.mjs",
     "build:watch": "tsc -p tsconfig.release.json --watch",
     "lint": "tsc -p tsconfig.release.json --noEmit",
-    "test:offline": "tsc -p tsconfig.offline.json && node --test test/*.test.cjs",
+    "test:offline": "tsc -p tsconfig.offline.json && node --test test/core.test.cjs",
     "test:e2e": "node ./test/e2e-installation.test.cjs",
     "pack:verify": "npm pack --dry-run",
     "verify:package": "node ./scripts/verify-package.mjs",

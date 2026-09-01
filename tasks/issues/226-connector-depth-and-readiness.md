@@ -123,11 +123,12 @@ connector в `ready`.
 для заявленных операций не пройдены; пропущенный тест даёт fail-closed, а не
 зелёный результат.
 
-### 226.4 — План углубления 17 health-only connector-ов
+### 226.4 — План решений для health-only и manifest-only поверхностей
 
 **Зависимости:** 226.2–226.3.
 
-- Для каждого из 17 connector-ов выбрать один из путей: business read,
+- Для каждого из 16 явных `health_only` и 2 `manifest_only` connector-ов
+  выбрать один из путей: business read,
   business write, отдельная специализированная поверхность, health-only с
   documented limitation или deprecation.
 - Не обещать commerce operations connector-у, чей домен — AI, social,
@@ -141,8 +142,9 @@ connector в `ready`.
 - Для оставшихся явно показывать причину, почему health-only является
   осознанным конечным статусом.
 
-**Acceptance:** есть утверждённый план по всем 17 health-only connector-ам;
-ни один не помечается `ready` только ради увеличения счётчика.
+**Acceptance:** есть утверждённый план по всем 18 поверхностям, которые не
+имеют обычного commerce runtime на текущем срезе; ни один connector не
+помечается `ready` только ради увеличения счётчика.
 
 ### 226.5 — Приоритетные commerce connectors: полезный read-срез
 

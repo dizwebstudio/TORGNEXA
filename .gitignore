@@ -73,6 +73,7 @@ build/
 # JavaScript bundler caches and test reports.
 .vite/
 *.tsbuildinfo
+.offline-dist/
 coverage/
 test-results/
 playwright-report/

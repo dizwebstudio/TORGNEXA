@@ -169,7 +169,7 @@ const fields: Field[] = [
   },
   {
     displayName: 'Warehouse ID', name: 'warehouseId', type: 'string', required: true,
-    displayOptions: { show: { resource: ['inventory', 'fulfillment'], operation: ['reserveAllocation', 'updateWarehouse', 'listTasks', 'createTask', 'createTasksFromOrder', 'createBatch'] } },
+    displayOptions: { show: { resource: ['inventory', 'fulfillment'], operation: ['reserveAllocation', 'updateWarehouse', 'listTasks', 'createTasksFromOrder'] } },
   },
   {
     displayName: 'Order Item ID', name: 'orderItemId', type: 'string', required: true,
@@ -228,16 +228,32 @@ function idempotencyHeaders(context: IExecuteFunctions, itemIndex: number): Reco
 
 function jsonObject(context: IExecuteFunctions, itemIndex: number): Record<string, unknown> {
   const raw = context.getNodeParameter('jsonBody', itemIndex, '{}');
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
-  if (typeof raw !== 'string') throw new Error('JSON Body must be an object');
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('JSON Body is not valid JSON');
+  let parsed: unknown = raw;
+  if (!(raw && typeof raw === 'object' && !Array.isArray(raw))) {
+    if (typeof raw !== 'string') throw new Error('JSON Body must be an object');
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('JSON Body is not valid JSON');
+    }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON Body must be an object');
+  assertNoTenantSelectors(parsed);
   return parsed as Record<string, unknown>;
+}
+
+function assertNoTenantSelectors(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) assertNoTenantSelectors(item);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'organization_id' || key === 'workspace_id' || key === 'organizationId' || key === 'workspaceId') {
+      throw new Error('JSON Body must not contain client tenant/workspace selectors');
+    }
+    assertNoTenantSelectors(child);
+  }
 }
 
 function jsonObjectIfPresent(context: IExecuteFunctions, itemIndex: number): Record<string, unknown> {

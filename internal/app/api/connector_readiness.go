@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ConnectorReadinessPath       = "/api/v1/connector-readiness"
-	ConnectorReadinessDetailPath = ConnectorReadinessPath + "/"
+	ReadinessPath       = "/api/v1/connector-readiness"
+	ReadinessDetailPath = "/api/v1/connector-readiness/"
 )
 
 // connectorReadinessResponse is the stable, catalog-wide readiness view. It
@@ -28,8 +28,8 @@ type connectorReadinessResponse struct {
 
 func newConnectorReadinessRoutes() []ProtectedRoute {
 	return []ProtectedRoute{
-		{Method: http.MethodGet, Path: ConnectorReadinessPath, Permission: "integrations.center.read", Handler: http.HandlerFunc(connectorReadinessList)},
-		{Method: http.MethodGet, Path: ConnectorReadinessDetailPath, PathPrefix: true, Permission: "integrations.center.read", Handler: http.HandlerFunc(connectorReadinessDetail)},
+		{Method: http.MethodGet, Path: ReadinessPath, Permission: "integrations.center.read", Handler: http.HandlerFunc(connectorReadinessList)},
+		{Method: http.MethodGet, Path: ReadinessDetailPath, PathPrefix: true, Permission: "integrations.center.read", Handler: http.HandlerFunc(connectorReadinessDetail)},
 	}
 }
 
@@ -66,7 +66,7 @@ func connectorReadinessList(w http.ResponseWriter, r *http.Request) {
 	started := after == ""
 	for _, profile := range snapshot.Profiles {
 		if !started {
-			if profile.ConnectorID == after {
+			if profile.ID == after {
 				started = true
 			}
 			continue
@@ -85,7 +85,7 @@ func connectorReadinessList(w http.ResponseWriter, r *http.Request) {
 	}
 	next := ""
 	if len(items) > limit {
-		next = encodeAccountCursor(items[limit-1].ConnectorID)
+		next = encodeAccountCursor(items[limit-1].ID)
 		items = items[:limit]
 	}
 	writeJSON(w, http.StatusOK, connectorReadinessResponse{SchemaVersion: snapshot.SchemaVersion, GeneratedAt: snapshot.GeneratedAt.UTC().Format(time.RFC3339Nano), Consistency: snapshot.Consistency, Summary: snapshot.Summary, Items: items, NextCursor: next})
@@ -96,7 +96,7 @@ func connectorReadinessDetail(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusForbidden, "Forbidden")
 		return
 	}
-	id := strings.TrimPrefix(r.URL.Path, ConnectorReadinessDetailPath)
+	id := strings.TrimPrefix(r.URL.Path, ReadinessDetailPath)
 	if id == "" || strings.ContainsAny(id, "/\r\n\t") {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
@@ -107,7 +107,7 @@ func connectorReadinessDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, profile := range snapshot.Profiles {
-		if profile.ConnectorID == id {
+		if profile.ID == id {
 			writeJSON(w, http.StatusOK, profile)
 			return
 		}

@@ -2,14 +2,19 @@
 
 Task `019` ships `integrations/n8n-nodes-torgnexa` as a separate community-node package. TORGNEXA does not embed n8n and the node has no privileged in-process access.
 
-## Baseline surface
+## Supported surface (`0.2.x`)
 
 - Credential: public TORGNEXA `/api/v1` base URL plus scoped bearer token.
-- Product: list/search through `GET /products`.
-- Order: list/search through `GET /orders`.
+- Product: list/get/create/update cards, offers, prices, category assignment and image lifecycle.
+- Catalog: list/create categories.
+- Order: list/get and idempotent optimistic-concurrency status transitions.
+- Inventory: positions, warehouses, fulfillment allocations and warehouse incidents.
+- Fulfillment/WMS: tasks, barcode scans, task history, packing batches and handoff.
+- Synchronization: status, policy create/update/run and drift resolution.
+- Pricing: deterministic repricing preview without remote price writes.
 - Trigger: dynamic Task-063 signed webhook subscription with canonical event allowlist and additive custom canonical event names.
 
-There is intentionally no raw API, SQL, provider-specific or generic mutation escape hatch. A future write operation must exist as a reviewed public TORGNEXA endpoint first; sensitive writes remain subject to Task `017` and relevant governance.
+There is intentionally no raw API, SQL, provider-specific or generic mutation escape hatch. Every exposed mutation requires a contract-valid `Idempotency-Key`, and state transitions pass an optimistic version. A future sensitive write must exist as a reviewed public TORGNEXA endpoint and approval contract first; n8n cannot become a privileged bypass.
 
 ## Tenancy and transport
 
@@ -32,8 +37,10 @@ Incoming deliveries are accepted only when all of the following hold:
 
 JSON re-serialization before verification is forbidden.
 
-## Package boundary
+## Package and E2E boundary
 
 The repository source package targets Node.js 22+ and the current n8n programmatic-node layout. `n8n-workflow` is a peer supplied by the host; no n8n runtime is shipped with TORGNEXA. Offline tests use local type stubs only as a sandbox compile harness; those stubs are excluded from the published `dist` package.
 
-Task `078 Plugin Marketplace Governance` is the next dependency-ready task and owns publication/admission policy for plugin packages.
+The package publishes as `n8n-nodes-torgnexa` with a versioned npm artifact and compatibility matrix. `test:e2e` installs the exact tarball into an isolated n8n-compatible host harness, executes representative read/mutation workflow steps and verifies a signed trigger. A protected deployment may repeat the same artifact against a disposable real n8n instance; production credentials are forbidden.
+
+Task `078 Plugin Marketplace Governance` owns publication/admission policy for plugin packages; n8n distribution remains external and does not embed n8n.

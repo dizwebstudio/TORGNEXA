@@ -19,11 +19,11 @@ func TestReadinessCatalogIsCompleteAndRedacted(t *testing.T) {
 	}
 	for _, profile := range profiles {
 		if profile.Status == ReadinessQualified {
-			t.Fatalf("repository fixture must not claim qualified without live evidence: %s", profile.ConnectorID)
+			t.Fatalf("repository fixture must not claim qualified without live evidence: %s", profile.ID)
 		}
 		for _, blocker := range profile.Blockers {
 			if blocker == "" {
-				t.Fatalf("empty blocker for %s", profile.ConnectorID)
+				t.Fatalf("empty blocker for %s", profile.ID)
 			}
 		}
 	}
@@ -44,15 +44,29 @@ func TestAllowsRemoteOperationFailsClosed(t *testing.T) {
 }
 
 func TestReadinessProfileForReturnsDefensiveProfile(t *testing.T) {
-	profile, err := ReadinessProfileFor("ozon")
+	profiles, err := ReadinessCatalog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.Status != ReadinessReady || profile.ConnectorID != "ozon" {
+	profileID := ""
+	for _, candidate := range profiles {
+		if candidate.Status == ReadinessReady {
+			profileID = candidate.ID
+			break
+		}
+	}
+	if profileID == "" {
+		t.Fatal("no ready profile in catalog")
+	}
+	profile, err := ReadinessProfileFor(profileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status != ReadinessReady || profile.ID != profileID {
 		t.Fatalf("unexpected profile: %+v", profile)
 	}
 	profile.Blockers = append(profile.Blockers, "test-only")
-	again, err := ReadinessProfileFor("ozon")
+	again, err := ReadinessProfileFor(profileID)
 	if err != nil {
 		t.Fatal(err)
 	}

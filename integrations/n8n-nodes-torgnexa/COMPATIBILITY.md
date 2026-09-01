@@ -41,7 +41,7 @@ given access to TORGNEXA internals.
 
 1. Update package version and this matrix.
 2. Run `npm run build`, `npm run test:offline`, `npm run test:e2e`,
-   `npm run verify-package` and `npm pack --dry-run`.
+  `npm run verify:package` and `npm pack --dry-run`.
 3. Inspect the tarball contents; only `dist`, package metadata, README, license
    and compatibility documentation may ship.
 4. Publish from a protected release job with provenance and a disposable n8n

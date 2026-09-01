@@ -45,6 +45,26 @@ test('API helper uses credential authentication and rejects redirects/status dri
   assert.equal('workspace_id' in captured.qs, false);
 });
 
+test('API helper supports governed mutation methods and idempotency headers', async () => {
+  let captured;
+  const context = {
+    async getCredentials() { return { baseUrl: 'https://merchant.example/api/v1' }; },
+    helpers: {
+      async httpRequestWithAuthentication(_name, options) {
+        captured = options;
+        return { statusCode: 200, body: { id: 'order-1', status: 'confirmed' } };
+      },
+    },
+  };
+  const result = await torgnexaApiRequest(context, 'PATCH', '/orders/order-1/status', {
+    body: { status: 'confirmed', version: 1 },
+    headers: { 'Idempotency-Key': 'e2e-order-1' },
+  });
+  assert.deepEqual(result, { id: 'order-1', status: 'confirmed' });
+  assert.equal(captured.method, 'PATCH');
+  assert.deepEqual(captured.headers, { 'Idempotency-Key': 'e2e-order-1' });
+});
+
 test('event type normalization is unique, sorted, and forward compatible', () => {
   const events = normalizeEventTypes(
     ['commerce.orders.order_changed.v1', 'commerce.orders.order_changed.v1'],
