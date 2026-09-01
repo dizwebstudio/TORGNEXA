@@ -39,7 +39,7 @@ read_only | partially_supported | qualified
 check или наличие credentials не являются доказательством полной поддержки.
 
 Полный DoD — сценарий `account → product → publication → price/stock → order →
-reserve → pick/pack → shipment → return → settlement → P&L` на синтетических
+reserve → pick/pack → label → shipment → return → settlement → P&L` на синтетических
 fixture с проверками duplicate/replay, crash до/после remote acceptance,
 timeout/unknown, stale data, partial quantities, cross-tenant IDs и отсутствия
 секретов в durable state. Неподтверждённые операции остаются fail-closed.

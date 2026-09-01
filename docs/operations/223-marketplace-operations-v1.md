@@ -34,7 +34,7 @@ release gate для marketplace, а не отдельный provider adapter. О
   сохранённой.
 - `internal/core/marketplaceoperations` проверяет порядок сквозного сценария
   `account → product → publication → price/stock → order → reserve →
-  pick/pack → shipment → return → settlement → P&L`, сохраняет только ссылки
+  pick/pack → label → shipment → return → settlement → P&L`, сохраняет только ссылки
   на канонические домены и оставляет timeout в состоянии `unknown`. Его
   `LifecycleRunner` последовательно вызывает владельцев bounded contexts и
   останавливается на `unknown`/`rejected`, не повторяя внешний write вслепую.
@@ -67,7 +67,7 @@ credentials или health-check не делает кабинет `qualified`.
 
 ```text
 account → product → publication → price/stock → order → reserve
-→ pick/pack → shipment → return → settlement → P&L
+→ pick/pack → label → shipment → return → settlement → P&L
 ```
 
 Каждый шаг должен иметь tenant scope, operation/idempotency reference,

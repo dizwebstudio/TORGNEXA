@@ -16,7 +16,7 @@ func (executor *goldenPathExecutor) Execute(_ context.Context, request StepReque
 	}
 	executor.calls[request.IdempotencyKey]++
 	return StepResult{
-		Outcome: OutcomeSucceeded,
+		Outcome:    OutcomeSucceeded,
 		References: []Reference{{Kind: request.Contract.RequiredReferenceKinds[0], ID: "record-" + string(request.Flow.Stage)}},
 		ObservedAt: time.Date(2026, 9, 1, 15, 0, 0, 0, time.UTC).Add(time.Duration(len(executor.calls)) * time.Minute),
 	}, nil
@@ -42,8 +42,7 @@ func TestGoldenPathRunsOrderThroughRefundAndReconciliation(t *testing.T) {
 			t.Fatalf("stage %s was not executed exactly once: calls=%v", stage, executor.calls)
 		}
 	}
-	if len(updated.References) != len(GoldenPathStages()) {
+	if len(updated.References) != len(GoldenPathStages())+1 {
 		t.Fatalf("canonical lineage is incomplete: %+v", updated.References)
 	}
 }
-

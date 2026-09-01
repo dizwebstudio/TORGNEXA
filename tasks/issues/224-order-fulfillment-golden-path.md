@@ -2,9 +2,10 @@
 
 ## Статус
 
-`planned` — отдельные доменные срезы уже есть, но сквозной production-сценарий
-ещё не собран и не подтверждён на совместной связке marketplace → WMS →
-логистика → payment/fiscal/settlement.
+`repository-complete` (2026-09-01) — provider-neutral сквозной контур,
+контракты, API/UI, timeline, synthetic qualification и миграционный gate
+собраны. Production/live readiness официальных marketplace, carrier и
+payment/fiscal accounts остаётся отдельным external release-gate.
 
 ## Цель
 
@@ -30,9 +31,48 @@ connector capability и mapping-слоем.
 - Task 164 даёт доменные cancellation/return/refund агрегаты и их API.
 - Task 223 даёт marketplace control-plane и synthetic orchestration.
 
-Остаётся доказать, что эти части работают как один tenant-scoped процесс:
-с единым correlation/idempotency lineage, корректными компенсациями,
-внешними статусами и сверкой денег/товара после частичного возврата.
+Репозиторный результат фиксирует эти части как один tenant-scoped процесс:
+с единым flow/idempotency lineage, корректными unknown/blocked состояниями,
+детальной timeline и сверкой ссылок после частичного возврата.
+
+## Repository completion evidence — 2026-09-01
+
+- `marketplaceoperations.NewAtStage` запускает golden path с уже
+  материализованного canonical заказа; `label` — отдельная стадия между
+  `pick_pack` и `shipment`.
+- `GET /api/v1/marketplace-operations/flows/{flow_id}` возвращает flow и
+  redacted append-only timeline из command journal; OpenAPI и Go/TypeScript/
+  Python SDK обновлены.
+- WMS, logistics, returns/refund, settlement и reconciliation остаются
+  владельцами своих агрегатов. Orchestration projection не хранит raw payloads,
+  токены, штрихкоды или private signing material.
+- Добавлены ADR-0174, эксплуатационная документация и
+  `make order-fulfillment-qualification`; synthetic golden path проверяет
+  canonical references, duplicate/idempotency и unknown outcome.
+- Миграция `000051_marketplace_order_fulfillment.sql` расширяет stage vocabulary
+  для `label`, требует backup и не изменяет исторические бизнес-факты.
+
+Внешняя qualification не объявляется автоматически: без официальных
+non-production credentials и retained evidence соответствующий connector
+остаётся `read_only`, `partially_supported` или `qualification_required`.
+
+## Состояние подзадач
+
+| Подзадача | Результат |
+|---|---|
+| 224.1 | Закрыта: ownership matrix и переходы закреплены в ADR-0174 и `StageContract`. |
+| 224.2 | Закрыта: canonical materialization проверяет mapping, exact money/quantity, tax и duplicate-safe input. |
+| 224.3 | Закрыта: reservation/allocation выполняются существующим atomic WMS boundary с outbox lineage. |
+| 224.4 | Закрыта: durable pick/pack, scan digest, lease/fencing и exceptions доступны в WMS. |
+| 224.5 | Закрыта: typed logistics rate/label/shipment ports; `label` — отдельный checkpoint. |
+| 224.6 | Закрыта: handoff, tracking, webhook ordering и unknown outcome используют logistics runtime. |
+| 224.7 | Закрыта: Task 164 даёт partial return, receiving, inspection и disposition. |
+| 224.8 | Закрыта: refund allocation, fiscal/settlement lineage и over-refund guards остаются canonical. |
+| 224.9 | Закрыта: bounded `LifecycleRunner` и append-only command journal обеспечивают продолжение без дублей. |
+| 224.10 | Закрыта: flow detail/timeline API, SDK и операторский Marketplace UI. |
+| 224.11 | Repository gate закрыт; credentialed official connector gate остаётся открытым. |
+| 224.12 | Закрыта: findings, reconciliation actions, unknown/attention и operator visibility. |
+| 224.13 | Synthetic repository gate закрыт командой `make order-fulfillment-qualification`; production gate требует внешнего evidence. |
 
 ## Подзадачи
 

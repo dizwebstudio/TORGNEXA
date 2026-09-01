@@ -240,7 +240,7 @@ Epic считается repository-complete только когда на synthet
 
 ```text
 account → product → publication → price/stock → order → reserve
-→ pick/pack → shipment → return → settlement → P&L
+→ pick/pack → label → shipment → return → settlement → P&L
 ```
 
 Обязательны проверки:

@@ -1130,15 +1130,17 @@ canonical product source; AI drafts cannot publish or bypass policy. See
 
 ## Epic 179 — Сквозная обработка заказа до возврата денег
 
-Task 224 is planned as the cross-domain release closure for
-order → reserve → pick/pack → label → shipment → return → refund →
-reconciliation. Canonical order, allocation, WMS, logistics and returns/
-refund domains already exist in Tasks 006, 054, 055, 074, 117, 164 and 170;
-Task 224 connects them into one idempotent durable workflow, operator timeline,
-connector qualification and authenticated Compose E2E. Production readiness
-remains blocked until at least one official marketplace, carrier and
-payment/fiscal path passes live or sandbox qualification with retained
-evidence. See `tasks/issues/224-order-fulfillment-golden-path.md`.
+Task 224 is repository-complete: the canonical order materialization contract,
+atomic WMS reservation/allocation, durable pick/pack, explicit label checkpoint,
+shipment handoff, partial return/inspection, refund allocation, settlement
+lineage, redacted flow timeline, API/SDK/UI and synthetic golden-path gate are
+connected without creating a second domain aggregate. `label` is explicit
+between `pick_pack` and `shipment`; unknown remote outcomes remain visible and
+require reconciliation. Production readiness remains blocked until at least
+one official marketplace, carrier and payment/fiscal path passes credentialed
+live or sandbox qualification with retained evidence. See
+`tasks/issues/224-order-fulfillment-golden-path.md` and
+`docs/operations/224-order-fulfillment-golden-path.md`.
 
 ## Epic 180 — Акции, скидки, рекламные ставки и бюджеты
 
