@@ -43,7 +43,7 @@ while (($# > 0)); do
   esac
 done
 
-for command_name in date dirname docker jq mktemp mv pwd sha256sum stat tail tr; do
+for command_name in date dirname docker jq mktemp mv pwd rm sha256sum stat tail tr; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
@@ -158,6 +158,7 @@ apply_migration() {
 
 apply_atomic_migration() {
   local version=$1 name=$2 file=$3 phase=$4 risk=$5 checksum=$6 migration=$7
+  local migration_input
   {
     printf "SET torgnexa.migration_version = '%s';\n" "$version"
     printf "SET torgnexa.migration_name = '%s';\n" "$name"
@@ -169,7 +170,12 @@ apply_atomic_migration() {
     printf "SET torgnexa.migration_execution_id = '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670';\n"
     printf "SET torgnexa.migration_duration_ms = '0';\n"
     cat -- "$migration"
-  } | psql_exec 5432 torgnexa --file - >/dev/null
+  } >"${migration_input:=$(mktemp)}"
+  if ! psql_exec 5432 torgnexa --file - <"$migration_input" >/dev/null; then
+    rm -f -- "$migration_input"
+    return 1
+  fi
+  rm -f -- "$migration_input"
 }
 
 seed_bootstrap_history() {
@@ -178,13 +184,13 @@ seed_bootstrap_history() {
     [[ "$history_mode" == bootstrap ]] || continue
     value="($version, '$name', '$file', '$phase', '$risk', '$checksum', '0.1.0', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670', 0)"
     if [[ -z "$values" ]]; then values=$value; else values="$values, $value"; fi
-  done <<<"$rows"
+  done < <(printf '%s\n' "$rows")
   psql_exec 5432 torgnexa --command "
     INSERT INTO migration_history (
       version, name, file_name, phase, risk, checksum_sha256,
       application_version, execution_id, duration_ms
     ) VALUES $values;
-  " >/dev/null
+  " </dev/null >/dev/null
 }
 
 apply_catalog_migrations() {
@@ -206,7 +212,7 @@ apply_catalog_migrations() {
       bootstrap_seeded=true
     fi
     apply_atomic_migration "$version" "$name" "$file" "$phase" "$risk" "$expected" "$repo_root/migrations/$file"
-  done <<<"$rows"
+  done < <(printf '%s\n' "$rows")
   if [[ "$bootstrap_seeded" != true ]]; then seed_bootstrap_history "$rows"; fi
 }
 
@@ -266,8 +272,8 @@ psql_exec 5432 torgnexa --command "
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0802','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0801','product','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0101',true,1,'2026-08-09T09:06:00Z','2026-08-09T09:06:00Z'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0802','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0801','sku','RESTORE-B-1',true,1,'2026-08-09T09:06:00Z','2026-08-09T09:06:00Z');
   INSERT INTO compliance_policies(id,organization_id,workspace_id,code,jurisdiction,operation,requirements,effective_from,active,version,created_at) VALUES
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0803','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','restore.publication','RU','publication','[{"document_type":"certificate","failure_outcome":"block","verification_required":true,"min_validity_hours":24}]'::jsonb,'2026-08-01T00:00:00Z',true,1,'2026-08-09T09:07:00Z'),
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0803','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','restore.publication','RU','publication','[{"document_type":"certificate","failure_outcome":"block","verification_required":true,"min_validity_hours":24}]'::jsonb,'2026-08-01T00:00:00Z',true,1,'2026-08-09T09:07:00Z');
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0803','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','restore.publication','RU','publication','[{\"document_type\":\"certificate\",\"failure_outcome\":\"block\",\"verification_required\":true,\"min_validity_hours\":24}]'::jsonb,'2026-08-01T00:00:00Z',true,1,'2026-08-09T09:07:00Z'),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0803','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','restore.publication','RU','publication','[{\"document_type\":\"certificate\",\"failure_outcome\":\"block\",\"verification_required\":true,\"min_validity_hours\":24}]'::jsonb,'2026-08-01T00:00:00Z',true,1,'2026-08-09T09:07:00Z');
   INSERT INTO connector_entity_mappings (organization_id, workspace_id, connector_account_id, entity_type, local_entity_id, remote_id) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'restore-connector-a', 'offer', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102', 'restore-remote-a'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'restore-connector-b', 'offer', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0102', 'restore-remote-b');
@@ -287,8 +293,8 @@ psql_exec 5432 torgnexa --command "
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0602','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0601',1,'018f0e8b-8a58-7f42-8c2d-5c2f9b1a0102','RESTORE-A-1',1,0,'EA',1000,1000,100,180,1080,'RU','standard',2,1,false),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0602','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0601',1,'018f0e8b-8a58-7f42-8c2d-5c2f9b1b0102','RESTORE-B-1',2,0,'EA',1000,2000,0,400,2400,'RU','standard',2,1,false);
   INSERT INTO outbox_events (id, organization_id, workspace_id, event_type, aggregate_type, aggregate_id, payload, event_envelope) VALUES
-    ('evt_restore_a', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'commerce.orders.order_created.v1', 'order', 'order_restore_a', '{"order_id":"order_restore_a"}'::jsonb, '{"event_id":"evt_restore_a","event_type":"commerce.orders.order_created.v1","occurred_at":"2026-08-09T09:00:00Z","organization_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001","workspace_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002","correlation_id":null,"causation_id":null,"entity_type":"order","entity_id":"order_restore_a","source":"restore","data":{"order_id":"order_restore_a"}}'::jsonb),
-    ('evt_restore_b', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'commerce.orders.order_created.v1', 'order', 'order_restore_b', '{"order_id":"order_restore_b"}'::jsonb, '{"event_id":"evt_restore_b","event_type":"commerce.orders.order_created.v1","occurred_at":"2026-08-09T09:00:00Z","organization_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001","workspace_id":"018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002","correlation_id":null,"causation_id":null,"entity_type":"order","entity_id":"order_restore_b","source":"restore","data":{"order_id":"order_restore_b"}}'::jsonb);
+    ('evt_restore_a', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'commerce.orders.order_created.v1', 'order', 'order_restore_a', '{\"order_id\":\"order_restore_a\"}'::jsonb, '{\"event_id\":\"evt_restore_a\",\"event_type\":\"commerce.orders.order_created.v1\",\"occurred_at\":\"2026-08-09T09:00:00Z\",\"organization_id\":\"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001\",\"workspace_id\":\"018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002\",\"correlation_id\":null,\"causation_id\":null,\"entity_type\":\"order\",\"entity_id\":\"order_restore_a\",\"source\":\"restore\",\"data\":{\"order_id\":\"order_restore_a\"}}'::jsonb),
+    ('evt_restore_b', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'commerce.orders.order_created.v1', 'order', 'order_restore_b', '{\"order_id\":\"order_restore_b\"}'::jsonb, '{\"event_id\":\"evt_restore_b\",\"event_type\":\"commerce.orders.order_created.v1\",\"occurred_at\":\"2026-08-09T09:00:00Z\",\"organization_id\":\"018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001\",\"workspace_id\":\"018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002\",\"correlation_id\":null,\"causation_id\":null,\"entity_type\":\"order\",\"entity_id\":\"order_restore_b\",\"source\":\"restore\",\"data\":{\"order_id\":\"order_restore_b\"}}'::jsonb);
   INSERT INTO audit_records (id,organization_id,workspace_id,actor_id,source,action,resource_type,resource_id,correlation_id,risk,summary,created_at) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0710','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002','system','restore','lineage.seed','price','018f0e8b-8a58-7f42-8c2d-5c2f9b1a0201','restore-a','write_safe','{}'::jsonb,'2026-08-09T09:00:00Z'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0710','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002','system','restore','lineage.seed','price','018f0e8b-8a58-7f42-8c2d-5c2f9b1b0201','restore-b','write_safe','{}'::jsonb,'2026-08-09T09:00:00Z');
@@ -302,8 +308,8 @@ psql_exec 5432 torgnexa --command "
     ('sec:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 1, 'aes-256-gcm', 'restore-k1', decode(repeat('11',12),'hex'), decode(repeat('aa',32),'hex')),
     ('sec:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 1, 'aes-256-gcm', 'restore-k1', decode(repeat('22',12),'hex'), decode(repeat('bb',32),'hex'));
   INSERT INTO privacy_purposes (organization_id, workspace_id, purpose_key, description, legal_basis, notice_reference, consent_reference, allowed_classes) VALUES
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '["personal"]'::jsonb),
-    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '["personal"]'::jsonb);
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '[\"personal\"]'::jsonb),
+    ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'order_fulfillment', 'Fulfil synthetic customer orders', 'contract', 'privacy-notice:v1', '', '[\"personal\"]'::jsonb);
   INSERT INTO privacy_retention_policies (organization_id, workspace_id, purpose_key, data_class, retention_days, disposition, legal_hold_permitted) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'order_fulfillment', 'personal', 365, 'anonymize', true),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'order_fulfillment', 'personal', 365, 'anonymize', true);

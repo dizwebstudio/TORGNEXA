@@ -1127,3 +1127,39 @@ Provider-specific taxonomy, conditional attributes, 1,000-SKU batch apply and
 live read-after-write remain explicit qualification gates. PIM remains the
 canonical product source; AI drafts cannot publish or bypass policy. See
 `tasks/issues/222-marketplace-listing-content-attributes.md`.
+
+## Epic 179 — Сквозная обработка заказа до возврата денег
+
+Task 224 is planned as the cross-domain release closure for
+order → reserve → pick/pack → label → shipment → return → refund →
+reconciliation. Canonical order, allocation, WMS, logistics and returns/
+refund domains already exist in Tasks 006, 054, 055, 074, 117, 164 and 170;
+Task 224 connects them into one idempotent durable workflow, operator timeline,
+connector qualification and authenticated Compose E2E. Production readiness
+remains blocked until at least one official marketplace, carrier and
+payment/fiscal path passes live or sandbox qualification with retained
+evidence. See `tasks/issues/224-order-fulfillment-golden-path.md`.
+
+## Epic 180 — Акции, скидки, рекламные ставки и бюджеты
+
+Task 225 is planned as the write-side release closure for promotions and
+advertising. Task 220 already provides read-only campaigns, spend,
+performance, metrics and reconciliation; Tasks 050, 051 and 221 provide the
+provider-neutral models, pricing guards and preview. Task 225 adds promotion
+eligibility, discounts/subsidies, campaign lifecycle, bid/budget management,
+approval-bound idempotent writes, connector qualification, UI, reconciliation
+and authenticated Compose E2E. Without current provider evidence, operations
+remain `read_only` or `qualification_required`. See
+`tasks/issues/225-promotions-advertising-management.md`.
+
+## Epic 181 — Глубина интеграций и readiness коннекторов
+
+Task 226 is planned to make connector depth truthful and measurable. The
+repository currently contains 61 manifests, 18 `ready` connectors and 17
+health-only connectors. The task adds a capability-level readiness model, full
+manifest audit, Task-064 conformance admission, a decision for every
+health-only connector, prioritized read/write qualification waves, durable
+sync/reconciliation, Integration Center status, quotas and release evidence.
+Manifest, SDK presence or health-check alone cannot promote a connector to
+`ready` or `qualified`. See
+`tasks/issues/226-connector-depth-and-readiness.md`.

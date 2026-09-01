@@ -103,7 +103,7 @@ func (r *Repository) Save(ctx context.Context, scope tenancy.Scope, record Recor
 			if err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO replenishment_recommendations(organization_id,workspace_id,recommendation_id,run_id,input_digest,offer_id,sku,warehouse_id,sales_channel,supplier_offer_id,quantity_coefficient,quantity_scale,unit,expected_receipt_days,risk_reduction_bps,reason_codes,eligible_mode,status,version,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), recommendation.ID, recommendation.RunID, recommendation.InputDigest, recommendation.Grain.OfferID, recommendation.Grain.SKU, recommendation.Grain.WarehouseID, recommendation.Grain.SalesChannel, recommendation.SupplierOfferID, recommendation.RecommendedQuantity.Value.Coefficient(), recommendation.RecommendedQuantity.Value.Scale(), recommendation.RecommendedQuantity.Unit.String(), recommendation.ExpectedReceiptDays, recommendation.RiskReductionBPS, string(reasons), recommendation.EligibleMode, recommendation.Status, recommendation.Version, recommendation.CreatedAt); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO replenishment_runtime_recommendations(organization_id,workspace_id,recommendation_id,run_id,input_digest,offer_id,sku,warehouse_id,sales_channel,supplier_offer_id,quantity_coefficient,quantity_scale,unit,expected_receipt_days,risk_reduction_bps,reason_codes,eligible_mode,status,version,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), recommendation.ID, recommendation.RunID, recommendation.InputDigest, recommendation.Grain.OfferID, recommendation.Grain.SKU, recommendation.Grain.WarehouseID, recommendation.Grain.SalesChannel, recommendation.SupplierOfferID, recommendation.RecommendedQuantity.Value.Coefficient(), recommendation.RecommendedQuantity.Value.Scale(), recommendation.RecommendedQuantity.Unit.String(), recommendation.ExpectedReceiptDays, recommendation.RiskReductionBPS, string(reasons), recommendation.EligibleMode, recommendation.Status, recommendation.Version, recommendation.CreatedAt); err != nil {
 				return fmt.Errorf("insert replenishment recommendation: %w", err)
 			}
 		}
@@ -163,7 +163,7 @@ func (r *Repository) List(ctx context.Context, scope tenancy.Scope, limit int) (
 			return err
 		}
 		for index := range result {
-			rows, err := tx.QueryContext(ctx, `SELECT recommendation_id,run_id,input_digest,offer_id,sku,warehouse_id,sales_channel,supplier_offer_id,quantity_coefficient,quantity_scale,unit,expected_receipt_days,risk_reduction_bps,reason_codes,eligible_mode,status,version,created_at FROM replenishment_recommendations WHERE organization_id=$1 AND workspace_id=$2 AND run_id=$3 ORDER BY recommendation_id LIMIT 200`, scope.OrganizationID().String(), scope.WorkspaceID().String(), result[index].Run.ID)
+			rows, err := tx.QueryContext(ctx, `SELECT recommendation_id,run_id,input_digest,offer_id,sku,warehouse_id,sales_channel,supplier_offer_id,quantity_coefficient,quantity_scale,unit,expected_receipt_days,risk_reduction_bps,reason_codes,eligible_mode,status,version,created_at FROM replenishment_runtime_recommendations WHERE organization_id=$1 AND workspace_id=$2 AND run_id=$3 ORDER BY recommendation_id LIMIT 200`, scope.OrganizationID().String(), scope.WorkspaceID().String(), result[index].Run.ID)
 			if err != nil {
 				return err
 			}

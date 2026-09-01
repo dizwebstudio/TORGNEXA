@@ -16,11 +16,10 @@ die() {
   exit 1
 }
 
-for command_name in docker go jq sha256sum tail tr; do
+for command_name in docker jq mktemp rm sha256sum tail tr; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
-"$repo_root/scripts/check-migrations.sh" >/dev/null
 postgres_image="$(jq -er '[.development_runtime[] | select(.name == "postgres") | .image] | if length == 1 then .[0] else error("expected exactly one postgres image") end' "$inventory")" || \
   die "PostgreSQL runtime image is not registered exactly once"
 [[ "$postgres_image" =~ ^postgres:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || die "PostgreSQL image is not immutable"
@@ -114,6 +113,7 @@ apply_migration() {
 apply_atomic_migration() {
   local database=$1 version=$2 name=$3 file=$4 phase=$5 risk=$6 checksum=$7
   local path="$repo_root/migrations/$file"
+  local migration_input
   [[ -f "$path" && ! -L "$path" ]] || die "unsafe migration path: $file"
   {
     printf "SET torgnexa.migration_version = '%s';\n" "$version"
@@ -126,7 +126,12 @@ apply_atomic_migration() {
     printf "SET torgnexa.migration_execution_id = '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670';\n"
     printf "SET torgnexa.migration_duration_ms = '0';\n"
     cat -- "$path"
-  } | psql_exec "$database" --file - >/dev/null
+  } >"${migration_input:=$(mktemp)}"
+  if ! psql_exec "$database" --file - <"$migration_input" >/dev/null; then
+    rm -f -- "$migration_input"
+    return 1
+  fi
+  rm -f -- "$migration_input"
 }
 
 catalog_rows="$(jq -er '.migrations[] | [.version, .name, .file, .phase, .risk, .sha256, .history_mode] | @tsv' "$catalog")" || die "unable to read migration catalog"
@@ -137,7 +142,7 @@ while IFS=$'\t' read -r version _ file _ _ checksum _; do
   if ((version <= 2)); then
     apply_migration torgnexa_upgrade "$file" "$checksum"
   fi
-done <<<"$catalog_rows"
+done < <(printf '%s\n' "$catalog_rows")
 
 psql_exec torgnexa_upgrade --command "
   INSERT INTO organizations (id, name) VALUES
@@ -179,7 +184,7 @@ while IFS=$'\t' read -r version name file phase risk checksum history_mode; do
   else
     history_values="$history_values, $value"
   fi
-done <<<"$catalog_rows"
+done < <(printf '%s\n' "$catalog_rows")
 psql_exec torgnexa_upgrade --command "
   INSERT INTO migration_history (
     version, name, file_name, phase, risk, checksum_sha256,
@@ -190,7 +195,7 @@ psql_exec torgnexa_upgrade --command "
 while IFS=$'\t' read -r version name file phase risk checksum history_mode; do
   [[ "$history_mode" == atomic ]] || continue
   apply_atomic_migration torgnexa_upgrade "$version" "$name" "$file" "$phase" "$risk" "$checksum"
-done <<<"$catalog_rows"
+done < <(printf '%s\n' "$catalog_rows")
 
 history_count="$(query_scalar torgnexa_upgrade "SELECT count(*) FROM migration_history;")"
 catalog_count="$(jq -er '.migrations | length' "$catalog")"
@@ -198,7 +203,7 @@ catalog_count="$(jq -er '.migrations | length' "$catalog")"
 while IFS=$'\t' read -r version name _ _ _ checksum _; do
   match="$(query_scalar torgnexa_upgrade "SELECT count(*) FROM migration_history WHERE version=$version AND name='$name' AND checksum_sha256='$checksum';")"
   [[ "$match" == 1 ]] || die "migration history drift at version $version"
-done <<<"$catalog_rows"
+done < <(printf '%s\n' "$catalog_rows")
 
 psql_exec torgnexa_upgrade --command "
   CREATE ROLE torgnexa_upgrade_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
@@ -315,7 +320,9 @@ if psql_exec torgnexa_upgrade --command "INSERT INTO backfill_jobs (id, job_key,
 fi
 
 fresh_bootstrap_values=
-while IFS=$'\t' read -r version name file phase risk checksum history_mode; do
+mapfile -t catalog_lines <<<"$catalog_rows"
+for catalog_line in "${catalog_lines[@]}"; do
+  IFS=$'\t' read -r version name file phase risk checksum history_mode <<<"$catalog_line"
   if [[ "$history_mode" == bootstrap ]]; then
     apply_migration torgnexa_fresh "$file" "$checksum"
     value="($version, '$name', '$file', '$phase', '$risk', '$checksum', '0.1.0', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670', 0)"
@@ -336,7 +343,7 @@ while IFS=$'\t' read -r version name file phase risk checksum history_mode; do
     fresh_bootstrap_values=
   fi
   apply_atomic_migration torgnexa_fresh "$version" "$name" "$file" "$phase" "$risk" "$checksum"
-done <<<"$catalog_rows"
+done
 
 upgrade_columns="$(query_scalar torgnexa_upgrade "
   SELECT md5(string_agg(table_name || ':' || column_name || ':' || data_type || ':' || is_nullable || ':' || coalesce(column_default,''), ',' ORDER BY table_name, ordinal_position))

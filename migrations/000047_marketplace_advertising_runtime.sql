@@ -6,7 +6,7 @@ SET LOCAL statement_timeout = '60s';
 -- Task 175 / marketplace advertising runtime. Only normalized facts and
 -- bounded evidence are stored. Raw provider responses and credentials never
 -- cross the connector boundary.
-CREATE TABLE advertising_campaigns (
+CREATE TABLE marketplace_advertising_campaigns (
   organization_id text NOT NULL,
   workspace_id text NOT NULL,
   campaign_id text NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE advertising_campaigns (
   CONSTRAINT advertising_campaign_ref_chk CHECK (campaign_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND channel ~ '^[a-z][a-z0-9._-]{0,63}$' AND remote_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'),
   CONSTRAINT advertising_campaign_value_chk CHECK (char_length(name) BETWEEN 1 AND 300 AND status IN ('draft','active','paused','stopped','archived','unknown') AND currency ~ '^[A-Z]{3}$' AND daily_budget_minor >= 0 AND total_budget_minor >= daily_budget_minor AND version >= 1 AND (effective_to IS NULL OR effective_from IS NULL OR effective_to > effective_from))
 );
-CREATE INDEX advertising_campaigns_channel_idx ON advertising_campaigns(organization_id,workspace_id,channel,status,updated_at DESC,campaign_id DESC);
+CREATE INDEX marketplace_advertising_campaigns_channel_idx ON marketplace_advertising_campaigns(organization_id,workspace_id,channel,status,updated_at DESC,campaign_id DESC);
 
 CREATE TABLE advertising_ad_groups (
   organization_id text NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE advertising_ad_groups (
   status text NOT NULL,
   observed_at timestamptz NOT NULL,
   PRIMARY KEY (organization_id,workspace_id,ad_group_id),
-  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
+  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES marketplace_advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
   CONSTRAINT advertising_ad_group_ref_chk CHECK (ad_group_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND remote_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND char_length(name) BETWEEN 1 AND 300 AND status IN ('draft','active','paused','stopped','archived','unknown'))
 );
 
@@ -70,7 +70,7 @@ CREATE TABLE advertising_campaign_products (
   observed_at timestamptz NOT NULL,
   PRIMARY KEY (organization_id,workspace_id,link_id),
   UNIQUE (organization_id,workspace_id,campaign_id,sku,remote_product_id),
-  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
+  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES marketplace_advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
   CONSTRAINT advertising_campaign_product_chk CHECK (link_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND char_length(sku) BETWEEN 1 AND 200 AND remote_product_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$')
 );
 
@@ -96,7 +96,7 @@ CREATE TABLE advertising_spend_facts (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (organization_id,workspace_id,fact_id),
   UNIQUE (organization_id,workspace_id,account_id,remote_fact_id,period_start,period_end),
-  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
+  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES marketplace_advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
   CONSTRAINT advertising_spend_fact_chk CHECK (fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND channel ~ '^[a-z][a-z0-9._-]{0,63}$' AND remote_fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND period_end > period_start AND amount_minor >= 0 AND currency ~ '^[A-Z]{3}$' AND source ~ '^[a-z][a-z0-9._-]{0,63}$' AND quality IN ('observed','confirmed','estimated','partial','delayed','unknown','conflict') AND fingerprint ~ '^[0-9a-f]{64}$' AND char_length(ad_id) <= 192 AND char_length(sku) <= 200)
 );
 CREATE INDEX advertising_spend_facts_period_idx ON advertising_spend_facts(organization_id,workspace_id,period_start,period_end,channel,campaign_id);
@@ -126,7 +126,7 @@ CREATE TABLE advertising_performance_facts (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (organization_id,workspace_id,fact_id),
   UNIQUE (organization_id,workspace_id,account_id,remote_fact_id,period_start,period_end),
-  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
+  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES marketplace_advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
   CONSTRAINT advertising_performance_fact_chk CHECK (fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND account_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND channel ~ '^[a-z][a-z0-9._-]{0,63}$' AND remote_fact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND period_end > period_start AND impressions >= 0 AND clicks >= 0 AND orders >= 0 AND revenue_minor >= 0 AND currency ~ '^[A-Z]{3}$' AND source ~ '^[a-z][a-z0-9._-]{0,63}$' AND quality IN ('observed','confirmed','estimated','partial','delayed','unknown','conflict') AND fingerprint ~ '^[0-9a-f]{64}$' AND char_length(ad_id) <= 192 AND char_length(sku) <= 200)
 );
 CREATE INDEX advertising_performance_facts_period_idx ON advertising_performance_facts(organization_id,workspace_id,period_start,period_end,channel,campaign_id);
@@ -145,7 +145,7 @@ CREATE TABLE advertising_attributions (
   confidence text NOT NULL,
   observed_at timestamptz NOT NULL,
   PRIMARY KEY (organization_id,workspace_id,attribution_id),
-  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
+  FOREIGN KEY (organization_id,workspace_id,campaign_id) REFERENCES marketplace_advertising_campaigns(organization_id,workspace_id,campaign_id) ON DELETE RESTRICT,
   CONSTRAINT advertising_attribution_chk CHECK (attribution_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND orders >= 0 AND revenue_minor >= 0 AND currency ~ '^[A-Z]{3}$' AND source ~ '^[a-z][a-z0-9._-]{0,63}$' AND confidence IN ('observed','confirmed','estimated','partial','delayed','unknown','conflict'))
 );
 
@@ -197,9 +197,9 @@ CREATE TRIGGER advertising_attribution_no_mutation BEFORE UPDATE OR DELETE OR TR
 CREATE TRIGGER advertising_findings_no_mutation BEFORE UPDATE OR DELETE OR TRUNCATE ON advertising_reconciliation_findings FOR EACH STATEMENT EXECUTE FUNCTION advertising_evidence_no_mutation();
 REVOKE UPDATE,DELETE,TRUNCATE ON advertising_spend_facts,advertising_performance_facts,advertising_attributions,advertising_reconciliation_findings FROM PUBLIC;
 
-ALTER TABLE advertising_campaigns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE advertising_campaigns FORCE ROW LEVEL SECURITY;
-CREATE POLICY advertising_campaigns_tenant_all ON advertising_campaigns FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
+ALTER TABLE marketplace_advertising_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_advertising_campaigns FORCE ROW LEVEL SECURITY;
+CREATE POLICY marketplace_advertising_campaigns_tenant_all ON marketplace_advertising_campaigns FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));
 ALTER TABLE advertising_ad_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE advertising_ad_groups FORCE ROW LEVEL SECURITY;
 CREATE POLICY advertising_ad_groups_tenant_all ON advertising_ad_groups FOR ALL USING (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true)) WITH CHECK (organization_id=current_setting('app.organization_id',true) AND workspace_id=current_setting('app.workspace_id',true));

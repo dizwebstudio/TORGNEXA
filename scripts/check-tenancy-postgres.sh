@@ -18,7 +18,7 @@ die() {
   exit 1
 }
 
-for command_name in docker jq sha256sum tail tr; do
+for command_name in docker jq mktemp rm sha256sum tail tr; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
@@ -88,6 +88,7 @@ apply_migration() {
 
 apply_atomic_migration() {
   local target_database=$1 version=$2 name=$3 file=$4 phase=$5 risk=$6 checksum=$7 migration=$8
+  local migration_input
   [[ "$version" =~ ^[0-9]+$ && "$name" =~ ^[a-z][a-z0-9_]{1,62}$ && "$file" =~ ^[0-9]{6}_[a-z][a-z0-9_]{1,62}\.sql$ ]] || \
     die "unsafe atomic migration metadata"
   [[ "$phase" =~ ^(expand|migrate|contract)$ && "$risk" =~ ^(low|medium|high|critical)$ && "$checksum" =~ ^[0-9a-f]{64}$ ]] || \
@@ -103,7 +104,12 @@ apply_atomic_migration() {
     printf "SET torgnexa.migration_execution_id = '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670';\n"
     printf "SET torgnexa.migration_duration_ms = '0';\n"
     cat -- "$migration"
-  } | psql_exec "$target_database" --file - >/dev/null
+  } >"${migration_input:=$(mktemp)}"
+  if ! psql_exec "$target_database" --file - <"$migration_input" >/dev/null; then
+    rm -f -- "$migration_input"
+    return 1
+  fi
+  rm -f -- "$migration_input"
 }
 
 seed_bootstrap_history() {
@@ -112,7 +118,7 @@ seed_bootstrap_history() {
     [[ "$history_mode" == bootstrap ]] || continue
     value="($version, '$name', '$file', '$phase', '$risk', '$checksum', '0.1.0', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0670', 0)"
     if [[ -z "$values" ]]; then values=$value; else values="$values, $value"; fi
-  done <<<"$rows"
+  done < <(printf '%s\n' "$rows")
   [[ -n "$values" ]] || die "bootstrap migration history is empty"
   psql_exec "$target_database" --command "
     INSERT INTO migration_history (
@@ -142,7 +148,7 @@ apply_catalog_migrations() {
     fi
     [[ "$history_mode" == atomic ]] || die "unsupported history mode: $history_mode"
     apply_atomic_migration "$target_database" "$version" "$name" "$file" "$phase" "$risk" "$expected" "$repo_root/migrations/$file"
-  done <<<"$rows"
+  done < <(printf '%s\n' "$rows")
   if [[ "$bootstrap_seeded" != true ]]; then
     seed_bootstrap_history "$target_database" "$rows"
   fi
