@@ -1187,3 +1187,27 @@ and escalations, reply delivery, claims/returns/refund links, connector
 qualification, UI, reconciliation and authenticated E2E. Unsupported channel
 operations remain `read_only`, `not_available` or `qualification_required`.
 See `tasks/issues/228-customer-service-operational-maturity.md`.
+
+## Epic 184 — Мобильная и складская работа
+
+Task 229 is planned as the mobile/WMS release closure. Tasks 055, 117 and 170
+already provide durable warehouse tasks, allocations, scan commands and a
+desktop operator workspace; Task 224 provides the broader order fulfillment
+path and Task 074 provides logistics label/shipment ports. Task 229 adds
+mobile-first pick-lists, hardware/camera scanning, packing, print queues,
+offline-safe command sync, FBS/FBO/hybrid ownership and connector/hardware
+qualification. Mobile state is not authoritative and FBO remote execution is
+not presented as local warehouse work. See
+`tasks/issues/229-mobile-warehouse-fulfillment.md`.
+
+## Epic 185 — Массовое управление каталогом
+
+Task 230 is planned as the unified multi-channel bulk workspace. Task 222
+already provides PIM/card, attributes, localized content, media and quality
+foundations; Task 221 provides price preview/guards; Task 225 covers promotion
+and advertising writes. Task 230 connects selection, channel comparison,
+bulk editing of cards/images/attributes/variants/prices/descriptions,
+preview/diff, approval, per-row apply, read-after-write, reconciliation and
+authenticated E2E in one interface. PIM remains canonical and unsupported
+channel writes remain `read_only` or `qualification_required`. See
+`tasks/issues/230-mass-catalog-management.md`.
