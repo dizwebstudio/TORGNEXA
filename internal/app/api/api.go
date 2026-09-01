@@ -32,6 +32,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/entitlementrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
@@ -429,6 +430,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("financial_repository_startup_failed", err)
 	}
+	financialCompletenessRepository, err := financialcompletenessrepo.New(db)
+	if err != nil {
+		return newRuntimeError("financial_completeness_repository_startup_failed", err)
+	}
 	advertisingRepository, err := advertisingrepo.New(db)
 	if err != nil {
 		return newRuntimeError("advertising_repository_startup_failed", err)
@@ -460,7 +465,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
 		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, publicationQuality: publicationQualityRepository, pim: pimRepository,
 		images: imageRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
-		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository, financialReports: financialRepository,
+		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository, financialReports: financialRepository, financialCompleteness: financialCompletenessRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		advertising: advertisingRepository, settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "version": "financial-completeness-v1",
+  "description": "Provider-neutral evidence matrix for seller finance reports. Missing facts are not zero-filled.",
+  "requirements": [
+    {"code": "revenue", "canonical_source": "order", "fallback": "none", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"},
+    {"code": "refunds", "canonical_source": "refund", "fallback": "payment_or_settlement", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"},
+    {"code": "payout", "canonical_source": "payout", "fallback": "settlement_entry", "required_for": ["settlement", "cash"], "retention": "financial_history"},
+    {"code": "cash", "canonical_source": "bank_receipt", "fallback": "acquirer_receipt", "required_for": ["cash"], "retention": "bank_evidence"},
+    {"code": "cogs", "canonical_source": "cogs", "fallback": "wms_or_receiving_layer", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"},
+    {"code": "fx", "canonical_source": "fx", "fallback": "none", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"},
+    {"code": "advertising", "canonical_source": "advertising", "fallback": "unattributed_channel_spend", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"},
+    {"code": "promotion", "canonical_source": "promotion", "fallback": "settlement_adjustment", "required_for": ["order_accrual", "settlement", "cash"], "retention": "financial_history"}
+  ]
+}

@@ -2865,6 +2865,60 @@ paths:
         '201': {description: Calculation status and immutable snapshot, content: {application/json: {schema: {$ref: '#/components/schemas/SellerFinancialRun'}}}}
         '400': {description: Invalid calculation request}
         '403': {description: Caller lacks finance.reports.write}
+  /financial-completeness:
+    get:
+      operationId: getFinancialCompleteness
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: basis, in: query, required: false, schema: {type: string, enum: [order_accrual, settlement, cash], default: order_accrual}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+      responses:
+        '200': {description: Evidence-backed financial completeness summary, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialCompletenessSummary'}}}}
+        '400': {description: Invalid basis, period or reporting currency}
+        '403': {description: Caller lacks finance.reports.read}
+  /financial-completeness/sources:
+    get:
+      operationId: listFinancialSources
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: kind, in: query, required: false, schema: {type: string, enum: [order, payment, refund, payout, bank_receipt, cogs, fx, advertising, promotion, settlement, other]}}
+        - {name: quality, in: query, required: false, schema: {type: string, enum: [observed, confirmed, estimated, missing, unmatched, stale, disputed, conflict]}}
+        - {name: from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: basis, in: query, required: false, schema: {type: string, enum: [order_accrual, settlement, cash], default: order_accrual}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {description: Redacted tenant-scoped financial evidence page, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialSourcePage'}}}}
+        '400': {description: Invalid source filter or cursor}
+        '403': {description: Caller lacks finance.reports.read}
+    post:
+      operationId: appendFinancialSource
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialSourceRecord'}
+      responses:
+        '201': {description: Immutable redacted source evidence accepted, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialSourceRecord'}}}}
+        '400': {description: Invalid or unsafe source evidence}
+        '403': {description: Caller lacks finance.sources.write}
+        '409': {description: Existing source identity has conflicting evidence}
+  /financial-completeness/findings:
+    get:
+      operationId: listFinancialCompletenessFindings
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {description: Tenant-scoped reconciliation findings, content: {application/json: {schema: {$ref: '#/components/schemas/FinancialFindingPage'}}}}
+        '400': {description: Invalid cursor or limit}
+        '403': {description: Caller lacks finance.reports.read}
   /advertising/campaigns:
     get:
       operationId: listAdvertisingCampaigns
@@ -3673,6 +3727,110 @@ components:
         created_at: {type: string, format: date-time}
         completed_at: {type: string, format: date-time}
         snapshot: {type: object, additionalProperties: true}
+    FinancialCompletenessRequirement:
+      type: object
+      additionalProperties: false
+      required: [code, label, canonical_source, fallback, required_for, retention]
+      properties:
+        code: {type: string, maxLength: 64}
+        label: {type: string, maxLength: 200}
+        canonical_source: {type: string, maxLength: 64}
+        fallback: {type: string, maxLength: 128}
+        required_for: {type: array, items: {type: string, enum: [order_accrual, settlement, cash]}}
+        retention: {type: string, maxLength: 64}
+    FinancialCompletenessComponent:
+      type: object
+      additionalProperties: false
+      required: [code, label, quality, required, evidence_count, amount_minor_units, currency]
+      properties:
+        code: {type: string, maxLength: 64}
+        label: {type: string, maxLength: 200}
+        quality: {type: string, enum: [observed, confirmed, estimated, missing, unmatched, stale, disputed, conflict]}
+        required: {type: boolean}
+        evidence_count: {type: integer, minimum: 0}
+        amount_minor_units: {type: integer, format: int64}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        reason: {type: string, maxLength: 200}
+    FinancialCompletenessEvaluation:
+      type: object
+      additionalProperties: false
+      required: [basis, from, to, status, coverage_percent, components, source_refs]
+      properties:
+        basis: {type: string, enum: [order_accrual, settlement, cash]}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        reporting_currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {type: string, enum: [complete, partial, stale, unmatched, disputed, conflict]}
+        coverage_percent: {type: integer, minimum: 0, maximum: 100}
+        components: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/FinancialCompletenessComponent'}}
+        missing_codes: {type: array, maxItems: 16, items: {type: string, maxLength: 64}}
+        warnings: {type: array, maxItems: 16, items: {type: string, maxLength: 200}}
+        source_refs: {type: array, maxItems: 1000, items: {type: string, maxLength: 192}}
+    FinancialCompletenessSummary:
+      type: object
+      additionalProperties: false
+      required: [matrix, evaluation, source_count, open_finding_count]
+      properties:
+        matrix: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/FinancialCompletenessRequirement'}}
+        evaluation: {$ref: '#/components/schemas/FinancialCompletenessEvaluation'}
+        source_count: {type: integer, minimum: 0}
+        open_finding_count: {type: integer, minimum: 0}
+        last_observed_at: {type: string, format: date-time}
+    FinancialSourceRecord:
+      type: object
+      additionalProperties: false
+      required: [kind, source_system, account_ref, source_ref, amount_minor_units, currency, state, quality, occurred_at, source_digest]
+      properties:
+        id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [order, payment, refund, payout, bank_receipt, cogs, fx, advertising, promotion, settlement, other]}
+        source_system: {type: string, maxLength: 192}
+        account_ref: {type: string, minLength: 1, maxLength: 128, description: Masked provider/account reference only}
+        source_ref: {type: string, maxLength: 192}
+        statement_id: {type: string, maxLength: 192}
+        order_id: {type: string, maxLength: 192}
+        payout_id: {type: string, maxLength: 192}
+        sku: {type: string, maxLength: 192}
+        campaign_id: {type: string, maxLength: 192}
+        attribution_status: {type: string, maxLength: 64}
+        amount_minor_units: {type: integer, format: int64}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        state: {type: string, enum: [pending, posted, reversed, fee, transfer, unknown, matched, unmatched, disputed, observed]}
+        quality: {type: string, enum: [observed, confirmed, estimated, missing, unmatched, stale, disputed, conflict]}
+        occurred_at: {type: string, format: date-time}
+        posted_at: {type: string, format: date-time}
+        source_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        created_at: {type: string, format: date-time}
+    FinancialSourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/FinancialSourceRecord'}}
+        next_cursor: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    FinancialFinding:
+      type: object
+      additionalProperties: false
+      required: [id, kind, subject_ref, expected_minor_units, observed_minor_units, currency, severity, status, explanation, detected_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        kind: {type: string, maxLength: 64}
+        subject_ref: {type: string, maxLength: 192}
+        expected_minor_units: {type: integer, format: int64}
+        observed_minor_units: {type: integer, format: int64}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        severity: {type: string, enum: [info, warn, block]}
+        status: {type: string, enum: [open, acknowledged, resolved]}
+        explanation: {type: string, minLength: 1, maxLength: 500}
+        owner_ref: {type: string, maxLength: 192}
+        detected_at: {type: string, format: date-time}
+        resolved_at: {type: string, format: date-time}
+    FinancialFindingPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/FinancialFinding'}}
+        next_cursor: {type: string, maxLength: 2048, pattern: '^v1\.[A-Za-z0-9_-]+$'}
     AdvertisingCampaign:
       type: object
       additionalProperties: false

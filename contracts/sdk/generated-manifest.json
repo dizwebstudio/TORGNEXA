@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "78bef883b31606fe5419128ecfd61e04f22c97ac63446af0f4b1161b5abce319",
+    "sha256": "619148dcae11a02568d84044935fe1ab7db767611b63c5a10f6eb6417f860799",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,11 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "appendFinancialSource",
+      "method": "POST",
+      "path": "/financial-completeness/sources"
     },
     {
       "operation_id": "applyMarketplaceGrowthOperation",
@@ -505,6 +510,11 @@
       "path": "/me/profile"
     },
     {
+      "operation_id": "getFinancialCompleteness",
+      "method": "GET",
+      "path": "/financial-completeness"
+    },
+    {
       "operation_id": "getFulfillmentAllocation",
       "method": "GET",
       "path": "/inventory/fulfillment-allocations/{allocation_id}"
@@ -873,6 +883,16 @@
       "operation_id": "listFXRates",
       "method": "GET",
       "path": "/fx/rates"
+    },
+    {
+      "operation_id": "listFinancialCompletenessFindings",
+      "method": "GET",
+      "path": "/financial-completeness/findings"
+    },
+    {
+      "operation_id": "listFinancialSources",
+      "method": "GET",
+      "path": "/financial-completeness/sources"
     },
     {
       "operation_id": "listFulfillmentAllocations",
