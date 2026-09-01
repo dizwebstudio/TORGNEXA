@@ -1113,6 +1113,26 @@
       },
       "backfill": null,
       "sha256": "e80bedb9d7487396207effc731e54e54f20f09c0f119b123a920730fd5c1a0b7"
+    },
+    {
+      "version": 55,
+      "name": "customer_service_inbox",
+      "file": "000055_customer_service_inbox.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [9, 29, 54],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "dd53eae15f723754433a19aad8512e66c07c734a83dfe201bdb4061cbc5c8531"
     }
   ]
 }
