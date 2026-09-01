@@ -26,6 +26,12 @@ func (request MarketplaceListingTaxonomyRequest) Validate() error {
 	return nil
 }
 
+// MarketplaceListingTaxonomyReader reads a provider taxonomy and normalizes
+// it into the provider-neutral Core contract.
+type MarketplaceListingTaxonomyReader interface {
+	ReadMarketplaceListingTaxonomy(context.Context, Account, Runtime, MarketplaceListingTaxonomyRequest) (marketplacelisting.Taxonomy, error)
+}
+
 // MarketplaceListingWriter is the qualified remote write port for a complete
 // provider-neutral listing draft. Implementations must support dry-run when
 // the remote API offers validation and must resolve unknown outcomes by the

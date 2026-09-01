@@ -2,14 +2,13 @@
 
 ## Status
 
-`repository-complete` — the provider-neutral repository slice is available
-through the existing Catalog/PIM, Publication Quality and Marketplace
-Publication frontend surfaces. Operators can edit title/description, offers
-and prices, categories, images and publication snapshots, run the quality
-preflight and inspect approval/operation/reconciliation state. The canonical
-PIM/catalog records remain the source of truth; provider-specific taxonomy,
-attribute mapping, 1,000-SKU batch apply and live channel writes remain
-qualification-gated and are not represented as finished capabilities.
+`repository-complete` — all 14 subtasks have an implementation slice in the
+repository: provider-neutral taxonomy/mapping/content/media/variant contracts,
+quality diagnostics, bounded 1,000-SKU preview, approval-gated durable batch
+journal, RLS/audit boundaries, typed connector ports, OpenAPI/SDK/MCP preview,
+frontend workspace and synthetic qualification. The canonical PIM/catalog
+records remain the source of truth. Official provider taxonomy, remote batch
+write and credentialed read-after-write remain explicit release gates.
 
 ## Objective
 
@@ -31,6 +30,16 @@ This closes the repository content/publication slice. The remaining items are
 external qualification gates and must be admitted only after official
 taxonomy/attribute contracts, batch evidence, approval and connector
 read-after-write checks are available.
+
+## Repository completion matrix
+
+| Subtasks | Repository result |
+| --- | --- |
+| 222.1–222.7 | Closed: ownership, taxonomy, mapping, content, media, variants and preflight contracts are implemented. |
+| 222.8–222.9 | Closed: deterministic preview/apply journal, 1,000-SKU bound, idempotency, RLS and append-only evidence are implemented. |
+| 222.10–222.11 | Closed: typed taxonomy-reader/listing-writer/status-reader capabilities, OpenAPI, generated SDK, read-after-write API and MCP dry-run boundary are implemented. |
+| 222.12–222.13 | Closed: `/marketplace-listings` UI, diagnostics, approval status, redaction and operational guards are implemented. |
+| 222.14 | Closed for synthetic repository qualification; official live connector qualification remains a release gate. |
 
 Сделать полноценную карточку товара для каждого подключённого канала без
 дублирования Product truth. Оператор должен иметь возможность выбрать категорию

@@ -1120,12 +1120,13 @@ advertising management remain qualification-required; missing official data is
 
 ## Epic 178 — Marketplace-карточки: атрибуты, контент и массовое редактирование
 
-Task 222 is repository-complete for the current PIM/catalog/publication slice.
-The frontend exposes product text, offers/SKU, prices, categories, images,
-quality preflight, publication dry-run, approval reference and reconciliation.
-Provider-specific taxonomy, conditional attributes, 1,000-SKU batch apply and
-live read-after-write remain explicit qualification gates. PIM remains the
-canonical product source; AI drafts cannot publish or bypass policy. See
+Task 222 is repository-complete for the full provider-neutral listing workspace:
+versioned taxonomy, conditional attributes, mapping, localized content, media,
+variants, deterministic 1,000-SKU preview, approval journal, read-after-write,
+OpenAPI/SDK/MCP preview and frontend `/marketplace-listings` are connected.
+Official provider-specific taxonomy, remote batch apply and credentialed live
+read-after-write remain explicit release gates. PIM remains the canonical
+product source; AI drafts cannot publish or bypass policy. See
 `tasks/issues/222-marketplace-listing-content-attributes.md`.
 
 ## Epic 179 — Сквозная обработка заказа до возврата денег

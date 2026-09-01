@@ -51,7 +51,7 @@ func newMarketplaceListingRoutes(store *marketplacelistingrepo.Repository, appro
 
 type marketplaceListingTaxonomyQuery struct {
 	TaxonomyID   string
-	ConnectorID  string
+	ChannelID    string
 	Locale       string
 	Jurisdiction string
 }
@@ -62,7 +62,7 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 		writeProblem(w, http.StatusServiceUnavailable, "Marketplace listing workspace is unavailable")
 		return
 	}
-	query := marketplaceListingTaxonomyQuery{TaxonomyID: strings.TrimSpace(r.URL.Query().Get("taxonomy_id")), ConnectorID: strings.TrimSpace(r.URL.Query().Get("connector_id")), Locale: strings.TrimSpace(r.URL.Query().Get("locale")), Jurisdiction: strings.TrimSpace(r.URL.Query().Get("jurisdiction"))}
+	query := marketplaceListingTaxonomyQuery{TaxonomyID: strings.TrimSpace(r.URL.Query().Get("taxonomy_id")), ChannelID: strings.TrimSpace(r.URL.Query().Get("connector_id")), Locale: strings.TrimSpace(r.URL.Query().Get("locale")), Jurisdiction: strings.TrimSpace(r.URL.Query().Get("jurisdiction"))}
 	if query.Locale == "" {
 		query.Locale = "ru-RU"
 	}
@@ -71,8 +71,8 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 	}
 	var taxonomy marketplacelisting.Taxonomy
 	var err error
-	if query.ConnectorID == "demo" && query.TaxonomyID == "" {
-		taxonomy = marketplacelisting.DemoTaxonomy(query.ConnectorID, query.Locale, query.Jurisdiction, api.now())
+	if query.ChannelID == "demo" && query.TaxonomyID == "" {
+		taxonomy = marketplacelisting.DemoTaxonomy(query.ChannelID, query.Locale, query.Jurisdiction, api.now())
 	} else if safePublicationID(query.TaxonomyID) {
 		taxonomy, err = api.store.Taxonomy(r.Context(), scope, query.TaxonomyID)
 	} else {
@@ -93,11 +93,11 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 }
 
 type marketplaceListingPreviewRequest struct {
-	ConnectorAccountID string                              `json:"connector_account_id"`
-	ConnectorID        string                              `json:"connector_id"`
-	Taxonomy           marketplacelisting.Taxonomy         `json:"taxonomy"`
-	Items              []marketplacelisting.BatchItem      `json:"items"`
-	Operations         []marketplacelisting.BatchOperation `json:"operations,omitempty"`
+	ChannelAccountID string                              `json:"connector_account_id"`
+	ChannelID        string                              `json:"connector_id"`
+	Taxonomy         marketplacelisting.Taxonomy         `json:"taxonomy"`
+	Items            []marketplacelisting.BatchItem      `json:"items"`
+	Operations       []marketplacelisting.BatchOperation `json:"operations,omitempty"`
 }
 
 func (api marketplaceListingAPI) preview(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +107,7 @@ func (api marketplaceListingAPI) preview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var request marketplaceListingPreviewRequest
-	if decodeStrictJSON(r, &request) != nil || !safePublicationID(request.ConnectorAccountID) || !safePublicationID(request.ConnectorID) || request.Taxonomy.Validate() != nil || request.Taxonomy.ConnectorID != request.ConnectorID || len(request.Items) == 0 || len(request.Items) > marketplacelisting.MaxBatchItems {
+	if decodeStrictJSON(r, &request) != nil || !safePublicationID(request.ChannelAccountID) || !safePublicationID(request.ChannelID) || request.Taxonomy.Validate() != nil || request.Taxonomy.ChannelID != request.ChannelID || len(request.Items) == 0 || len(request.Items) > marketplacelisting.MaxBatchItems {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -125,7 +125,7 @@ func (api marketplaceListingAPI) preview(w http.ResponseWriter, r *http.Request)
 	inputSum := sha256.Sum256(input)
 	previewID := stableID("mlp_", 32, scope, hex.EncodeToString(inputSum[:]))
 	now := api.now()
-	preview, err := marketplacelisting.BuildBatchPreview(previewID, scope.OrganizationID().String(), scope.WorkspaceID().String(), request.ConnectorAccountID, request.ConnectorID, request.Taxonomy, request.Items, request.Operations, now)
+	preview, err := marketplacelisting.BuildBatchPreview(previewID, scope.OrganizationID().String(), scope.WorkspaceID().String(), request.ChannelAccountID, request.ChannelID, request.Taxonomy, request.Items, request.Operations, now)
 	if err != nil {
 		writeMarketplaceListingError(w, err)
 		return

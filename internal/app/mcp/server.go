@@ -181,7 +181,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 type localListingPreviewer struct{}
 
 func (localListingPreviewer) PreviewListing(_ context.Context, identity Identity, input ListingPreviewInput) (marketplacelisting.BatchPreview, error) {
-	if !identity.Valid() || strings.TrimSpace(input.ConnectorAccountID) == "" || strings.TrimSpace(input.ConnectorID) == "" || input.Taxonomy.Validate() != nil || input.Taxonomy.ConnectorID != input.ConnectorID || len(input.Items) == 0 || len(input.Items) > marketplacelisting.MaxBatchItems {
+	if !identity.Valid() || strings.TrimSpace(input.ChannelAccountID) == "" || strings.TrimSpace(input.ChannelID) == "" || input.Taxonomy.Validate() != nil || input.Taxonomy.ChannelID != input.ChannelID || len(input.Items) == 0 || len(input.Items) > marketplacelisting.MaxBatchItems {
 		return marketplacelisting.BatchPreview{}, ErrInvalid
 	}
 	for _, item := range input.Items {
@@ -194,7 +194,7 @@ func (localListingPreviewer) PreviewListing(_ context.Context, identity Identity
 		return marketplacelisting.BatchPreview{}, ErrInvalid
 	}
 	digest := sha256.Sum256(data)
-	return marketplacelisting.BuildBatchPreview("mcp.preview."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.ConnectorAccountID, input.ConnectorID, input.Taxonomy, input.Items, input.Operations, time.Now().UTC())
+	return marketplacelisting.BuildBatchPreview("mcp.preview."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.ChannelAccountID, input.ChannelID, input.Taxonomy, input.Items, input.Operations, time.Now().UTC())
 }
 
 func (s *Server) Handler() http.Handler {

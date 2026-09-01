@@ -90,6 +90,34 @@ func TestMappingRequiresCurrentTaxonomyAndIsDeterministic(t *testing.T) {
 	_ = now
 }
 
+func TestMappingConvertsSupportedUnitsExactly(t *testing.T) {
+	taxonomy, now := testTaxonomy(t)
+	taxonomy.Attributes = append(taxonomy.Attributes, AttributeDefinition{Code: "length", Name: "Длина", ValueType: ValueDimension, Requirement: RequirementOptional, Unit: "mm"})
+	taxonomy.Categories[0].AttributeCodes = append(taxonomy.Categories[0].AttributeCodes, "length")
+	fingerprint, err := taxonomy.ComputeFingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapping := Mapping{ID: "mapping-units", Version: 1, TaxonomyFingerprint: fingerprint, Entries: []MappingEntry{{SourceField: "source.length", TargetCode: "length", UnitFrom: "cm", UnitTo: "mm"}}}
+	values, err := ApplyMapping(mapping, taxonomy, map[string]AttributeValue{"source.length": {Value: "1.25", Unit: "cm"}})
+	if err != nil || values["length"].Value != "12.5" || values["length"].Unit != "mm" {
+		t.Fatalf("ApplyMapping(unit) values = %#v, error = %v", values, err)
+	}
+	_ = now
+}
+
+func TestBatchOperationsRejectUnknownFieldsAndDuplicateVariants(t *testing.T) {
+	if err := (BatchOperation{Kind: BatchSet, Field: "remote.unsupported", Value: "value"}).Validate(); err == nil {
+		t.Fatal("unknown batch field was accepted")
+	}
+	taxonomy, now := testTaxonomy(t)
+	draft := testDraft(t, taxonomy, now, "sku-1", "white")
+	draft.Variants = []Variant{{ID: "variant-1", SKU: "sku-2", Axes: map[string]string{"color": "black"}}, {ID: "variant-2", SKU: "sku-3", Axes: map[string]string{"color": "black"}}}
+	if err := draft.Validate(); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate variant combination error = %v, want %v", err, ErrConflict)
+	}
+}
+
 func TestBuildBatchPreviewBoundsSortsAndBlocksRows(t *testing.T) {
 	taxonomy, now := testTaxonomy(t)
 	valid := testDraft(t, taxonomy, now, "sku-b", "white")

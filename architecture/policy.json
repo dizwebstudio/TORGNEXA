@@ -103,6 +103,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/marketplacelisting",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/marketplaceoperations",
       "kind": "core_domain"
     },
@@ -132,6 +136,10 @@
     },
     {
       "path": "internal/core/pricing",
+      "kind": "core_domain"
+    },
+    {
+      "path": "internal/core/repricing",
       "kind": "core_domain"
     },
     {
@@ -435,6 +443,10 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/marketplacelistingrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/marketplaceoperationsrepo",
       "kind": "infrastructure_adapter"
     },
@@ -496,6 +508,10 @@
     },
     {
       "path": "internal/platform/postgres/reconciliationrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/replenishmentrepo",
       "kind": "infrastructure_adapter"
     },
     {

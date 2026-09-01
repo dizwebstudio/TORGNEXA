@@ -23,11 +23,11 @@ type Tool struct {
 // ListingPreviewInput is the provider-neutral, dry-run input accepted by the
 // MCP listing tool. It cannot carry credentials or trigger a remote write.
 type ListingPreviewInput struct {
-	ConnectorAccountID string                              `json:"connector_account_id"`
-	ConnectorID        string                              `json:"connector_id"`
-	Taxonomy           marketplacelisting.Taxonomy         `json:"taxonomy"`
-	Items              []marketplacelisting.BatchItem      `json:"items"`
-	Operations         []marketplacelisting.BatchOperation `json:"operations,omitempty"`
+	ChannelAccountID string                              `json:"connector_account_id"`
+	ChannelID        string                              `json:"connector_id"`
+	Taxonomy         marketplacelisting.Taxonomy         `json:"taxonomy"`
+	Items            []marketplacelisting.BatchItem      `json:"items"`
+	Operations       []marketplacelisting.BatchOperation `json:"operations,omitempty"`
 }
 
 // ListingPreviewer is deliberately read-only. Applying a batch is only

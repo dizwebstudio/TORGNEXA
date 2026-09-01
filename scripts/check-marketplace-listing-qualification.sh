@@ -38,7 +38,7 @@ for required in ('RequirementConditional', 'ComputeFingerprint', 'BuildBatchPrev
     if required not in core:
         raise SystemExit(f'marketplace listing qualification: missing core invariant {required}')
 sdk = (root / 'internal/platform/connectors/marketplace_listing.go').read_text()
-for required in ('MarketplaceListingWriter', 'MarketplaceListingStatusReader', 'DryRun', 'IdempotencyKey'):
+for required in ('MarketplaceListingTaxonomyReader', 'MarketplaceListingWriter', 'MarketplaceListingStatusReader', 'DryRun', 'IdempotencyKey'):
     if required not in sdk:
         raise SystemExit(f'marketplace listing qualification: missing SDK invariant {required}')
 openapi = (root / 'contracts/openapi/torgnexa-v1.yaml').read_text()

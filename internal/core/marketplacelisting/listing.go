@@ -109,6 +109,9 @@ func (a AttributeDefinition) Validate() error {
 	if !codePattern.MatchString(a.Code) || strings.TrimSpace(a.Name) != a.Name || a.Name == "" || len(a.Name) > 300 || !a.ValueType.Valid() || !a.Requirement.Valid() || (a.Unit != "" && !codePattern.MatchString(a.Unit)) || len(a.EnumValues) > 256 || len(a.Conditions) > 16 {
 		return ErrInvalid
 	}
+	if a.Requirement == RequirementConditional && len(a.Conditions) == 0 {
+		return ErrInvalid
+	}
 	seen := map[string]struct{}{}
 	for _, item := range a.EnumValues {
 		if !codePattern.MatchString(item.Code) || strings.TrimSpace(item.Label) != item.Label || item.Label == "" || len(item.Label) > 300 {
@@ -183,7 +186,7 @@ func (m MediaSlot) Validate() error {
 
 type Taxonomy struct {
 	ID           string                `json:"id"`
-	ConnectorID  string                `json:"connector_id"`
+	ChannelID    string                `json:"connector_id"`
 	Locale       string                `json:"locale"`
 	Jurisdiction string                `json:"jurisdiction"`
 	Version      int64                 `json:"version"`
@@ -197,7 +200,7 @@ type Taxonomy struct {
 }
 
 func (t Taxonomy) Validate() error {
-	if !refPattern.MatchString(t.ID) || !refPattern.MatchString(t.ConnectorID) || !localePattern.MatchString(t.Locale) || !countryPattern.MatchString(t.Jurisdiction) || t.Version < 1 || strings.TrimSpace(t.Source) != t.Source || t.Source == "" || len(t.Source) > 256 || !isUTC(t.ObservedAt) || !isUTC(t.FreshUntil) || !t.FreshUntil.After(t.ObservedAt) || len(t.Categories) > 50_000 || len(t.Attributes) > 512 || len(t.MediaSlots) > 64 {
+	if !refPattern.MatchString(t.ID) || !refPattern.MatchString(t.ChannelID) || !localePattern.MatchString(t.Locale) || !countryPattern.MatchString(t.Jurisdiction) || t.Version < 1 || strings.TrimSpace(t.Source) != t.Source || t.Source == "" || len(t.Source) > 256 || !isUTC(t.ObservedAt) || !isUTC(t.FreshUntil) || !t.FreshUntil.After(t.ObservedAt) || len(t.Categories) > 50_000 || len(t.Attributes) > 512 || len(t.MediaSlots) > 64 {
 		return ErrInvalid
 	}
 	if t.Fingerprint != "" && !isDigest(t.Fingerprint) {
@@ -222,6 +225,51 @@ func (t Taxonomy) Validate() error {
 			return ErrConflict
 		}
 		seen[attribute.Code] = struct{}{}
+	}
+	attributes := make(map[string]struct{}, len(t.Attributes))
+	for _, attribute := range t.Attributes {
+		attributes[attribute.Code] = struct{}{}
+	}
+	for _, attribute := range t.Attributes {
+		for _, condition := range attribute.Conditions {
+			if _, ok := attributes[condition.WhenField]; !ok {
+				return ErrInvalid
+			}
+		}
+	}
+	categoryCodes := make(map[string]struct{}, len(t.Categories))
+	for _, category := range t.Categories {
+		categoryCodes[category.Code] = struct{}{}
+	}
+	for _, category := range t.Categories {
+		if category.ParentCode != "" {
+			if category.ParentCode == category.Code {
+				return ErrConflict
+			}
+			if _, ok := categoryCodes[category.ParentCode]; !ok {
+				return ErrInvalid
+			}
+		}
+		for _, attributeCode := range category.AttributeCodes {
+			if _, ok := attributes[attributeCode]; !ok {
+				return ErrInvalid
+			}
+		}
+	}
+	for _, category := range t.Categories {
+		seenParents := map[string]struct{}{category.Code: {}}
+		parent := category.ParentCode
+		for parent != "" {
+			if _, seen := seenParents[parent]; seen {
+				return ErrConflict
+			}
+			seenParents[parent] = struct{}{}
+			current, ok := findCategory(t, parent)
+			if !ok {
+				return ErrInvalid
+			}
+			parent = current.ParentCode
+		}
 	}
 	seen = map[string]struct{}{}
 	for _, slot := range t.MediaSlots {
@@ -351,14 +399,23 @@ func (d ListingDraft) Validate() error {
 		}
 	}
 	seen := map[string]struct{}{}
+	variantCombinations := map[string]struct{}{}
 	for _, variant := range d.Variants {
 		if variant.Validate() != nil {
 			return ErrInvalid
+		}
+		if variant.SKU == d.SKU {
+			return ErrConflict
 		}
 		if _, ok := seen[variant.SKU]; ok {
 			return ErrConflict
 		}
 		seen[variant.SKU] = struct{}{}
+		combination := mapSignature(variant.Axes)
+		if _, ok := variantCombinations[combination]; ok {
+			return ErrConflict
+		}
+		variantCombinations[combination] = struct{}{}
 	}
 	seen = map[string]struct{}{}
 	for _, media := range d.Media {
@@ -574,13 +631,18 @@ func (m Mapping) Validate() error {
 	}
 	seen := map[string]struct{}{}
 	for _, entry := range m.Entries {
-		if !codePattern.MatchString(entry.SourceField) || !codePattern.MatchString(entry.TargetCode) || (entry.Transform != "" && !codePattern.MatchString(entry.Transform)) || len(entry.EnumMap) > 256 || (entry.UnitFrom != "" && !codePattern.MatchString(entry.UnitFrom)) || (entry.UnitTo != "" && !codePattern.MatchString(entry.UnitTo)) {
+		if !codePattern.MatchString(entry.SourceField) || !codePattern.MatchString(entry.TargetCode) || !validMappingTransform(entry.Transform) || len(entry.EnumMap) > 256 || (entry.UnitFrom != "" && !codePattern.MatchString(entry.UnitFrom)) || (entry.UnitTo != "" && !codePattern.MatchString(entry.UnitTo)) || (entry.UnitFrom == "") != (entry.UnitTo == "") {
 			return ErrInvalid
 		}
 		if _, ok := seen[entry.TargetCode]; ok {
 			return ErrConflict
 		}
 		seen[entry.TargetCode] = struct{}{}
+		for from, to := range entry.EnumMap {
+			if !validText(from, 256) || !validText(to, 256) {
+				return ErrInvalid
+			}
+		}
 	}
 	return nil
 }
@@ -596,7 +658,15 @@ func ApplyMapping(mapping Mapping, taxonomy Taxonomy, source map[string]Attribut
 		return nil, ErrStaleTaxonomy
 	}
 	result := make(map[string]AttributeValue, len(mapping.Entries))
+	definitions := make(map[string]AttributeDefinition, len(taxonomy.Attributes))
+	for _, definition := range taxonomy.Attributes {
+		definitions[definition.Code] = definition
+	}
 	for _, entry := range mapping.Entries {
+		definition, exists := definitions[entry.TargetCode]
+		if !exists {
+			return nil, ErrInvalid
+		}
 		value, ok := source[entry.SourceField]
 		if !ok {
 			continue
@@ -617,7 +687,18 @@ func ApplyMapping(mapping Mapping, taxonomy Taxonomy, source map[string]Attribut
 			}
 		}
 		if entry.UnitTo != "" {
+			if value.Unit != entry.UnitFrom {
+				return nil, ErrInvalid
+			}
+			converted, err := convertUnit(value.Value, entry.UnitFrom, entry.UnitTo)
+			if err != nil {
+				return nil, ErrInvalid
+			}
+			value.Value = converted
 			value.Unit = entry.UnitTo
+		}
+		if definition.Unit != "" && value.Unit != definition.Unit {
+			return nil, ErrInvalid
 		}
 		result[entry.TargetCode] = value
 	}
@@ -648,7 +729,10 @@ type BatchOperation struct {
 }
 
 func (o BatchOperation) Validate() error {
-	if !o.Kind.Valid() || !codePattern.MatchString(strings.TrimPrefix(o.Field, "attributes.")) || len(o.Value) > 2000 || (o.FromField != "" && !codePattern.MatchString(strings.TrimPrefix(o.FromField, "attributes."))) {
+	if !o.Kind.Valid() || !validBatchField(o.Field) || len(o.Value) > 2000 || (o.FromField != "" && !validBatchField(o.FromField)) {
+		return ErrInvalid
+	}
+	if o.Kind == BatchCopy && o.FromField == "" {
 		return ErrInvalid
 	}
 	if (o.Kind == BatchSet || o.Kind == BatchReplace || o.Kind == BatchMap || o.Kind == BatchAppend || o.Kind == BatchCopy) && o.Value == "" && o.FromField == "" {
@@ -677,8 +761,8 @@ type BatchPreview struct {
 	ID                  string     `json:"id"`
 	OrganizationID      string     `json:"organization_id"`
 	WorkspaceID         string     `json:"workspace_id"`
-	ConnectorAccountID  string     `json:"connector_account_id"`
-	ConnectorID         string     `json:"connector_id"`
+	ChannelAccountID    string     `json:"connector_account_id"`
+	ChannelID           string     `json:"connector_id"`
 	TaxonomyFingerprint string     `json:"taxonomy_fingerprint"`
 	RuleVersion         int64      `json:"rule_version"`
 	InputDigest         string     `json:"input_digest"`
@@ -690,7 +774,7 @@ type BatchPreview struct {
 }
 
 func (p BatchPreview) Validate() error {
-	if !refPattern.MatchString(p.ID) || !refPattern.MatchString(p.OrganizationID) || !refPattern.MatchString(p.WorkspaceID) || !refPattern.MatchString(p.ConnectorAccountID) || !refPattern.MatchString(p.ConnectorID) || !isDigest(p.TaxonomyFingerprint) || p.RuleVersion < 1 || !isDigest(p.InputDigest) || p.AffectedCount < 0 || p.AffectedCount > MaxBatchItems || p.EligibleCount < 0 || p.BlockedCount < 0 || p.EligibleCount+p.BlockedCount != p.AffectedCount || len(p.Rows) != p.AffectedCount || !isUTC(p.CreatedAt) {
+	if !refPattern.MatchString(p.ID) || !refPattern.MatchString(p.OrganizationID) || !refPattern.MatchString(p.WorkspaceID) || !refPattern.MatchString(p.ChannelAccountID) || !refPattern.MatchString(p.ChannelID) || !isDigest(p.TaxonomyFingerprint) || p.RuleVersion < 1 || !isDigest(p.InputDigest) || p.AffectedCount < 0 || p.AffectedCount > MaxBatchItems || p.EligibleCount < 0 || p.BlockedCount < 0 || p.EligibleCount+p.BlockedCount != p.AffectedCount || len(p.Rows) != p.AffectedCount || !isUTC(p.CreatedAt) {
 		return ErrInvalid
 	}
 	for _, row := range p.Rows {
@@ -708,7 +792,7 @@ func (p BatchPreview) Validate() error {
 
 // BuildBatchPreview produces a bounded, immutable before/after diff. Rows are
 // sorted by SKU, making the digest independent from selection order.
-func BuildBatchPreview(id, organizationID, workspaceID, accountID, connectorID string, taxonomy Taxonomy, items []BatchItem, operations []BatchOperation, now time.Time) (BatchPreview, error) {
+func BuildBatchPreview(id, organizationID, workspaceID, accountID, channelID string, taxonomy Taxonomy, items []BatchItem, operations []BatchOperation, now time.Time) (BatchPreview, error) {
 	if len(items) == 0 {
 		return BatchPreview{}, ErrInvalid
 	}
@@ -759,7 +843,7 @@ func BuildBatchPreview(id, organizationID, workspaceID, accountID, connectorID s
 	}{fingerprint, rowsInput, operations}
 	inputJSON, _ := json.Marshal(input)
 	inputSum := sha256.Sum256(inputJSON)
-	preview := BatchPreview{ID: id, OrganizationID: organizationID, WorkspaceID: workspaceID, ConnectorAccountID: accountID, ConnectorID: connectorID, TaxonomyFingerprint: fingerprint, RuleVersion: 1, InputDigest: hex.EncodeToString(inputSum[:]), AffectedCount: len(rows), Rows: rows, CreatedAt: now}
+	preview := BatchPreview{ID: id, OrganizationID: organizationID, WorkspaceID: workspaceID, ChannelAccountID: accountID, ChannelID: channelID, TaxonomyFingerprint: fingerprint, RuleVersion: 1, InputDigest: hex.EncodeToString(inputSum[:]), AffectedCount: len(rows), Rows: rows, CreatedAt: now}
 	for _, row := range rows {
 		if row.Eligible {
 			preview.EligibleCount++
@@ -779,8 +863,12 @@ func applyBatchOperations(draft ListingDraft, operations []BatchOperation) Listi
 	result.Content.Bullets = append([]string(nil), draft.Content.Bullets...)
 	for _, operation := range operations {
 		switch {
+		case operation.Kind == BatchCopy && operation.Field == "content.title":
+			result.Content.Title = batchSourceText(result, operation.FromField)
+		case operation.Kind == BatchCopy && operation.Field == "content.description":
+			result.Content.Description = batchSourceText(result, operation.FromField)
 		case operation.Field == "category_code":
-			if operation.Kind == BatchSet || operation.Kind == BatchReplace {
+			if operation.Kind == BatchSet || operation.Kind == BatchReplace || operation.Kind == BatchMap {
 				result.CategoryCode = operation.Value
 			}
 		case operation.Field == "content.title":
@@ -835,6 +923,87 @@ func applyText(current string, operation BatchOperation) string {
 	default:
 		return current
 	}
+}
+
+func validMappingTransform(value string) bool {
+	switch value {
+	case "", "trim", "lower", "upper", "normalize_decimal":
+		return true
+	default:
+		return false
+	}
+}
+
+func validBatchField(value string) bool {
+	switch value {
+	case "category_code", "content.title", "content.description":
+		return true
+	default:
+		return strings.HasPrefix(value, "attributes.") && codePattern.MatchString(strings.TrimPrefix(value, "attributes."))
+	}
+}
+
+func batchSourceText(draft ListingDraft, field string) string {
+	switch field {
+	case "category_code":
+		return draft.CategoryCode
+	case "content.title":
+		return draft.Content.Title
+	case "content.description":
+		return draft.Content.Description
+	default:
+		if strings.HasPrefix(field, "attributes.") {
+			return draft.Attributes[strings.TrimPrefix(field, "attributes.")].Value
+		}
+		return ""
+	}
+}
+
+func mapSignature(values map[string]string) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var result strings.Builder
+	for _, key := range keys {
+		result.WriteString(key)
+		result.WriteByte('=')
+		result.WriteString(values[key])
+		result.WriteByte(';')
+	}
+	return result.String()
+}
+
+func convertUnit(value, from, to string) (string, error) {
+	if from == to {
+		return value, nil
+	}
+	scales := map[string][2]int64{
+		"mg": {1, 1000}, "g": {1, 1}, "kg": {1000, 1},
+		"mm": {1, 1}, "cm": {10, 1}, "m": {1000, 1},
+	}
+	fromScale, fromOK := scales[from]
+	toScale, toOK := scales[to]
+	if !fromOK || !toOK {
+		return "", ErrInvalid
+	}
+	result, ok := new(big.Rat).SetString(value)
+	if !ok {
+		return "", ErrInvalid
+	}
+	result.Mul(result, new(big.Rat).SetFrac64(fromScale[0], fromScale[1]))
+	result.Quo(result, new(big.Rat).SetFrac64(toScale[0], toScale[1]))
+	rendered := result.FloatString(9)
+	parsed, ok := new(big.Rat).SetString(rendered)
+	if !ok || parsed.Cmp(result) != 0 {
+		return "", ErrInvalid
+	}
+	rendered = strings.TrimRight(strings.TrimRight(rendered, "0"), ".")
+	if rendered == "" || rendered == "-0" {
+		rendered = "0"
+	}
+	return rendered, nil
 }
 
 func DraftDigest(draft ListingDraft) (string, error) {
@@ -961,8 +1130,8 @@ func Reconcile(expected ListingDraft, expectedDigest string, observation RemoteO
 
 // DemoTaxonomy is deterministic synthetic data for local Compose/demo flows.
 // It never claims that a real marketplace schema has been qualified.
-func DemoTaxonomy(connectorID, locale, jurisdiction string, now time.Time) Taxonomy {
-	return Taxonomy{ID: "demo.taxonomy." + connectorID, ConnectorID: connectorID, Locale: locale, Jurisdiction: jurisdiction, Version: 1, Source: "synthetic.demo", ObservedAt: now.UTC(), FreshUntil: now.UTC().Add(24 * time.Hour), Categories: []Category{{Code: "demo.product", Name: "Демонстрационный товар", AttributeCodes: []string{"color", "material"}}}, Attributes: []AttributeDefinition{{Code: "color", Name: "Цвет", ValueType: ValueEnum, Requirement: RequirementRequired, EnumValues: []EnumValue{{Code: "black", Label: "Чёрный"}, {Code: "white", Label: "Белый"}}}, {Code: "material", Name: "Материал", ValueType: ValueText, Requirement: RequirementConditional, Conditions: []Condition{{WhenField: "color", Equals: "black"}}}}, MediaSlots: []MediaSlot{{Code: "main", Name: "Главное изображение", Required: true, MaxItems: 1, Formats: []string{"image/jpeg", "image/png"}, MinWidth: 500, MinHeight: 500}}}
+func DemoTaxonomy(channelID, locale, jurisdiction string, now time.Time) Taxonomy {
+	return Taxonomy{ID: "demo.taxonomy." + channelID, ChannelID: channelID, Locale: locale, Jurisdiction: jurisdiction, Version: 1, Source: "synthetic.demo", ObservedAt: now.UTC(), FreshUntil: now.UTC().Add(24 * time.Hour), Categories: []Category{{Code: "demo.product", Name: "Демонстрационный товар", AttributeCodes: []string{"color", "material"}}}, Attributes: []AttributeDefinition{{Code: "color", Name: "Цвет", ValueType: ValueEnum, Requirement: RequirementRequired, EnumValues: []EnumValue{{Code: "black", Label: "Чёрный"}, {Code: "white", Label: "Белый"}}}, {Code: "material", Name: "Материал", ValueType: ValueText, Requirement: RequirementConditional, Conditions: []Condition{{WhenField: "color", Equals: "black"}}}}, MediaSlots: []MediaSlot{{Code: "main", Name: "Главное изображение", Required: true, MaxItems: 1, Formats: []string{"image/jpeg", "image/png"}, MinWidth: 500, MinHeight: 500}}}
 }
 
 func findCategory(t Taxonomy, code string) (Category, bool) {

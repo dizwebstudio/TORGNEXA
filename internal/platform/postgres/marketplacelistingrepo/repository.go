@@ -62,7 +62,7 @@ func (r *Repository) SaveTaxonomy(ctx context.Context, scope tenancy.Scope, taxo
 		if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("marketplace listing repository: taxonomy lookup: %w", err)
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO marketplace_listing_taxonomies(organization_id,workspace_id,taxonomy_id,connector_id,locale,jurisdiction,taxonomy_version,source,fingerprint,observed_at,fresh_until,taxonomy_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`, scope.OrganizationID(), scope.WorkspaceID(), taxonomy.ID, taxonomy.ConnectorID, taxonomy.Locale, taxonomy.Jurisdiction, taxonomy.Version, taxonomy.Source, fingerprint, taxonomy.ObservedAt, taxonomy.FreshUntil, document)
+		_, err = tx.ExecContext(ctx, `INSERT INTO marketplace_listing_taxonomies(organization_id,workspace_id,taxonomy_id,connector_id,locale,jurisdiction,taxonomy_version,source,fingerprint,observed_at,fresh_until,taxonomy_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`, scope.OrganizationID(), scope.WorkspaceID(), taxonomy.ID, taxonomy.ChannelID, taxonomy.Locale, taxonomy.Jurisdiction, taxonomy.Version, taxonomy.Source, fingerprint, taxonomy.ObservedAt, taxonomy.FreshUntil, document)
 		if err != nil {
 			return fmt.Errorf("marketplace listing repository: taxonomy insert: %w", err)
 		}

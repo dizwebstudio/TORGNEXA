@@ -12,17 +12,44 @@
   capability/freshness evidence перед публикацией.
 - `/marketplace-publications` — snapshot preflight, dry-run, approval reference,
   очередь публикации, remote status и reconciliation drift.
+- `/marketplace-listings` — taxonomy канала, conditional attributes, локализованный
+  content, media release, batch preview до 1 000 SKU, approval-gated apply и
+  read-after-write reconciliation.
 
 Публикация не считается успешной по одному HTTP-ответу: состояния `unknown`,
 `needs_attention` и `rejected` остаются видимыми оператору.
 
-## Граница текущей версии
+## Что работает сейчас
 
-В текущем repository slice нет притворной поддержки provider-specific taxonomy,
-условных атрибутов, массового batch apply и live read-after-write для WB/Ozon/
-Yandex Market. Эти возможности включаются только после официального connector
-контракта, approval, idempotency, качества данных и квалификационного evidence.
-До этого оператор работает с канонической карточкой, preflight и dry-run.
+В repository-контуре доступны:
+
+- provider-neutral taxonomy с версиями, fingerprint и freshness;
+- required/optional/conditional attributes, enum deprecation, типы, units,
+  диапазоны и диагностические remediation;
+- deterministic mapping с enum map, trim/case и exact taxonomy check;
+- localized title/description/bullets, variants/SKU и только released/safe
+  media references;
+- bounded deterministic batch preview с before/after digest, сортировкой SKU,
+  лимитом 1 000 и исключением blocked rows;
+- approval-gated durable batch journal, OpenAPI, Go/Python/TypeScript SDK и
+  MCP dry-run preview;
+- typed taxonomy-reader, listing-writer и status-reader ports с dry-run,
+  idempotency и нормализованным unknown outcome;
+- read-after-write reconciliation для mismatch, missing, status и unknown;
+- tenant-scoped append-only persistence с RLS, idempotency и migration 52.
+
+Demo taxonomy намеренно синтетическая. Для WB, Ozon и Yandex Market нельзя
+подставлять её вместо официальной схемы канала.
+
+## Release gate
+
+`products.write` и batch API не являются доказательством live-поддержки. Для
+каждого коннектора отдельно нужны официальные channel-specific схемы, scope и
+rate-limit evidence, тестовый remote batch write и credentialed read-after-write.
+До этого UI показывает qualification boundary, а не успешную публикацию.
+
+MCP/OpenClaw может только запросить preview. Apply, approval и remote write
+остаются за authenticated HTTP/API boundary.
 
 ## Безопасность
 
