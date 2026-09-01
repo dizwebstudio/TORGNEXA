@@ -33,6 +33,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/customerservicerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ecosystemrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/entitlementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
@@ -444,6 +445,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("customer_service_repository_startup_failed", err)
 	}
+	ecosystemRepository, err := ecosystemrepo.New(db)
+	if err != nil {
+		return newRuntimeError("ecosystem_repository_startup_failed", err)
+	}
 	advertisingRepository, err := advertisingrepo.New(db)
 	if err != nil {
 		return newRuntimeError("advertising_repository_startup_failed", err)
@@ -480,7 +485,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		advertising: advertisingRepository, settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
 		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository, marketplaceListing: marketplaceListingRepository, marketplaceGrowth: marketplaceGrowthRepository, marketplaceFlows: marketplaceOperationsRepository, procurement: procurementRepository, replenishment: replenishmentRepository,
-		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()}, customerService: customerServiceRepository,
+		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()}, customerService: customerServiceRepository, ecosystem: ecosystemRepository,
 	}
 	routes := newProductionRoutes(routeDeps)
 	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))

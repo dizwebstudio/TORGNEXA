@@ -116,8 +116,7 @@ export function AppShell() {
   const allowed = knownPath && (path === "/oauth/connectors/callback" ? capabilities.includes("connectors.accounts.write") : canOpenPath(path, capabilities));
   const current = routeForPath(path);
   useEffect(()=>{let prefix=false;let timer=0;const handler=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;const key=event.key.toLowerCase();if((event.metaKey||event.ctrlKey)&&key==="k"){event.preventDefault();setCommandOpen(true);return}if(event.key==="Escape"){setCommandOpen(false);setMobileOpen(false);prefix=false;return}if(key==="g"){prefix=true;window.clearTimeout(timer);timer=window.setTimeout(()=>{prefix=false},900);return}if(prefix){prefix=false;const item=navigation.find(value=>value.shortcut?.toLowerCase()===`g ${key}`);if(item){event.preventDefault();navigate(item.path)}}};window.addEventListener("keydown",handler);return()=>{window.removeEventListener("keydown",handler);window.clearTimeout(timer)}},[navigation]);
-  useEffect(()=>setMobileOpen(false),[path]);
-  useEffect(()=>setSectionsOpen(secondaryRouteActive),[secondaryRouteActive]);
+  useEffect(()=>{setMobileOpen(false);setSectionsOpen(false)},[path]);
 
   return <div className={`app-shell ${mobileOpen?"nav-open":""}`}>
     <aside className="sidebar">

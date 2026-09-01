@@ -1266,6 +1266,44 @@
       }
     },
     {
+      "schema": "events/ecosystem-onboarding-run-created-v1.schema.json",
+      "valid": {
+        "run_id": "onboard_fixture_001",
+        "resource_id": "connector.catalog",
+        "state": "running",
+        "check_count": 4,
+        "required_pending_count": 1,
+        "created_at": "2026-08-30T10:00:00Z"
+      },
+      "invalid": {
+        "run_id": "onboard_fixture_001",
+        "resource_id": "connector.catalog",
+        "state": "qualified",
+        "check_count": 0,
+        "required_pending_count": 1,
+        "created_at": "bad"
+      }
+    },
+    {
+      "schema": "events/ecosystem-partner-certification-recorded-v1.schema.json",
+      "valid": {
+        "certification_id": "cert_fixture_001",
+        "partner_ref": "partner_fixture_001",
+        "tier": "implementation",
+        "state": "sandbox_ready",
+        "version": 1,
+        "updated_at": "2026-08-30T10:00:00Z"
+      },
+      "invalid": {
+        "certification_id": "cert_fixture_001",
+        "partner_ref": "partner_fixture_001",
+        "tier": "unknown",
+        "state": "certified",
+        "version": 0,
+        "updated_at": "bad"
+      }
+    },
+    {
       "schema": "events/compliance-document-status-changed-v1.schema.json",
       "valid": {
         "event_id": "evt_test_002",

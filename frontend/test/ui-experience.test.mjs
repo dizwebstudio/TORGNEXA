@@ -19,6 +19,7 @@ test("shell exposes icon navigation, command search, theme and activity center",
   assert.match(shell, /Не удалось загрузить часть активности/);
   assert.match(shell, /Повторить/);
   assert.match(shell, /Все разделы/);
+  assert.match(shell, /setMobileOpen\(false\);setSectionsOpen\(false\)/);
   assert.match(shell, /secondary-navigation/);
   assert.match(shell, /primaryNavigation/);
   assert.match(read("shell/navigation.ts"), /navigationSections/);

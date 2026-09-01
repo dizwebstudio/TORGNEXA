@@ -1173,6 +1173,26 @@
       },
       "backfill": null,
       "sha256": "b5565538fb5f545f69587117c7ec403b72fdc0d6326b2e747ab3de6ad89662d4"
+    },
+    {
+      "version": 58,
+      "name": "ecosystem_support",
+      "file": "000058_ecosystem_support.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [9, 55, 57],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "5e53c7a4d5816b3c8f9da57b33fe69ba1e2aafa89cbbff6ab23caab7034bf01f"
     }
   ]
 }

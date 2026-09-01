@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ecosystem-partner-certification-recorded-v1.json",
+  "title": "ecosystem.partner.certification_recorded.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["certification_id", "partner_ref", "tier", "state", "version", "updated_at"],
+  "properties": {
+    "certification_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "partner_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "tier": {"type": "string", "enum": ["referral", "implementation", "certified_solution", "managed_operations", "support_escalation"]},
+    "state": {"type": "string", "enum": ["applied", "sandbox_ready", "certified", "suspended", "revoked", "expired"]},
+    "version": {"type": "integer", "minimum": 1},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

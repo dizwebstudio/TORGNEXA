@@ -34,6 +34,30 @@ const dispositionLabels: Readonly<Record<string, string>> = {
   replace: "Замена",
 };
 
+const reasonLabels: Readonly<Record<string, string>> = {
+  customer_changed_mind: "Покупатель передумал",
+  damaged: "Товар повреждён",
+  defective: "Товар с дефектом",
+  wrong_item: "Доставлен другой товар",
+  not_as_described: "Товар не соответствует описанию",
+  delivery_delay: "Задержка доставки",
+};
+
+const sourceLabels: Readonly<Record<string, string>> = {
+  "api.returns": "Раздел возвратов",
+  marketplace: "Канал продаж",
+  storefront: "Интернет-магазин",
+  customer_service: "Клиентский сервис",
+};
+
+const unitLabels: Readonly<Record<string, string>> = {
+  PCS: "шт.",
+  KG: "кг",
+  G: "г",
+  L: "л",
+  ML: "мл",
+};
+
 type ReturnAction = {status: string; label: string; danger?: boolean};
 
 type ReturnsClient = {
@@ -71,11 +95,19 @@ function actionsFor(status: string): ReturnAction[] {
 
 function quantity(value: {coefficient: number; scale: number; unit: string}): string {
   const amount = value.coefficient / (10 ** value.scale);
-  return `${amount} ${value.unit}`;
+  return `${amount} ${unitLabels[value.unit] ?? value.unit}`;
 }
 
 function money(minor: number, currency: string): string {
   return new Intl.NumberFormat("ru-RU", {style: "currency", currency}).format(minor / 100);
+}
+
+function reasonLabel(value: string): string {
+  return reasonLabels[value] ?? value;
+}
+
+function source(value: string): string {
+  return sourceLabels[value] ?? value;
 }
 
 function ReturnItemRow({item}: {item: ReturnItemHit}) {
@@ -112,7 +144,7 @@ export function ReturnsPage() {
   });
   const createCancellation = useMutation({
     mutationFn: () => api.createOrderCancellation({idempotencyKey: uuidV7(), body: {id: uuidV7(), order_id: orderID.trim(), reason_code: reason.trim()}}),
-    onSuccess: () => { toast.push({kind: "success", title: "Отмена поставлена в обработку", body: "Дальнейшее состояние появится после worker/reconciliation."}); setOrderID(""); },
+    onSuccess: () => { toast.push({kind: "success", title: "Отмена поставлена в обработку", body: "Дальнейший статус появится после фоновой обработки и сверки."}); setOrderID(""); },
     onError: () => toast.push({kind: "error", title: "Отмена не создана", body: "Проверьте ID заказа, причину и права."}),
   });
   const createReturn = useMutation({
@@ -127,21 +159,21 @@ export function ReturnsPage() {
     {key: "id", label: "Возврат", value: (item: ReturnSummary) => item.id, render: (item: ReturnSummary) => <span className="mono table-primary">{item.id}</span>},
     {key: "order", label: "Заказ", value: (item: ReturnSummary) => item.order_id, render: (item: ReturnSummary) => <span className="mono">{item.order_id}</span>},
     {key: "status", label: "Статус", value: (item: ReturnSummary) => item.status, render: (item: ReturnSummary) => <StatusBadge value={item.status}/>},
-    {key: "reason", label: "Причина", value: (item: ReturnSummary) => item.reason_code},
+    {key: "reason", label: "Причина", value: (item: ReturnSummary) => reasonLabel(item.reason_code)},
     {key: "amount", label: "Доставка / налог", value: (item: ReturnSummary) => `${item.requested_shipping_minor + item.requested_tax_minor}`, render: (item: ReturnSummary) => <strong>{money(item.requested_shipping_minor + item.requested_tax_minor, item.currency)}</strong>, align: "end" as const},
     {key: "created", label: "Создан", value: (item: ReturnSummary) => item.created_at, render: (item: ReturnSummary) => <time>{new Date(item.created_at).toLocaleString("ru-RU")}</time>},
   ];
 
-  return <Page eyebrow="Commerce Core" title="Возвраты и refunds" description="Отмена заказа, физический возврат и возврат оплаты идут раздельно. Каждое действие идемпотентно и оставляет audit/outbox evidence.">
+  return <Page eyebrow="Операционная работа" title="Возвраты и возврат средств" description="Отмена заказа, физический возврат и возврат оплаты идут раздельно. Каждое действие идемпотентно и фиксируется в журнале аудита и очереди событий.">
     <div className="catalog-tabs" role="tablist" aria-label="Контур возврата">
       <button type="button" role="tab" aria-selected={tab === "returns"} className={tab === "returns" ? "active" : ""} onClick={() => setTab("returns")}>Возвраты</button>
       <button type="button" role="tab" aria-selected={tab === "cancellations"} className={tab === "cancellations" ? "active" : ""} onClick={() => setTab("cancellations")}>Отмены заказов</button>
     </div>
     <section className="panel inline-create">
-      <div><h2>{tab === "returns" ? "Оформить возврат" : "Запросить отмену"}</h2><p>{tab === "returns" ? "Создаётся только запрос. Приёмка, disposition и refund подтверждаются отдельными шагами." : "Отмена не переписывает заказ: worker и reconciliation доводят отдельный cancellation aggregate."}</p></div>
+      <div><h2>{tab === "returns" ? "Оформить возврат" : "Запросить отмену"}</h2><p>{tab === "returns" ? "Создаётся только запрос. Приёмка, способ обработки товара и возврат средств подтверждаются отдельными шагами." : "Отмена не переписывает заказ: фоновая обработка и сверка доводят отдельную операцию отмены."}</p></div>
       <form onSubmit={(event) => { event.preventDefault(); if (tab === "returns") createReturn.mutate(); else createCancellation.mutate(); }}>
         <input required value={orderID} onChange={(event) => setOrderID(event.target.value)} placeholder="ID заказа" aria-label="ID заказа" />
-        <input required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина (machine code)" aria-label="Причина" />
+        <input required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Код причины" aria-label="Код причины" />
         {tab === "returns" ? <>
           <input required value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase().slice(0, 3))} maxLength={3} placeholder="RUB" aria-label="Валюта" />
           <input type="number" min="0" value={shipping} onChange={(event) => setShipping(event.target.value)} placeholder="Доставка, коп." aria-label="Возврат доставки" />
@@ -150,7 +182,7 @@ export function ReturnsPage() {
         <button className="button primary" disabled={!orderID.trim() || createReturn.isPending || createCancellation.isPending}>{createReturn.isPending || createCancellation.isPending ? "Сохраняем…" : tab === "returns" ? "Создать возврат" : "Запросить отмену"}</button>
       </form>
     </section>
-    {tab === "cancellations" ? <section className="panel social-onboarding"><div><h3>Безопасное выполнение</h3><p>После создания статус остаётся <code>requested</code>. Не повторяйте запрос при timeout: используйте тот же ключ идемпотентности на уровне API/worker и проверяйте reconciliation.</p></div></section> : null}
+    {tab === "cancellations" ? <section className="panel social-onboarding"><div><h3>Безопасное выполнение</h3><p>После создания отмена получает статус «Запрошен». Не повторяйте запрос при тайм-ауте: используйте тот же ключ идемпотентности и проверяйте результат сверки.</p></div></section> : null}
     {tab === "returns" ? <>
     <div className="catalog-tabs" role="tablist" aria-label="Фильтр возвратов">
       <button type="button" role="tab" aria-selected={!status} className={!status ? "active" : ""} onClick={() => setStatus("")}>Все</button>
@@ -160,8 +192,8 @@ export function ReturnsPage() {
     <Drawer open={!!selectedID} title={selected ? `Возврат ${selected.id}` : "Возврат"} subtitle={selected ? `Заказ ${selected.order_id}` : undefined} onClose={() => navigate("/returns")}>
       {details.isPending ? <LoadingBlock/> : details.isError ? <ErrorBlock retry={() => void details.refetch()}>Не удалось открыть возврат.</ErrorBlock> : selected ? <>
         <div className="drawer-kpis"><div><small>Статус</small><StatusBadge value={selected.status}/></div><div><small>Позиции</small><strong>{details.data.items.length}</strong></div><div><small>Доставка и налог</small><strong>{money(selected.requested_shipping_minor + selected.requested_tax_minor, selected.currency)}</strong></div></div>
-        {canWrite && actions.length > 0 ? <section className="drawer-section order-actions"><h3>Действия</h3><p className="drawer-help">Переход проверяется по текущей версии возврата, записывается в аудит и публикуется через outbox.</p><div className="button-row">{actions.map((action) => <button type="button" key={action.status} className={`button ${action.danger ? "danger" : "primary"}`} disabled={changeStatus.isPending} onClick={() => changeStatus.mutate({id: selected.id, status: action.status, version: selected.version})}>{changeStatus.isPending ? "Сохраняем…" : action.label}</button>)}</div></section> : null}
-        <section className="drawer-section"><h3>Причина и источник</h3><dl className="detail-list"><div><dt>Причина</dt><dd>{selected.reason_code}</dd></div><div><dt>Источник</dt><dd>{selected.source}</dd></div><div><dt>Создан</dt><dd>{new Date(selected.created_at).toLocaleString("ru-RU")}</dd></div><div><dt>Версия</dt><dd className="mono">{selected.version}</dd></div></dl></section>
+        {canWrite && actions.length > 0 ? <section className="drawer-section order-actions"><h3>Действия</h3><p className="drawer-help">Переход проверяется по текущей версии возврата, записывается в журнал аудита и публикуется в очереди событий.</p><div className="button-row">{actions.map((action) => <button type="button" key={action.status} className={`button ${action.danger ? "danger" : "primary"}`} disabled={changeStatus.isPending} onClick={() => changeStatus.mutate({id: selected.id, status: action.status, version: selected.version})}>{changeStatus.isPending ? "Сохраняем…" : action.label}</button>)}</div></section> : null}
+        <section className="drawer-section"><h3>Причина и источник</h3><dl className="detail-list"><div><dt>Причина</dt><dd>{reasonLabel(selected.reason_code)}</dd></div><div><dt>Источник</dt><dd>{source(selected.source)}</dd></div><div><dt>Создан</dt><dd>{new Date(selected.created_at).toLocaleString("ru-RU")}</dd></div><div><dt>Версия</dt><dd className="mono">{selected.version}</dd></div></dl></section>
         <section className="drawer-section"><h3>Позиции возврата</h3>{details.data.items.length > 0 ? <div className="line-items">{details.data.items.map((item) => <ReturnItemRow key={item.id} item={item}/>)}</div> : <p className="drawer-help">Позиции ещё не добавлены.</p>}<ReturnActions api={api} returnID={selected.id} items={details.data.items} onSaved={() => { void details.refetch(); void queryClient.invalidateQueries({queryKey: ["returns"]}); }} /></section>
       </> : null}
     </Drawer>
@@ -185,17 +217,17 @@ function ReturnActions({api, returnID, items, onSaved}: {api: ReturnsClient; ret
     if (input.kind === "logistics") return api.createReturnLogistics({returnId: returnID, idempotencyKey: key, body: input.body});
     if (input.kind === "inspection") return api.recordReturnInspection({returnId: returnID, idempotencyKey: key, body: input.body});
     return api.createRefundAllocation({idempotencyKey: key, body: input.body});
-  }, onSuccess: () => { toast.push({kind: "success", title: "Операция зарегистрирована", body: "Remote outcome и платёжный статус подтверждаются отдельным worker/reconciliation шагом."}); onSaved(); }, onError: () => toast.push({kind: "error", title: "Операция отклонена", body: "Проверьте состояние возврата, версию, capability и суммы."})});
+  }, onSuccess: () => { toast.push({kind: "success", title: "Операция зарегистрирована", body: "Результат внешней операции и статус платежа подтверждаются фоновой обработкой и сверкой."}); onSaved(); }, onError: () => toast.push({kind: "error", title: "Операция отклонена", body: "Проверьте состояние возврата, версию, доступ к операции и суммы."})});
   const submit = (kind: string, body: unknown) => { if (!mutation.isPending) mutation.mutate({kind, body}); };
   return <div className="catalog-stack" style={{marginTop: "1rem"}}>
-    <div><strong>Следующие операции</strong><p className="drawer-help">Сырые ответы провайдера не отображаются. Повторяйте только с новым осознанным действием после проверки состояния.</p></div>
+    <div><strong>Следующие операции</strong><p className="drawer-help">Технические ответы внешних систем не отображаются. Повторяйте операцию только после проверки текущего состояния.</p></div>
     <div className="social-form-grid">
-      <input value={orderItemID} onChange={(event) => setOrderItemID(event.target.value)} placeholder="Order item ID" aria-label="Order item ID" />
+      <input value={orderItemID} onChange={(event) => setOrderItemID(event.target.value)} placeholder="ID позиции заказа" aria-label="ID позиции заказа" />
       <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Количество" aria-label="Количество" />
-      <select value={disposition} onChange={(event) => setDisposition(event.target.value)} aria-label="Disposition"><option value="restock">На склад</option><option value="quarantine">Карантин</option><option value="scrap">Утилизация</option><option value="replace">Замена</option></select>
+      <select value={disposition} onChange={(event) => setDisposition(event.target.value)} aria-label="Способ обработки товара"><option value="restock">На склад</option><option value="quarantine">Карантин</option><option value="scrap">Утилизация</option><option value="replace">Замена</option></select>
       <button type="button" className="button ghost" disabled={!orderItemID.trim() || mutation.isPending} onClick={() => submit("item", {id: uuidV7(), order_item_id: orderItemID.trim(), unit: "PCS", requested_coefficient: Number(quantity), requested_scale: 0, disposition})}>Добавить позицию</button>
     </div>
-    {items.length > 0 ? <div className="social-form-grid"><input value={accountID} onChange={(event) => setAccountID(event.target.value)} placeholder="Logistics account ID" aria-label="Logistics account ID" /><input value={remoteID} onChange={(event) => setRemoteID(event.target.value)} placeholder="Исходный remote ID" aria-label="Исходный remote ID" /><button type="button" className="button ghost" disabled={!accountID.trim() || !remoteID.trim() || mutation.isPending} onClick={() => submit("logistics", {id: uuidV7(), connector_account_id: accountID.trim(), original_remote_id: remoteID.trim(), external_id: uuidV7(), mail_type: "RETURN", tariff_code: 0})}>Запросить этикетку возврата</button></div> : null}
-    {items.length > 0 ? <div className="social-form-grid"><input value={paymentID} onChange={(event) => setPaymentID(event.target.value)} placeholder="Payment ID" aria-label="Payment ID" /><input value={refundID} onChange={(event) => setRefundID(event.target.value)} placeholder="Refund ID" aria-label="Refund ID" /><input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Сумма, коп." aria-label="Сумма возврата" /><button type="button" className="button ghost" disabled={!paymentID.trim() || !refundID.trim() || !amount || mutation.isPending} onClick={() => submit("refund", {id: uuidV7(), payment_id: paymentID.trim(), refund_id: refundID.trim(), return_id: returnID, component: "line", currency: "RUB", amount_minor: Number(amount)})}>Зарезервировать refund</button></div> : null}
+    {items.length > 0 ? <div className="social-form-grid"><input value={accountID} onChange={(event) => setAccountID(event.target.value)} placeholder="ID кабинета доставки" aria-label="ID кабинета доставки" /><input value={remoteID} onChange={(event) => setRemoteID(event.target.value)} placeholder="Внешний ID отправления" aria-label="Внешний ID отправления" /><button type="button" className="button ghost" disabled={!accountID.trim() || !remoteID.trim() || mutation.isPending} onClick={() => submit("logistics", {id: uuidV7(), connector_account_id: accountID.trim(), original_remote_id: remoteID.trim(), external_id: uuidV7(), mail_type: "RETURN", tariff_code: 0})}>Запросить этикетку возврата</button></div> : null}
+    {items.length > 0 ? <div className="social-form-grid"><input value={paymentID} onChange={(event) => setPaymentID(event.target.value)} placeholder="ID платежа" aria-label="ID платежа" /><input value={refundID} onChange={(event) => setRefundID(event.target.value)} placeholder="ID возврата средств" aria-label="ID возврата средств" /><input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Сумма, коп." aria-label="Сумма возврата" /><button type="button" className="button ghost" disabled={!paymentID.trim() || !refundID.trim() || !amount || mutation.isPending} onClick={() => submit("refund", {id: uuidV7(), payment_id: paymentID.trim(), refund_id: refundID.trim(), return_id: returnID, component: "line", currency: "RUB", amount_minor: Number(amount)})}>Зарезервировать возврат средств</button></div> : null}
   </div>;
 }

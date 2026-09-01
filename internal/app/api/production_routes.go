@@ -20,6 +20,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorconfigrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/customerservicerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ecosystemrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo"
@@ -86,6 +87,7 @@ type productionRouteDependencies struct {
 	financialReports       *financialrepo.Repository
 	financialCompleteness  *financialcompletenessrepo.Repository
 	customerService        *customerservicerepo.Repository
+	ecosystem              *ecosystemrepo.Repository
 	lineage                lineage.Reader
 	legalParties           LegalPartySearcher
 	legalPartyWriter       legalPartyWriter
@@ -140,6 +142,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newIntegrationCenterRoutes(deps.integrationCenter)...)
 	routes = append(routes, newConnectorReadinessRoutes()...)
+	routes = append(routes, newEcosystemRoutes(deps.ecosystem, deps.plugins, deps.cloudSubscription, deps.customerService, deps.auditService)...)
 	routes = append(routes, newMarketplaceOperationsRoutes(marketplaceOperationsSource{center: deps.integrationCenter}, deps.marketplaceFlows)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService, deps.profiles)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)

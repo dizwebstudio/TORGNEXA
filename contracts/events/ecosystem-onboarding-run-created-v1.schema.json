@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/ecosystem-onboarding-run-created-v1.json",
+  "title": "ecosystem.onboarding.run_created.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "resource_id", "state", "check_count", "required_pending_count", "created_at"],
+  "properties": {
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "resource_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "state": {"type": "string", "enum": ["draft", "running", "ready", "blocked", "rolled_back"]},
+    "check_count": {"type": "integer", "minimum": 1, "maximum": 64},
+    "required_pending_count": {"type": "integer", "minimum": 0, "maximum": 64},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

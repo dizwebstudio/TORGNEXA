@@ -166,6 +166,14 @@
       "payload_schema": "events/product-compliance-record-changed-v1.schema.json"
     },
     {
+      "event_type": "ecosystem.onboarding.run_created.v1",
+      "payload_schema": "events/ecosystem-onboarding-run-created-v1.schema.json"
+    },
+    {
+      "event_type": "ecosystem.partner.certification_recorded.v1",
+      "payload_schema": "events/ecosystem-partner-certification-recorded-v1.schema.json"
+    },
+    {
       "event_type": "enterprise.legal_party.record_changed.v1",
       "payload_schema": "events/legal-party-record-changed-v1.schema.json"
     },
