@@ -93,47 +93,47 @@ type Candidate struct {
 // lifecycle, bid and budget changes. It contains no credentials or raw remote
 // payloads.
 type PreviewRequest struct {
-	Operation              OperationName `json:"operation"`
-	ChannelID              string        `json:"channel_id"`
-	AccountID              string        `json:"account_id"`
-	TargetID               string        `json:"target_id"`
-	Currency               string        `json:"currency"`
-	FloorPriceMinor        int64         `json:"floor_price_minor"`
-	MinimumMarginBPS       int64         `json:"minimum_margin_basis_points"`
-	ApprovalThreshold      int           `json:"approval_threshold"`
-	ProposedBidMinor       int64         `json:"proposed_bid_minor"`
-	MaximumBidMinor        int64         `json:"maximum_bid_minor"`
-	ProposedBudgetMinor    int64         `json:"proposed_budget_minor"`
-	MaximumBudgetMinor     int64         `json:"maximum_budget_minor"`
-	BidUnit                BidUnit       `json:"bid_unit,omitempty"`
-	Strategy               string        `json:"strategy,omitempty"`
-	Items                  []Candidate   `json:"items"`
+	Operation           OperationName `json:"operation"`
+	ChannelID           string        `json:"channel_id"`
+	AccountID           string        `json:"account_id"`
+	TargetID            string        `json:"target_id"`
+	Currency            string        `json:"currency"`
+	FloorPriceMinor     int64         `json:"floor_price_minor"`
+	MinimumMarginBPS    int64         `json:"minimum_margin_basis_points"`
+	ApprovalThreshold   int           `json:"approval_threshold"`
+	ProposedBidMinor    int64         `json:"proposed_bid_minor"`
+	MaximumBidMinor     int64         `json:"maximum_bid_minor"`
+	ProposedBudgetMinor int64         `json:"proposed_budget_minor"`
+	MaximumBudgetMinor  int64         `json:"maximum_budget_minor"`
+	BidUnit             BidUnit       `json:"bid_unit,omitempty"`
+	Strategy            string        `json:"strategy,omitempty"`
+	Items               []Candidate   `json:"items"`
 }
 
 // PreviewRow is the operator-facing before/after result for one SKU.
 type PreviewRow struct {
-	SKU                  string `json:"sku"`
-	Decision             string `json:"decision"`
-	ReasonCodes          []string `json:"reason_codes,omitempty"`
-	CurrentPriceMinor    int64  `json:"current_price_minor"`
-	EffectivePriceMinor  int64  `json:"effective_price_minor"`
-	DiscountMinor        int64  `json:"discount_minor"`
-	SubsidyMinor         int64  `json:"subsidy_minor"`
-	CommissionMinor      int64  `json:"commission_minor"`
-	LogisticsMinor       int64  `json:"logistics_minor"`
-	AdvertisingMinor     int64  `json:"advertising_minor"`
-	UnitCostMinor        int64  `json:"unit_cost_minor"`
-	ContributionMinor    int64  `json:"contribution_minor"`
-	MarginBPS             int64  `json:"margin_basis_points"`
-	FloorPriceMinor      int64  `json:"floor_price_minor"`
-	Stock                 int64  `json:"stock"`
-	StockRisk             bool   `json:"stock_risk"`
+	SKU                 string   `json:"sku"`
+	Decision            string   `json:"decision"`
+	ReasonCodes         []string `json:"reason_codes,omitempty"`
+	CurrentPriceMinor   int64    `json:"current_price_minor"`
+	EffectivePriceMinor int64    `json:"effective_price_minor"`
+	DiscountMinor       int64    `json:"discount_minor"`
+	SubsidyMinor        int64    `json:"subsidy_minor"`
+	CommissionMinor     int64    `json:"commission_minor"`
+	LogisticsMinor      int64    `json:"logistics_minor"`
+	AdvertisingMinor    int64    `json:"advertising_minor"`
+	UnitCostMinor       int64    `json:"unit_cost_minor"`
+	ContributionMinor   int64    `json:"contribution_minor"`
+	MarginBPS           int64    `json:"margin_basis_points"`
+	FloorPriceMinor     int64    `json:"floor_price_minor"`
+	Stock               int64    `json:"stock"`
+	StockRisk           bool     `json:"stock_risk"`
 }
 
 const (
-	DecisionApplied        = "applied"
-	DecisionRejected       = "rejected"
-	DecisionUnknown        = "unknown"
+	DecisionApplied         = "applied"
+	DecisionRejected        = "rejected"
+	DecisionUnknown         = "unknown"
 	DecisionManualAttention = "manual_attention"
 )
 
@@ -158,7 +158,7 @@ type Preview struct {
 }
 
 const (
-	PreviewReady           = "ready"
+	PreviewReady            = "ready"
 	PreviewApprovalRequired = "approval_required"
 	PreviewBlocked          = "blocked"
 )
@@ -186,13 +186,13 @@ type Operation struct {
 }
 
 const (
-	StateAccepted             = "accepted"
-	StateApplied              = "applied"
-	StateRejected             = "rejected"
-	StateConflict             = "conflict"
-	StateRateLimited          = "rate_limited"
-	StateUnknown              = "unknown"
-	StateManualAttention      = "manual_attention"
+	StateAccepted              = "accepted"
+	StateApplied               = "applied"
+	StateRejected              = "rejected"
+	StateConflict              = "conflict"
+	StateRateLimited           = "rate_limited"
+	StateUnknown               = "unknown"
+	StateManualAttention       = "manual_attention"
 	StateQualificationRequired = "qualification_required"
 )
 
@@ -225,19 +225,19 @@ type KillSwitch struct {
 
 // Rule is the compact read model shown in the promotions tab.
 type Rule struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	ChannelID      string    `json:"channel_id"`
-	Kind           string    `json:"kind"`
-	Status         string    `json:"status"`
-	Currency       string    `json:"currency"`
-	DiscountBPS    int64     `json:"discount_basis_points"`
-	SubsidyMinor   int64     `json:"subsidy_minor"`
-	FloorPriceMinor int64    `json:"floor_price_minor"`
-	MinimumMarginBPS int64  `json:"minimum_margin_basis_points"`
-	StartsAt       time.Time `json:"starts_at"`
-	EndsAt         time.Time `json:"ends_at"`
-	Version        int64     `json:"version"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	ChannelID        string    `json:"channel_id"`
+	Kind             string    `json:"kind"`
+	Status           string    `json:"status"`
+	Currency         string    `json:"currency"`
+	DiscountBPS      int64     `json:"discount_basis_points"`
+	SubsidyMinor     int64     `json:"subsidy_minor"`
+	FloorPriceMinor  int64     `json:"floor_price_minor"`
+	MinimumMarginBPS int64     `json:"minimum_margin_basis_points"`
+	StartsAt         time.Time `json:"starts_at"`
+	EndsAt           time.Time `json:"ends_at"`
+	Version          int64     `json:"version"`
 }
 
 func (r PreviewRequest) Validate() error {

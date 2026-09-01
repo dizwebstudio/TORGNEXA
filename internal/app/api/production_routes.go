@@ -23,6 +23,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacegrowthrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacelistingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplaceoperationsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
@@ -114,6 +115,7 @@ type productionRouteDependencies struct {
 	marking                *markingrepo.Repository
 	marketplacePublication *marketplacepublicationrepo.Repository
 	marketplaceListing     *marketplacelistingrepo.Repository
+	marketplaceGrowth      *marketplacegrowthrepo.Repository
 	marketplaceFlows       *marketplaceoperationsrepo.Repository
 	procurement            *procurementrepo.Repository
 	replenishment          *replenishmentrepo.Repository
@@ -146,6 +148,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
 	routes = append(routes, newMarketplaceListingRoutes(deps.marketplaceListing, deps.approvals)...)
+	routes = append(routes, newMarketplaceGrowthRoutes(deps.marketplaceGrowth, deps.approvals)...)
 	routes = append(routes, newProcurementRoutes(deps.procurement, deps.approvals, deps.uploadAccess, deps.uploadContent)...)
 	routes = append(routes, newReplenishmentRoutes(deps.replenishment)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)

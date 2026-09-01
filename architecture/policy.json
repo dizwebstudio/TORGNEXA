@@ -107,6 +107,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/marketplacegrowth",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/marketplaceoperations",
       "kind": "core_domain"
     },
@@ -444,6 +448,10 @@
     },
     {
       "path": "internal/platform/postgres/marketplacelistingrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/marketplacegrowthrepo",
       "kind": "infrastructure_adapter"
     },
     {

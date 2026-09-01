@@ -2911,6 +2911,91 @@ paths:
         '200': {description: Tenant-scoped advertising ingestion runs and watermarks, content: {application/json: {schema: {$ref: '#/components/schemas/AdvertisingSyncRunPage'}}}}
         '400': {description: Invalid advertising sync-run filter}
         '403': {description: Caller lacks ads.read}
+  /marketplace-growth/rules:
+    get:
+      operationId: listMarketplaceGrowthRules
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: channel_id, in: query, required: false, schema: {type: string, maxLength: 192}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: "Versioned tenant-scoped promotion rules and eligibility windows", content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthRulePage'}}}}
+        '400': {description: Invalid promotion rule filter}
+        '403': {description: Caller lacks promotions.read}
+  /marketplace-growth/previews:
+    post:
+      operationId: createMarketplaceGrowthPreview
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthPreviewRequest'}}}}
+      responses:
+        '200': {description: "Effective-price, floor, margin and eligibility preview for up to 1000 SKU", content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthPreview'}}}}
+        '400': {description: Invalid growth preview}
+  /marketplace-growth/previews/{preview_id}:
+    get:
+      operationId: getMarketplaceGrowthPreview
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: preview_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Immutable promotion and advertising preview evidence, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthPreview'}}}}
+        '404': {description: Preview not found}
+  /marketplace-growth/operations:
+    get:
+      operationId: listMarketplaceGrowthOperations
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: "Approved growth intents and normalized remote states", content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthOperationPage'}}}}
+        '403': {description: Caller lacks ads.read}
+    post:
+      operationId: applyMarketplaceGrowthOperation
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthApplyRequest'}}}}
+      responses:
+        '202': {description: "Approved intent durably stored; remote execution remains qualification-gated", content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthOperation'}}}}
+        '400': {description: Invalid or unauthenticated operation request}
+        '409': {description: Matching approval or idempotent intent is unavailable}
+  /marketplace-growth/operations/{operation_id}:
+    get:
+      operationId: getMarketplaceGrowthOperation
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: operation_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: One durable promotion or advertising operation, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthOperation'}}}}
+        '404': {description: Operation not found}
+  /marketplace-growth/reconciliation:
+    get:
+      operationId: listMarketplaceGrowthDrifts
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: "Promotion and advertising reconciliation findings", content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthDriftPage'}}}}
+    post:
+      operationId: reconcileMarketplaceGrowthOperation
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthObservation'}}}}
+      responses:
+        '200': {description: Sanitized read-after-write decision and drifts, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthDriftPage'}}}}
+        '404': {description: Operation not found}
+  /marketplace-growth/kill-switch:
+    get:
+      operationId: getMarketplaceGrowthKillSwitch
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Tenant-scoped promotion and advertising worker kill switch, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthKillSwitch'}}}}
+    post:
+      operationId: setMarketplaceGrowthKillSwitch
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthKillSwitch'}}}}
+      responses:
+        '200': {description: Updated kill switch state, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceGrowthKillSwitch'}}}}
+        '403': {description: Caller lacks ads.manage}
   /realtime:
     get:
       operationId: streamRealtimeInvalidations
@@ -3710,6 +3795,180 @@ components:
       required: [items]
       properties:
         items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/AdvertisingSyncRun'}}
+    MarketplaceGrowthRule:
+      type: object
+      additionalProperties: false
+      required: [id, name, channel_id, kind, status, currency, discount_basis_points, subsidy_minor, floor_price_minor, minimum_margin_basis_points, starts_at, ends_at, version]
+      properties:
+        id: {type: string, maxLength: 192}
+        name: {type: string, minLength: 1, maxLength: 192}
+        channel_id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [discount, coupon, subsidy]}
+        status: {type: string, enum: [draft, preview, active, ended, unknown]}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        discount_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        subsidy_minor: {type: integer, format: int64, minimum: 0}
+        floor_price_minor: {type: integer, format: int64, minimum: 1}
+        minimum_margin_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        starts_at: {type: string, format: date-time}
+        ends_at: {type: string, format: date-time}
+        version: {type: integer, format: int64, minimum: 1}
+    MarketplaceGrowthRulePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/MarketplaceGrowthRule'}}
+    MarketplaceGrowthCandidate:
+      type: object
+      additionalProperties: false
+      required: [sku, currency, current_price_minor, proposed_price_minor, unit_cost_minor, commission_basis_points, logistics_minor, advertising_minor, discount_basis_points, subsidy_minor, stock, facts_fresh, eligible, conflict]
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 192}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        current_price_minor: {type: integer, format: int64, minimum: 0}
+        proposed_price_minor: {type: integer, format: int64, minimum: 0}
+        unit_cost_minor: {type: integer, format: int64, minimum: 0}
+        commission_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        logistics_minor: {type: integer, format: int64, minimum: 0}
+        advertising_minor: {type: integer, format: int64, minimum: 0}
+        discount_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        subsidy_minor: {type: integer, format: int64, minimum: 0}
+        stock: {type: integer, format: int64, minimum: 0}
+        facts_fresh: {type: boolean}
+        eligible: {type: boolean}
+        conflict: {type: boolean}
+    MarketplaceGrowthPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [operation, channel_id, account_id, target_id, currency, floor_price_minor, minimum_margin_basis_points, items]
+      properties:
+        operation: {type: string, enum: [promotion.apply, campaign.create, campaign.launch, campaign.pause, campaign.resume, campaign.stop, campaign.archive, campaign.link_products, bid.update, budget.update, kill_switch.enable]}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        target_id: {type: string, maxLength: 192}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        floor_price_minor: {type: integer, format: int64, minimum: 1}
+        minimum_margin_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        approval_threshold: {type: integer, minimum: 0, maximum: 1000}
+        proposed_bid_minor: {type: integer, format: int64, minimum: 0}
+        maximum_bid_minor: {type: integer, format: int64, minimum: 0}
+        proposed_budget_minor: {type: integer, format: int64, minimum: 0}
+        maximum_budget_minor: {type: integer, format: int64, minimum: 0}
+        bid_unit: {type: string, enum: [cpc, cpm, cpa]}
+        strategy: {type: string, maxLength: 128}
+        items: {type: array, minItems: 1, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceGrowthCandidate'}}
+    MarketplaceGrowthPreviewRow:
+      type: object
+      additionalProperties: false
+      required: [sku, decision, current_price_minor, effective_price_minor, discount_minor, subsidy_minor, commission_minor, logistics_minor, advertising_minor, unit_cost_minor, contribution_minor, margin_basis_points, floor_price_minor, stock, stock_risk]
+      properties:
+        sku: {type: string, maxLength: 192}
+        decision: {type: string, enum: [applied, rejected, unknown, manual_attention]}
+        reason_codes: {type: array, maxItems: 8, items: {type: string, maxLength: 64}}
+        current_price_minor: {type: integer, format: int64, minimum: 0}
+        effective_price_minor: {type: integer, format: int64, minimum: 0}
+        discount_minor: {type: integer, format: int64, minimum: 0}
+        subsidy_minor: {type: integer, format: int64, minimum: 0}
+        commission_minor: {type: integer, format: int64, minimum: 0}
+        logistics_minor: {type: integer, format: int64, minimum: 0}
+        advertising_minor: {type: integer, format: int64, minimum: 0}
+        unit_cost_minor: {type: integer, format: int64, minimum: 0}
+        contribution_minor: {type: integer, format: int64}
+        margin_basis_points: {type: integer, format: int64}
+        floor_price_minor: {type: integer, format: int64, minimum: 1}
+        stock: {type: integer, format: int64, minimum: 0}
+        stock_risk: {type: boolean}
+    MarketplaceGrowthPreview:
+      type: object
+      additionalProperties: false
+      required: [id, operation, channel_id, account_id, target_id, currency, input_digest, rule_version, rows, affected_count, eligible_count, blocked_count, approval_required, state, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        operation: {type: string, maxLength: 64}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        target_id: {type: string, maxLength: 192}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        rule_version: {type: integer, format: int64, minimum: 1}
+        rows: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceGrowthPreviewRow'}}
+        affected_count: {type: integer, minimum: 1, maximum: 1000}
+        eligible_count: {type: integer, minimum: 0, maximum: 1000}
+        blocked_count: {type: integer, minimum: 0, maximum: 1000}
+        approval_required: {type: boolean}
+        state: {type: string, enum: [ready, approval_required, blocked]}
+        created_at: {type: string, format: date-time}
+    MarketplaceGrowthApplyRequest:
+      type: object
+      additionalProperties: false
+      required: [preview_id]
+      properties:
+        preview_id: {type: string, maxLength: 192}
+    MarketplaceGrowthOperation:
+      type: object
+      additionalProperties: false
+      required: [id, preview_id, idempotency_key, approval_request_id, operation, capability, channel_id, account_id, target_id, input_digest, state, remote_write_qualified, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        preview_id: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        approval_request_id: {type: string, maxLength: 192}
+        operation: {type: string, maxLength: 64}
+        capability: {type: string, enum: [ads.manage, promotions.manage]}
+        channel_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        target_id: {type: string, maxLength: 192}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        state: {type: string, enum: [accepted, applied, rejected, conflict, rate_limited, unknown, manual_attention, qualification_required]}
+        remote_write_qualified: {type: boolean}
+        remote_operation_id: {type: string, maxLength: 192}
+        error_code: {type: string, maxLength: 128}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    MarketplaceGrowthOperationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/MarketplaceGrowthOperation'}}
+    MarketplaceGrowthObservation:
+      type: object
+      additionalProperties: false
+      required: [operation_id, state, input_digest, applied_rows, observed_at]
+      properties:
+        operation_id: {type: string, maxLength: 192}
+        state: {type: string, enum: [accepted, applied, rejected, conflict, rate_limited, unknown, manual_attention, qualification_required]}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        applied_rows: {type: integer, minimum: 0, maximum: 1000}
+        observed_at: {type: string, format: date-time}
+    MarketplaceGrowthDrift:
+      type: object
+      additionalProperties: false
+      required: [id, operation_id, kind, expected, actual, severity, observed_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        operation_id: {type: string, maxLength: 192}
+        kind: {type: string, maxLength: 64}
+        expected: {type: string, maxLength: 192}
+        actual: {type: string, maxLength: 192}
+        severity: {type: string, enum: [low, medium, high, critical]}
+        observed_at: {type: string, format: date-time}
+    MarketplaceGrowthDriftPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/MarketplaceGrowthDrift'}}
+        decision: {type: string, enum: [reconciled, needs_attention]}
+    MarketplaceGrowthKillSwitch:
+      type: object
+      additionalProperties: false
+      required: [enabled, reason]
+      properties:
+        enabled: {type: boolean}
+        reason: {type: string, maxLength: 500}
+        updated_at: {type: string, format: date-time}
     ProcurementSupplier:
       type: object
       additionalProperties: false

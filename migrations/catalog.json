@@ -1073,6 +1073,26 @@
       },
       "backfill": null,
       "sha256": "665521cfe3bc231ba055235c54921aa4aa99fa4aba5e1f3a3cefd11dace52705"
+    },
+    {
+      "version": 53,
+      "name": "marketplace_growth_management",
+      "file": "000053_marketplace_growth_management.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [47, 48, 52],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "2a864f0fa682a8e14f1cdab71cfe6dc6eefa12f32c8cf97b55bffa1e4d085866"
     }
   ]
 }

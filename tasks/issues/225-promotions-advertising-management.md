@@ -2,9 +2,32 @@
 
 ## Статус
 
-`planned` — read-only факты рекламы и аналитика уже доступны, а pricing guards
-и preview защищают минимальную цену/маржу. Управление акциями, ставками,
-бюджетами и товарами кампаний пока не допущено до внешней записи.
+`repository-complete` — все 12 подзадач закрыты в provider-neutral репозиторном
+контуре: модель, правила и eligibility, integer economics, preview до 1 000
+SKU, approval/idempotency, typed connector port, persistence/RLS, API/OpenAPI/
+SDK/MCP, frontend, reconciliation, quotas/kill switch, synthetic E2E и
+qualification gate. Внешняя запись в конкретный marketplace остаётся честным
+credentialed release-gate и не маскируется под локальный success.
+
+| Подзадача | Статус | Реализованный результат |
+|---|---|---|
+| 225.1 | closed | ADR-0176, policy matrix и release boundary |
+| 225.2 | closed | versioned rules, calendar, discount/subsidy и eligibility model |
+| 225.3 | closed | integer effective price, proceeds, commission, logistics, ads, contribution и margin guards |
+| 225.4 | closed | deterministic preview до 1 000 SKU с построчными решениями |
+| 225.5 | closed | typed campaign lifecycle operations |
+| 225.6 | closed | CPC/CPM/CPA, bid/budget ceilings, strategy fields и caps |
+| 225.7 | closed | approval-bound durable intent, idempotency и unknown state |
+| 225.8 | closed | `promotions.*`/`ads.*` capability ports и qualification boundary |
+| 225.9 | closed | migration 53, forced RLS, API, OpenAPI, SDK и MCP preview |
+| 225.10 | closed | `/advertising` tabs, preview/apply journal, statuses и kill switch |
+| 225.11 | closed | reconciliation drift, bounded evidence, quota/kill-switch runbook |
+| 225.12 | closed | unit/API/UI synthetic checks and release qualification script |
+
+Статус `repository-complete` не означает, что без credentials можно объявить
+WB/Ozon production-ready: для этого нужен отдельный evidence по официальным
+promotion и advertising writes, rate limits, partial responses и
+read-after-write.
 
 ## Цель
 

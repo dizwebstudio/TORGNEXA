@@ -34,6 +34,57 @@ func New(db *sql.DB) (*Repository, error) {
 	return &Repository{db: db}, nil
 }
 
+// SaveRule stores an immutable, versioned promotion rule.
+func (r *Repository) SaveRule(ctx context.Context, scope tenancy.Scope, rule marketplacegrowth.Rule) error {
+	if err := r.validate(ctx, scope); err != nil || rule.Validate() != nil {
+		return marketplacegrowth.ErrInvalid
+	}
+	document, err := json.Marshal(rule)
+	if err != nil || forbiddenDocument(document) {
+		return marketplacegrowth.ErrInvalid
+	}
+	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+		var existing []byte
+		err := tx.QueryRowContext(ctx, `SELECT rule_document FROM marketplace_growth_rules WHERE organization_id=$1 AND workspace_id=$2 AND rule_id=$3`, scope.OrganizationID(), scope.WorkspaceID(), rule.ID).Scan(&existing)
+		if err == nil {
+			if string(existing) != string(document) {
+				return ErrConflict
+			}
+			return nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO marketplace_growth_rules(organization_id,workspace_id,rule_id,channel_id,version,rule_document,created_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7)`, scope.OrganizationID(), scope.WorkspaceID(), rule.ID, rule.ChannelID, rule.Version, document, rule.StartsAt)
+		return err
+	})
+}
+
+// ListRules returns the latest bounded promotion rules for a channel.
+func (r *Repository) ListRules(ctx context.Context, scope tenancy.Scope, channelID string, limit int) ([]marketplacegrowth.Rule, error) {
+	if err := r.validate(ctx, scope); err != nil || len(channelID) > 192 || limit < 1 || limit > 200 {
+		return nil, marketplacegrowth.ErrInvalid
+	}
+	result := make([]marketplacegrowth.Rule, 0, limit)
+	err := r.withTx(ctx, scope, true, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT rule_document FROM marketplace_growth_rules WHERE organization_id=$1 AND workspace_id=$2 AND ($3='' OR channel_id=$3) ORDER BY version DESC,rule_id DESC LIMIT $4`, scope.OrganizationID(), scope.WorkspaceID(), channelID, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var document []byte
+			var rule marketplacegrowth.Rule
+			if err := rows.Scan(&document); err != nil || json.Unmarshal(document, &rule) != nil || rule.Validate() != nil {
+				return marketplacegrowth.ErrInvalid
+			}
+			result = append(result, rule)
+		}
+		return rows.Err()
+	})
+	return result, err
+}
+
 // SavePreview stores immutable preview evidence. Replaying the same preview
 // digest is harmless; a different document under the same identifier conflicts.
 func (r *Repository) SavePreview(ctx context.Context, scope tenancy.Scope, preview marketplacegrowth.Preview) error {

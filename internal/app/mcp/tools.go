@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
+	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
@@ -34,6 +35,12 @@ type ListingPreviewInput struct {
 // available through the authenticated HTTP approval boundary.
 type ListingPreviewer interface {
 	PreviewListing(context.Context, Identity, ListingPreviewInput) (marketplacelisting.BatchPreview, error)
+}
+
+// GrowthPreviewer exposes the promotion/advertising dry-run to MCP. It never
+// applies a remote operation; application remains behind HTTP approval.
+type GrowthPreviewer interface {
+	PreviewGrowth(context.Context, Identity, marketplacegrowth.PreviewRequest) (marketplacegrowth.Preview, error)
 }
 
 type toolDescriptor struct {
@@ -122,6 +129,31 @@ func listingPreviewTool(available bool) toolDescriptor {
 			"items":                map[string]any{"type": "array", "minItems": 1, "maxItems": marketplacelisting.MaxBatchItems, "items": map[string]any{"type": "object"}},
 			"operations":           map[string]any{"type": "array", "maxItems": 512, "items": map[string]any{"type": "object"}},
 		}, []string{"connector_account_id", "connector_id", "taxonomy", "items"}),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
+	}}
+}
+
+func growthPreviewTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionGrowthPreview, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.marketplace.growth.preview", Title: "Preview promotions and advertising changes",
+		Description: "Calculate promotion eligibility, effective price, floor, margin and bounded bid or budget changes for up to 1000 SKU. Dry-run only; no remote write.",
+		InputSchema: objectSchema(map[string]any{
+			"operation":                   map[string]any{"type": "string", "enum": []string{"promotion.apply", "campaign.create", "campaign.launch", "campaign.pause", "campaign.resume", "campaign.stop", "campaign.archive", "campaign.link_products", "bid.update", "budget.update", "kill_switch.enable"}},
+			"channel_id":                  stringProp("Provider-neutral channel reference", 1, 192),
+			"account_id":                  stringProp("Marketplace account reference", 1, 192),
+			"target_id":                   stringProp("Promotion or campaign reference", 1, 192),
+			"currency":                    map[string]any{"type": "string", "pattern": "^[A-Z]{3}$"},
+			"floor_price_minor":           map[string]any{"type": "integer", "minimum": 1},
+			"minimum_margin_basis_points": map[string]any{"type": "integer", "minimum": 0, "maximum": 10000},
+			"approval_threshold":          map[string]any{"type": "integer", "minimum": 0, "maximum": marketplacegrowth.MaxPreviewRows},
+			"proposed_bid_minor":          map[string]any{"type": "integer", "minimum": 0},
+			"maximum_bid_minor":           map[string]any{"type": "integer", "minimum": 0},
+			"proposed_budget_minor":       map[string]any{"type": "integer", "minimum": 0},
+			"maximum_budget_minor":        map[string]any{"type": "integer", "minimum": 0},
+			"bid_unit":                    map[string]any{"type": "string", "enum": []string{"cpc", "cpm", "cpa"}},
+			"strategy":                    stringProp("Versioned strategy name", 0, 128),
+			"items":                       map[string]any{"type": "array", "minItems": 1, "maxItems": marketplacegrowth.MaxPreviewRows, "items": map[string]any{"type": "object"}},
+		}, []string{"operation", "channel_id", "account_id", "target_id", "currency", "floor_price_minor", "items"}),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
 	}}
 }

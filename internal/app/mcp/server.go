@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
+	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
@@ -53,6 +54,7 @@ const (
 	permissionOrdersRead         = "commerce.orders.read"
 	permissionCounterpartiesRead = "party.counterparties.read"
 	permissionPriceChangeRequest = "commerce.price.change.request"
+	permissionGrowthPreview      = "commerce.marketplace.growth.preview"
 )
 
 type Identity struct {
@@ -130,6 +132,7 @@ type Dependencies struct {
 	LegalParties     LegalPartySearcher
 	PriceChanges     PriceChangeRequester
 	ListingPreviewer ListingPreviewer
+	GrowthPreviewer  GrowthPreviewer
 	AllowedOrigins   []string
 	Edge             securityedge.Config
 	Limiter          *securityedge.Limiter
@@ -145,6 +148,7 @@ type Server struct {
 	legalParties   LegalPartySearcher
 	priceChanges   PriceChangeRequester
 	listingPreview ListingPreviewer
+	growthPreview  GrowthPreviewer
 	edge           securityedge.Config
 	limiter        *securityedge.Limiter
 }
@@ -175,7 +179,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, growthPreview: deps.GrowthPreviewer, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -195,6 +199,16 @@ func (localListingPreviewer) PreviewListing(_ context.Context, identity Identity
 	}
 	digest := sha256.Sum256(data)
 	return marketplacelisting.BuildBatchPreview("mcp.preview."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.ChannelAccountID, input.ChannelID, input.Taxonomy, input.Items, input.Operations, time.Now().UTC())
+}
+
+type localGrowthPreviewer struct{}
+
+func (localGrowthPreviewer) PreviewGrowth(_ context.Context, identity Identity, input marketplacegrowth.PreviewRequest) (marketplacegrowth.Preview, error) {
+	if !identity.Valid() || input.Validate() != nil {
+		return marketplacegrowth.Preview{}, ErrInvalid
+	}
+	digest := sha256.Sum256([]byte(compactText(input)))
+	return marketplacegrowth.BuildPreview("mcp.growth."+hex.EncodeToString(digest[:])[:32], input, 1, time.Now().UTC())
 }
 
 func (s *Server) Handler() http.Handler {
@@ -467,6 +481,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.listingPreview.PreviewListing(ctx, identity, input)
+	case "commerce.marketplace.growth.preview":
+		if s.growthPreview == nil {
+			return nil, ErrUnavailable
+		}
+		var input marketplacegrowth.PreviewRequest
+		if err := decodeArguments(raw, &input); err != nil {
+			return nil, ErrInvalid
+		}
+		return s.growthPreview.PreviewGrowth(ctx, identity, input)
 	default:
 		return nil, ErrInvalid
 	}
@@ -479,6 +502,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		counterpartyTool(s.legalParties != nil),
 		priceChangeTool(s.priceChanges != nil),
 		listingPreviewTool(s.listingPreview != nil),
+		growthPreviewTool(s.growthPreview != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -524,6 +548,12 @@ func governanceMetrics(name string, raw json.RawMessage) (agentgovernance.Action
 			return agentgovernance.ActionMetrics{}, ErrInvalid
 		}
 		return agentgovernance.ActionMetrics{Money: &agentgovernance.Money{Currency: input.Currency, MinorUnits: input.MinorUnits}}, nil
+	case "commerce.marketplace.growth.preview":
+		var input marketplacegrowth.PreviewRequest
+		if err := decodeArguments(raw, &input); err != nil || input.Validate() != nil {
+			return agentgovernance.ActionMetrics{}, ErrInvalid
+		}
+		return agentgovernance.ActionMetrics{}, nil
 	default:
 		return agentgovernance.ActionMetrics{}, ErrInvalid
 	}
@@ -587,7 +617,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

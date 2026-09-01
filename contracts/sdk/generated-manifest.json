@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "cea8ad9f757a9f71cdd063d09bea1c701c5dd31e8b9c19df4a5f82107afa3338",
+    "sha256": "0a64603243068f55139345fa71a7a732afd6a614e0d6f279a8a33f31949b5063",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,11 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "applyMarketplaceGrowthOperation",
+      "method": "POST",
+      "path": "/marketplace-growth/operations"
     },
     {
       "operation_id": "applyMarketplaceListingBatch",
@@ -208,6 +213,11 @@
       "operation_id": "createMCPAccount",
       "method": "POST",
       "path": "/settings/mcp-accounts"
+    },
+    {
+      "operation_id": "createMarketplaceGrowthPreview",
+      "method": "POST",
+      "path": "/marketplace-growth/previews"
     },
     {
       "operation_id": "createMarketplaceOperationFlow",
@@ -538,6 +548,21 @@
       "operation_id": "getMCPAgentKillSwitch",
       "method": "GET",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "getMarketplaceGrowthKillSwitch",
+      "method": "GET",
+      "path": "/marketplace-growth/kill-switch"
+    },
+    {
+      "operation_id": "getMarketplaceGrowthOperation",
+      "method": "GET",
+      "path": "/marketplace-growth/operations/{operation_id}"
+    },
+    {
+      "operation_id": "getMarketplaceGrowthPreview",
+      "method": "GET",
+      "path": "/marketplace-growth/previews/{preview_id}"
     },
     {
       "operation_id": "getMarketplaceListingBatch",
@@ -875,6 +900,21 @@
       "path": "/settings/mcp-accounts"
     },
     {
+      "operation_id": "listMarketplaceGrowthDrifts",
+      "method": "GET",
+      "path": "/marketplace-growth/reconciliation"
+    },
+    {
+      "operation_id": "listMarketplaceGrowthOperations",
+      "method": "GET",
+      "path": "/marketplace-growth/operations"
+    },
+    {
+      "operation_id": "listMarketplaceGrowthRules",
+      "method": "GET",
+      "path": "/marketplace-growth/rules"
+    },
+    {
       "operation_id": "listMarketplaceOperationFindings",
       "method": "GET",
       "path": "/marketplace-operations/findings"
@@ -1165,6 +1205,11 @@
       "path": "/webhooks/social/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
     },
     {
+      "operation_id": "reconcileMarketplaceGrowthOperation",
+      "method": "POST",
+      "path": "/marketplace-growth/reconciliation"
+    },
+    {
       "operation_id": "recordAssistantFeedback",
       "method": "POST",
       "path": "/assistant/feedback"
@@ -1298,6 +1343,11 @@
       "operation_id": "setMCPAgentKillSwitch",
       "method": "POST",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "setMarketplaceGrowthKillSwitch",
+      "method": "POST",
+      "path": "/marketplace-growth/kill-switch"
     },
     {
       "operation_id": "startConnectorBootstrap",

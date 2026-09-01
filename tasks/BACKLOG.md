@@ -1145,14 +1145,15 @@ live or sandbox qualification with retained evidence. See
 
 ## Epic 180 — Акции, скидки, рекламные ставки и бюджеты
 
-Task 225 is planned as the write-side release closure for promotions and
-advertising. Task 220 already provides read-only campaigns, spend,
-performance, metrics and reconciliation; Tasks 050, 051 and 221 provide the
-provider-neutral models, pricing guards and preview. Task 225 adds promotion
-eligibility, discounts/subsidies, campaign lifecycle, bid/budget management,
-approval-bound idempotent writes, connector qualification, UI, reconciliation
-and authenticated Compose E2E. Without current provider evidence, operations
-remain `read_only` or `qualification_required`. See
+Task 225 is repository-complete for the write-side promotion and advertising
+runtime: versioned rules/eligibility, integer price and margin guards, bounded
+preview to 1,000 SKU, approval-bound idempotent intents, campaign lifecycle,
+bid/budget caps, forced-RLS persistence, OpenAPI/SDK/MCP, frontend tabs,
+reconciliation, quotas and kill switch are connected. Task 220 still provides
+the read-only facts layer. Official promotion/advertising writes and
+credentialed read-after-write for a concrete marketplace remain external
+release gates; without that evidence the operation stays
+`qualification_required`. See
 `tasks/issues/225-promotions-advertising-management.md`.
 
 ## Epic 181 — Глубина интеграций и readiness коннекторов

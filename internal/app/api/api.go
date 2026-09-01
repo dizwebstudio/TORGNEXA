@@ -39,6 +39,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/legalpartyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacegrowthrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacelistingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplaceoperationsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
@@ -242,6 +243,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	marketplaceListingRepository, err := marketplacelistingrepo.New(db)
 	if err != nil {
 		return newRuntimeError("marketplace_listing_repository_startup_failed", err)
+	}
+	marketplaceGrowthRepository, err := marketplacegrowthrepo.New(db)
+	if err != nil {
+		return newRuntimeError("marketplace_growth_repository_startup_failed", err)
 	}
 	procurementRepository, err := procurementrepo.New(db)
 	if err != nil {
@@ -459,7 +464,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		advertising: advertisingRepository, settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,
 		uploadStatus: uploadRepository, uploadAccess: uploadAccessGate, uploadEvidence: uploadRepository, uploadContent: quarantineStore, profiles: profileRepository,
-		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository, marketplaceListing: marketplaceListingRepository, marketplaceFlows: marketplaceOperationsRepository, procurement: procurementRepository, replenishment: replenishmentRepository,
+		aiAdvisory: aiAdvisoryRepository, assistant: operatorAssistantRepository, aiRegistry: builtinruntime.New(), mcpAccounts: mcpAccountsRepository, agentGovernance: agentGovernanceRepository, runtimePosture: postureInspector, trustControl: trustControlRepository, workflows: workflowRepository, returns: returnsRepository, marketplacePublication: marketplacePublicationRepository, marketplaceListing: marketplaceListingRepository, marketplaceGrowth: marketplaceGrowthRepository, marketplaceFlows: marketplaceOperationsRepository, procurement: procurementRepository, replenishment: replenishmentRepository,
 		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()},
 	}
 	routes := newProductionRoutes(routeDeps)
