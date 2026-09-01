@@ -136,6 +136,59 @@ paths:
       responses:
         '200': {description: Normalized remote observation and reconciliation drifts, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingReconciliation'}}}}
         '409': {description: Remote state is not consistent with the expected draft}
+  /catalog/bulk/summary:
+    get:
+      operationId: listCatalogBulkChannels
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Effective bulk catalog channel capabilities, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkChannelPage'}}}}
+  /catalog/bulk/previews:
+    post:
+      operationId: previewCatalogBulk
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkPreviewRequest'}}}}
+      responses:
+        '200': {description: Immutable multi-channel before/after preview, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkPreview'}}}}
+        '413': {description: Selection exceeds 1000 SKU or bounded channel fanout}
+  /catalog/bulk/previews/{preview_id}:
+    get:
+      operationId: getCatalogBulkPreview
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: preview_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Stored catalog bulk preview, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkPreview'}}}}
+        '404': {description: Preview not found}
+  /catalog/bulk/apply:
+    post:
+      operationId: applyCatalogBulk
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkApplyRequest'}}}}
+      responses:
+        '202': {description: Approved bulk operation queued by channel/account partitions, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkRun'}}}}
+        '409': {description: Preview is stale, approval is missing or a channel is not qualified}
+  /catalog/bulk/runs/{run_id}:
+    get:
+      operationId: getCatalogBulkRun
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Durable per-row catalog bulk result, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkRun'}}}}
+        '404': {description: Run not found}
+  /catalog/bulk/runs/{run_id}/reconcile:
+    post:
+      operationId: reconcileCatalogBulkRun
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkReconcileRequest'}}}}
+      responses:
+        '200': {description: Normalized read-after-write reconciliation result, content: {application/json: {schema: {$ref: '#/components/schemas/CatalogBulkReconciliation'}}}}
+        '409': {description: Remote state is mismatched or unknown}
   /social/channels:
     get:
       operationId: listSocialChannels

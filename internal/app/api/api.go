@@ -25,6 +25,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo"
@@ -245,6 +246,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	marketplaceListingRepository, err := marketplacelistingrepo.New(db)
 	if err != nil {
 		return newRuntimeError("marketplace_listing_repository_startup_failed", err)
+	}
+	catalogBulkRepository, err := catalogbulkrepo.New(db)
+	if err != nil {
+		return newRuntimeError("catalog_bulk_repository_startup_failed", err)
 	}
 	marketplaceGrowthRepository, err := marketplacegrowthrepo.New(db)
 	if err != nil {
@@ -469,7 +474,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
 		settingsSecurity: settingsSecurityRepository, settingsAudit: auditRepository, identityProviders: settingsSecurityRepository, identityPolicy: identityPolicy, identityValidator: identityValidator, oidc: cfg.OIDC,
 		tenancy: tenantRepository, search: searchRepository, orders: orderRepository, catalog: catalogRepository, pricing: pricingRepository, publicationQuality: publicationQualityRepository, pim: pimRepository,
-		images: imageRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
+		images: imageRepository, catalogBulk: catalogBulkRepository, inventory: inventoryRepository, marking: markingRepository, logistics: logisticsRepository, compliance: complianceRepository, notifications: notificationService,
 		syncPolicies: syncRepository, reconciliations: reconciliationRepository, approvals: approvalRepository, reports: reportRepository, financialReports: financialRepository, financialCompleteness: financialCompletenessRepository,
 		lineage: lineageRepository, legalParties: legalPartyRepository, counterparties: legalPartyRepository, entitlements: entitlementService, quotas: quotaService, webhooks: webhookService,
 		advertising: advertisingRepository, settlements: settlementRepository, social: socialRepository, socialReceipts: socialDispatchRepository, payments: paymentsRepository, privacy: privacyWorkflowAdapter{service: privacyService, repository: retentionRepository}, fxRates: fxRepository, cloudSubscription: cloudSubscriptionRepository, uploads: uploadService, plugins: pluginRepository, inboundWebhooks: inboundWebhookInbox,

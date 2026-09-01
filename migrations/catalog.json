@@ -1153,6 +1153,26 @@
       },
       "backfill": null,
       "sha256": "88991e82adbd985b1889bf942d2519cd7d6cb3374634788e02dbfaa1e7dfdc4c"
+    },
+    {
+      "version": 57,
+      "name": "mass_catalog_management",
+      "file": "000057_mass_catalog_management.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [44, 52, 54, 56],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "c404549ceb7968557ce68bd812b5e77060281c76c1e4bc184e99de3ea3fec061"
     }
   ]
 }

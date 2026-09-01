@@ -72,6 +72,10 @@ test("integration settings use overview cards and a focused drawer", () => {
   assert.match(integrations, /integration-capability-tags/);
   assert.match(integrations, /connectionState/);
   assert.match(integrations, /<Drawer/);
+  assert.match(integrations, /setupRef/);
+  assert.match(integrations, /onSetup=\{scrollToSetup\}/);
+  assert.match(integrations, /Перейти к форме подключения/);
+  assert.doesNotMatch(integrations, /onClick=\{close\}>Настроить подключение/);
   assert.match(integrations, /Разрешённые возможности/);
   assert.match(css, /--connector-surface/);
   assert.match(css, /connector-logo-branded/);

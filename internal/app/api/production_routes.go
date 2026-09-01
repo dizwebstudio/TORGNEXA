@@ -13,6 +13,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo"
@@ -69,6 +70,7 @@ type productionRouteDependencies struct {
 	search                 *searchrepo.Repository
 	orders                 orderStatusRepository
 	catalog                *catalogrepo.Repository
+	catalogBulk            *catalogbulkrepo.Repository
 	pricing                *pricingrepo.Repository
 	publicationQuality     *publicationqualityrepo.Repository
 	pim                    *pimrepo.Repository
@@ -146,6 +148,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newSearchRoutes(deps.search, deps.auditService)...)
 	routes = append(routes, newOrderStatusRoutes(deps.orders)...)
 	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
+	routes = append(routes, newCatalogBulkRoutes(deps.catalogBulk, deps.approvals)...)
 	routes = append(routes, newRepricingRoutes()...)
 	routes = append(routes, newPublicationQualityRoutes(deps.publicationQuality)...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
