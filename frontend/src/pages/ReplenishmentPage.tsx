@@ -6,27 +6,19 @@ import {EmptyState} from "../components/EmptyState";
 import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
+import {formatQuantity} from "../lib/formatters";
+import {uuidV7} from "../lib/ids";
 
 type Quantity = {coefficient: number; scale: number; unit: string};
 type Recommendation = {id: string; sku: string; warehouse_id: string; supplier_offer_id: string; recommended_quantity: Quantity; expected_receipt_days: number; risk_reduction_bps: number; reason_codes: string[]; eligible_mode: string; status: string};
 type RunResult = {run: {id: string; algorithm_version: string; input_digest: string; horizon_days: number; generated_at: string; valid_until: string; status: string; quality: {status: string; coverage_bps: number; sample_count: number}}; recommendations: Recommendation[]};
 type Client = {listReplenishmentRuns(input: {limit: number}): Promise<{body: unknown}>; createReplenishmentRun(input: {idempotencyKey: string; body: unknown}): Promise<{body: unknown}>};
 
-function uuidV7(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16)); const millis = BigInt(Date.now());
-  for (let index = 5; index >= 0; index -= 1) bytes[5 - index] = Number((millis >> BigInt(index * 8)) & 255n);
-  bytes[6] = (bytes[6] & 15) | 112; bytes[8] = (bytes[8] & 63) | 128;
-  const raw = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
-  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
-}
-
 function decodeRuns(value: unknown): RunResult[] {
   const root = value as {items?: unknown};
   if (!Array.isArray(root?.items)) throw new Error("invalid replenishment response");
   return root.items as RunResult[];
 }
-
-function quantity(value: Quantity): string { return `${value.coefficient / (10 ** value.scale)} ${value.unit}`; }
 
 export function ReplenishmentPage() {
   const api = useApi() as unknown as Client; const toast = useToast(); const cache = useQueryClient();
@@ -36,6 +28,6 @@ export function ReplenishmentPage() {
   const valid = sku.trim() && offerID.trim() && warehouseID.trim() && supplierOfferID.trim() && [demand, returns, opening, inbound, horizon, leadTime].every((value) => /^\d+$/.test(value));
   return <Page eyebrow="Планирование запасов" title="Прогноз и пополнение" description="Прогноз показывает риск stockout и рекомендацию. Остатки остаются во владении WMS, а заказ поставщику требует отдельного согласования.">
     <section className="panel inline-create"><div><h2>Рассчитать базовый прогноз</h2><p>Вводятся агрегированные synthetic/нормализованные факты за период. Returns вычитаются явно, результат фиксирует digest и версию алгоритма.</p></div><form onSubmit={(event) => {event.preventDefault(); if (valid && !create.isPending) create.mutate();}}><input required value={sku} onChange={(event) => setSku(event.target.value)} placeholder="SKU" aria-label="SKU"/><input required value={offerID} onChange={(event) => setOfferID(event.target.value)} placeholder="Offer ID" aria-label="Offer ID"/><input required value={warehouseID} onChange={(event) => setWarehouseID(event.target.value)} placeholder="Склад" aria-label="Склад"/><input required value={supplierOfferID} onChange={(event) => setSupplierOfferID(event.target.value)} placeholder="Supplier offer" aria-label="Supplier offer"/><input type="number" min="0" value={demand} onChange={(event) => setDemand(event.target.value)} placeholder="Спрос" aria-label="Спрос"/><input type="number" min="0" value={returns} onChange={(event) => setReturns(event.target.value)} placeholder="Возвраты" aria-label="Возвраты"/><input type="number" min="0" value={opening} onChange={(event) => setOpening(event.target.value)} placeholder="Доступно" aria-label="Доступно"/><input type="number" min="0" value={inbound} onChange={(event) => setInbound(event.target.value)} placeholder="Подтверждённый inbound" aria-label="Подтверждённый inbound"/><input type="number" min="1" max="366" value={horizon} onChange={(event) => setHorizon(event.target.value)} placeholder="Горизонт, дней" aria-label="Горизонт"/><input type="number" min="1" max="366" value={leadTime} onChange={(event) => setLeadTime(event.target.value)} placeholder="Срок поставки" aria-label="Срок поставки"/><button className="button primary" disabled={!valid || create.isPending}>{create.isPending ? "Считаем…" : "Рассчитать"}</button></form></section>
-    {query.isPending ? <LoadingBlock/> : query.isError ? <ErrorBlock retry={() => void query.refetch()}>Не удалось загрузить прогнозы.</ErrorBlock> : query.data.length === 0 ? <EmptyState title="Прогнозов пока нет" text="Заполните факты по SKU и складу, чтобы получить первую рекомендацию."/> : <div className="catalog-stack">{query.data.map((result) => <section className="panel" key={result.run.id}><div className="drawer-section-heading"><div><h2>Запуск <span className="mono">{result.run.id}</span></h2><p>Алгоритм {result.run.algorithm_version} · горизонт {result.run.horizon_days} дней · {new Date(result.run.generated_at).toLocaleString("ru-RU")}</p></div><StatusBadge value={result.run.quality.status}/></div><div className="line-items">{result.recommendations.map((item) => <div className="line-item" key={item.id}><div className="line-product-copy"><strong>{item.sku}</strong><small>Склад {item.warehouse_id} · supplier offer {item.supplier_offer_id} · получение через {item.expected_receipt_days} дн.</small></div><div className="line-price"><strong>{quantity(item.recommended_quantity)}</strong><small>{item.reason_codes.join(" · ")}</small></div></div>)}</div></section>)}</div>}
+    {query.isPending ? <LoadingBlock/> : query.isError ? <ErrorBlock retry={() => void query.refetch()}>Не удалось загрузить прогнозы.</ErrorBlock> : query.data.length === 0 ? <EmptyState title="Прогнозов пока нет" text="Заполните факты по SKU и складу, чтобы получить первую рекомендацию."/> : <div className="catalog-stack">{query.data.map((result) => <section className="panel" key={result.run.id}><div className="drawer-section-heading"><div><h2>Запуск <span className="mono">{result.run.id}</span></h2><p>Алгоритм {result.run.algorithm_version} · горизонт {result.run.horizon_days} дней · {new Date(result.run.generated_at).toLocaleString("ru-RU")}</p></div><StatusBadge value={result.run.quality.status}/></div><div className="line-items">{result.recommendations.map((item) => <div className="line-item" key={item.id}><div className="line-product-copy"><strong>{item.sku}</strong><small>Склад {item.warehouse_id} · supplier offer {item.supplier_offer_id} · получение через {item.expected_receipt_days} дн.</small></div><div className="line-price"><strong>{formatQuantity(item.recommended_quantity)}</strong><small>{item.reason_codes.join(" · ")}</small></div></div>)}</div></section>)}</div>}
   </Page>;
 }

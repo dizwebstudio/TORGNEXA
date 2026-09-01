@@ -11,6 +11,8 @@ import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {Page} from "./Page";
 import {navigate, useLocationPath} from "../shell/useLocationPath";
+import {formatMoneyMinor, formatQuantity} from "../lib/formatters";
+import {uuidV7} from "../lib/ids";
 
 const statusLabels: Readonly<Record<string, string>> = {
   requested: "Запрошен",
@@ -72,16 +74,6 @@ type ReturnsClient = {
   getReturn(input: {returnId: string}): Promise<{body: unknown}>;
 };
 
-function uuidV7(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  const millis = BigInt(Date.now());
-  for (let index = 5; index >= 0; index -= 1) bytes[5 - index] = Number((millis >> BigInt(index * 8)) & 255n);
-  bytes[6] = (bytes[6] & 15) | 112;
-  bytes[8] = (bytes[8] & 63) | 128;
-  const raw = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
-  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
-}
-
 function actionsFor(status: string): ReturnAction[] {
   if (status === "requested") return [{status: "approved", label: "Согласовать"}, {status: "cancelled", label: "Отменить", danger: true}];
   if (status === "approved") return [{status: "authorized", label: "Авторизовать"}, {status: "cancelled", label: "Отменить", danger: true}];
@@ -93,15 +85,6 @@ function actionsFor(status: string): ReturnAction[] {
   return [];
 }
 
-function quantity(value: {coefficient: number; scale: number; unit: string}): string {
-  const amount = value.coefficient / (10 ** value.scale);
-  return `${amount} ${unitLabels[value.unit] ?? value.unit}`;
-}
-
-function money(minor: number, currency: string): string {
-  return new Intl.NumberFormat("ru-RU", {style: "currency", currency}).format(minor / 100);
-}
-
 function reasonLabel(value: string): string {
   return reasonLabels[value] ?? value;
 }
@@ -111,7 +94,7 @@ function source(value: string): string {
 }
 
 function ReturnItemRow({item}: {item: ReturnItemHit}) {
-  return <div className="line-item"><div className="line-product-copy"><strong>{item.order_item_id}</strong><small>Запрошено: {quantity(item.requested)} · Получено: {quantity(item.received)} · Принято: {quantity(item.accepted)}</small></div><div className="line-price"><StatusBadge value={item.disposition}/><small>{dispositionLabels[item.disposition] ?? item.disposition}</small></div></div>;
+  return <div className="line-item"><div className="line-product-copy"><strong>{item.order_item_id}</strong><small>Запрошено: {formatQuantity(item.requested, unitLabels)} · Получено: {formatQuantity(item.received, unitLabels)} · Принято: {formatQuantity(item.accepted, unitLabels)}</small></div><div className="line-price"><StatusBadge value={item.disposition}/><small>{dispositionLabels[item.disposition] ?? item.disposition}</small></div></div>;
 }
 
 export function ReturnsPage() {
@@ -160,7 +143,7 @@ export function ReturnsPage() {
     {key: "order", label: "Заказ", value: (item: ReturnSummary) => item.order_id, render: (item: ReturnSummary) => <span className="mono">{item.order_id}</span>},
     {key: "status", label: "Статус", value: (item: ReturnSummary) => item.status, render: (item: ReturnSummary) => <StatusBadge value={item.status}/>},
     {key: "reason", label: "Причина", value: (item: ReturnSummary) => reasonLabel(item.reason_code)},
-    {key: "amount", label: "Доставка / налог", value: (item: ReturnSummary) => `${item.requested_shipping_minor + item.requested_tax_minor}`, render: (item: ReturnSummary) => <strong>{money(item.requested_shipping_minor + item.requested_tax_minor, item.currency)}</strong>, align: "end" as const},
+    {key: "amount", label: "Доставка / налог", value: (item: ReturnSummary) => `${item.requested_shipping_minor + item.requested_tax_minor}`, render: (item: ReturnSummary) => <strong>{formatMoneyMinor(item.requested_shipping_minor + item.requested_tax_minor, item.currency)}</strong>, align: "end" as const},
     {key: "created", label: "Создан", value: (item: ReturnSummary) => item.created_at, render: (item: ReturnSummary) => <time>{new Date(item.created_at).toLocaleString("ru-RU")}</time>},
   ];
 
@@ -191,7 +174,7 @@ export function ReturnsPage() {
     {returns.isPending ? <LoadingBlock/> : returns.isError ? <ErrorBlock retry={() => void returns.refetch()}>Не удалось загрузить возвраты.</ErrorBlock> : rows.length === 0 && !status ? <EmptyState title="Возвратов пока нет" text="Создайте возврат через API или дождитесь события от канала продаж."/> : <DataTable rows={rows} columns={columns} rowKey={(item) => item.id} searchPlaceholder="Возврат, заказ, причина…" empty="По выбранному фильтру возвратов нет" onOpen={(item) => navigate(`/returns/${encodeURIComponent(item.id)}`)}/>} 
     <Drawer open={!!selectedID} title={selected ? `Возврат ${selected.id}` : "Возврат"} subtitle={selected ? `Заказ ${selected.order_id}` : undefined} onClose={() => navigate("/returns")}>
       {details.isPending ? <LoadingBlock/> : details.isError ? <ErrorBlock retry={() => void details.refetch()}>Не удалось открыть возврат.</ErrorBlock> : selected ? <>
-        <div className="drawer-kpis"><div><small>Статус</small><StatusBadge value={selected.status}/></div><div><small>Позиции</small><strong>{details.data.items.length}</strong></div><div><small>Доставка и налог</small><strong>{money(selected.requested_shipping_minor + selected.requested_tax_minor, selected.currency)}</strong></div></div>
+        <div className="drawer-kpis"><div><small>Статус</small><StatusBadge value={selected.status}/></div><div><small>Позиции</small><strong>{details.data.items.length}</strong></div><div><small>Доставка и налог</small><strong>{formatMoneyMinor(selected.requested_shipping_minor + selected.requested_tax_minor, selected.currency)}</strong></div></div>
         {canWrite && actions.length > 0 ? <section className="drawer-section order-actions"><h3>Действия</h3><p className="drawer-help">Переход проверяется по текущей версии возврата, записывается в журнал аудита и публикуется в очереди событий.</p><div className="button-row">{actions.map((action) => <button type="button" key={action.status} className={`button ${action.danger ? "danger" : "primary"}`} disabled={changeStatus.isPending} onClick={() => changeStatus.mutate({id: selected.id, status: action.status, version: selected.version})}>{changeStatus.isPending ? "Сохраняем…" : action.label}</button>)}</div></section> : null}
         <section className="drawer-section"><h3>Причина и источник</h3><dl className="detail-list"><div><dt>Причина</dt><dd>{reasonLabel(selected.reason_code)}</dd></div><div><dt>Источник</dt><dd>{source(selected.source)}</dd></div><div><dt>Создан</dt><dd>{new Date(selected.created_at).toLocaleString("ru-RU")}</dd></div><div><dt>Версия</dt><dd className="mono">{selected.version}</dd></div></dl></section>
         <section className="drawer-section"><h3>Позиции возврата</h3>{details.data.items.length > 0 ? <div className="line-items">{details.data.items.map((item) => <ReturnItemRow key={item.id} item={item}/>)}</div> : <p className="drawer-help">Позиции ещё не добавлены.</p>}<ReturnActions api={api} returnID={selected.id} items={details.data.items} onSaved={() => { void details.refetch(); void queryClient.invalidateQueries({queryKey: ["returns"]}); }} /></section>

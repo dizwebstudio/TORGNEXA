@@ -8507,6 +8507,16 @@ components:
         state: {type: string, enum: [pending, passed, failed, skipped]}
         evidence_ref: {type: string, maxLength: 192}
         updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    EcosystemOnboardingCheckWrite:
+      type: object
+      additionalProperties: false
+      required: [id, label, required]
+      properties:
+        id: {type: string, maxLength: 96}
+        label: {type: string, minLength: 1, maxLength: 192}
+        required: {type: boolean}
+        state: {type: string, enum: [pending, passed, failed, skipped], default: pending}
+        evidence_ref: {type: string, maxLength: 192}
     EcosystemOnboardingRun:
       type: object
       additionalProperties: false
@@ -8632,7 +8642,7 @@ components:
       required: [resource_id, checks]
       properties:
         resource_id: {type: string, minLength: 1, maxLength: 192}
-        checks: {type: array, minItems: 1, maxItems: 64, items: {$ref: '#/components/schemas/EcosystemOnboardingCheck'}}
+        checks: {type: array, minItems: 1, maxItems: 64, items: {$ref: '#/components/schemas/EcosystemOnboardingCheckWrite'}}
     EcosystemPartnerCertificationPage:
       type: object
       additionalProperties: false

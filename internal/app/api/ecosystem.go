@@ -123,6 +123,14 @@ func (api ecosystemAPI) createOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	now := time.Now().UTC()
+	for i := range input.Checks {
+		if input.Checks[i].State == "" {
+			input.Checks[i].State = ecosystem.CheckPending
+		}
+		if input.Checks[i].UpdatedAt.IsZero() {
+			input.Checks[i].UpdatedAt = now
+		}
+	}
 	run := ecosystem.OnboardingRun{ID: stableID("ecosystem_onboarding_", 40, scope, key), ResourceID: input.ResourceID, State: ecosystem.OnboardingDraft, Checks: input.Checks, OwnerRef: boundedActorRef(principal.Subject), IdempotencyKey: key, Version: 1, CreatedAt: now, UpdatedAt: now}
 	evaluated, err := ecosystem.EvaluateOnboarding(run)
 	if err != nil {

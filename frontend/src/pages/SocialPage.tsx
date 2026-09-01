@@ -1,6 +1,7 @@
 import {useMemo,useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useApi} from "../api/ApiProvider";
+import {decodeItems} from "../api/decoders";
 import {ErrorBlock,LoadingBlock} from "../components/ApiState";
 import {EmptyState} from "../components/EmptyState";
 import {connectorCatalog} from "../generated/connector-catalog";
@@ -8,6 +9,7 @@ import {StatusBadge} from "../components/StatusBadge";
 import {useToast} from "../components/Toast";
 import {navigate} from "../shell/useLocationPath";
 import {Page} from "./Page";
+import {uuidV7} from "../lib/ids";
 
 interface ConnectorAccount{id:string;connector_id:string;family:string;status:string;health_status:string;capabilities:{capability:string;enabled:boolean}[]}
 interface SocialChannel{id:string;connector_account_id:string;display_name:string;capabilities:string[];status:"active"|"disabled";version:number}
@@ -16,16 +18,14 @@ interface SocialPublication{id:string;channel_account_id:string;channel_name:str
 type Response={body:unknown};
 type Client={listConnectorAccounts(input?:object):Promise<Response>;listSocialChannels(input?:object):Promise<Response>;createSocialChannel(input:{idempotencyKey:string;body:unknown}):Promise<Response>;updateSocialChannel(input:{channelId:string;idempotencyKey:string;body:unknown}):Promise<Response>;listSocialPublications(input?:object):Promise<Response>;createSocialPublication(input:{idempotencyKey:string;body:unknown}):Promise<Response>;editSocialPublication(input:{publicationId:string;idempotencyKey:string;approvalRequestID:string;body:unknown}):Promise<Response>;deleteSocialPublication(input:{publicationId:string;idempotencyKey:string;approvalRequestID:string}):Promise<Response>;subscribeSocialWebhook(input:{idempotencyKey:string;body:unknown}):Promise<Response>;unsubscribeSocialWebhook(input:{idempotencyKey:string;body:unknown}):Promise<Response>};
 
-function items<T>(value:unknown):T[]{const root=value as {items?:unknown};if(!Array.isArray(root?.items))throw new Error("invalid social response");return root.items as T[]}
-function uuidV7(){const bytes=crypto.getRandomValues(new Uint8Array(16)),millis=BigInt(Date.now());for(let index=5;index>=0;index--)bytes[5-index]=Number((millis>>BigInt(index*8))&255n);bytes[6]=(bytes[6]&15)|112;bytes[8]=(bytes[8]&63)|128;const raw=[...bytes].map(value=>value.toString(16).padStart(2,"0")).join("");return `${raw.slice(0,8)}-${raw.slice(8,12)}-${raw.slice(12,16)}-${raw.slice(16,20)}-${raw.slice(20)}`}
 const statusLabels:Record<string,string>={scheduled:"Запланировано",ready:"В очереди",publishing:"Публикуется",published:"Опубликовано",failed:"Ошибка",cancelled:"Отменено",active:"Активен",disabled:"Отключён"};
 
 export function SocialPage(){
  const api=useApi() as unknown as Client,cache=useQueryClient(),toast=useToast();
  const [accountId,setAccountId]=useState(""),[channelName,setChannelName]=useState("Новый канал"),[channelId,setChannelId]=useState(""),[text,setText]=useState(""),[publishAt,setPublishAt]=useState(""),[buttonRows,setButtonRows]=useState<SocialButton[]>([]),[editId,setEditId]=useState(""),[editText,setEditText]=useState(""),[editApprovalId,setEditApprovalId]=useState(""),[deleteId,setDeleteId]=useState(""),[deleteApprovalId,setDeleteApprovalId]=useState("");
- const accounts=useQuery({queryKey:["social","connector-accounts"],queryFn:async()=>items<ConnectorAccount>((await api.listConnectorAccounts({limit:100})).body),staleTime:10_000});
- const channels=useQuery({queryKey:["social","channels"],queryFn:async()=>items<SocialChannel>((await api.listSocialChannels({limit:100})).body),staleTime:5_000});
- const publications=useQuery({queryKey:["social","publications"],queryFn:async()=>items<SocialPublication>((await api.listSocialPublications({limit:50})).body),refetchInterval:5_000});
+ const accounts=useQuery({queryKey:["social","connector-accounts"],queryFn:async()=>decodeItems<ConnectorAccount>((await api.listConnectorAccounts({limit:100})).body,"invalid social response"),staleTime:10_000});
+ const channels=useQuery({queryKey:["social","channels"],queryFn:async()=>decodeItems<SocialChannel>((await api.listSocialChannels({limit:100})).body,"invalid social response"),staleTime:5_000});
+ const publications=useQuery({queryKey:["social","publications"],queryFn:async()=>decodeItems<SocialPublication>((await api.listSocialPublications({limit:50})).body,"invalid social response"),refetchInterval:5_000});
  const socialAccounts=useMemo(()=>(accounts.data??[]).filter(value=>value.family==="social"&&value.status==="active"&&value.health_status==="healthy"&&value.capabilities.some(capability=>capability.capability==="social.post.text"&&capability.enabled)),[accounts.data]);
  const activeChannels=(channels.data??[]).filter(value=>value.status==="active");
  const selectedChannel=activeChannels.find(value=>value.id===channelId),selectedAccount=(accounts.data??[]).find(value=>value.id===selectedChannel?.connector_account_id),selectedRuntime=connectorCatalog.find(value=>value.id===selectedAccount?.connector_id)?.runtime;

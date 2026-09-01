@@ -21,7 +21,7 @@ CREATE TABLE ecosystem_onboarding_runs (
   updated_at timestamptz NOT NULL,
   PRIMARY KEY (organization_id,workspace_id,run_id),
   FOREIGN KEY (organization_id,workspace_id) REFERENCES workspaces(organization_id,id) ON DELETE RESTRICT,
-  UNIQUE (organization_id,workspace_id,idempotency_key),
+  CONSTRAINT ecosystem_onboarding_idempotency_uq UNIQUE (organization_id,workspace_id,idempotency_key),
   CONSTRAINT ecosystem_onboarding_ref_chk CHECK (
     run_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND
     resource_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND
@@ -50,7 +50,7 @@ CREATE TABLE ecosystem_partner_certifications (
   updated_at timestamptz NOT NULL,
   PRIMARY KEY (organization_id,workspace_id,certification_id),
   FOREIGN KEY (organization_id,workspace_id) REFERENCES workspaces(organization_id,id) ON DELETE RESTRICT,
-  UNIQUE (organization_id,workspace_id,idempotency_key),
+  CONSTRAINT ecosystem_partner_certification_idempotency_uq UNIQUE (organization_id,workspace_id,idempotency_key),
   CONSTRAINT ecosystem_partner_certification_chk CHECK (
     certification_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND
     partner_ref ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND

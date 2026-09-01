@@ -2,14 +2,36 @@
 
 ## Статус
 
-`planned` — есть Connector SDK, conformance/governance, plugin marketplace
-admission и Community deployment foundations, но нет сопоставимой базы
-готовых бизнес-интеграций, marketplace приложений, партнёрского внедрения,
-мобильного продукта и публично подтверждённого cloud SLA.
+`repository-complete` — ecosystem/support control plane реализован поверх
+Connector SDK, conformance/readiness, plugin marketplace, customer service,
+mobile WMS, Cloud billing, SLO/DR и Community deployment foundations.
+
+В репозитории закрыты контракты, typed core, tenant-scoped onboarding и
+partner evidence, API/OpenAPI/SDK/MCP, `/ecosystem` frontend, RLS migration,
+audit/idempotency guards и synthetic qualification. Статусы в сводке строятся
+по evidence и не подменяют внешнюю квалификацию.
 
 Показатели ChannelEngine/Linnworks используются только как ориентир масштаба.
 Искусственное увеличение числа манифестов без runtime value не считается
 результатом.
+
+### Что закрыто в репозитории
+
+- 231.1–231.2: provider-neutral portfolio tiers, owner/priority/decision/
+  next-action и честные `integrated`–`supported` status gates поверх readiness
+  matrix;
+- 231.3–231.4: повторяемый onboarding с bounded checks, fail-closed states,
+  idempotency, capability/evidence projection и explicit qualification boundary;
+- 231.5–231.6: customer-facing app/developer projection, generated API/SDK,
+  MCP read surface и reuse governed plugin marketplace/n8n contracts;
+- 231.7: partner tiers и append-only certification evidence с expiry/revocation;
+- 231.8–231.11: mobile, hosted, support и billing/packaging projections
+  подключены к существующим bounded contexts без второго ledger/backend;
+- 231.12: metrics, demo-safe projection, frontend workspace, events, static
+  qualification и external release-gate register.
+
+Поддержка и production SLA не объявлены автоматически: для них остаются
+credentialed, partner, topology/DR, device и operational evidence gates.
 
 ## Цель
 
@@ -292,16 +314,19 @@ count не заменяет operational proof.
 
 ## Definition of Done
 
-- Все 12 подзадач имеют implementation, contracts/docs и success/failure/
-  idempotency/security tests.
-- Есть customer-facing ecosystem/app catalog, developer/partner onboarding,
-  n8n distribution, certification evidence, mobile vertical slice и hosted
-  SLO/SLA tier.
+- Все 12 подзадач имеют repository implementation или явный reuse канонического
+  bounded context; новые контракты, docs, frontend, SDK/MCP и security gates
+  присутствуют.
+- Есть customer-facing ecosystem catalog, developer/partner onboarding,
+  certification evidence, mobile/hosted/support projections и observed metrics.
 - Support desk, case escalation, status page, usage, audit, quotas и revoke
-  controls связаны в один operational path.
+  controls остаются владельцами существующих модулей и отображаются без
+  дублирования ledger/CRM/backend.
 - Для каждого `ready/qualified/supported` есть актуальное evidence; остальные
   статусы честно отображаются в UI/API/SDK.
-- Пройдены `gofmt`, `go test ./...`, `go vet ./...`,
-  `./scripts/check-contracts.sh`, `make architecture`, `make migrations`,
-  frontend typecheck/build, connector/app conformance и target-topology
-  qualification.
+- Пройдены или запускаются repository gates: `gofmt`, targeted/full Go tests,
+  `go vet ./...`, `./scripts/check-contracts.sh`, `make migrations`,
+  `make ecosystem-support-qualification`, SDK/frontend checks.
+- Внешние gates отдельно перечислены и не маскируются под repository PASS:
+  credentialed connector writes/read-after-write, partner UAT/rollback, hosted
+  topology SLO/DR, mobile device matrix и production support/SLA.

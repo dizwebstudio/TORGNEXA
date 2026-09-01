@@ -1226,12 +1226,14 @@ taxonomy/write/read-after-write evidence remains an external release-gate. See
 
 ## Epic 186 — Экосистема и поддержка
 
-Task 231 is planned as the ecosystem/support release closure. The repository
-has a governed plugin marketplace, Connector SDK/conformance and Community
-deployment foundations, but not a comparable ready-integration catalog,
-partner implementation program, mobile product or hosted SLA. Task 019 already
-provides the external n8n package; Task 231 adds connector portfolio tiers,
-app marketplace operations, n8n distribution/support, partner enablement,
-mobile delivery, cloud SLO/SLA, support tooling and customer-facing evidence;
-it does not inflate health-only or manifest-only integrations into `ready`.
-See `tasks/issues/231-ecosystem-support.md`.
+Task 231 is repository-complete as the ecosystem/support control plane. The
+provider-neutral portfolio projection, evidence-backed status gates,
+tenant-scoped onboarding and partner certification records, ecosystem API,
+generated SDK, MCP read surface and `/ecosystem` frontend workspace are wired
+over the existing connector readiness, plugin marketplace, customer service,
+mobile WMS, cloud billing, SLO/DR and n8n foundations. It does not inflate
+health-only or manifest-only integrations into `ready`, `qualified` or
+`supported`. The remaining credentialed connector, partner UAT, hosted
+topology/DR, device-matrix and production support checks are explicit external
+release-gates. See `tasks/issues/231-ecosystem-support.md` and
+`docs/operations/231-ecosystem-support.md`.

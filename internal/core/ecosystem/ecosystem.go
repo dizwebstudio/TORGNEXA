@@ -140,6 +140,9 @@ func (p PortfolioItem) Validate(now time.Time) error {
 	if (p.Status == StatusVerified || p.Status == StatusReady || p.Status == StatusQualified || p.Status == StatusSupported) && p.Evidence == nil {
 		return ErrPromotion
 	}
+	if p.Status == StatusQualified && p.Evidence != nil && p.Evidence.Kind != "credentialed_sandbox" && p.Evidence.Kind != "credentialed_live" {
+		return ErrPromotion
+	}
 	if p.Status == StatusSupported && p.SupportLevel == "" {
 		return ErrPromotion
 	}
@@ -159,6 +162,9 @@ func Promote(item PortfolioItem, target Status, evidence Evidence, now time.Time
 		return PortfolioItem{}, err
 	}
 	if target == StatusQualified && evidence.Kind != "credentialed_sandbox" && evidence.Kind != "credentialed_live" {
+		return PortfolioItem{}, ErrPromotion
+	}
+	if target == StatusSupported && evidence.Kind != "support" {
 		return PortfolioItem{}, ErrPromotion
 	}
 	item.Status = target

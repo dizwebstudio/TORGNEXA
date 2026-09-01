@@ -103,6 +103,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/ecosystem",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/inventory",
       "kind": "core_domain"
     },
@@ -432,6 +436,10 @@
     },
     {
       "path": "internal/platform/postgres/entitlementrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/ecosystemrepo",
       "kind": "infrastructure_adapter"
     },
     {

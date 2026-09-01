@@ -42,6 +42,12 @@ function object(value: unknown): Record<string, unknown> | undefined {
 function text(value: unknown): string | undefined { return typeof value === "string" ? value : undefined; }
 function integer(value: unknown): number | undefined { return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined; }
 
+export function decodeItems<T>(value: unknown, message = "invalid list response"): T[] {
+  const root = object(value);
+  if (!root || !Array.isArray(root.items)) throw new Error(message);
+  return root.items as T[];
+}
+
 export function decodeProductPage(value: unknown): ProductPage {
   const root = object(value);
   if (!root || !Array.isArray(root.items)) throw new Error("invalid product page");
