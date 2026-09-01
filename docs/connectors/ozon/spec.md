@@ -73,3 +73,19 @@ unit price, VAT and integer dimensions. Ozon's task ID is returned as
 The adapter rejects media and non-empty canonical attributes until their
 provider-specific mapping and released-upload bridge pass qualification. Raw
 Ozon responses, credentials and arbitrary URLs never enter the host receipt.
+
+The bounded price writer uses `POST /v1/product/import/prices` for one offer at
+a time, validates the per-offer `updated` result and keeps the receipt
+unreconciled until a subsequent price read confirms the remote value. Ozon
+inventory writes remain deferred because the current host contract does not yet
+carry the product identity required by the verified stock mutation API.
+
+## `orders.read`
+
+The bounded FBS order projection uses `POST /v3/posting/fbs/list` with an
+explicit UTC time window and an opaque offset cursor. The adapter validates
+posting identity, dates, items and quantities, rejects duplicate rows and
+never returns the raw posting payload. Provider status is retained as
+`status_remote_id`; canonical status mapping is performed by the runtime
+composition layer. Outbound order mutation, returns and settlement remain
+separate capabilities.

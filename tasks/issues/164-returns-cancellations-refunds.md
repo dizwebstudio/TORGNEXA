@@ -2,15 +2,30 @@
 
 ## Status
 
-`in_progress` — базовые доменные агрегаты, миграция PostgreSQL, outbox/audit,
-идемпотентный API, контрактные события, generated SDK и операторский экран
-возвратов реализованы. Live connector/WMS/fiscal/settlement qualification,
-durable worker orchestration и production enablement остаются отдельным
-завершающим gate.
+`repository-complete` — provider-neutral доменные агрегаты, миграция PostgreSQL,
+outbox/audit, идемпотентный API, generated SDK, durable logistics route и
+операторский экран с созданием отмены/возврата, строками, этикеткой, инспекцией
+и refund allocation реализованы и проверены. Live connector/WMS/fiscal/
+settlement qualification и production enablement остаются отдельным release
+gate; внешние credentials и неподтверждённые результаты в этот статус не
+включены.
 
 Репозиторная проверка: `go test ./...`, `go vet ./...`, contract/architecture/
 migration gates и frontend typecheck/build/logic/docs проходят. Полный production
 claim не делается до live Compose/conformance прогона.
+
+### Repository completion evidence — 2026-09-01
+
+- API и OpenAPI/SDK покрывают cancellation, return, line item, status,
+  inspection, carrier return operation и refund allocation.
+- `frontend/src/pages/ReturnsPage.tsx` предоставляет оператору создание
+  отмены/возврата, добавление строки, запрос возвратной этикетки и резерв
+  refund allocation; raw provider payloads не показываются.
+- PostgreSQL использует tenant scope, optimistic version, idempotency,
+  append-only history и transactional outbox. Неизвестный внешний результат
+  остаётся `unknown`/manual attention и не повторяется вслепую.
+- Live provider, WMS, fiscal и settlement evidence не выдумывается и должна
+  быть приложена к release gate отдельно.
 
 ## Objective
 

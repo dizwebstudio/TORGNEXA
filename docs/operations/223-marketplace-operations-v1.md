@@ -7,6 +7,52 @@ release gate для marketplace, а не отдельный provider adapter. О
 состояние кабинета, каталога, цен, остатков, заказов, WMS, отгрузок, возвратов,
 маркировки, settlement и P&L.
 
+Репозиторная часть v1 control-plane закрыта: матрица доступности, операторский
+экран, bounded WB/Ozon order reader и provider-neutral flow находятся в коде.
+Полная live qualification конкретных кабинетов остаётся условием выпуска и не
+может быть подменена наличием токена или synthetic fixture.
+
+## Что уже работает
+
+- `GET /api/v1/marketplace-operations` показывает tenant-scoped матрицу
+  фактических capabilities и состояния `read_only`, `partially_supported`,
+  `qualified` и `blocked`.
+- `GET /api/v1/marketplace-operations/flows` показывает сохранённые стадии
+  workflow и unknown-состояния с cursor pagination. Команды workflow пишутся в
+  append-only журнал; повтор с тем же idempotency key не создаёт вторую запись.
+- `POST /api/v1/marketplace-operations/flows` создаёт tenant-scoped flow, а
+  `POST /api/v1/marketplace-operations/flows/{flow_id}/commands` принимает
+  typed-команду текущей стадии. Оба маршрута требуют `Idempotency-Key`; API
+  меняет только orchestration projection и не выполняет remote side effect.
+- WB и Ozon предоставляют bounded FBS-order reader для reconciliation и
+  host sync: provider-owned cursor, дедупликация и нормализованные статусы.
+- Материализация remote order в canonical `orders` должна выполняться
+  отдельным host importer после проверки offer/SKU mapping. Builder
+  `BuildMarketplaceOrderCreate` принимает только полный redacted snapshot с
+  canonical OfferID, точными money/quantity/tax и canonical IDs; reader не
+  создаёт вторую модель заказа и не объявляет удалённую запись локально
+  сохранённой.
+- `internal/core/marketplaceoperations` проверяет порядок сквозного сценария
+  `account → product → publication → price/stock → order → reserve →
+  pick/pack → shipment → return → settlement → P&L`, сохраняет только ссылки
+  на канонические домены и оставляет timeout в состоянии `unknown`. Его
+  `LifecycleRunner` последовательно вызывает владельцев bounded contexts и
+  останавливается на `unknown`/`rejected`, не повторяя внешний write вслепую.
+- `GET /api/v1/marketplace-operations/findings` и
+  `GET /api/v1/marketplace-operations/flows/{flow_id}/findings` показывают
+  tenant-scoped findings: stale data, missing mapping, duplicate order,
+  price/stock mismatch, partial response, health и dead-letter состояния.
+  `POST /api/v1/marketplace-operations/findings/{finding_id}/actions` пишет
+  append-only intent `retry`/`reconcile`/`resolve`; сам endpoint не выполняет
+  удалённый побочный эффект.
+- Миграции `000048_marketplace_operations_runtime.sql` и
+  `000049_marketplace_operations_findings.sql` хранят только
+  provider-neutral projection и ссылки на канонические записи; raw payloads,
+  токены и credentials в таблицах отсутствуют.
+- Каталог/публикация, WMS reservations, возвраты, settlement/P&L и реклама
+  используются через существующие bounded contexts, без второй модели заказа
+  или товара.
+
 ## Статусы поддержки
 
 - `read_only` — разрешены только подтверждённые чтения;
@@ -50,6 +96,11 @@ reconciliation/status read, а не повторяет write вслепую.
   сформировать append-only finding;
 - падение worker: восстановить lease безопасным replay; внешнюю операцию с
   неизвестным результатом не повторять без evidence.
+
+Finding создаётся один раз с digest безопасного evidence. Его исходная запись
+не меняется: решение оператора добавляется отдельной строкой action journal,
+а статус `resolved` вычисляется по журналу. Это сохраняет историю и позволяет
+повторить аудит без хранения ответа marketplace.
 
 ## Критерий выпуска
 

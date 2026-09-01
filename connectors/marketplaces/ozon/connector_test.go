@@ -34,6 +34,9 @@ var warehousesFixture []byte
 //go:embed fixtures/stocks.json
 var stocksFixture []byte
 
+//go:embed fixtures/postings-page.json
+var postingsPageFixture []byte
+
 type scriptedTransport struct {
 	responses []Response
 	errs      []error
@@ -87,8 +90,52 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	if !reflect.DeepEqual(got.Canonical(), Manifest().Canonical()) {
 		t.Fatalf("manifest drift")
 	}
-	if !Manifest().Supports("products.write") || Manifest().Supports("inventory.write") {
+	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") {
 		t.Fatal("marketplace product publication capability is not declared exactly")
+	}
+}
+
+func TestWritePriceUsesOfferImportAndReturnsUnreconciledReceipt(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"result":[{"offer_id":"OZ-RED-M","updated":true,"errors":[]}]}`)}}}
+	connector := New(transport, nil)
+	receipt, err := connector.WritePrice(context.Background(), testAccount(), testRuntime{creds()}, sdk.PriceWriteRequest{
+		VariantRemoteID: "OZ-RED-M", Value: "1999.00", CompareAt: "2499.00", Currency: "RUB", IdempotencyKey: "price-write-1",
+	})
+	if err != nil || receipt.RemoteID != "OZ-RED-M" || !receipt.Applied || receipt.Reconciled || receipt.Duplicate {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	request := transport.requests[0]
+	if request.Method != "POST" || request.Host != apiHost || request.Path != "/v1/product/import/prices" || request.IdempotencyKey != "price-write-1" || string(request.ClientID) != "123456" || strings.Contains(string(request.Body), "synthetic-api-key") {
+		t.Fatalf("unexpected or unsafe request: %+v body=%s", request, request.Body)
+	}
+	var body priceImportRequest
+	if err := json.Unmarshal(request.Body, &body); err != nil || len(body.Prices) != 1 || body.Prices[0].OfferID != "OZ-RED-M" || body.Prices[0].Price != "1999.00" || body.Prices[0].OldPrice != "2499.00" || body.Prices[0].CurrencyCode != "RUB" {
+		t.Fatalf("body=%s err=%v", request.Body, err)
+	}
+}
+
+func TestWritePriceRejectsPerOfferFailure(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"result":[{"offer_id":"OZ-RED-M","updated":false,"errors":[{"code":"invalid_price"}]}]}`)}}}
+	_, err := New(transport, nil).WritePrice(context.Background(), testAccount(), testRuntime{creds()}, sdk.PriceWriteRequest{
+		VariantRemoteID: "OZ-RED-M", Value: "1999.00", Currency: "RUB", IdempotencyKey: "price-write-1",
+	})
+	var remote *sdk.RemoteError
+	if !errors.As(err, &remote) || remote.Category != sdk.ErrorInvalidRequest || remote.Code != "remote_rejected" {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestReadOrdersUsesOffsetCursorAndPreservesRemoteStatuses(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: postingsPageFixture}}}
+	connector := New(transport, func() time.Time { return now })
+	page, err := connector.ReadOrders(context.Background(), testAccount(), testRuntime{creds()}, sdk.PageRequest{Limit: 1})
+	if err != nil || len(page.Items) != 1 || page.Items[0].RemoteID != "00000000-0001-1" || page.Items[0].ExternalID != "order-1001" || page.Items[0].StatusRemoteID != "awaiting_packaging" || page.Items[0].Items[0].Quantity != 2 || page.NextCursor == "" {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	var request postingListRequest
+	if json.Unmarshal(transport.requests[0].Body, &request) != nil || request.Offset != 0 || request.Limit != 1 || request.Filter.Since == "" || request.Filter.To == "" {
+		t.Fatalf("request=%s", transport.requests[0].Body)
 	}
 }
 
@@ -292,4 +339,6 @@ func TestInterfaces(t *testing.T) {
 	var _ sdk.Connector = (*Connector)(nil)
 	var _ sdk.ProductReader = (*Connector)(nil)
 	var _ sdk.InventoryReader = (*Connector)(nil)
+	var _ sdk.PriceWriter = (*Connector)(nil)
+	var _ sdk.OrderReader = (*Connector)(nil)
 }

@@ -406,8 +406,9 @@ provider IDs and the `docs/connectors/<provider>` documentation paths.
 
 ## Workflow automation builder
 
-Task 163 is the in-progress provider-neutral automation builder. Its foundation
-and runtime are implemented; it is decomposed
+Task 163 is repository-complete for the provider-neutral automation builder.
+Its foundation, durable runtime, safe action adapters, REST/OpenAPI and
+operator frontend are implemented; it is decomposed
 into ten bounded subtasks: ADR/action catalog; canonical immutable workflow
 versions; schema-backed DSL/compiler; tenant-scoped PostgreSQL state; EventBus
 and durable schedule triggers; execution/retry/approval state machine; typed
@@ -421,7 +422,7 @@ unbounded loops and secret/payload persistence are explicitly excluded. See
 
 ## Возвраты, отмены и refunds
 
-Task 164 is the in-progress provider-neutral returns/cancellations/refunds
+Task 164 is repository-complete for the provider-neutral returns/cancellations/refunds
 contour. Its completion gate is one synthetic end-to-end order flow:
 order → reservation → picking/packing → label → shipment → full/partial return
 → inspection/disposition → refund → settlement/fiscal evidence → reconciliation.
@@ -441,8 +442,8 @@ See `tasks/issues/164-returns-cancellations-refunds.md`.
 
 ## Прогноз остатков и автопополнение
 
-Task 165 is the in-progress extension of Task 053 from a basic advisory formula to
-an explainable forecast and guarded replenishment runtime. It adds forecast
+Task 165 is repository-complete for its provider-neutral forecast and operator
+runtime slice. It extends Task 053 from a basic advisory formula to an explainable forecast and guarded replenishment runtime. It adds forecast
 horizons/intervals, data-quality gates, projected stockout/overstock risk,
 supplier/MOQ/case-pack and budget/capacity policies, plus three explicit modes:
 `recommendation_only` (default), idempotent `draft_po` and narrowly qualified
@@ -453,7 +454,20 @@ worker, procurement execution, REST/UI/MCP boundaries, connector qualification,
 security/observability/quotas and Compose/load/chaos qualification. Forecasts
 never become inventory truth; PO submission never bypasses the existing
 procurement lifecycle or approval, and stale/ambiguous/unqualified inputs fail
-closed. See `tasks/issues/165-stock-forecast-auto-replenishment.md`.
+closed. The current repository mode is `recommendation_only`; provider-backed
+inputs, scheduled workers and approved PO execution remain explicit release
+gates. See `tasks/issues/165-stock-forecast-auto-replenishment.md`.
+
+## Цены, repricing и продвижение
+
+Task 221 is repository-complete for the bounded pricing preview slice. The
+frontend `/pricing` route and `POST /api/v1/pricing/repricing/preview` provide
+an exact, deterministic dry-run for up to 1,000 candidates, with stable digest,
+floor-price/max-step guards and per-row explanations. Canonical catalog price
+editing remains the internal mutation path. Marketplace price apply, Buy Box,
+promotions and advertising management stay qualification-required until an
+official connector, approval, idempotency and read-after-write evidence exist.
+See `tasks/issues/221-marketplace-pricing-repricing-promotions.md`.
 
 ## Центр качества публикации товаров
 
@@ -717,6 +731,19 @@ reference. PostgreSQL transaction advisory locks plus a post-lock bundle reread
 prevent API/worker races against rotating refresh tokens. Client-credentials
 grants exchange without a browser. No connector readiness count changes;
 Task 135 may now compose VK on top of this boundary.
+
+## Task 135 — VK production runtime composition
+
+Repository implementation complete for the admitted text-publication slice:
+VK uses the host-owned OAuth refresh runtime, strict `group_id` configuration,
+the common pinned HTTPS transport and the provider-neutral Social Core worker.
+The `/integrations` and `/social` frontend flows expose OAuth setup, health
+verification, channel creation, immediate/scheduled text publication and
+status history. The runtime admits `social.post.text` with a 16,384-rune limit;
+media, comments and analytics remain SDK-ready but explicitly deferred until
+their complete host API, persistence/reconciliation and frontend workflows are
+implemented. Live VK readiness still requires a dedicated non-production
+account and external evidence.
 
 ## Task 136 — Unauthenticated verified webhook ingress boundary
 
@@ -1071,8 +1098,9 @@ explicitly deferred until a separate approval-bound qualification.
 
 ## Epic 176 — Marketplace Operations v1
 
-Task 223 is in progress as the parent integration and release gate for the
-complete marketplace flow: account → product publication → price/stock → order
+Task 223 is repository-complete for the provider-neutral control-plane and
+synthetic orchestration. Live qualification remains the parent release gate
+for the complete marketplace flow: account → product publication → price/stock → order
 → reserve → pick/pack → shipment → return → settlement → P&L. It reuses the
 canonical domains and existing Tasks 164, 167, 171, 217, 218, 219 and 220;
 it does not create a second marketplace order, inventory or financial ledger.
@@ -1082,25 +1110,20 @@ qualification evidence. See `tasks/issues/223-marketplace-operations-v1.md`.
 
 ## Epic 177 — Массовые цены, repricing, Buy Box и продвижение
 
-Task 221 is planned to close the gap between price/unit-economics reporting and
-safe commercial action. It adds provider-neutral market observations, truthful
-Buy Box states, deterministic repricing previews, floor/margin guards, approval-
-bound price writes, promotion participation, advertising bids/budgets and
-reconciliation. The work is decomposed into thirteen subtasks covering policy
-and calculation contracts, observations, durable runs, connector qualification,
-OpenAPI/SDK/MCP, operator UI, quotas/operations and Compose/conformance. Missing
-official competitor or Buy Box data remains `not_available`; scraping and blind
-remote retries are forbidden. See
+Task 221 is repository-complete for the deterministic preview slice. It adds
+provider-neutral price candidates, stable digests, floor/max-step guards,
+per-row explanations and the `/pricing` operator route without a remote side
+effect. Provider-backed market observations, Buy Box, apply, promotions and
+advertising management remain qualification-required; missing official data is
+`not_available`, scraping and blind remote retries are forbidden. See
 `tasks/issues/221-marketplace-pricing-repricing-promotions.md`.
 
 ## Epic 178 — Marketplace-карточки: атрибуты, контент и массовое редактирование
 
-Task 222 is planned to make channel product cards complete and consistent. It
-adds versioned marketplace taxonomy, typed required/conditional attributes,
-provider-neutral mappings, localized content, variants, channel media slots,
-quality preflight, deterministic 1,000-SKU batch preview/apply, approval,
-read-after-write, drift/reconciliation and connector qualification. PIM remains
-the canonical product source; channel projections are separate and append-only.
-AI may create drafts but cannot publish or bypass policy. Unsupported or stale
-channel capabilities remain visibly denied. See
+Task 222 is repository-complete for the current PIM/catalog/publication slice.
+The frontend exposes product text, offers/SKU, prices, categories, images,
+quality preflight, publication dry-run, approval reference and reconciliation.
+Provider-specific taxonomy, conditional attributes, 1,000-SKU batch apply and
+live read-after-write remain explicit qualification gates. PIM remains the
+canonical product source; AI drafts cannot publish or bypass policy. See
 `tasks/issues/222-marketplace-listing-content-attributes.md`.

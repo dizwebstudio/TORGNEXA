@@ -45,6 +45,7 @@ import (
 	yookassa "github.com/torgnexa/torgnexa/connectors/payments/yookassa"
 	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
 	telegram "github.com/torgnexa/torgnexa/connectors/social/telegram"
+	vk "github.com/torgnexa/torgnexa/connectors/social/vk"
 	bitrixstore "github.com/torgnexa/torgnexa/connectors/storefronts/bitrix"
 	cscart "github.com/torgnexa/torgnexa/connectors/storefronts/cs-cart"
 	magento "github.com/torgnexa/torgnexa/connectors/storefronts/magento"
@@ -948,7 +949,7 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "orders.read") {
 		return nil, ErrUnavailable
 	}
-	if load == nil {
+	if load == nil && account.ConnectorID != "wildberries" && account.ConnectorID != "ozon" {
 		return nil, ErrConfigurationNeeded
 	}
 	var value sdk.OrderReader
@@ -985,6 +986,12 @@ func (r *Registry) OrderReader(ctx context.Context, account sdk.Account, runtime
 	case "yandex-market":
 		value = yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil)
 		remoteToCanonical = yandexOrderStatuses
+	case "wildberries":
+		value = wildberries.New(wbHTTP{r.http}, nil)
+		remoteToCanonical = wildberriesOrderStatuses
+	case "ozon":
+		value = ozon.New(ozonHTTP{r.http}, nil)
+		remoteToCanonical = ozonOrderStatuses
 	case "magento":
 		value = magento.New(magentoHTTP{r.http}, magentoConfigSource{load: load}, nil)
 		remoteToCanonical = magentoOrderStatuses
@@ -1054,6 +1061,16 @@ var megamarketOrderStatuses = map[string]string{
 var yandexOrderStatuses = map[string]string{
 	"PLACING": "pending", "RESERVATION": "confirmed", "PROCESSING": "processing",
 	"DELIVERY": "processing", "DELIVERED": "fulfilled", "CANCELLED": "cancelled", "RETURNED": "cancelled",
+}
+
+var wildberriesOrderStatuses = map[string]string{
+	"new": "pending", "assembly": "processing", "cancelled": "cancelled",
+}
+
+var ozonOrderStatuses = map[string]string{
+	"awaiting_packaging": "pending", "awaiting_approve": "confirmed", "awaiting_verification": "confirmed",
+	"awaiting_deliver": "processing", "delivering": "processing", "delivered": "fulfilled",
+	"cancelled": "cancelled", "canceled": "cancelled",
 }
 
 var magentoOrderStatuses = map[string]string{
@@ -1434,6 +1451,11 @@ func (r *Registry) SocialPublisher(account sdk.Account, load ConfigLoader) (sdk.
 			return nil, ErrConfigurationNeeded
 		}
 		return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
+	case "vk":
+		if load == nil {
+			return nil, ErrConfigurationNeeded
+		}
+		return vk.New(vkHTTP{r.http}, vkConfigSource{load: load}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -1685,6 +1707,10 @@ func (r *Registry) healthConnector(account sdk.Account, load ConfigLoader) (sdk.
 		if load != nil {
 			return maxmessenger.New(maxHTTP{r.http}, maxConfigSource{load: load}, nil), nil
 		}
+	case "vk":
+		if load != nil {
+			return vk.New(vkHTTP{r.http}, vkConfigSource{load: load}, nil), nil
+		}
 	case "yandex-market":
 		if load != nil {
 			return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
@@ -1801,6 +1827,10 @@ func (r *Registry) PriceWriter(account sdk.Account, runtime sdk.Runtime, load Co
 			return nil, ErrConfigurationNeeded
 		}
 		return cscart.New(csCartHTTP{r.http}, csCartConfigSource{load: load}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
 	case "yandex-market":
 		if load == nil {
 			return nil, ErrConfigurationNeeded
@@ -1858,7 +1888,7 @@ func (r *Registry) SupportsPriceWrite(account sdk.Account) bool {
 	// Keep the adapter-level admission stable for callers that use this port
 	// outside the generic sync route. The generated runtime-support contract
 	// separately controls which entities the production worker may route.
-	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "cs-cart" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop" || account.ConnectorID == "opencart")
+	return SupportsCapability(account.ConnectorID, "prices.write") && (account.ConnectorID == "bitrix" || account.ConnectorID == "cs-cart" || account.ConnectorID == "yandex-market" || account.ConnectorID == "woocommerce" || account.ConnectorID == "shopify" || account.ConnectorID == "medusa" || account.ConnectorID == "shopware" || account.ConnectorID == "magento" || account.ConnectorID == "saleor" || account.ConnectorID == "prestashop" || account.ConnectorID == "opencart" || account.ConnectorID == "ozon" || account.ConnectorID == "wildberries")
 }
 
 // InventoryWriter resolves first-party connectors with an executable
@@ -1924,6 +1954,8 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return yandexmarket.New(ymHTTP{r.http}, yandexConfigSource{load: load}, nil), nil
+	case "wildberries":
+		return wildberries.New(wbHTTP{r.http}, nil), nil
 	default:
 		return nil, ErrUnavailable
 	}
@@ -2030,6 +2062,26 @@ type yandexConfigSource struct{ load ConfigLoader }
 type telegramConfigSource struct{ load ConfigLoader }
 
 type maxConfigSource struct{ load ConfigLoader }
+
+type vkConfigSource struct{ load ConfigLoader }
+
+func (source vkConfigSource) Resolve(ctx context.Context, account sdk.Account) (vk.Configuration, error) {
+	raw, err := source.load(ctx, account.ID)
+	if err != nil {
+		return vk.Configuration{}, err
+	}
+	var value struct {
+		GroupID int64 `json:"group_id"`
+	}
+	if decodeStrict(raw, &value) != nil {
+		return vk.Configuration{}, vk.ErrInvalidConfiguration
+	}
+	configuration := vk.Configuration{GroupID: value.GroupID}
+	if configuration.Validate() != nil {
+		return vk.Configuration{}, vk.ErrInvalidConfiguration
+	}
+	return configuration, nil
+}
 
 func (source maxConfigSource) Resolve(ctx context.Context, account sdk.Account) (maxmessenger.Configuration, error) {
 	raw, err := source.load(ctx, account.ID)

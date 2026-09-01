@@ -59,7 +59,15 @@ UI не создаёт refund автоматически и не показыв�
 reconciliation выполняйте через соответствующие API после approval и проверки
 runtime capability.
 
-## Approval и runtime qualification
+## Операторские действия и runtime qualification
+
+В рабочем экране **Возвраты** доступны два независимых входа: запрос отмены
+заказа и оформление физического возврата. В карточке возврата оператор может
+добавить строку с точным количеством и disposition, запросить возвратную
+этикетку через capability logistics, записать allocation возврата денег и
+увидеть текущий lifecycle. Каждая форма создаёт новый `Idempotency-Key`; UI не
+выдаёт кнопку для неподтверждённой remote-операции и не показывает секреты или
+сырой ответ провайдера.
 
 Sensitive/legal действия проходят Task-017 policy/approval и повторную
 проверку scope, capability, account, amount и version. После approval worker

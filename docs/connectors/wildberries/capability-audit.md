@@ -9,9 +9,10 @@ Admit the read baseline and the bounded marketplace publication slice needed to 
 | `products.read` | Content `POST /content/v2/get/cards/list` | enabled |
 | `inventory.read` | Marketplace `GET /api/v3/warehouses`; `POST /api/v3/stocks/{warehouseId}` | enabled |
 | `products.write` | Content `/content/v2/cards/upload` and `/content/v2/cards/update` | enabled for bounded snapshot card create/update |
-| `prices.read/write` | Prices/discounts APIs | deferred |
-| `inventory.write` | `PUT/DELETE /api/v3/stocks/{warehouseId}` | denied |
-| `orders.read` | FBS/DBS/DBW order APIs | deferred |
+| `prices.write` | Discounts/prices `POST /api/v2/upload/task` | enabled for bounded outbound submit; reconciliation required |
+| `prices.read` | Prices/discounts APIs | deferred |
+| `inventory.write` | `PUT /api/v3/stocks/{warehouseId}` | enabled for bounded outbound submit; reconciliation required |
+| `orders.read` | FBS `GET /api/v3/orders` | enabled for bounded assembly-order projection |
 | `orders.status.write` | marketplace order mutation APIs | denied |
 | returns/reviews/messages/ads/promotions/finance | dedicated WB categories | deferred |
 
@@ -34,7 +35,10 @@ provider-neutral snapshot, forwards the host idempotency key, and returns an
 accepted receipt without treating HTTP 200 as final publication. The bounded
 status reader uses the existing cards projection. Released media and
 provider-specific characteristic/category bridges are rejected explicitly until
-their official fixtures and upload pipeline are qualified.
+their official fixtures and upload pipeline are qualified. Price writes require
+both the parent `nmID` mapping and the variant `chrtID`; a missing parent mapping
+fails closed. A successful HTTP response is `applied`, not `reconciled`, until a
+subsequent prices/inventory read confirms the remote state.
 
 ## Release rule
 

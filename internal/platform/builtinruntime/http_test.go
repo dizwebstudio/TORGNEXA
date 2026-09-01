@@ -13,6 +13,7 @@ import (
 
 	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
 	telegram "github.com/torgnexa/torgnexa/connectors/social/telegram"
+	vk "github.com/torgnexa/torgnexa/connectors/social/vk"
 )
 
 func TestHostAndAddressPolicy(t *testing.T) {
@@ -87,6 +88,57 @@ func TestMAXMediaUploadUsesOfficialHostAndBoundedMultipart(t *testing.T) {
 	payload, err := io.ReadAll(part)
 	if err != nil || string(payload) != "video" || part.FormName() != "data" || part.FileName() != upload.FileName {
 		t.Fatalf("unexpected upload part: name=%q file=%q body=%q err=%v", part.FormName(), part.FileName(), payload, err)
+	}
+}
+
+func TestVKRuntimeRequestAdmissionIsExact(t *testing.T) {
+	for _, method := range []string{"wall.post", "groups.getById", "photos.getWallUploadServer"} {
+		if !validVKAPIMethod(method) {
+			t.Fatalf("valid VK method rejected: %s", method)
+		}
+	}
+	for _, method := range []string{"/wall.post", "wall.post/evil", "wall.post\n", ""} {
+		if validVKAPIMethod(method) {
+			t.Fatalf("unsafe VK method accepted: %q", method)
+		}
+	}
+	if !validVKParam(vk.Param{Name: "owner_id", Value: "-12345"}) || validVKParam(vk.Param{Name: "owner_id", Value: "bad\nvalue"}) || validVKParam(vk.Param{Name: "owner.id", Value: "1"}) {
+		t.Fatal("VK parameter boundary is not fail-closed")
+	}
+}
+
+func TestVKMultipartBodyUsesOfficialUploadHostAndBounds(t *testing.T) {
+	upload := vk.UploadRequest{
+		URL:       "https://pu.vk.com/c12345/upload.php?act=do_add",
+		FieldName: "photo",
+		FileName:  "upl_0123456789abcdef0123456789abcdef.jpg",
+		MediaType: "image/jpeg",
+		SizeBytes: 5,
+		SHA256:    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		Body:      bytes.NewReader([]byte("photo")),
+	}
+	body, contentType, err := vkMultipartBody(upload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !validVKUploadURL(upload.URL) || validVKUploadURL("https://pu.vk.com.evil.example/upload") || validVKUploadURL("https://pu.vk.com:444/upload") || validVKUploadURL("http://pu.vk.com/upload") {
+		t.Fatal("unsafe or non-official VK upload URL accepted")
+	}
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType != "multipart/form-data" || params["boundary"] == "" {
+		t.Fatalf("invalid multipart content type: %q: %v", contentType, err)
+	}
+	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	part, err := reader.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := io.ReadAll(part)
+	if err != nil || string(payload) != "photo" || part.FormName() != "photo" || part.FileName() != upload.FileName {
+		t.Fatalf("unexpected VK upload part: name=%q file=%q body=%q err=%v", part.FormName(), part.FileName(), payload, err)
+	}
+	if _, _, err := vkMultipartBody(vk.UploadRequest{FieldName: "photo", FileName: "x.jpg", MediaType: "image/jpeg", SizeBytes: 4, SHA256: upload.SHA256, Body: bytes.NewReader([]byte("abc"))}); err == nil {
+		t.Fatal("VK short upload was accepted")
 	}
 }
 

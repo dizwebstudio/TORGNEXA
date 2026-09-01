@@ -2,12 +2,38 @@
 
 ## Status
 
-`in_progress` — foundation Task 165.1–165.2, deterministic baseline portions
-of 165.4–165.6 and part of 165.7 реализованы: provider-neutral model,
-tenant-scoped persistence and unit tests. Input adapters, durable worker,
-API/UI, procurement execution and production qualification остаются открытыми.
+`repository-complete` — provider-neutral foundation and the bounded operator
+runtime are implemented and validated. The repository now has exact planning
+contracts, tenant-scoped PostgreSQL persistence with RLS/outbox/audit, a
+deterministic forecast/projection/recommendation path, REST/OpenAPI plus
+generated SDK, and a frontend workspace at `/replenishment`. The current
+runtime is explicitly `recommendation_only`: it does not create or submit
+purchase orders and therefore cannot bypass procurement approval or write the
+WMS ledger. Provider-backed input adapters, scheduled production workers,
+approved draft/submit PO execution and live connector qualification remain
+release gates, not hidden claims of readiness.
 
 ## Objective
+
+## Repository completion evidence — 2026-09-01
+
+- migration `000050_replenishment_runtime.sql` is cataloged with a verified
+  digest, forced RLS, append-only controls and the immediate predecessor
+  dependency;
+- event `commerce.replenishment.run_completed.v1`, its schema fixture and the
+  generated SDK/OpenAPI operation set are synchronized;
+- `GET/POST /api/v1/replenishment` persist an immutable input digest and expose
+  exact p50/p90 forecast values, projected available stock, shortfall,
+  recommendation reasons and quality metadata;
+- the frontend route `/replenishment` lets an operator enter bounded planning
+  facts, run a preview and inspect recommendations, freshness/quality and
+  reason codes. No provider payloads or secrets are shown;
+- targeted Go tests, migration checks, contract validation, frontend typecheck,
+  53 logic tests, public-docs checks and production build passed.
+
+This closes the repository implementation slice. The release gates below
+remain intentionally visible and must be completed with approved external
+credentials, synthetic Compose evidence and current connector qualification.
 
 Довести существующий Task 053 из простого advisory-расчёта до production-ready
 контура прогноза спроса/остатков и управляемого автопополнения. Система должна

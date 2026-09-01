@@ -1742,6 +1742,11 @@
       }
     },
     {
+      "schema": "events/replenishment-run-completed-v1.schema.json",
+      "valid": {"run_id":"run_replenishment_001","status":"completed","input_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","recommendation_count":1,"version":1},
+      "invalid": {"run_id":"run_replenishment_001","status":"running","input_digest":"bad","recommendation_count":-1,"version":0}
+    },
+    {
       "schema": "events/return-requested-v1.schema.json",
       "valid": {
         "return_id": "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0711",

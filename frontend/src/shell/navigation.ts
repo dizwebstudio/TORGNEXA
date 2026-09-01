@@ -25,8 +25,8 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 ]);
 
 export const navigationSections = [
-  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "returns", "incidents", "marking"]},
-  {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "social"]},
+  {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "returns", "incidents", "marking", "replenishment", "pricing"]},
+  {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "marketplace-operations", "social"]},
   {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "financial-analytics", "advertising", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
 ] as const;
@@ -39,9 +39,12 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "orders", label: "Заказы", path: "/orders", capability: "orders.read", risk: "READ", icon: "orders", shortcut: "G O"},
   {id: "returns", label: "Возвраты", path: "/returns", capability: "orders.returns.read", risk: "WRITE_SENSITIVE", icon: "orders"},
   {id: "inventory", label: "Остатки", path: "/inventory", capability: "stock.read", risk: "READ", icon: "inventory", shortcut: "G I"},
+  {id: "replenishment", label: "Прогноз и пополнение", path: "/replenishment", capability: "stock.read", risk: "WRITE_SENSITIVE", icon: "inventory"},
+  {id: "pricing", label: "Цены и repricing", path: "/pricing", capability: "products.read", risk: "WRITE_SENSITIVE", icon: "finance"},
   {id: "incidents", label: "Инциденты", path: "/incidents", capability: "stock.read", risk: "READ", icon: "incident", shortcut: "G E"},
   {id: "marking", label: "Маркировка", path: "/marking", capability: "stock.read", risk: "WRITE_SENSITIVE", icon: "compliance"},
   {id: "integration-status", label: "Состояние интеграций", path: "/integrations/status", capability: "connectors.read", risk: "READ", icon: "connectors"},
+  {id: "marketplace-operations", label: "Операции marketplace", path: "/marketplace-operations", capability: "integrations.center.read", risk: "READ", icon: "connectors"},
   {id: "connectors", label: "Интеграции", path: "/integrations", capability: "connectors.read", risk: "READ", icon: "connectors", shortcut: "G X"},
   {id: "social", label: "Публикации", path: "/social", capability: "connectors.read", risk: "WRITE_SAFE", icon: "notifications", shortcut: "G M"},
   {id: "sync", label: "Синхронизация", path: "/sync", capability: "sync.read", risk: "READ", icon: "sync", shortcut: "G S"},
@@ -85,7 +88,7 @@ export function canOpenPath(pathname: string, capabilities: readonly string[]): 
 export function isKnownPath(pathname: string): boolean {
   const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
   if (normalized === "/" || navigationItems.some((item) => item.path === normalized)) return true;
-  if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/(orders|returns)\/[^/]+$/.test(normalized) || /^\/integrations\/status\/[^/]+$/.test(normalized)) return true;
+  if (/^\/catalog\/[^/]+$/.test(normalized) || /^\/(orders|returns)\/[^/]+$/.test(normalized) || /^\/integrations\/status\/[^/]+$/.test(normalized) || /^\/marketplace-operations\/[^/]+$/.test(normalized)) return true;
   if (normalized === "/oauth/connectors/callback") return true;
   if (normalized === "/finance/analytics") return true;
   return /^\/incidents\/(warehouse|drift|connector|approval)\/[^/]+$/.test(normalized);

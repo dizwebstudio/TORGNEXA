@@ -6,24 +6,73 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
 
 ## Progress
 
+## Current closure sequence — 2026-09-01
+
+Работа над оставшимися карточками выполняется строго последовательно: в каждый
+момент времени активна только одна задача. Статус задачи переводится в
+`repository-complete` только после реализации, обновления API/контрактов и
+документации, доступного frontend-сценария и прохождения релевантных проверок.
+
+1. **Task 135 — VK production runtime composition — repository-complete.**
+   Text publication is admitted through the shared Social Core surface;
+   media/comments/analytics remain explicitly runtime-deferred.
+2. **Task 163 — Workflow Automation Builder — repository-complete.** Runtime,
+   recovery, quotas, API/UI и qualification checks закрыты; live-provider gates
+   остаются в task card.
+3. **Task 164 — Returns, cancellations and refunds — repository-complete.**
+   Domain, tenant persistence, idempotent API, durable logistics route и
+   operator UI закрыты; live WMS/fiscal/payment qualification остаётся gate.
+4. **Task 165 — Forecast and auto-replenishment.** Закрыт repository slice:
+   exact forecast/projection/recommendation, tenant persistence, API/OpenAPI,
+   generated SDK и frontend `/replenishment`. Provider inputs, durable
+   production worker и approved PO execution остаются release gates.
+5. **Task 221 — Pricing, repricing, Buy Box and promotions — repository-complete
+   for preview slice.** Deterministic preview, floor/max-step guards, API,
+   SDK и frontend `/pricing` закрыты; marketplace apply/promotions/Buy Box
+   остаются qualification gates.
+6. **Task 222 — Listing content, attributes and mass editing — repository-complete
+   for the current PIM/publication slice.** Catalog, content, offers, prices,
+   categories, media, quality preflight и publication UI закрыты; provider
+   taxonomy, batch apply и live read-after-write остаются gates.
+7. **Epic 176 / Task 223 — final marketplace integration gate —
+   repository-complete.** Связать
+   результаты 164/165/221/222 с marketplace order, fulfillment, returns,
+   settlement/P&L и operations center; затем отдельно провести provider
+   qualification. До официального non-production smoke WB/Ozon остаются
+   `read_only`/`partially_supported`; live provider evidence remains the release
+   gate.
+
+Task 135–222 выполняются по одному. Для каждого шага обязательны: task card,
+product/architecture/operations documentation, OpenAPI and generated SDK when
+the public contract changes, frontend route and operator workflow, tenant/RLS
+and security checks, deterministic tests, and the appropriate migration,
+contract, Docker and performance checks. Repository completion does not invent
+live-provider evidence.
+
 - Completed repository implementation: `001`, `024`, `065`, `002`, `027`,
   `067`, `080`, `003`, `021`, `060`, `007`, `008`, `009`, `004`, `005`, `006`, `076`, `025`, `010`, `029`, `064`, `017`, `030`, `023`, `081`, `082`, `028`, `026`, `063`, `022`, `062`, `032`, `031`, `088`, `013`, `014`, `011`, `012`, `015`, `016`, `033`, `034`, `035`, `036`, `018`, `079`, `020`, `019`, `078`, `040`, `041`, `042`, `037`, `038`, `039`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`, `051`, `052`, `053`, `054`, `055`, `056`, `057`, `058`, `059`, `061`, `066`, `068`, `069`, `070`, `071`, `072`, `073`, `074`, `075`, `077`, `083`, `084`, `085`, `086`, `087`, `090`, `091`, `092`, `089`, `093`, `094`, `095`, `096`, `097`.
 - Completed split-stage repository implementation: `076a`, `076b`, `088a`, `088b`, `089a`, and `089b`; parent Tasks `076`, `088`, and `089` are repository-complete.
-- Contiguous implemented baseline: Tasks `001`–`134`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces; Task `134` closes the host-owned OAuth access-token projection and refresh boundary. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
+- Contiguous implemented baseline: Tasks `001`–`135`. Task `118` closes the P4 repository layer with fail-closed go-live evidence synthesis and PASS-gated release promotion; Tasks `119`–`130` add operator UX, compact migrations, AI/MCP governance, the trust control plane and a runtime-truthful integration catalog; Tasks `131`–`133` compose CBR FX, Telegram and MAX into truthful dedicated production surfaces; Task `134` closes the host-owned OAuth access-token projection and refresh boundary; Task `135` composes VK text publication on the shared Social Core surface. Deployment/hosted and live-provider evidence remains release-topology specific and cannot be inferred from repository completion.
 - Post-baseline provider tasks `139`, `141`, `142`, `143`, `145`, `147`, `149`, `150`, `151`, `152`, `153`, `154`, `155`, `156`, `172`, `173`, `174`, `175`, `176`, `177` and `178` are repository-complete; their live credentials, external API contracts and production qualification remain environment-specific gates. Task `156` groups all former planned entries into explicit category surfaces and admits only health checks.
 - Task `157` is repository-complete: Lamoda and М.Видео are visible in the Marketplace catalog as health-only surfaces with tenant-scoped API-key enrollment and bounded operator-configured HTTPS probes; product, price, stock and order operations remain qualification-gated.
 - Task `158` is repository-complete: «Долями» is visible in Payments as an mTLS/basic health-only surface; payment mutations and webhooks remain qualification-gated.
 - Task `159` is repository-complete: Google Gemini and Grok are visible in the governed AI-provider surface with official API-key transports; Midjourney remains intentionally unavailable because its terms prohibit third-party automation.
 - Task `161` is repository-complete: `commerce-sync` now consumes canonical product change events, invokes admitted ProductWriter routes with provider-native status translation, and persists product mappings only after validated remote receipts.
 - Task `162` is repository-complete: the Community deployment now has a repeatable authenticated Chrome E2E that reconciles the Keycloak demo member and verifies catalog, product images, orders and order thumbnails through the rendered browser UI.
-- Task `163` is in progress: the Workflow Automation Builder foundation and
+- Task `135` is repository-complete for its admitted slice: VK OAuth, strict
+  group configuration, health and Social Core text publication are composed
+  through the common host transport and exposed in the Integrations and
+  Publications frontend. Media, comments and analytics remain SDK-ready but
+  fail-closed until their complete application workflows are added; live
+  provider readiness still needs a dedicated non-production account.
+- Task `163` is repository-complete for its implementation slice: the Workflow Automation Builder foundation and
   runtime are implemented; the remaining qualification gates are tracked in
   the issue and must pass before production readiness. The feature is decomposed into
   ten bounded subtasks covering the action catalog/ADR, immutable workflow
   versions, schema-backed DSL/compiler, RLS persistence, EventBus and durable
   schedule triggers, execution/retry/approval runtime, typed safe adapters,
   REST/UI, quotas/observability/recovery and load/chaos/Compose qualification.
-- Task `164` is planned: Returns, cancellations and refunds are decomposed into
+- Task `164` is repository-complete for its bounded implementation slice: Returns, cancellations and refunds are decomposed into
   twelve bounded subtasks covering policy/state machines, order/payment/
   fulfillment/WMS orchestration, RLS persistence, canonical events and
   webhooks, cancellation and return workers, refund/fiscal/settlement
@@ -31,7 +80,8 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   release evidence. The existing payments refund lifecycle remains the single
   mutation path; ambiguous external outcomes require reconciliation/manual
   attention rather than blind retry.
-- Task `165` is in progress: Stock forecasting and auto-replenishment are decomposed
+- Task `165` is repository-complete for the bounded provider-neutral runtime:
+  Stock forecasting and auto-replenishment are decomposed
   into thirteen bounded subtasks covering deterministic forecasts, data-quality
   gates, stock projections/risk, supplier/MOQ/budget optimization, RLS/lineage,
   scheduler/worker, guarded draft/submit PO execution, REST/UI, connector
@@ -61,8 +111,9 @@ Tasks `076`, `088`, and `089` are explicitly split into `a` and `b` implementati
   REST/OpenAPI, operator UI, idempotent actions, security/SLO/quotas and
   Compose/test/documentation qualification. GET performs no remote probe and
   manifest/health-only/SDK-only evidence never becomes executable green state.
-- Task `223` is in progress as the parent integration gate for user-facing
-  Epic 176 Marketplace Operations v1. It composes the existing product,
+- Task `223` is repository-complete for the provider-neutral control-plane and
+  synthetic orchestration, with live provider qualification as the remaining
+  release gate for user-facing Epic 176 Marketplace Operations v1. It composes the existing product,
   pricing/inventory, orders, WMS/fulfillment, returns, marking/EDO,
   settlement, advertising and financial boundaries; it does not claim a
   provider as fully qualified until the complete end-to-end gate passes.
@@ -559,7 +610,8 @@ interaction. The catalog remains 11 generic, nine separate and 18 planned.
 - Connector SDK v1, OpenAPI, events, migrations and readiness counts do not
   change;
 - Go test/vet, contracts, architecture, migration, frontend and rebuilt
-  API/worker health gates must pass before Task 135 begins.
+  API/worker health gates passed for the Task-134 boundary; Task 135 is now
+  repository-complete for its admitted VK text-publication slice.
 
 ## Phase 20 — Bitrix24 CRM production composition
 
@@ -1040,11 +1092,9 @@ and JavaScript supply-chain graph remain unchanged.
 
 `163`
 
-Task 163 is being implemented as a provider-neutral automation builder on top of the
-existing EventBus/Transactional Outbox/Inbox, PostgreSQL scheduler, worker,
-approval and connector-port boundaries. The implementation is intentionally
-split into ten subtasks so that the first safe vertical slice can ship before
-the full visual builder:
+Task 163 is repository-complete as a provider-neutral automation builder on top
+of the existing EventBus/Transactional Outbox/Inbox, PostgreSQL scheduler,
+worker, approval and connector-port boundaries. All ten subtasks are covered:
 
 1. `163.1` ADR, scope and typed action catalog;
 2. `163.2` canonical workflow model and immutable version lifecycle;
@@ -1059,7 +1109,7 @@ the full visual builder:
 10. `163.10` contract, security, load/chaos, Compose E2E and documentation
     qualification.
 
-### Gate RUNTIME-163
+### Gate RUNTIME-163 — repository-complete
 
 - workflow definitions are immutable after publish and every run is
   tenant-scoped, idempotent and resumable;
@@ -1073,8 +1123,9 @@ the full visual builder:
   storms on the small-VPS Compose profile;
 - API/UI expose only validated actions and current runtime capabilities;
 - full Go, contract, architecture, migration, frontend, conformance,
-  performance and deployment qualification checks pass before production
-  admission.
+  performance and repository qualification checks pass. Live deployment
+  capacity, target-topology chaos and live-provider evidence remain separate
+  release gates.
 
 ## Phase 34 — Возвраты, отмены и refunds
 
@@ -1436,7 +1487,8 @@ administrator. The implementation is split into twenty subtasks:
 
 `165`
 
-Task 165 is in progress as a provider-neutral extension of Task 053. It turns the
+Task 165 is repository-complete for its bounded provider-neutral runtime slice.
+It turns the
 current velocity/lead-time/safety-stock recommendation into a versioned demand
 forecast, projected stockout/overstock risk and controlled replenishment plan,
 while keeping PostgreSQL/WMS ledger authoritative and ClickHouse analytical

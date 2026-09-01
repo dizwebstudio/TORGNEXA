@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "a01c56440d7faf060e511fe3b9531fbac18f680e8368f5ae506b337de7041cca",
+    "sha256": "96796273fab4cdf5b3d6e1d58dd09f317c94a08d09cbcae7a7aeeea6d27054be",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,16 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "applyMarketplaceOperationFindingAction",
+      "method": "POST",
+      "path": "/marketplace-operations/findings/{finding_id}/actions"
+    },
+    {
+      "operation_id": "applyMarketplaceOperationFlowCommand",
+      "method": "POST",
+      "path": "/marketplace-operations/flows/{flow_id}/commands"
     },
     {
       "operation_id": "approveAssistantActionPreview",
@@ -195,6 +205,11 @@
       "path": "/settings/mcp-accounts"
     },
     {
+      "operation_id": "createMarketplaceOperationFlow",
+      "method": "POST",
+      "path": "/marketplace-operations/flows"
+    },
+    {
       "operation_id": "createOfferPrice",
       "method": "POST",
       "path": "/products/{product_id}/prices/{offer_or_price_id}"
@@ -263,6 +278,11 @@
       "operation_id": "createRefundAllocation",
       "method": "POST",
       "path": "/refund-allocations"
+    },
+    {
+      "operation_id": "createReplenishmentRun",
+      "method": "POST",
+      "path": "/replenishment"
     },
     {
       "operation_id": "createReturn",
@@ -513,6 +533,11 @@
       "operation_id": "getMCPAgentKillSwitch",
       "method": "GET",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "getMarketplaceOperations",
+      "method": "GET",
+      "path": "/marketplace-operations/{account_id}"
     },
     {
       "operation_id": "getMarketplacePublication",
@@ -830,6 +855,26 @@
       "path": "/settings/mcp-accounts"
     },
     {
+      "operation_id": "listMarketplaceOperationFindings",
+      "method": "GET",
+      "path": "/marketplace-operations/findings"
+    },
+    {
+      "operation_id": "listMarketplaceOperationFlowFindings",
+      "method": "GET",
+      "path": "/marketplace-operations/flows/{flow_id}/findings"
+    },
+    {
+      "operation_id": "listMarketplaceOperationFlows",
+      "method": "GET",
+      "path": "/marketplace-operations/flows"
+    },
+    {
+      "operation_id": "listMarketplaceOperations",
+      "method": "GET",
+      "path": "/marketplace-operations"
+    },
+    {
       "operation_id": "listMarketplacePublicationDrifts",
       "method": "GET",
       "path": "/marketplace-publications/{operation_id}/drifts"
@@ -893,6 +938,11 @@
       "operation_id": "listPublicationQualityRuns",
       "method": "GET",
       "path": "/publication-quality/runs"
+    },
+    {
+      "operation_id": "listReplenishmentRuns",
+      "method": "GET",
+      "path": "/replenishment"
     },
     {
       "operation_id": "listReports",
@@ -1023,6 +1073,11 @@
       "operation_id": "previewProcurementPriceList",
       "method": "POST",
       "path": "/procurement/price-lists/preview"
+    },
+    {
+      "operation_id": "previewRepricing",
+      "method": "POST",
+      "path": "/pricing/repricing/preview"
     },
     {
       "operation_id": "publishWorkflow",

@@ -2,11 +2,32 @@
 
 ## Status
 
-`planned` — существующие pricing guards, unit economics и read-only рекламная
-аналитика дают основу, но production-ready массовое принятие и применение
-ценовых решений ещё не реализовано.
+`repository-complete` — deterministic, provider-neutral repricing preview is
+implemented and available at `/pricing`. It evaluates up to 1,000 rows with a
+stable input digest, exact minor-unit arithmetic, floor-price and max-step
+guards, per-row explanations and blocked-row counts. Existing catalog price
+editing remains the canonical internal price write path. Marketplace price
+apply, Buy Box/competitor observations, promotions and advertising management
+remain explicitly qualification-gated; no remote write is implied by preview.
 
 ## Objective
+
+## Repository completion evidence — 2026-09-01
+
+- `internal/core/repricing` provides deterministic sorted previews and stable
+  SHA-256 input digests, with tests for duplicate rows, floor violations and
+  step limits;
+- `POST /api/v1/pricing/repricing/preview` is tenant-authenticated, bounded to
+  1,000 candidates, and is documented in OpenAPI with generated Go/Python/
+  TypeScript SDKs;
+- the frontend route `/pricing` lets an operator enter a batch, run a dry-run,
+  inspect every approved or blocked row and read the Russian explanation;
+- contract validation, API/core tests and frontend typecheck/logic/docs checks
+  passed. The UI clearly states that preview does not call a marketplace.
+
+This closes the repository preview slice. Provider-backed price writes,
+promotions, Buy Box and advertising management require separate current
+connector evidence, approval and read-after-write qualification.
 
 Довести provider-neutral контур от наблюдения рынка до безопасного изменения
 цены, участия в акции и управления рекламной кампанией. Оператор должен видеть

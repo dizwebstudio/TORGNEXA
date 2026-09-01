@@ -3,6 +3,7 @@ package wildberries
 import (
 	"context"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -27,6 +28,9 @@ var warehousesFixture []byte
 
 //go:embed fixtures/stocks.json
 var stocksFixture []byte
+
+//go:embed fixtures/orders-page.json
+var ordersPageFixture []byte
 
 type scriptedTransport struct {
 	responses []Response
@@ -76,8 +80,83 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	if !reflect.DeepEqual(fromFile.Canonical(), Manifest().Canonical()) {
 		t.Fatalf("manifest drift: %#v != %#v", fromFile, Manifest())
 	}
-	if !Manifest().Supports("products.write") || Manifest().Supports("inventory.write") {
+	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || !Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") {
 		t.Fatal("marketplace product publication capability is not declared exactly")
+	}
+}
+
+func TestWriteInventoryUsesFBSStockEndpointAndReturnsUnreconciledReceipt(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 204}}}
+	connector := New(transport, nil)
+	receipt, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.InventoryWriteRequest{
+		VariantRemoteID: "701710869", LocationRemoteID: "12345", Quantity: 7, IdempotencyKey: "inventory-write-1",
+	})
+	if err != nil || receipt.RemoteID != "701710869" || !receipt.Applied || receipt.Reconciled || receipt.Duplicate {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	if got := transport.requests[0]; got.Method != "PUT" || got.Host != marketplaceHost || got.Path != "/api/v3/stocks/12345" || got.IdempotencyKey != "inventory-write-1" {
+		t.Fatalf("unexpected request: %+v", got)
+	}
+	var body inventoryWriteRequest
+	if err := json.Unmarshal(transport.requests[0].Body, &body); err != nil || len(body.Stocks) != 1 || body.Stocks[0].ChrtID != 701710869 || body.Stocks[0].Amount != 7 {
+		t.Fatalf("body=%s err=%v", transport.requests[0].Body, err)
+	}
+}
+
+func TestWriteInventoryTransportFailureIsUnknown(t *testing.T) {
+	transport := &scriptedTransport{errs: []error{errors.New("dial token=must-not-leak")}}
+	connector := New(transport, nil)
+	_, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.InventoryWriteRequest{
+		VariantRemoteID: "701710869", LocationRemoteID: "12345", Quantity: 7, IdempotencyKey: "inventory-write-1",
+	})
+	var remote *sdk.RemoteError
+	if !errors.As(err, &remote) || remote.Code != "write_outcome_unknown" || strings.Contains(err.Error(), "must-not-leak") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestWritePriceRequiresParentProductAndUsesSizePriceEndpoint(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"data":{"id":123}}`)}}}
+	connector := New(transport, nil)
+	receipt, err := connector.WritePrice(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.PriceWriteRequest{
+		ProductRemoteID: "505548518", VariantRemoteID: "701710869", Value: "1999.00", CompareAt: "2499.00", Currency: "RUB", IdempotencyKey: "price-write-1",
+	})
+	if err != nil || receipt.RemoteID != "701710869" || !receipt.Applied || receipt.Reconciled || receipt.Duplicate {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	if got := transport.requests[0]; got.Method != "POST" || got.Host != pricesHost || got.Path != "/api/v2/upload/task" || got.IdempotencyKey != "price-write-1" {
+		t.Fatalf("unexpected request: %+v", got)
+	}
+	var body priceUploadRequest
+	if err := json.Unmarshal(transport.requests[0].Body, &body); err != nil || len(body.Data) != 1 || body.Data[0].NmID != 505548518 || body.Data[0].SizeID != 701710869 || body.Data[0].Price != 1999 || body.Data[0].Discount != 20 {
+		t.Fatalf("body=%s err=%v", transport.requests[0].Body, err)
+	}
+}
+
+func TestWritePriceRejectsMissingParentProduct(t *testing.T) {
+	_, err := New(&scriptedTransport{}, nil).WritePrice(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.PriceWriteRequest{
+		VariantRemoteID: "701710869", Value: "1999.00", Currency: "RUB", IdempotencyKey: "price-write-1",
+	})
+	if !errors.Is(err, sdk.ErrInvalidCommerceWrite) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestReadOrdersUsesBoundedNextCursorAndNormalizedProjection(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: ordersPageFixture}}}
+	connector := New(transport, func() time.Time { return now })
+	page, err := connector.ReadOrders(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.PageRequest{Limit: 1})
+	if err != nil || len(page.Items) != 1 || page.Items[0].RemoteID != "13833711" || page.Items[0].Items[0].VariantRemoteID != "987654321" || page.Items[0].StatusRemoteID != "assembly" || page.NextCursor == "" {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	if len(transport.requests[0].Query) != 4 || transport.requests[0].Query[0].Name != "limit" || transport.requests[0].Query[0].Value != "1" || transport.requests[0].Query[1].Name != "next" || transport.requests[0].Query[1].Value != "0" {
+		t.Fatalf("query=%+v", transport.requests[0].Query)
+	}
+	data, decodeErr := base64.RawURLEncoding.DecodeString(page.NextCursor)
+	var cursor orderCursor
+	if decodeErr != nil || json.Unmarshal(data, &cursor) != nil || cursor.Next != 13833712 {
+		t.Fatalf("cursor=%q", page.NextCursor)
 	}
 }
 
@@ -197,6 +276,7 @@ func TestProductAndInventoryInterfaces(t *testing.T) {
 	var _ sdk.Connector = (*Connector)(nil)
 	var _ sdk.ProductReader = (*Connector)(nil)
 	var _ sdk.InventoryReader = (*Connector)(nil)
+	var _ sdk.OrderReader = (*Connector)(nil)
 }
 
 func TestReadProductsRejectsMalformedCursorAndResponse(t *testing.T) {
@@ -281,4 +361,13 @@ func publicationRequest(t *testing.T, sku, connectorID string) sdk.ProductPublic
 	request.Snapshot.SKU = sku
 	request.Snapshot.Target.ConnectorID = connectorID
 	return request
+}
+
+func TestInterfaces(t *testing.T) {
+	var _ sdk.Connector = (*Connector)(nil)
+	var _ sdk.ProductReader = (*Connector)(nil)
+	var _ sdk.InventoryReader = (*Connector)(nil)
+	var _ sdk.InventoryWriter = (*Connector)(nil)
+	var _ sdk.PriceWriter = (*Connector)(nil)
+	var _ sdk.OrderReader = (*Connector)(nil)
 }

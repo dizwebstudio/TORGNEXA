@@ -680,6 +680,32 @@ paths:
       responses:
         '202': {description: Refund allocation accepted, content: {application/json: {schema: {$ref: '#/components/schemas/RefundAllocation'}}}}
         '409': {description: Payment allocation or idempotency conflict}
+  /replenishment:
+    get:
+      operationId: listReplenishmentRuns
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200': {description: Tenant-scoped forecast and replenishment runs, content: {application/json: {schema: {$ref: '#/components/schemas/ReplenishmentRunPage'}}}}
+    post:
+      operationId: createReplenishmentRun
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReplenishmentRunCreate'}}}}
+      responses:
+        '201': {description: Forecast and recommendation generated, content: {application/json: {schema: {$ref: '#/components/schemas/ReplenishmentRunResult'}}}}
+        '409': {description: Planning run input conflict}
+  /pricing/repricing/preview:
+    post:
+      operationId: previewRepricing
+      security: [{bearerAuth: []}]
+      description: Deterministic, provider-neutral price preview. This dry-run never calls a marketplace and never changes a price.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RepricingPreviewCreate'}}}}
+      responses:
+        '200': {description: Price candidates with floor and step guards, content: {application/json: {schema: {$ref: '#/components/schemas/RepricingPreview'}}}}
+        '400': {description: Invalid price candidates}
   /payments:
     get:
       operationId: listPayments
@@ -1672,6 +1698,140 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
         '404': {description: Account is not visible in the resolved tenant}
+  /marketplace-operations:
+    get:
+      operationId: listMarketplaceOperations
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: account_id, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+      responses:
+        '200':
+          description: Tenant-scoped marketplace operation matrix without remote IO
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationsResponse'}}}
+        '400': {description: "Invalid cursor, account id or limit"}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+  /marketplace-operations/{account_id}:
+    get:
+      operationId: getMarketplaceOperations
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: account_id, in: path, required: true, schema: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+      responses:
+        '200':
+          description: Marketplace operation matrix for one tenant-scoped account
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationsAccount'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+        '404': {description: Account is not visible in the resolved tenant}
+  /marketplace-operations/flows:
+    get:
+      operationId: listMarketplaceOperationFlows
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Tenant-scoped marketplace workflow projections without remote IO or provider payloads
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFlowsResponse'}}}
+        '400': {description: Invalid cursor or limit}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+    post:
+      operationId: createMarketplaceOperationFlow
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarketplaceOperationFlowCreate'}
+      responses:
+        '201':
+          description: Tenant-scoped marketplace workflow created
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFlowCreateResponse'}}}
+        '400': {description: Invalid account or idempotency key}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks marketplace.operations.write}
+        '409': {description: Flow identity conflict}
+  /marketplace-operations/flows/{flow_id}/commands:
+    post:
+      operationId: applyMarketplaceOperationFlowCommand
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: flow_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarketplaceOperationFlowCommand'}
+      responses:
+        '200':
+          description: Flow command applied or replayed idempotently
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFlowCommandResponse'}}}
+        '400': {description: Invalid command}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks marketplace.operations.write}
+        '404': {description: Flow is not visible in the resolved tenant}
+        '409': {description: Invalid transition or idempotency conflict}
+  /marketplace-operations/flows/{flow_id}/findings:
+    get:
+      operationId: listMarketplaceOperationFlowFindings
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: flow_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, resolved]}}
+      responses:
+        '200':
+          description: Findings for one tenant-scoped marketplace workflow
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFindingsResponse'}}}
+        '400': {description: "Invalid cursor, status or limit"}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+        '404': {description: Flow is not visible in the resolved tenant}
+  /marketplace-operations/findings:
+    get:
+      operationId: listMarketplaceOperationFindings
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: flow_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [open, resolved]}}
+      responses:
+        '200':
+          description: Tenant-scoped immutable marketplace findings
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFindingsResponse'}}}
+        '400': {description: "Invalid cursor, status, flow id or limit"}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks integrations.center.read}
+  /marketplace-operations/findings/{finding_id}/actions:
+    post:
+      operationId: applyMarketplaceOperationFindingAction
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: finding_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarketplaceOperationFindingAction'}
+      responses:
+        '200':
+          description: Durable operator action appended or replayed; remote IO is performed only by a guarded worker
+          content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceOperationFindingActionResponse'}}}
+        '400': {description: Invalid action or idempotency key}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks marketplace.operations.write}
+        '404': {description: Finding is not visible in the resolved tenant}
+        '409': {description: Idempotency conflict}
   /connector-accounts:disable:
     post:
       operationId: disableConnectorAccount
@@ -5211,6 +5371,53 @@ components:
         minor_units: {type: integer, minimum: 0}
         currency: {type: string, pattern: '^[A-Z]{3}$'}
         version: {type: integer, minimum: 1}
+    RepricingPreviewCreate:
+      type: object
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        run_id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items: {$ref: '#/components/schemas/RepricingCandidateInput'}
+    RepricingCandidateInput:
+      type: object
+      additionalProperties: false
+      required: [id, offer_id, sku, currency, current_minor, proposed_minor, floor_minor, max_change_bps]
+      properties:
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        offer_id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        current_minor: {type: integer, minimum: 0}
+        proposed_minor: {type: integer, minimum: 0}
+        floor_minor: {type: integer, minimum: 0}
+        max_change_bps: {type: integer, minimum: 0, maximum: 10000}
+    RepricingCandidate:
+      allOf:
+        - {$ref: '#/components/schemas/RepricingCandidateInput'}
+        - type: object
+          required: [status, delta_minor, delta_bps, explanation, approval_required]
+          properties:
+            status: {type: string, enum: [approved, blocked]}
+            delta_minor: {type: integer}
+            delta_bps: {type: integer}
+            explanation: {type: string, minLength: 1, maxLength: 300}
+            approval_required: {type: boolean}
+    RepricingPreview:
+      type: object
+      additionalProperties: false
+      required: [id, input_digest, status, generated_at, candidate_count, blocked_count, candidates]
+      properties:
+        id: {type: string}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, enum: [completed, partial]}
+        generated_at: {type: string, format: date-time}
+        candidate_count: {type: integer, minimum: 1, maximum: 1000}
+        blocked_count: {type: integer, minimum: 0, maximum: 1000}
+        candidates: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/RepricingCandidate'}}
     CategoryWrite:
       type: object
       required: [code, name]
@@ -6246,6 +6453,166 @@ components:
         summary: {$ref: '#/components/schemas/IntegrationCenterSummary'}
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/IntegrationCenterAccount'}}
         next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    MarketplaceOperation:
+      type: object
+      additionalProperties: false
+      required: [key, label, state, required_capabilities, available_capabilities, permission, risk, approval_required, reason_code]
+      properties:
+        key: {type: string, pattern: '^[a-z][a-z0-9_]{0,63}$'}
+        label: {type: string, minLength: 1, maxLength: 160}
+        state: {type: string, enum: [not_available, read_only, partially_supported, qualified, blocked]}
+        required_capabilities: {type: array, maxItems: 16, items: {type: string, maxLength: 128}}
+        available_capabilities: {type: array, maxItems: 16, items: {type: string, maxLength: 128}}
+        permission: {type: string, maxLength: 96}
+        risk: {type: string, enum: [read, write_sensitive, legally_significant]}
+        approval_required: {type: boolean}
+        reason_code: {type: string, pattern: '^[a-z][a-z0-9_]{0,95}$'}
+    MarketplaceOperationsAccount:
+      type: object
+      additionalProperties: false
+      required: [account_id, connector_id, display_name, account_status, health_status, overall_state, partial, operations]
+      properties:
+        account_id: {type: string, minLength: 1, maxLength: 128}
+        connector_id: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,95}$'}
+        display_name: {type: string, maxLength: 160}
+        account_status: {type: string, maxLength: 64}
+        health_status: {type: string, maxLength: 64}
+        overall_state: {type: string, enum: [not_available, read_only, partially_supported, qualified, blocked]}
+        partial: {type: boolean}
+        operations: {type: array, maxItems: 32, items: {$ref: '#/components/schemas/MarketplaceOperation'}}
+    MarketplaceOperationsResponse:
+      type: object
+      additionalProperties: false
+      required: [snapshot_version, generated_at, partial, consistency, items]
+      properties:
+        snapshot_version: {type: integer, minimum: 1}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        partial: {type: boolean}
+        consistency: {type: string, enum: [atomic, best_effort]}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplaceOperationsAccount'}}
+        next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    MarketplaceOperationFlowReference:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+    MarketplaceOperationFlow:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, account_id, stage, state, version, created_at, updated_at]
+      properties:
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation, complete]}
+        state: {type: string, enum: [pending, unknown, blocked, complete]}
+        version: {type: integer, minimum: 1}
+        last_operation_id: {type: string, maxLength: 192}
+        last_idempotency_key: {type: string, maxLength: 192}
+        last_reason_code: {type: string, maxLength: 192}
+        references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceOperationFlowsResponse:
+      type: object
+      additionalProperties: false
+      required: [snapshot_version, generated_at, consistency, items]
+      properties:
+        snapshot_version: {type: integer, minimum: 1}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        consistency: {type: string, enum: [atomic, best_effort]}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplaceOperationFlow'}}
+        next_cursor: {type: string, maxLength: 512}
+    MarketplaceOperationFlowCreate:
+      type: object
+      additionalProperties: false
+      required: [account_id]
+      properties:
+        id: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}
+        account_id: {type: string, minLength: 1, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$'}
+    MarketplaceOperationFlowCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [flow, replayed]
+      properties:
+        flow: {$ref: '#/components/schemas/MarketplaceOperationFlow'}
+        replayed: {type: boolean}
+    MarketplaceOperationFlowCommand:
+      type: object
+      additionalProperties: false
+      required: [operation_id, stage, outcome, occurred_at]
+      properties:
+        operation_id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation, complete]}
+        outcome: {type: string, enum: [succeeded, rejected, unknown]}
+        reason_code: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        references: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceOperationFlowReference'}}
+        occurred_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceOperationFlowCommandResponse:
+      type: object
+      additionalProperties: false
+      required: [flow, duplicate]
+      properties:
+        flow: {$ref: '#/components/schemas/MarketplaceOperationFlow'}
+        duplicate: {type: boolean}
+    MarketplaceOperationFinding:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, flow_id, account_id, stage, kind, entity_kind, entity_id, severity, status, reason_code, detected_at]
+      properties:
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        flow_id: {type: string, maxLength: 192}
+        account_id: {type: string, maxLength: 192}
+        stage: {type: string, enum: [account, product, publication, pricing, inventory, order, reservation, pick_pack, shipment, return, settlement, profitability, reconciliation]}
+        kind: {type: string, enum: [unknown_remote_outcome, stale_data, missing_mapping, duplicate_order, price_stock_mismatch, marketplace_health, dead_letter, partial_response, status_drift]}
+        entity_kind: {type: string, maxLength: 192}
+        entity_id: {type: string, maxLength: 192}
+        severity: {type: string, enum: [info, warn, block]}
+        status: {type: string, enum: [open, resolved]}
+        reason_code: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}
+        expected: {type: string, maxLength: 2000}
+        observed: {type: string, maxLength: 2000}
+        evidence_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        detected_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceOperationFindingsResponse:
+      type: object
+      additionalProperties: false
+      required: [snapshot_version, generated_at, consistency, items]
+      properties:
+        snapshot_version: {type: integer, minimum: 1}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        consistency: {type: string, enum: [atomic, best_effort]}
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplaceOperationFinding'}}
+        next_cursor: {type: string, maxLength: 512}
+    MarketplaceOperationFindingAction:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: {type: string, enum: [retry, reconcile, resolve]}
+    MarketplaceOperationFindingActionResponse:
+      type: object
+      additionalProperties: false
+      required: [action, finding, duplicate]
+      properties:
+        action:
+          type: object
+          additionalProperties: false
+          required: [id, finding_id, action, idempotency_key, actor_id, occurred_at]
+          properties:
+            id: {type: string, maxLength: 192}
+            finding_id: {type: string, maxLength: 192}
+            action: {type: string, enum: [retry, reconcile, resolve]}
+            idempotency_key: {type: string, maxLength: 192}
+            actor_id: {type: string, maxLength: 192}
+            occurred_at: {type: string, format: date-time, pattern: 'Z$'}
+        finding: {$ref: '#/components/schemas/MarketplaceOperationFinding'}
+        duplicate: {type: boolean}
     ConnectorAccountSettings:
       type: object
       additionalProperties: false
@@ -7404,6 +7771,85 @@ components:
               format: uri-reference
               pattern: '^(https://[^[:space:]]+|/demo-images/demo-[0-9]+\.svg|/api/v1/uploads/upl_[0-9a-f]{32}/content)$'
               maxLength: 2048
+    ReplenishmentQuantity:
+      title: Exact planning quantity
+      type: object
+      additionalProperties: false
+      required: [coefficient, scale, unit]
+      properties:
+        coefficient: {type: integer, minimum: 0}
+        scale: {type: integer, minimum: 0, maximum: 9}
+        unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+    ReplenishmentRunCreate:
+      title: Replenishment planning input
+      type: object
+      additionalProperties: false
+      required: [horizon_days, offer_id, sku, warehouse_id, supplier_offer_id, unit, demand, returns, opening_available, confirmed_inbound, lead_time_days]
+      properties:
+        run_id: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        algorithm_version: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
+        horizon_days: {type: integer, minimum: 1, maximum: 366}
+        offer_id: {type: string, minLength: 1, maxLength: 192}
+        sku: {type: string, minLength: 1, maxLength: 192}
+        warehouse_id: {type: string, minLength: 1, maxLength: 192}
+        sales_channel: {type: string, maxLength: 192}
+        supplier_offer_id: {type: string, minLength: 1, maxLength: 192}
+        unit: {type: string, pattern: '^[A-Z][A-Z0-9._-]{0,15}$'}
+        demand: {$ref: '#/components/schemas/ReplenishmentQuantity'}
+        returns: {$ref: '#/components/schemas/ReplenishmentQuantity'}
+        opening_available: {$ref: '#/components/schemas/ReplenishmentQuantity'}
+        confirmed_inbound: {$ref: '#/components/schemas/ReplenishmentQuantity'}
+        lead_time_days: {type: integer, minimum: 1, maximum: 366}
+    ReplenishmentRun:
+      title: Replenishment run
+      type: object
+      additionalProperties: false
+      required: [id, algorithm_version, input_digest, horizon_days, generated_at, valid_until, status, quality]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 192}
+        algorithm_version: {type: string, minLength: 1, maxLength: 192}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        horizon_days: {type: integer, minimum: 1, maximum: 366}
+        generated_at: {type: string, format: date-time, pattern: Z$}
+        valid_until: {type: string, format: date-time, pattern: Z$}
+        status: {type: string, const: completed}
+        quality: {type: object, additionalProperties: true}
+    ReplenishmentRecommendation:
+      title: Replenishment recommendation
+      type: object
+      additionalProperties: false
+      required: [id, run_id, offer_id, sku, warehouse_id, supplier_offer_id, recommended_quantity, expected_receipt_days, risk_reduction_bps, reason_codes, eligible_mode, status, version, created_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 192}
+        run_id: {type: string, minLength: 1, maxLength: 192}
+        offer_id: {type: string, minLength: 1, maxLength: 192}
+        sku: {type: string, minLength: 1, maxLength: 192}
+        warehouse_id: {type: string, minLength: 1, maxLength: 192}
+        sales_channel: {type: string, maxLength: 192}
+        supplier_offer_id: {type: string, minLength: 1, maxLength: 192}
+        recommended_quantity: {$ref: '#/components/schemas/ReplenishmentQuantity'}
+        expected_receipt_days: {type: integer, minimum: 1, maximum: 366}
+        risk_reduction_bps: {type: integer, minimum: 0, maximum: 10000}
+        reason_codes: {type: array, minItems: 1, maxItems: 32, uniqueItems: true, items: {type: string}}
+        eligible_mode: {type: string, enum: [recommendation_only, draft_po, auto_submit]}
+        status: {type: string, enum: [proposed, accepted, rejected, deferred, on_hold]}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+    ReplenishmentRunResult:
+      title: Replenishment run result
+      type: object
+      additionalProperties: false
+      required: [run, recommendations]
+      properties:
+        run: {$ref: '#/components/schemas/ReplenishmentRun'}
+        recommendations: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ReplenishmentRecommendation'}}
+    ReplenishmentRunPage:
+      title: Replenishment run page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ReplenishmentRunResult'}}
     ExternalSearchProductSearchPageV1:
       title: Product search page v1
       type: object

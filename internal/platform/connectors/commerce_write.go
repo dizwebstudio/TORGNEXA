@@ -52,6 +52,10 @@ type ProductWriter interface {
 }
 
 type PriceWriteRequest struct {
+	// ProductRemoteID is optional for providers whose price resource is keyed
+	// only by the variant/offer. Providers such as WB require both the parent
+	// product ID and the size ID; the host resolves it from the typed mapping.
+	ProductRemoteID string `json:"product_remote_id,omitempty"`
 	VariantRemoteID string `json:"variant_remote_id"`
 	Value           string `json:"value"`
 	CompareAt       string `json:"compare_at,omitempty"`
@@ -60,7 +64,7 @@ type PriceWriteRequest struct {
 }
 
 func (request PriceWriteRequest) Validate() error {
-	if !validRemoteID(request.VariantRemoteID) || !validUnsignedMoney(request.Value) || (request.CompareAt != "" && !validUnsignedMoney(request.CompareAt)) || !validCurrency(request.Currency) || !validIdempotencyKey(request.IdempotencyKey) {
+	if !validOptionalRemoteID(request.ProductRemoteID) || !validRemoteID(request.VariantRemoteID) || !validUnsignedMoney(request.Value) || (request.CompareAt != "" && !validUnsignedMoney(request.CompareAt)) || !validCurrency(request.Currency) || !validIdempotencyKey(request.IdempotencyKey) {
 		return ErrInvalidCommerceWrite
 	}
 	return nil

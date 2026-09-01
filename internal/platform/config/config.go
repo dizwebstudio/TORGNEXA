@@ -241,6 +241,7 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 				"commerce.orders.events.v1",
 				"commerce.pim.events.v1",
 				"commerce.pricing.events.v1",
+				"commerce.replenishment.events.v1",
 				"commerce.returns.events.v1",
 				"commerce.social.events.v1",
 				"commerce.storefront.events.v1",

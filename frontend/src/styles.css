@@ -64,6 +64,10 @@ h1 { margin: 0; letter-spacing: -.035em; font-size: clamp(28px, 3vw, 42px); line
 .module-card > span:nth-child(2) { display: grid; gap: 4px; }
 .module-card small { color: #9aa3b2; font-size: 10px; letter-spacing: .08em; }
 .arrow { color: #a5adbb; font-size: 20px; }
+.marketplace-surfaces,.marketplace-flows { padding: 22px; }
+.marketplace-surfaces .section-heading,.marketplace-flows .section-heading { margin-bottom: 16px; }
+.marketplace-surfaces .module-card { cursor: pointer; font: inherit; }
+.marketplace-flows .table-wrap { margin-top: 2px; }
 .panel, .table-wrap, .notification { border: 1px solid #e6eaf0; background: #fff; border-radius: 16px; box-shadow: 0 8px 28px rgba(18,31,53,.03); }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 720px; }

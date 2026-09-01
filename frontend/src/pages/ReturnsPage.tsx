@@ -36,6 +36,28 @@ const dispositionLabels: Readonly<Record<string, string>> = {
 
 type ReturnAction = {status: string; label: string; danger?: boolean};
 
+type ReturnsClient = {
+  createOrderCancellation(input: {idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  createReturn(input: {idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  createReturnItem(input: {returnId: string; idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  createReturnLogistics(input: {returnId: string; idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  recordReturnInspection(input: {returnId: string; idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  createRefundAllocation(input: {idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  changeReturnStatus(input: {returnId: string; idempotencyKey: string; body: unknown}): Promise<{body: unknown}>;
+  listReturns(input: {limit: number}): Promise<{body: unknown}>;
+  getReturn(input: {returnId: string}): Promise<{body: unknown}>;
+};
+
+function uuidV7(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const millis = BigInt(Date.now());
+  for (let index = 5; index >= 0; index -= 1) bytes[5 - index] = Number((millis >> BigInt(index * 8)) & 255n);
+  bytes[6] = (bytes[6] & 15) | 112;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const raw = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
+}
+
 function actionsFor(status: string): ReturnAction[] {
   if (status === "requested") return [{status: "approved", label: "Согласовать"}, {status: "cancelled", label: "Отменить", danger: true}];
   if (status === "approved") return [{status: "authorized", label: "Авторизовать"}, {status: "cancelled", label: "Отменить", danger: true}];
@@ -61,13 +83,19 @@ function ReturnItemRow({item}: {item: ReturnItemHit}) {
 }
 
 export function ReturnsPage() {
-  const api = useApi();
+  const api = useApi() as unknown as ReturnsClient;
   const auth = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
   const path = useLocationPath();
   const selectedID = path.startsWith("/returns/") ? decodeURIComponent(path.slice("/returns/".length)) : undefined;
   const [status, setStatus] = useState("");
+  const [tab, setTab] = useState<"returns" | "cancellations">("returns");
+  const [orderID, setOrderID] = useState("");
+  const [reason, setReason] = useState("customer_changed_mind");
+  const [currency, setCurrency] = useState("RUB");
+  const [shipping, setShipping] = useState("0");
+  const [tax, setTax] = useState("0");
   const canWrite = auth.session?.capabilities.includes("orders.returns.write") ?? false;
   const returns = useQuery({queryKey: ["returns"], queryFn: async () => decodeReturnPage((await api.listReturns({limit: 200})).body), staleTime: 15_000});
   const details = useQuery({queryKey: ["returns", "detail", selectedID], enabled: !!selectedID, queryFn: async () => decodeReturnDetails((await api.getReturn({returnId: selectedID!})).body)});
@@ -82,6 +110,16 @@ export function ReturnsPage() {
       toast.push({kind: "error", title: "Не удалось изменить статус возврата", body: statusCode === 409 ? "Возврат уже изменился или такой переход недоступен. Обновите карточку." : "Проверьте права и повторите операцию."});
     },
   });
+  const createCancellation = useMutation({
+    mutationFn: () => api.createOrderCancellation({idempotencyKey: uuidV7(), body: {id: uuidV7(), order_id: orderID.trim(), reason_code: reason.trim()}}),
+    onSuccess: () => { toast.push({kind: "success", title: "Отмена поставлена в обработку", body: "Дальнейшее состояние появится после worker/reconciliation."}); setOrderID(""); },
+    onError: () => toast.push({kind: "error", title: "Отмена не создана", body: "Проверьте ID заказа, причину и права."}),
+  });
+  const createReturn = useMutation({
+    mutationFn: () => api.createReturn({idempotencyKey: uuidV7(), body: {id: uuidV7(), order_id: orderID.trim(), reason_code: reason.trim(), currency, shipping_minor: Number(shipping), tax_minor: Number(tax)}}),
+    onSuccess: async () => { toast.push({kind: "success", title: "Возврат создан", body: "Добавьте строки и проведите приёмку в карточке возврата."}); setOrderID(""); await queryClient.invalidateQueries({queryKey: ["returns"]}); },
+    onError: () => toast.push({kind: "error", title: "Возврат не создан", body: "Проверьте ID заказа, валюту и суммы."}),
+  });
   const rows = useMemo(() => (returns.data?.items ?? []).filter((item) => !status || item.status === status), [returns.data, status]);
   const selected = details.data?.return;
   const actions = selected ? actionsFor(selected.status) : [];
@@ -94,7 +132,26 @@ export function ReturnsPage() {
     {key: "created", label: "Создан", value: (item: ReturnSummary) => item.created_at, render: (item: ReturnSummary) => <time>{new Date(item.created_at).toLocaleString("ru-RU")}</time>},
   ];
 
-  return <Page eyebrow="Commerce Core" title="Возвраты и refunds" description="Единый контур возвратов, отмен и связанных возвратных операций с контролем статуса, версий и аудита.">
+  return <Page eyebrow="Commerce Core" title="Возвраты и refunds" description="Отмена заказа, физический возврат и возврат оплаты идут раздельно. Каждое действие идемпотентно и оставляет audit/outbox evidence.">
+    <div className="catalog-tabs" role="tablist" aria-label="Контур возврата">
+      <button type="button" role="tab" aria-selected={tab === "returns"} className={tab === "returns" ? "active" : ""} onClick={() => setTab("returns")}>Возвраты</button>
+      <button type="button" role="tab" aria-selected={tab === "cancellations"} className={tab === "cancellations" ? "active" : ""} onClick={() => setTab("cancellations")}>Отмены заказов</button>
+    </div>
+    <section className="panel inline-create">
+      <div><h2>{tab === "returns" ? "Оформить возврат" : "Запросить отмену"}</h2><p>{tab === "returns" ? "Создаётся только запрос. Приёмка, disposition и refund подтверждаются отдельными шагами." : "Отмена не переписывает заказ: worker и reconciliation доводят отдельный cancellation aggregate."}</p></div>
+      <form onSubmit={(event) => { event.preventDefault(); if (tab === "returns") createReturn.mutate(); else createCancellation.mutate(); }}>
+        <input required value={orderID} onChange={(event) => setOrderID(event.target.value)} placeholder="ID заказа" aria-label="ID заказа" />
+        <input required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина (machine code)" aria-label="Причина" />
+        {tab === "returns" ? <>
+          <input required value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase().slice(0, 3))} maxLength={3} placeholder="RUB" aria-label="Валюта" />
+          <input type="number" min="0" value={shipping} onChange={(event) => setShipping(event.target.value)} placeholder="Доставка, коп." aria-label="Возврат доставки" />
+          <input type="number" min="0" value={tax} onChange={(event) => setTax(event.target.value)} placeholder="Налог, коп." aria-label="Возврат налога" />
+        </> : null}
+        <button className="button primary" disabled={!orderID.trim() || createReturn.isPending || createCancellation.isPending}>{createReturn.isPending || createCancellation.isPending ? "Сохраняем…" : tab === "returns" ? "Создать возврат" : "Запросить отмену"}</button>
+      </form>
+    </section>
+    {tab === "cancellations" ? <section className="panel social-onboarding"><div><h3>Безопасное выполнение</h3><p>После создания статус остаётся <code>requested</code>. Не повторяйте запрос при timeout: используйте тот же ключ идемпотентности на уровне API/worker и проверяйте reconciliation.</p></div></section> : null}
+    {tab === "returns" ? <>
     <div className="catalog-tabs" role="tablist" aria-label="Фильтр возвратов">
       <button type="button" role="tab" aria-selected={!status} className={!status ? "active" : ""} onClick={() => setStatus("")}>Все</button>
       {Object.entries(statusLabels).map(([value, label]) => <button type="button" role="tab" aria-selected={status === value} className={status === value ? "active" : ""} key={value} onClick={() => setStatus(value)}>{label}</button>)}
@@ -105,8 +162,40 @@ export function ReturnsPage() {
         <div className="drawer-kpis"><div><small>Статус</small><StatusBadge value={selected.status}/></div><div><small>Позиции</small><strong>{details.data.items.length}</strong></div><div><small>Доставка и налог</small><strong>{money(selected.requested_shipping_minor + selected.requested_tax_minor, selected.currency)}</strong></div></div>
         {canWrite && actions.length > 0 ? <section className="drawer-section order-actions"><h3>Действия</h3><p className="drawer-help">Переход проверяется по текущей версии возврата, записывается в аудит и публикуется через outbox.</p><div className="button-row">{actions.map((action) => <button type="button" key={action.status} className={`button ${action.danger ? "danger" : "primary"}`} disabled={changeStatus.isPending} onClick={() => changeStatus.mutate({id: selected.id, status: action.status, version: selected.version})}>{changeStatus.isPending ? "Сохраняем…" : action.label}</button>)}</div></section> : null}
         <section className="drawer-section"><h3>Причина и источник</h3><dl className="detail-list"><div><dt>Причина</dt><dd>{selected.reason_code}</dd></div><div><dt>Источник</dt><dd>{selected.source}</dd></div><div><dt>Создан</dt><dd>{new Date(selected.created_at).toLocaleString("ru-RU")}</dd></div><div><dt>Версия</dt><dd className="mono">{selected.version}</dd></div></dl></section>
-        <section className="drawer-section"><h3>Позиции возврата</h3>{details.data.items.length > 0 ? <div className="line-items">{details.data.items.map((item) => <ReturnItemRow key={item.id} item={item}/>)}</div> : <p className="drawer-help">Позиции ещё не добавлены.</p>}</section>
+        <section className="drawer-section"><h3>Позиции возврата</h3>{details.data.items.length > 0 ? <div className="line-items">{details.data.items.map((item) => <ReturnItemRow key={item.id} item={item}/>)}</div> : <p className="drawer-help">Позиции ещё не добавлены.</p>}<ReturnActions api={api} returnID={selected.id} items={details.data.items} onSaved={() => { void details.refetch(); void queryClient.invalidateQueries({queryKey: ["returns"]}); }} /></section>
       </> : null}
     </Drawer>
+    </> : null}
   </Page>;
+}
+
+function ReturnActions({api, returnID, items, onSaved}: {api: ReturnsClient; returnID: string; items: ReturnItemHit[]; onSaved: () => void}) {
+  const toast = useToast();
+  const [orderItemID, setOrderItemID] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [disposition, setDisposition] = useState("restock");
+  const [accountID, setAccountID] = useState("");
+  const [remoteID, setRemoteID] = useState("");
+  const [paymentID, setPaymentID] = useState("");
+  const [refundID, setRefundID] = useState("");
+  const [amount, setAmount] = useState("");
+  const mutation = useMutation({mutationFn: (input: {kind: string; body: unknown}) => {
+    const key = uuidV7();
+    if (input.kind === "item") return api.createReturnItem({returnId: returnID, idempotencyKey: key, body: input.body});
+    if (input.kind === "logistics") return api.createReturnLogistics({returnId: returnID, idempotencyKey: key, body: input.body});
+    if (input.kind === "inspection") return api.recordReturnInspection({returnId: returnID, idempotencyKey: key, body: input.body});
+    return api.createRefundAllocation({idempotencyKey: key, body: input.body});
+  }, onSuccess: () => { toast.push({kind: "success", title: "Операция зарегистрирована", body: "Remote outcome и платёжный статус подтверждаются отдельным worker/reconciliation шагом."}); onSaved(); }, onError: () => toast.push({kind: "error", title: "Операция отклонена", body: "Проверьте состояние возврата, версию, capability и суммы."})});
+  const submit = (kind: string, body: unknown) => { if (!mutation.isPending) mutation.mutate({kind, body}); };
+  return <div className="catalog-stack" style={{marginTop: "1rem"}}>
+    <div><strong>Следующие операции</strong><p className="drawer-help">Сырые ответы провайдера не отображаются. Повторяйте только с новым осознанным действием после проверки состояния.</p></div>
+    <div className="social-form-grid">
+      <input value={orderItemID} onChange={(event) => setOrderItemID(event.target.value)} placeholder="Order item ID" aria-label="Order item ID" />
+      <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Количество" aria-label="Количество" />
+      <select value={disposition} onChange={(event) => setDisposition(event.target.value)} aria-label="Disposition"><option value="restock">На склад</option><option value="quarantine">Карантин</option><option value="scrap">Утилизация</option><option value="replace">Замена</option></select>
+      <button type="button" className="button ghost" disabled={!orderItemID.trim() || mutation.isPending} onClick={() => submit("item", {id: uuidV7(), order_item_id: orderItemID.trim(), unit: "PCS", requested_coefficient: Number(quantity), requested_scale: 0, disposition})}>Добавить позицию</button>
+    </div>
+    {items.length > 0 ? <div className="social-form-grid"><input value={accountID} onChange={(event) => setAccountID(event.target.value)} placeholder="Logistics account ID" aria-label="Logistics account ID" /><input value={remoteID} onChange={(event) => setRemoteID(event.target.value)} placeholder="Исходный remote ID" aria-label="Исходный remote ID" /><button type="button" className="button ghost" disabled={!accountID.trim() || !remoteID.trim() || mutation.isPending} onClick={() => submit("logistics", {id: uuidV7(), connector_account_id: accountID.trim(), original_remote_id: remoteID.trim(), external_id: uuidV7(), mail_type: "RETURN", tariff_code: 0})}>Запросить этикетку возврата</button></div> : null}
+    {items.length > 0 ? <div className="social-form-grid"><input value={paymentID} onChange={(event) => setPaymentID(event.target.value)} placeholder="Payment ID" aria-label="Payment ID" /><input value={refundID} onChange={(event) => setRefundID(event.target.value)} placeholder="Refund ID" aria-label="Refund ID" /><input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Сумма, коп." aria-label="Сумма возврата" /><button type="button" className="button ghost" disabled={!paymentID.trim() || !refundID.trim() || !amount || mutation.isPending} onClick={() => submit("refund", {id: uuidV7(), payment_id: paymentID.trim(), refund_id: refundID.trim(), return_id: returnID, component: "line", currency: "RUB", amount_minor: Number(amount)})}>Зарезервировать refund</button></div> : null}
+  </div>;
 }

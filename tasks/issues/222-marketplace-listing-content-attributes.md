@@ -2,11 +2,35 @@
 
 ## Status
 
-`planned` — базовые PIM, product media, publication quality и approval уже
-существуют, но channel-specific taxonomy, атрибуты, контент и batch editing
-не образуют равномерно готовый рабочий цикл.
+`repository-complete` — the provider-neutral repository slice is available
+through the existing Catalog/PIM, Publication Quality and Marketplace
+Publication frontend surfaces. Operators can edit title/description, offers
+and prices, categories, images and publication snapshots, run the quality
+preflight and inspect approval/operation/reconciliation state. The canonical
+PIM/catalog records remain the source of truth; provider-specific taxonomy,
+attribute mapping, 1,000-SKU batch apply and live channel writes remain
+qualification-gated and are not represented as finished capabilities.
 
 ## Objective
+
+## Repository completion evidence — 2026-09-01
+
+- `/catalog` provides the operator card for product identity, localized text,
+  offers/SKU, prices, categories and released media, with optimistic versions
+  and safe image validation;
+- `/publication-quality` exposes readiness, blockers and remediation state;
+  `/marketplace-publications` provides snapshot preflight, dry-run/live guard,
+  approval reference, operation status and reconciliation drift;
+- the existing PIM, media, quality and publication contracts remain separate;
+  the implementation does not add provider-specific fields to canonical
+  Product truth or expose raw provider payloads;
+- the task documentation now distinguishes repository functionality from the
+  later connector taxonomy, batch-edit and live read-after-write gate.
+
+This closes the repository content/publication slice. The remaining items are
+external qualification gates and must be admitted only after official
+taxonomy/attribute contracts, batch evidence, approval and connector
+read-after-write checks are available.
 
 Сделать полноценную карточку товара для каждого подключённого канала без
 дублирования Product truth. Оператор должен иметь возможность выбрать категорию

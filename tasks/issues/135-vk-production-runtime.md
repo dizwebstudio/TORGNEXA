@@ -1,6 +1,6 @@
 # Task 135 — VK production runtime composition
 
-Status: Planned
+Status: Repository-complete
 
 ## Problem
 
@@ -8,6 +8,11 @@ The VK Connector SDK adapter and manifest exist, while the production runtime
 still classifies VK as planned. Task 134 supplies the missing host-owned OAuth
 access-token projection and refresh boundary, but no Social/API/worker route is
 yet admitted for VK.
+
+Repository status: the text-publication slice is now admitted. VK is available
+in «Интеграции» and «Публикации» through the shared Social Core workflow; media,
+comments and analytics remain explicitly SDK-ready but runtime-deferred until
+their complete host and frontend workflows are implemented.
 
 ## Scope
 
@@ -20,10 +25,25 @@ yet admitted for VK.
   readiness evidence for the admitted capability subset.
 - Update the generated runtime catalog and user documentation truthfully.
 
+## Repository completion evidence
+
+- `builtin-runtime-support-v1` admits only `social.post.text` with an exact
+  16,384-rune limit and a strict non-secret `{ "group_id": 12345 }` config
+  template;
+- the built-in registry composes VK health and text-publisher routes through
+  the common pinned HTTPS transport and Task-134 secret callback;
+- the transport validates VK API method names, parameters, upload authorities,
+  multipart bounds and never places the OAuth token in query parameters;
+- the `/integrations` and `/social` frontend flows expose VK setup, health and
+  text publication, while the catalog marks non-admitted SDK capabilities as
+  unavailable;
+- generated connector catalogs and VK/runtime documentation were regenerated.
+
 ## Acceptance criteria
 
-- VK moves from `planned` only after every advertised production operation has
-  an executable end-to-end route and fail-closed negative coverage.
+- VK moves from `planned` only for the explicitly admitted `social.post.text`
+  slice; every other manifest capability remains fail-closed and is not
+  presented as an available application operation.
 - Browser login is required initially and after explicit reauthorization only;
   ordinary access-token expiry is handled by the host refresh runtime.
 - Core and application modules do not branch on the VK identifier; provider

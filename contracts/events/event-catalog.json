@@ -98,6 +98,10 @@
       "payload_schema": "events/price-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.replenishment.run_completed.v1",
+      "payload_schema": "events/replenishment-run-completed-v1.schema.json"
+    },
+    {
       "event_type": "commerce.returns.requested.v1",
       "payload_schema": "events/return-requested-v1.schema.json"
     },

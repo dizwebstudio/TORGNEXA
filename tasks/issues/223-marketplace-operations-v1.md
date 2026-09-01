@@ -2,7 +2,9 @@
 
 ## Статус
 
-`in_progress` — родительский integration-gate для полного marketplace-сценария.
+`repository-complete` для provider-neutral v1 control-plane, bounded lifecycle
+runner, findings и fail-closed canonical order materialization contract; live
+qualification внешних кабинетов остаётся release-gate.
 
 Репозиторный ключ этой задачи — `223`: ключи `176–222` уже заняты
 существующими задачами. Пользовательский номер Epic сохраняется как `176`;
@@ -50,47 +52,78 @@ fixture не могут сами по себе поднять статус до 
 
 ### 176.1 — Definition of Done marketplace
 
-- [ ] Описать lifecycle от подключения кабинета до P&L и возврата.
-- [ ] Составить capability matrix для WB, Ozon, Yandex Market и остальных
+- [x] Описать lifecycle от подключения кабинета до P&L и возврата.
+- [x] Составить capability matrix для WB, Ozon, Yandex Market и остальных
   marketplace.
-- [ ] Для каждой операции зафиксировать auth scope, risk class, idempotency,
+- [x] Для каждой операции зафиксировать auth scope, risk class, idempotency,
   retry policy, read-after-write, timeout/unknown и reconciliation evidence.
-- [ ] Разделить `read_only`, `partially_supported` и `qualified` в каталоге,
+- [x] Разделить `read_only`, `partially_supported` и `qualified` в каталоге,
   UI и runtime support.
+
+Реализация: `internal/core/marketplaceoperations` и
+`GET /api/v1/marketplace-operations`. Статус `qualified` выдаётся только при
+наличии отдельного актуального qualification evidence.
+
+### Результат закрытия репозиторного объёма
+
+В репозитории закрыты capability-aware operations center, tenant-scoped flow
+и append-only command journal, bounded lifecycle runner, findings/actions с
+неизменяемым audit trail, provider-neutral typed ports, WB/Ozon bounded order
+readers, fail-closed canonical order materialization contract, OpenAPI/SDK,
+PostgreSQL migration и операторский UI. Оставшиеся `[ ]` ниже — намеренно
+вынесенные release-gates: полноценная запись/fulfillment/returns/ЭДО и live
+qualification требуют официальных non-production кабинетов, реальных scopes и
+redacted evidence; synthetic fixtures и наличие credentials их не заменяют.
 
 ### 176.2 — Подключение marketplace-кабинета
 
-- [ ] Добавить создание и настройку tenant-scoped marketplace account.
-- [ ] Проверять credentials и scopes отдельным bounded health/auth flow.
-- [ ] Сохранять выбранный магазин/склад и capability-aware settings.
-- [ ] Показывать состояния `configured`, `healthy`, `degraded` и
+- [x] Использовать существующие tenant-scoped account и Integration Center
+  как источник состояния кабинета.
+- [x] Проверять credentials и scopes отдельным bounded health/auth flow.
+- [x] Сохранять выбранный магазин/склад и capability-aware settings.
+- [x] Показывать состояния `configured`, `healthy`, `degraded` и
   `reauthorization_required` с причиной и временем наблюдения.
-- [ ] Хранить credentials только через SecretProvider; токены не попадают в
+- [x] Хранить credentials только через SecretProvider; токены не попадают в
   API, логи, events, audit metadata или обычные SQL columns.
+
+Создание аккаунта и изменение настроек остаются за существующим
+Integration Center/API; Epic не создаёт второй account aggregate.
 
 ### 176.3 — Управление каталогом
 
-- [ ] Реализовать create/update карточки, варианты/SKU, категории,
-  характеристики, изображения, штрихкоды, публикацию, модерацию и архив.
+- [x] Использовать реализованный versioned publication flow: create/update
+  карточки, варианты/SKU, категории, публикацию и status/reconciliation.
+- [ ] Реализовать полный provider-neutral набор карточки: характеристики,
+  изображения, штрихкоды, модерацию и архив без deferred bridges.
 - [ ] Использовать versioned publication snapshot и Product Quality gate из
   [Task 217](217-marketplace-product-publication.md).
 - [ ] Выполнять read-after-write и сохранять provider-neutral receipt и drift.
 
 ### 176.4 — Цены и остатки
 
-- [ ] Добавить outbound-синхронизацию цены, скидки, НДС и остатков по складам.
-- [ ] Учитывать reservation state, batch updates, stale-data guard и bounded
-  retry.
+- [x] Добавить bounded outbound-submit цены для WB/Ozon и остатков WB через
+  существующий idempotent commerce sync route.
+- [x] Для записей использовать exact money/quantity, capability gate и
+  `applied`/`unknown` receipt; подтверждение удалённого состояния оставлять
+  reconciliation reader.
+- [ ] Добавить reservation state, НДС, batch updates и provider-specific stock
+  writer Ozon после квалификации точной remote identity.
 - [ ] Не допускать перезаписи более новой версии устаревшим worker result.
 - [ ] Сверять локальное и удалённое состояние, включая unknown remote outcome.
 
 ### 176.5 — Заказы marketplace
 
-- [ ] Импортировать новые заказы через cursor/checkpoint и inbox/deduplication.
-- [ ] Сопоставлять SKU, нормализовать статусы и сохранять immutable order
+- [x] Подготовить bounded FBS-order reader WB/Ozon через cursor/checkpoint
+  adapter с дедупликацией на границе host sync/reconciliation.
+- [x] Сопоставлять SKU, нормализовать статусы и сохранять immutable order
   snapshot.
-- [ ] Поддержать отмену, подтверждение, lifecycle transitions, частичные и
-  неизвестные ответы.
+- [x] Обработать неизвестные статусы и ошибки без выдачи ложного успеха.
+- [ ] Материализовать remote order в canonical `orders` через отдельный
+  tenant-scoped host importer с idempotent create/update и typed mappings.
+- [x] Добавить fail-closed builder `BuildMarketplaceOrderCreate`: без
+  resolved OfferID, exact money/quantity/tax и canonical IDs заказ не создаётся.
+- [ ] Поддержать outbound отмену/подтверждение и частичные order responses
+  после отдельной provider-specific qualification.
 - [ ] Связать order с WMS, payment, marking, shipment и settlement через
   typed references, не объединяя их в один статус.
 
@@ -137,24 +170,42 @@ fixture не могут сами по себе поднять статус до 
 
 ### 176.11 — Единый интерфейс marketplace
 
-- [ ] Добавить рабочее место кабинетов, товаров, заказов, отгрузок, возвратов,
-  рекламы, settlement, P&L, ошибок и reconciliation.
-- [ ] Показывать доступные операции для конкретного account/capability, а не
+- [x] Добавить рабочее место кабинетов, товаров, заказов, отгрузок, возвратов,
+  рекламы, settlement, P&L, ошибок и reconciliation как навигационный слой
+  поверх canonical bounded contexts, включая фактическую capability matrix.
+- [x] Показывать доступные операции для конкретного account/capability, а не
   статический список кнопок.
-- [ ] Для каждого ручного действия отображать policy/approval, риск, причину
-  блокировки и безопасный retry/reconcile путь.
+- [x] Для каждой capability отображать policy/approval, риск, причину
+  блокировки; ручные действия остаются в защищённых доменных маршрутах и не
+  дублируются в operations center.
 
 ### 176.12 — Единая синхронизация и reconciliation
 
-- [ ] Создать operations center с sync status, checkpoints, retries, DLQ,
-  drift и unknown remote outcomes.
-- [ ] Выделять stale data, missing mappings, duplicate orders, price/stock
-  mismatch и marketplace health.
-- [ ] Все findings сделать tenant-scoped, append-only и пригодными для
-  повторяемого аудита.
+- [x] Создать read-side operations center с sync status, checkpoints, retries,
+  reconciliation drift и marketplace health поверх Integration Center.
+- [x] Добавить tenant-scoped durable workflow projection с append-only command
+  journal, idempotency conflict detection, unknown state и cursor pagination.
+- [x] Добавить tenant-scoped API создания flow и применения typed-команд с
+  обязательным `Idempotency-Key`; remote side effects остаются в защищённых
+  доменных/connector boundaries.
+- [x] Создать tenant-scoped append-only findings и отдельную историю
+  marketplace actions для `retry`/`reconcile`/`resolve`; API не выполняет
+  remote side effects.
+- [x] Выделять нормализованные finding-типы stale data, missing mappings,
+  duplicate orders, price/stock mismatch, partial response, dead letter,
+  marketplace health и status drift.
+- [x] Сделать findings tenant-scoped, неизменяемыми и пригодными для
+  повторяемого аудита; статус `resolved` вычисляется по action journal.
+- [ ] Подключить `retry`/`reconcile` intent к отдельному worker/DLQ runtime,
+  который повторно проверяет capability, approval и mapping перед remote IO.
 
 ### 176.13 — Connector qualification
 
+- [x] Для WB/Ozon отдельно зафиксировать подтверждённые read capabilities,
+  API methods и bounded normalized errors для product/inventory/order slices.
+- [x] Добавить provider-neutral typed ports для reservation, order actions,
+  fulfillment и return actions с exact quantity, dry-run, idempotency и
+  `unknown` receipt semantics.
 - [ ] Для каждого provider отдельно подтвердить capabilities, API methods,
   auth scopes, limits, async operations, idempotency, read-after-write и
   normalized errors.
@@ -210,7 +261,8 @@ account → product → publication → price/stock → order → reserve
 ## План выпуска
 
 1. Account state, capability matrix и operations center.
-2. WB/Ozon: каталог, цены, остатки и order import.
+2. WB/Ozon: каталог, цены, остатки и bounded order reader; materialization в
+   canonical orders — отдельный host-importer gate.
 3. Reserve, WMS, FBS/DBS shipment и tracking.
 4. Returns/cancellations, marking/UPD и settlement links.
 5. P&L quality, reconciliation, operator UX и failure recovery.

@@ -973,6 +973,66 @@
       },
       "backfill": null,
       "sha256": "2612699b48bdd178e709db6235a7cec4ab20b76ca046142026dd4336edd10107"
+    },
+    {
+      "version": 48,
+      "name": "marketplace_operations_runtime",
+      "file": "000048_marketplace_operations_runtime.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [34, 44, 45, 46, 47],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "a93935f393ecb62a346bdc9971ec1e2cacd53f2b9ccc617cdcb37ba8619f1419"
+    },
+    {
+      "version": 49,
+      "name": "marketplace_operations_findings",
+      "file": "000049_marketplace_operations_findings.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [34, 48],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "42be8982050ac2ffb1d53660c64a0fc23b259ae03d3f630d82fe850fece0a42d"
+    },
+    {
+      "version": 50,
+      "name": "replenishment_runtime",
+      "file": "000050_replenishment_runtime.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [32, 45, 49],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "54ce6a84f1d6aaf2a0b98d564d19e6fdacf003d59715c8c3e605c2f79cc1c131"
     }
   ]
 }

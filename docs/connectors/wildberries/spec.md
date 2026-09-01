@@ -91,5 +91,18 @@ WB card writes are asynchronous from the operator's point of view. The receipt
 is `accepted`; a later bounded cards read is required before local state becomes
 `published`. The adapter deliberately rejects snapshot media and
 provider-specific characteristic/category bridges until a released-upload
-bridge and current category fixtures are qualified. Inventory, order-status
-and other mutation capabilities remain unchanged.
+bridge and current category fixtures are qualified. Inventory outbound writes
+use `PUT /api/v3/stocks/{warehouseId}` with a single `chrtId` row. Price
+outbound writes use `POST /api/v2/upload/task` and require both the mapped
+parent `nmID` and variant `chrtID`. Both operations return an unreconciled
+receipt and require a later read; a transport failure is an unknown remote
+outcome. Order-status and other mutation capabilities remain unchanged.
+
+## `orders.read`
+
+FBS assembly orders are read from `GET /api/v3/orders` with the documented
+`dateFrom`/`dateTo`, `limit` and `next` cursor. The connector keeps the cursor
+opaque, bounds the response and projects only order identity, timestamps,
+status and item references. The current endpoint does not provide the complete
+order lifecycle, so remote `assembly` is normalized in the runtime and
+outbound order mutations remain denied.

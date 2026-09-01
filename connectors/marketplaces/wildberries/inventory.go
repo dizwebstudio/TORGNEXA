@@ -24,6 +24,16 @@ type stocksResponse struct {
 	} `json:"stocks"`
 }
 
+// inventoryWriteRequest is the single-item form accepted by WB's FBS stock
+// endpoint. chrtId is the size/variant identifier returned by the cards and
+// stock APIs; it must not be confused with the product nmID.
+type inventoryWriteRequest struct {
+	Stocks []struct {
+		ChrtID int64 `json:"chrtId"`
+		Amount int64 `json:"amount"`
+	} `json:"stocks"`
+}
+
 func (connector *Connector) ListInventoryLocations(ctx context.Context, account sdk.Account, runtime sdk.Runtime) ([]sdk.RemoteLocation, error) {
 	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.read") != nil {
 		return nil, sdk.ErrInvalidReadRequest
@@ -116,3 +126,50 @@ func (connector *Connector) ReadInventory(ctx context.Context, account sdk.Accou
 	})
 	return result, err
 }
+
+// WriteInventory updates one WB FBS warehouse stock. WB acknowledges this
+// mutation without returning the resulting row, so the receipt is applied but
+// not reconciled; the host must perform a subsequent inventory read. A
+// transport failure is deliberately reported as an unknown remote outcome.
+func (connector *Connector) WriteInventory(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.write") != nil || request.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	warehouseID, err := strconv.ParseInt(request.LocationRemoteID, 10, 64)
+	if err != nil || warehouseID <= 0 || request.Quantity > 2_000_000_000 {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	chrtID, err := strconv.ParseInt(request.VariantRemoteID, 10, 64)
+	if err != nil || chrtID <= 0 {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	body, err := json.Marshal(inventoryWriteRequest{Stocks: []struct {
+		ChrtID int64 `json:"chrtId"`
+		Amount int64 `json:"amount"`
+	}{{ChrtID: chrtID, Amount: request.Quantity}}})
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	var receipt sdk.CommerceWriteReceipt
+	err = runtime.Secrets().UseSecret(ctx, account.SecretReference, func(secret []byte) error {
+		response, callErr := connector.transport.Do(ctx, Request{
+			Method:         "PUT",
+			Host:           marketplaceHost,
+			Path:           "/api/v3/stocks/" + strconv.FormatInt(warehouseID, 10),
+			Body:           body,
+			Token:          secret,
+			IdempotencyKey: request.IdempotencyKey,
+		})
+		if callErr != nil {
+			return writeOutcomeUnknown()
+		}
+		if remote := normalizeHTTP(response); remote != nil {
+			return remote
+		}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true}
+		return receipt.Validate()
+	})
+	return receipt, err
+}
+
+var _ sdk.InventoryWriter = (*Connector)(nil)

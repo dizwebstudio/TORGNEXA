@@ -27,7 +27,14 @@ metadata are tenant-scoped with forced RLS; recommendation history is
 append-only. In-memory implementations in tests are reference semantics, not
 production durability.
 
-The remaining production gates are the durable EventBus worker/scheduler,
-procurement approval/reconciliation, REST/OpenAPI/UI, connector qualification,
-quotas/observability and Compose/load/chaos evidence. See
+The repository runtime slice now exposes `GET/POST /api/v1/replenishment` and
+the frontend route `/replenishment`. The operator enters normalized demand,
+returns, available stock, confirmed inbound and supplier offer; the API stores
+an immutable digest, exact p50/p90 forecast, explicit shortfall and a proposed
+recommendation. The recommendation is always `recommendation_only` in this
+slice and cannot submit a purchase order.
+
+The remaining external release gates are provider-backed input adapters,
+approval-bound procurement submission, scheduled catch-up/load/chaos evidence
+and live connector qualification. See
 `tasks/issues/165-stock-forecast-auto-replenishment.md` and ADR 0118.

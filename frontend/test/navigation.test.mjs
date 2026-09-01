@@ -5,7 +5,7 @@ import {connectorCatalog} from "../.repository-test/generated/connector-catalog.
 
 test("navigation is capability-aware", () => {
   const visible = allowedNavigation(["products.read", "orders.read"]);
-  assert.deepEqual(visible.map((item) => item.id), ["dashboard", "catalog", "publication-quality", "marketplace-publication", "orders"]);
+  assert.deepEqual(visible.map((item) => item.id), ["dashboard", "catalog", "publication-quality", "marketplace-publication", "orders", "pricing"]);
   assert.equal(canOpenPath("/catalog", ["products.read"]), true);
   assert.equal(canOpenPath("/catalog", ["orders.read"]), false);
 });

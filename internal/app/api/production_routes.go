@@ -23,6 +23,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplaceoperationsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo"
@@ -34,6 +35,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/procurementrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/replenishmentrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo"
@@ -110,7 +112,9 @@ type productionRouteDependencies struct {
 	returns                *returnsrepo.Repository
 	marking                *markingrepo.Repository
 	marketplacePublication *marketplacepublicationrepo.Repository
+	marketplaceFlows       *marketplaceoperationsrepo.Repository
 	procurement            *procurementrepo.Repository
+	replenishment          *replenishmentrepo.Repository
 	mcpAccounts            *mcpaccountsrepo.Repository
 	agentGovernance        *agentgovernancerepo.Repository
 	runtimePosture         *runtimeposture.Inspector
@@ -123,6 +127,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newIntegrationCenterRoutes(deps.integrationCenter)...)
+	routes = append(routes, newMarketplaceOperationsRoutes(marketplaceOperationsSource{center: deps.integrationCenter}, deps.marketplaceFlows)...)
 	routes = append(routes, newMemberSettingsRoutes(deps.tenancy, deps.auditService, deps.profiles)...)
 	routes = append(routes, newSettingsSecurityRoutes(deps.settingsSecurity, deps.settingsAudit, deps.oidc, deps.runtimePosture)...)
 	routes = append(routes, newIdentityProviderSettingsRoutes(deps.identityProviders, deps.secretProvider, deps.auditService, deps.identityPolicy, deps.identityValidator)...)
@@ -132,12 +137,14 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newSearchRoutes(deps.search, deps.auditService)...)
 	routes = append(routes, newOrderStatusRoutes(deps.orders)...)
 	routes = append(routes, newCatalogRoutes(catalogAPI{catalog: deps.catalog, prices: deps.pricing, pim: deps.pim, images: deps.images, uploadAccess: deps.uploadAccess})...)
+	routes = append(routes, newRepricingRoutes()...)
 	routes = append(routes, newPublicationQualityRoutes(deps.publicationQuality)...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
 	routes = append(routes, newProcurementRoutes(deps.procurement, deps.approvals, deps.uploadAccess, deps.uploadContent)...)
+	routes = append(routes, newReplenishmentRoutes(deps.replenishment)...)
 	routes = append(routes, newComplianceRoutes(deps.compliance)...)
 	routes = append(routes, newNotificationRoutes(deps.notifications)...)
 	routes = append(routes, newSocialRoutes(deps.social, deps.accounts, deps.aiRegistry, socialRouteDependency{secrets: deps.secretProvider, configs: deps.connectorConfigs, receipts: deps.socialReceipts, approvals: deps.approvals, operations: deps.logistics, webhookControllerRuntime: deps.aiRegistry, audit: deps.auditService, uploadAccess: deps.uploadAccess, uploadContent: deps.uploadContent})...)

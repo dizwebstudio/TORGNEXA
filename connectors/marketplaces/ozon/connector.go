@@ -141,6 +141,11 @@ func normalizedTransportError() error {
 	return remote
 }
 
+func writeOutcomeUnknown() error {
+	remote, _ := sdk.NewRemoteError(sdk.ErrorConflict, "write_outcome_unknown", "", 0)
+	return remote
+}
+
 func normalizeHTTP(response Response) error {
 	if len(response.Body) > maxBodyBytes || response.RetryAfterMS < 0 {
 		remote, _ := sdk.NewRemoteError(sdk.ErrorInternal, "response_invalid", "", 0)

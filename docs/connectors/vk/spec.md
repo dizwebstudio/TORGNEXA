@@ -11,13 +11,22 @@
 - account configuration: positive VK community `GroupID`
 - authentication: OAuth2 **user** access token projected by the Task-134 host refresh runtime behind Task-021 `SecretAccessor`; refresh/client material never enters the provider
 
-Admitted capabilities:
+Adapter capabilities:
 
 - `social.post.text`
 - `social.post.media` (images/gallery only, connector support ceiling 10 images)
 - `social.comments.read`
 - `social.comments.reply`
 - `social.analytics.read`
+
+Production runtime admission (Task 135):
+
+- `social.post.text` — available through the `/social` frontend workflow;
+- media, comments and analytics — SDK-ready but not admitted until their host
+  API, worker, persistence/reconciliation and frontend workflows are complete.
+
+The manifest is the adapter contract. The generated
+`builtin-runtime-support-v1` catalog is the application admission boundary.
 
 ## Canonical publish flow
 

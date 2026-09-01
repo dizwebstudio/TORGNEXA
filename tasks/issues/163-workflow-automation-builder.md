@@ -2,15 +2,26 @@
 
 ## Status
 
-`in_progress` — foundation, durable runtime, typed adapters, REST/OpenAPI и
-operator UI реализованы; release qualification и нагрузочные/chaos-проверки
-остаются обязательным следующим этапом.
+`repository-complete` — foundation, durable runtime, typed adapters,
+REST/OpenAPI, operator UI and deterministic repository qualification are
+complete. Live deployment capacity and target-topology chaos evidence remain
+release evidence and are not fabricated by this task.
 
-Repository qualification is now executable via `make workflow-qualification`.
+Repository qualification is executable via `make workflow-qualification`.
 It covers the deterministic compiler, tenant persistence boundary, Inbox-backed
-event trigger path, lease recovery, retry budget, API/worker tests and contract
-fixtures. The command deliberately reports live-provider and target-VPS
-capacity checks as deployment evidence rather than inventing a production claim.
+event trigger path, lease recovery, retry budget, API/worker tests, contract
+fixtures and frontend logic/docs checks. The command deliberately reports
+live-provider and target-VPS capacity checks as deployment evidence rather than
+inventing a production claim.
+
+## Repository completion evidence
+
+`make workflow-qualification` passed on 2026-09-01. It produced retained
+machine-readable evidence under the ignored `qualification/evidence/` path and
+reported PASS for workflow/core/repository tests, Go vet, contracts and the
+frontend logic/docs suites. The operator workflow is available at
+`/workflows`: draft → validation → publish → test run → step/evidence timeline
+with retry and cancel controls.
 
 ## Objective
 

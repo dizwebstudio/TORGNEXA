@@ -166,12 +166,34 @@ func (r *commerceWriteRoute) routePrice(ctx context.Context, scope tenancy.Scope
 	if err != nil {
 		return eventbus.Permanent("commerce_sync_invalid_price")
 	}
+	coreScope, err := catalog.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return eventbus.Permanent("commerce_sync_invalid_scope")
+	}
+	offerID, err := catalog.ParseOfferID(payload.OfferID)
+	if err != nil {
+		return eventbus.Permanent("commerce_sync_invalid_price")
+	}
+	offer, err := r.catalog.Offer(ctx, coreScope, offerID)
+	if errors.Is(err, catalog.ErrNotFound) || errors.Is(err, catalog.ErrInvalidRecord) {
+		return eventbus.Permanent("commerce_sync_offer_missing")
+	}
+	if err != nil {
+		return eventbus.Retryable("commerce_sync_offer_read_failed")
+	}
 	return r.route(ctx, scope, event, commercePricesEntity, payload.PriceID, "offer", payload.OfferID, payload.Version, false, func(account sdk.Account, runtime sdk.Runtime, policy syncengine.Policy, remoteID string) (sdk.CommerceWriteReceipt, error) {
+		productRemoteID := ""
+		productMapping, mappingErr := r.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, "product", offer.ProductID.String())
+		if mappingErr == nil {
+			productRemoteID = productMapping.RemoteID
+		} else if !errors.Is(mappingErr, sdk.ErrMappingNotFound) {
+			return sdk.CommerceWriteReceipt{}, mappingErr
+		}
 		writer, err := r.registry.priceWriter(scope, account, runtime)
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}
-		receipt, err := writer.WritePrice(ctx, account, runtime, sdk.PriceWriteRequest{VariantRemoteID: remoteID, Value: value, Currency: payload.Amount.Currency().String(), IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
+		receipt, err := writer.WritePrice(ctx, account, runtime, sdk.PriceWriteRequest{ProductRemoteID: productRemoteID, VariantRemoteID: remoteID, Value: value, Currency: payload.Amount.Currency().String(), IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}

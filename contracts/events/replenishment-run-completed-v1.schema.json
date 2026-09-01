@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://torgnexa.local/schemas/events/replenishment-run-completed-v1.json",
+  "title":"commerce.replenishment.run_completed.v1",
+  "type":"object","additionalProperties":false,
+  "required":["run_id","status","input_digest","recommendation_count","version"],
+  "properties":{
+    "run_id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "status":{"const":"completed"},
+    "input_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "recommendation_count":{"type":"integer","minimum":0,"maximum":2000},
+    "version":{"type":"integer","minimum":1}
+  }
+}

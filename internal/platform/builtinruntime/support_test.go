@@ -72,6 +72,10 @@ func TestRuntimeSupportIsFailClosedAndDirectionExact(t *testing.T) {
 	if !ok || max.Stage != SupportSeparateSurface || max.Surface != "social" || !SupportsAccountConfiguration("max-messenger") || !SupportsCapability("max-messenger", "social.post.text") || !SupportsCapability("max-messenger", "social.post.media") || !SupportsCapability("max-messenger", "social.post.video") || !SupportsCapability("max-messenger", "social.post.buttons") || SupportsSync("max-messenger", "products", "inbound") || SocialTextLimit("max-messenger") != 4000 {
 		t.Fatalf("MAX social runtime support is inaccurate: %+v", max)
 	}
+	vk, ok := SupportFor("vk")
+	if !ok || vk.Stage != SupportSeparateSurface || vk.Surface != "social" || vk.HealthOnly || !SupportsAccountConfiguration("vk") || !SupportsCapability("vk", "social.post.text") || SupportsCapability("vk", "social.post.media") || SupportsCapability("vk", "social.comments.read") || SocialTextLimit("vk") != 16384 {
+		t.Fatalf("VK social runtime support is inaccurate: %+v", vk)
+	}
 	if SocialTextLimit("avito") != 0 {
 		t.Fatal("health-only connector gained an executable social text limit")
 	}
@@ -210,6 +214,12 @@ func TestSocialPublisherAdmissionIsExact(t *testing.T) {
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "max-messenger"), load); err != nil {
 		t.Fatalf("MAX publisher unavailable: %v", err)
+	}
+	vkLoad := func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"group_id":12345}`), nil
+	}
+	if publisher, err := registry.SocialPublisher(supportTestAccount(t, "vk"), vkLoad); err != nil || publisher == nil {
+		t.Fatalf("VK publisher unavailable: publisher=%T err=%v", publisher, err)
 	}
 	if _, err := registry.SocialPublisher(supportTestAccount(t, "avito"), load); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unadmitted social publisher resolved: %v", err)
@@ -534,8 +544,29 @@ func TestPrestaShopCommerceWriteAdmissionIsExact(t *testing.T) {
 	if _, err := registry.InventoryWriter(account, supportTestRuntime{}, load); err != nil {
 		t.Fatalf("PrestaShop inventory writer unavailable: %v", err)
 	}
-	if _, err := registry.PriceWriter(supportTestAccount(t, "wildberries"), supportTestRuntime{}, load); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted price writer resolved: %v", err)
+}
+
+func TestMarketplaceCommerceWriteAdmissionIsExact(t *testing.T) {
+	registry := New()
+	wildberries := supportTestAccount(t, "wildberries")
+	if !registry.SupportsPriceWrite(wildberries) || !registry.SupportsInventoryWrite(wildberries) || !SupportsCapability("wildberries", "prices.write") || !SupportsSync("wildberries", "prices", "outbound") || !SupportsSync("wildberries", "inventory", "outbound") {
+		t.Fatal("Wildberries marketplace write support is not admitted")
+	}
+	if _, err := registry.PriceWriter(wildberries, supportTestRuntime{}, nil); err != nil {
+		t.Fatalf("Wildberries price writer unavailable: %v", err)
+	}
+	if _, err := registry.InventoryWriter(wildberries, supportTestRuntime{}, nil); err != nil {
+		t.Fatalf("Wildberries inventory writer unavailable: %v", err)
+	}
+	ozon := supportTestAccount(t, "ozon")
+	if !registry.SupportsPriceWrite(ozon) || registry.SupportsInventoryWrite(ozon) || !SupportsCapability("ozon", "prices.write") || !SupportsSync("ozon", "prices", "outbound") {
+		t.Fatal("Ozon marketplace write support is not admitted exactly")
+	}
+	if _, err := registry.PriceWriter(ozon, supportTestRuntime{}, nil); err != nil {
+		t.Fatalf("Ozon price writer unavailable: %v", err)
+	}
+	if _, err := registry.InventoryWriter(ozon, supportTestRuntime{}, nil); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("unadmitted Ozon inventory writer resolved: %v", err)
 	}
 }
 
@@ -715,13 +746,19 @@ func TestCommerceReadAdaptersAreAdmittedOnlyWhenComposed(t *testing.T) {
 
 func TestHealthOnlyCatalogProvidersResolveProbeConnector(t *testing.T) {
 	registry := New()
-	for _, connectorID := range []string{"auto-ru", "avito", "chestny-znak", "cian", "diadoc", "egais", "instagram", "lamoda", "mvideo", "odnoklassniki", "rutube", "saby-edo", "threads", "vetis-mercury", "vk", "youtube"} {
+	for _, connectorID := range []string{"auto-ru", "avito", "chestny-znak", "cian", "diadoc", "egais", "instagram", "lamoda", "mvideo", "odnoklassniki", "rutube", "saby-edo", "threads", "vetis-mercury", "youtube"} {
 		connector, err := registry.healthConnector(supportTestAccount(t, connectorID), func(context.Context, string) (json.RawMessage, error) {
 			return json.RawMessage(`{"probe_url":"https://example.com/health"}`), nil
 		})
 		if err != nil || connector == nil || connector.Manifest().ID != connectorID {
 			t.Fatalf("%s health-only connector unavailable: connector=%T err=%v", connectorID, connector, err)
 		}
+	}
+	connector, err := registry.healthConnector(supportTestAccount(t, "vk"), func(context.Context, string) (json.RawMessage, error) {
+		return json.RawMessage(`{"group_id":12345}`), nil
+	})
+	if err != nil || connector == nil || connector.Manifest().ID != "vk" {
+		t.Fatalf("VK health connector unavailable: connector=%T err=%v", connector, err)
 	}
 }
 

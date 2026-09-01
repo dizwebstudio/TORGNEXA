@@ -1,5 +1,34 @@
 # VK Connector
 
-Task 040 adds the first Social Core provider adapter. The admitted baseline publishes canonical TORGNEXA text/image publications to a configured VK community wall, reads/replies to comments, and reads post-reach analytics.
+VK подключён к production runtime через общий Social Core и host-owned OAuth-контур.
+Текущая версия рабочего продукта допускает один пользовательский сценарий:
 
-The connector deliberately does **not** declare video, edit, or delete capabilities. Provider-specific scheduling is also forbidden: Task 020 remains the only scheduler and calls this adapter only when a canonical Publication is READY.
+`Интеграции → OAuth VK → group_id → проверка → social.post.text → Публикации`.
+
+## Что работает в приложении
+
+- в «Интеграциях» можно создать VK-кабинет и пройти OAuth 2.0;
+- `group_id` хранится как обычная конфигурация, а access token выдаётся коннектору только внутри callback `SecretAccessor`;
+- health-check проверяет доступ к настроенной VK-группе через официальный API;
+- в разделе «Публикации» можно создать активный канал, опубликовать текст сразу или запланировать его через общий worker;
+- повтор публикации использует канонический `PublicationID` как VK `guid`, а неизвестный результат не повторяется вслепую;
+- лимит текста VK в текущем runtime — 16 384 Unicode code points.
+
+## Граница текущего runtime
+
+SDK-адаптер также содержит подготовленные маршруты изображений, комментариев и
+охватов. Они пока не включены в production support catalog: для их admission
+нужны отдельные host API/worker workflows, persisted receipts/reconciliation и
+операторские экраны во frontend. Наличие capability в manifest не означает,
+что операция доступна пользователю.
+
+Видео, редактирование и удаление публикаций не заявлены адаптером. Расписание
+остаётся ответственностью TORGNEXA Social Core; VK не реализует собственный
+scheduler.
+
+## Проверки
+
+Синтетические conformance-тесты проверяют OAuth boundary, конфигурацию группы,
+идемпотентный text publish, ошибки VK и fail-closed поведение. Live readiness
+не заявляется без отдельной non-production VK-группы и сохранённого внешнего
+evidence.

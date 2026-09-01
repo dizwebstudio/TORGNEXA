@@ -23,6 +23,8 @@ const OrdersPage = lazy(() => import("../pages/OrdersPage").then(module => ({def
 const ReturnsPage = lazy(() => import("../pages/ReturnsPage").then(module => ({default: module.ReturnsPage})));
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
 const InventoryPage = lazy(() => import("../pages/InventoryPage").then(module => ({default: module.InventoryPage})));
+const ReplenishmentPage = lazy(() => import("../pages/ReplenishmentPage").then(module => ({default: module.ReplenishmentPage})));
+const PricingPage = lazy(() => import("../pages/PricingPage").then(module => ({default: module.PricingPage})));
 const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then(module => ({default: module.CounterpartiesPage})));
 const ProcurementPage = lazy(() => import("../pages/ProcurementPage").then(module => ({default: module.ProcurementPage})));
 const FinancePage = lazy(() => import("../pages/FinancePage").then(module => ({default: module.FinancePage})));
@@ -39,6 +41,7 @@ const ApprovalsPage = lazy(() => import("../pages/ApprovalsPage").then(module =>
 const WorkflowsPage = lazy(() => import("../pages/WorkflowsPage").then(module => ({default: module.WorkflowsPage})));
 const IntegrationsPage = lazy(() => import("../pages/IntegrationsPage").then(module => ({default: module.IntegrationsPage})));
 const IntegrationStatusPage = lazy(() => import("../pages/IntegrationStatusPage").then(module => ({default: module.IntegrationStatusPage})));
+const MarketplaceOperationsPage = lazy(() => import("../pages/MarketplaceOperationsPage").then(module => ({default: module.MarketplaceOperationsPage})));
 const SocialPage = lazy(() => import("../pages/SocialPage").then(module => ({default: module.SocialPage})));
 const PlaceholderPage = lazy(() => import("../pages/PlaceholderPage").then(module => ({default: module.PlaceholderPage})));
 const IncidentCenterPage = lazy(() => import("../pages/IncidentCenterPage").then(module => ({default: module.IncidentCenterPage})));
@@ -55,6 +58,8 @@ function content(path: string) {
   if (path === "/orders" || path.startsWith("/orders/")) return <OrdersPage />;
   if (path === "/returns" || path.startsWith("/returns/")) return <ReturnsPage />;
   if (path === "/inventory") return <InventoryPage />;
+  if (path === "/replenishment") return <ReplenishmentPage />;
+  if (path === "/pricing") return <PricingPage />;
   if (path === "/incidents" || path.startsWith("/incidents/")) return <IncidentCenterPage />;
   if (path === "/marking") return <MarkingPage />;
   if (path === "/compliance") return <CompliancePage />;
@@ -69,6 +74,7 @@ function content(path: string) {
   if (path === "/workflows") return <WorkflowsPage />;
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/integrations/status" || path.startsWith("/integrations/status/")) return <IntegrationStatusPage />;
+  if (path === "/marketplace-operations" || path.startsWith("/marketplace-operations/")) return <MarketplaceOperationsPage />;
   if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
   if (path === "/assistant") return <OperatorAssistantPage />;

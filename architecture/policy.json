@@ -103,6 +103,10 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/marketplaceoperations",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/marketplacepublication",
       "kind": "core_domain"
     },
@@ -428,6 +432,10 @@
     },
     {
       "path": "internal/platform/postgres/logisticsrepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
+      "path": "internal/platform/postgres/marketplaceoperationsrepo",
       "kind": "infrastructure_adapter"
     },
     {

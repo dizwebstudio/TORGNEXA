@@ -41,6 +41,7 @@ import (
 	yandexmarket "github.com/torgnexa/torgnexa/connectors/marketplaces/yandex-market"
 	maxmessenger "github.com/torgnexa/torgnexa/connectors/social/max-messenger"
 	telegram "github.com/torgnexa/torgnexa/connectors/social/telegram"
+	vk "github.com/torgnexa/torgnexa/connectors/social/vk"
 	bitrixstore "github.com/torgnexa/torgnexa/connectors/storefronts/bitrix"
 	cscart "github.com/torgnexa/torgnexa/connectors/storefronts/cs-cart"
 	magento "github.com/torgnexa/torgnexa/connectors/storefronts/magento"
@@ -778,6 +779,122 @@ func telegramMultipartBody(params []telegram.Param, files []telegram.FilePart) (
 
 func validTelegramMediaType(value string) bool {
 	return value == "image/jpeg" || value == "image/png" || value == "image/webp" || value == "video/mp4"
+}
+
+type vkHTTP struct{ h *httpTransport }
+
+func (t vkHTTP) Do(ctx context.Context, request vk.Request) (vk.Response, error) {
+	if t.h == nil || request.Host != "api.vk.com" || request.Method != http.MethodPost || len(request.AccessToken) == 0 || !validVKAPIMethod(request.APIMethod) {
+		return vk.Response{}, errors.New("vk http: invalid request")
+	}
+	query := url.Values{}
+	for _, parameter := range request.Params {
+		if !validVKParam(parameter) {
+			return vk.Response{}, errors.New("vk http: invalid parameter")
+		}
+		query.Add(parameter.Name, parameter.Value)
+	}
+	headers := http.Header{"Authorization": []string{"Bearer " + string(request.AccessToken)}}
+	status, body, requestID, retryAfter, _, err := t.h.do(ctx, request.Method, request.Host, "/method/"+request.APIMethod, query, nil, headers, nil, nil)
+	return vk.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+func (t vkHTTP) Upload(ctx context.Context, upload vk.UploadRequest) (vk.Response, error) {
+	if t.h == nil || upload.Body == nil || upload.SizeBytes < 1 || upload.SizeBytes > maxVKMediaBytes || !validVKUploadURL(upload.URL) || !validVKMultipartName(upload.FieldName) || upload.FileName == "" || strings.ContainsAny(upload.FileName, "\x00\r\n\\/") || !validVKMediaType(upload.MediaType) || !validVKSHA256(upload.SHA256) {
+		return vk.Response{}, errors.New("vk http: invalid media upload")
+	}
+	body, contentType, err := vkMultipartBody(upload)
+	if err != nil {
+		return vk.Response{}, err
+	}
+	parsed, err := url.Parse(upload.URL)
+	if err != nil {
+		return vk.Response{}, errors.New("vk http: invalid upload URL")
+	}
+	query, err := url.ParseQuery(parsed.RawQuery)
+	if err != nil {
+		return vk.Response{}, errors.New("vk http: invalid upload query")
+	}
+	headers := http.Header{"Content-Type": []string{contentType}}
+	status, responseBody, requestID, retryAfter, _, err := t.h.doWithLimits(ctx, http.MethodPost, parsed.Hostname(), parsed.EscapedPath(), query, body, headers, nil, nil, maxVKUploadBody, maxResponseBody)
+	return vk.Response{StatusCode: status, Body: responseBody, RequestID: requestID, RetryAfterMS: retryAfter}, err
+}
+
+const (
+	maxVKMediaBytes = 50 << 20
+	maxVKUploadBody = 52 << 20
+)
+
+var (
+	vkAPIMethodPattern     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9.]{0,127}$`)
+	vkMultipartNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,31}$`)
+)
+
+func validVKAPIMethod(value string) bool {
+	return vkAPIMethodPattern.MatchString(value)
+}
+
+func validVKParam(parameter vk.Param) bool {
+	return vkMultipartNamePattern.MatchString(parameter.Name) && !strings.ContainsAny(parameter.Value, "\x00\r\n")
+}
+
+func validVKUploadURL(value string) bool {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" || parsed.Hostname() == "" || parsed.Path == "" || strings.ContainsAny(value, "\x00\r\n") {
+		return false
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return host == "vk.com" || strings.HasSuffix(host, ".vk.com") || host == "userapi.com" || strings.HasSuffix(host, ".userapi.com")
+}
+
+func validVKMultipartName(value string) bool {
+	return vkMultipartNamePattern.MatchString(value)
+}
+
+func validVKMediaType(value string) bool {
+	return value == "image/jpeg" || value == "image/png" || value == "image/webp"
+}
+
+func validVKSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, symbol := range value {
+		if !((symbol >= '0' && symbol <= '9') || (symbol >= 'a' && symbol <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func vkMultipartBody(upload vk.UploadRequest) ([]byte, string, error) {
+	if upload.SizeBytes > maxVKMediaBytes || upload.SizeBytes > int64(maxVKUploadBody) {
+		return nil, "", errors.New("vk http: media upload exceeds limit")
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	header := textproto.MIMEHeader{}
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, upload.FieldName, upload.FileName))
+	header.Set("Content-Type", upload.MediaType)
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		return nil, "", errors.New("vk http: multipart file failed")
+	}
+	written, err := io.CopyN(part, upload.Body, upload.SizeBytes)
+	if err != nil || written != upload.SizeBytes {
+		return nil, "", errors.New("vk http: multipart file size mismatch")
+	}
+	var extra [1]byte
+	if count, readErr := upload.Body.Read(extra[:]); count != 0 || (readErr != nil && readErr != io.EOF) {
+		return nil, "", errors.New("vk http: multipart file has trailing data")
+	}
+	if err := writer.Close(); err != nil || body.Len() > maxVKUploadBody {
+		return nil, "", errors.New("vk http: multipart body exceeds limit")
+	}
+	return body.Bytes(), writer.FormDataContentType(), nil
 }
 
 type maxHTTP struct{ h *httpTransport }

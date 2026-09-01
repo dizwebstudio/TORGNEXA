@@ -1,0 +1,17 @@
+{
+  "result": {
+    "postings": [
+      {
+        "posting_number": "00000000-0001-1",
+        "order_number": "order-1001",
+        "status": "awaiting_packaging",
+        "created_at": "2026-08-10T07:56:29Z",
+        "in_process_at": "2026-08-10T08:00:00Z",
+        "products": [
+          {"product_id": 9001001, "offer_id": "OZ-RED-M", "quantity": 2}
+        ]
+      }
+    ],
+    "has_next": true
+  }
+}
