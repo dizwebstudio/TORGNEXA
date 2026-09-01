@@ -51,6 +51,7 @@ const PlaceholderPage = lazy(() => import("../pages/PlaceholderPage").then(modul
 const IncidentCenterPage = lazy(() => import("../pages/IncidentCenterPage").then(module => ({default: module.IncidentCenterPage})));
 const MarkingPage = lazy(() => import("../pages/MarkingPage").then(module => ({default: module.MarkingPage})));
 const ConnectorOAuthCallbackPage = lazy(() => import("../pages/ConnectorOAuthCallbackPage").then(module => ({default: module.ConnectorOAuthCallbackPage})));
+const EcosystemPage = lazy(() => import("../pages/EcosystemPage").then(module => ({default: module.EcosystemPage})));
 
 const realtimeLabels: Readonly<Record<string, string>> = {live: "Подключено", connecting: "Подключение…", offline: "Недоступно"};
 
@@ -83,6 +84,7 @@ function content(path: string) {
   if (path === "/integrations") return <IntegrationsPage />;
   if (path === "/integrations/status" || path.startsWith("/integrations/status/")) return <IntegrationStatusPage />;
   if (path === "/marketplace-operations" || path.startsWith("/marketplace-operations/")) return <MarketplaceOperationsPage />;
+  if (path === "/ecosystem") return <EcosystemPage />;
   if (path === "/social") return <SocialPage />;
   if (path === "/reports") return <ReportsPage />;
   if (path === "/assistant") return <OperatorAssistantPage />;

@@ -6,6 +6,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/customerservice"
+	"github.com/torgnexa/torgnexa/internal/core/ecosystem"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
@@ -96,6 +97,13 @@ type CustomerServiceInput struct {
 // It never sends replies, changes assignments or mutates claims.
 type CustomerServiceReader interface {
 	ReadCustomerService(context.Context, Identity, CustomerServiceInput) (any, error)
+}
+
+// EcosystemReader exposes the same redacted portfolio and release-gate view
+// as the authenticated HTTP workspace. It never accepts tenant selectors or
+// credentials from a tool call.
+type EcosystemReader interface {
+	ReadEcosystem(context.Context, Identity) (ecosystem.Overview, error)
 }
 
 type toolDescriptor struct {
@@ -262,6 +270,15 @@ func customerServiceTool(available bool) toolDescriptor {
 			"search":          stringProp("Safe queue search", 0, 160),
 			"limit":           integerProp(1, 200),
 		}, []string{"view"}),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
+	}}
+}
+
+func ecosystemTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionEcosystemRead, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.ecosystem.overview", Title: "Read ecosystem overview",
+		Description: "Read the tenant-scoped ecosystem portfolio, onboarding, partner, mobile, hosted and support evidence. Counts never promote a connector or app to qualified or supported.",
+		InputSchema: objectSchema(map[string]any{}, nil),
 		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read"},
 	}}
 }

@@ -27,7 +27,7 @@ export const primaryNavigationIDs: ReadonlySet<string> = new Set([
 
 export const navigationSections = [
   {id: "operations", label: "Операционная работа", itemIds: ["publication-quality", "marketplace-publication", "marketplace-listing", "mass-catalog", "returns", "customer-service", "incidents", "marking", "replenishment", "pricing"]},
-  {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "marketplace-operations", "social"]},
+  {id: "integrations", label: "Интеграции и каналы", itemIds: ["integration-status", "marketplace-operations", "ecosystem", "social"]},
   {id: "control", label: "Контроль и данные", itemIds: ["counterparties", "procurement", "finance", "financial-analytics", "advertising", "approvals", "compliance", "reports", "audit"]},
   {id: "automation", label: "Автоматизация", itemIds: ["workflows", "operator-assistant"]},
 ] as const;
@@ -50,6 +50,7 @@ export const navigationItems: readonly NavigationItem[] = [
   {id: "marking", label: "Маркировка", path: "/marking", capability: "stock.read", risk: "WRITE_SENSITIVE", icon: "compliance"},
   {id: "integration-status", label: "Состояние интеграций", path: "/integrations/status", capability: "connectors.read", risk: "READ", icon: "connectors"},
   {id: "marketplace-operations", label: "Операции marketplace", path: "/marketplace-operations", capability: "integrations.center.read", risk: "READ", icon: "connectors"},
+  {id: "ecosystem", label: "Экосистема", path: "/ecosystem", capability: "ecosystem.read", risk: "READ", icon: "connectors"},
   {id: "connectors", label: "Интеграции", path: "/integrations", capability: "connectors.read", risk: "READ", icon: "connectors", shortcut: "G X"},
   {id: "social", label: "Публикации", path: "/social", capability: "connectors.read", risk: "WRITE_SAFE", icon: "notifications", shortcut: "G M"},
   {id: "sync", label: "Синхронизация", path: "/sync", capability: "sync.read", risk: "READ", icon: "sync", shortcut: "G S"},

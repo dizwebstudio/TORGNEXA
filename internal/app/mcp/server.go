@@ -22,6 +22,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/catalogbulk"
 	"github.com/torgnexa/torgnexa/internal/core/customerservice"
+	"github.com/torgnexa/torgnexa/internal/core/ecosystem"
 	"github.com/torgnexa/torgnexa/internal/core/financialcompleteness"
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/marketplacegrowth"
@@ -65,6 +66,7 @@ const (
 	permissionConnectorReadinessRead    = "commerce.connectors.readiness.read"
 	permissionFinancialCompletenessRead = "commerce.finance.completeness.read"
 	permissionCustomerServiceRead       = "commerce.customer_service.read"
+	permissionEcosystemRead             = "commerce.ecosystem.read"
 )
 
 type Identity struct {
@@ -147,6 +149,7 @@ type Dependencies struct {
 	ReadinessReader             ConnectorReadinessReader
 	FinancialCompletenessReader FinancialCompletenessReader
 	CustomerServiceReader       CustomerServiceReader
+	EcosystemReader             EcosystemReader
 	AllowedOrigins              []string
 	Edge                        securityedge.Config
 	Limiter                     *securityedge.Limiter
@@ -167,6 +170,7 @@ type Server struct {
 	readiness             ConnectorReadinessReader
 	financialCompleteness FinancialCompletenessReader
 	customerService       CustomerServiceReader
+	ecosystem             EcosystemReader
 	edge                  securityedge.Config
 	limiter               *securityedge.Limiter
 }
@@ -197,7 +201,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, catalogBulkPreview: deps.CatalogBulkPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, customerService: deps.CustomerServiceReader, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, catalogBulkPreview: deps.CatalogBulkPreviewer, growthPreview: deps.GrowthPreviewer, readiness: deps.ReadinessReader, financialCompleteness: deps.FinancialCompletenessReader, customerService: deps.CustomerServiceReader, ecosystem: deps.EcosystemReader, edge: edge, limiter: limiter}, nil
 }
 
 type localListingPreviewer struct{}
@@ -261,6 +265,48 @@ func (localReadinessReader) Readiness(_ context.Context, identity Identity) (con
 		return connectorSDK.ReadinessMatrix{}, ErrForbidden
 	}
 	return connectorSDK.ReadinessSnapshot()
+}
+
+type localEcosystemReader struct{}
+
+func (localEcosystemReader) ReadEcosystem(_ context.Context, identity Identity) (ecosystem.Overview, error) {
+	if !identity.Valid() {
+		return ecosystem.Overview{}, ErrForbidden
+	}
+	now := time.Now().UTC()
+	readiness, err := connectorSDK.ReadinessSnapshot()
+	if err != nil {
+		return ecosystem.Overview{}, err
+	}
+	portfolio := make([]ecosystem.PortfolioItem, 0, len(readiness.Profiles))
+	for _, profile := range readiness.Profiles {
+		status := ecosystem.StatusIntegrated
+		var evidence *ecosystem.Evidence
+		if profile.Status == connectorSDK.ReadinessReady {
+			status = ecosystem.StatusReady
+			evidence = ecosystemEvidence(profile.ID, profile, now)
+		}
+		portfolio = append(portfolio, ecosystem.PortfolioItem{ID: "connector:" + profile.ID, Kind: ecosystem.KindConnector, Tier: profile.Family, DisplayName: profile.DisplayName, Status: status, Owner: profile.Owner, Priority: profile.Priority, Decision: profile.Decision, NextAction: profile.NextAction, SupportLevel: "not_claimed", Deployment: "community_self_hosted", Capabilities: readinessNames(profile), Evidence: evidence, Version: 1, UpdatedAt: now})
+	}
+	mobile, hosted, support, err := ecosystem.DefaultSurfaces(now)
+	if err != nil {
+		return ecosystem.Overview{}, err
+	}
+	return ecosystem.BuildOverview(ecosystem.OverviewInput{Now: now, Portfolio: portfolio, Mobile: mobile, HostedTiers: hosted, Support: support, Metrics: []ecosystem.OutcomeMetric{{Name: "connectors.catalog", Value: int64(len(readiness.Profiles)), Unit: "items", State: "observed", AsOf: now}}, ExternalGates: []string{"credentialed_connector_qualification", "hosted_topology_slo_drill", "partner_uat_and_rollback"}})
+}
+
+func ecosystemEvidence(id string, value any, now time.Time) *ecosystem.Evidence {
+	raw, _ := json.Marshal(value)
+	sum := sha256.Sum256(raw)
+	return &ecosystem.Evidence{Kind: "repository", SourceRef: "connector-readiness/" + id, Digest: hex.EncodeToString(sum[:]), CheckedAt: now, Environment: "repository"}
+}
+
+func readinessNames(profile connectorSDK.ReadinessProfile) []string {
+	names := make([]string, 0, len(profile.Capabilities))
+	for _, capability := range profile.Capabilities {
+		names = append(names, capability.Name)
+	}
+	return names
 }
 
 type postgresFinancialCompletenessReader struct {
@@ -650,6 +696,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.customerService.ReadCustomerService(ctx, identity, input)
+	case "commerce.ecosystem.overview":
+		if s.ecosystem == nil {
+			return nil, ErrUnavailable
+		}
+		var input map[string]any
+		if err := decodeArguments(raw, &input); err != nil || len(input) != 0 {
+			return nil, ErrInvalid
+		}
+		return s.ecosystem.ReadEcosystem(ctx, identity)
 	default:
 		return nil, ErrInvalid
 	}
@@ -667,6 +722,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		connectorReadinessTool(s.readiness != nil),
 		financialCompletenessTool(s.financialCompleteness != nil),
 		customerServiceTool(s.customerService != nil),
+		ecosystemTool(s.ecosystem != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -704,7 +760,7 @@ func toolText(outputKind string, result any) string {
 
 func governanceMetrics(name string, raw json.RawMessage) (agentgovernance.ActionMetrics, error) {
 	switch name {
-	case "commerce.products.search", "commerce.orders.list", "party.counterparties.search", "commerce.customer_service.get":
+	case "commerce.products.search", "commerce.orders.list", "party.counterparties.search", "commerce.customer_service.get", "commerce.ecosystem.overview":
 		return agentgovernance.ActionMetrics{}, nil
 	case "commerce.price.change.request":
 		var input PriceChangeInput
@@ -789,7 +845,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, CatalogBulkPreviewer: localCatalogBulkPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, CatalogBulkPreviewer: localCatalogBulkPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, EcosystemReader: localEcosystemReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

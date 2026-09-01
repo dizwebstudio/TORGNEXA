@@ -2059,6 +2059,68 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Caller lacks integrations.center.read}
         '404': {description: Connector is not present in the reviewed catalog}
+  /ecosystem/overview:
+    get:
+      operationId: getEcosystemOverview
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Tenant-scoped ecosystem portfolio, onboarding, support and honest release-gate snapshot
+          content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemOverview'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.read}
+  /ecosystem/metrics:
+    get:
+      operationId: getEcosystemMetrics
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Outcome metrics for integrations, apps, support, onboarding and partner delivery
+          content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemMetricsResponse'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.read}
+  /ecosystem/onboarding:
+    get:
+      operationId: listEcosystemOnboarding
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Tenant-scoped append-only onboarding attempts
+          content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemOnboardingPage'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.read}
+    post:
+      operationId: createEcosystemOnboarding
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemOnboardingWrite'}}}}
+      responses:
+        '202': {description: Onboarding checks accepted and evaluated; no remote connector write is implied}
+        '400': {description: Invalid checks or missing idempotency key}
+        '409': {description: Idempotency conflict}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.onboarding.write}
+  /ecosystem/partners/certifications:
+    get:
+      operationId: listEcosystemPartnerCertifications
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Tenant-scoped partner certification evidence
+          content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemPartnerCertificationPage'}}}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.read}
+    post:
+      operationId: createEcosystemPartnerCertification
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EcosystemPartnerCertificationWrite'}}}}
+      responses:
+        '202': {description: Redacted partner evidence accepted; certification never grants connector or production access by itself}
+        '400': {description: Invalid evidence or missing idempotency key}
+        '409': {description: Idempotency conflict}
+        '401': {description: Missing or invalid OIDC bearer token}
+        '403': {description: Caller lacks ecosystem.partners.write}
   /marketplace-operations:
     get:
       operationId: listMarketplaceOperations
@@ -8390,6 +8452,204 @@ components:
         summary: {$ref: '#/components/schemas/ConnectorReadinessSummary'}
         items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/ConnectorReadinessProfile'}}
         next_cursor: {type: string, maxLength: 256, pattern: '^v1\.[A-Za-z0-9_-]+$'}
+    EcosystemEvidence:
+      type: object
+      additionalProperties: false
+      required: [kind, source_ref, digest, checked_at, environment]
+      properties:
+        kind: {type: string, maxLength: 64}
+        source_ref: {type: string, maxLength: 192}
+        digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        checked_at: {type: string, format: date-time, pattern: 'Z$'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+        environment: {type: string, maxLength: 32}
+    EcosystemPortfolioItem:
+      type: object
+      additionalProperties: false
+      required: [id, kind, tier, display_name, status, owner, priority, decision, next_action, support_level, deployment, use_cases, capabilities, version, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [connector, capability, app, partner_service, mobile_surface, cloud_tier]}
+        tier: {type: string, maxLength: 64}
+        display_name: {type: string, minLength: 1, maxLength: 192}
+        status: {type: string, enum: [integrated, verified, ready, qualified, supported, deprecated, blocked]}
+        owner: {type: string, maxLength: 192}
+        priority: {type: string, maxLength: 32}
+        decision: {type: string, maxLength: 128}
+        next_action: {type: string, maxLength: 256}
+        support_level: {type: string, maxLength: 64}
+        deployment: {type: string, maxLength: 64}
+        use_cases: {type: array, maxItems: 32, items: {type: string, maxLength: 192}}
+        capabilities: {type: array, maxItems: 128, items: {type: string, maxLength: 192}}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+        version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    EcosystemStatusCounts:
+      type: object
+      additionalProperties: false
+      required: [integrated, verified, ready, qualified, supported, deprecated, blocked]
+      properties:
+        integrated: {type: integer, minimum: 0}
+        verified: {type: integer, minimum: 0}
+        ready: {type: integer, minimum: 0}
+        qualified: {type: integer, minimum: 0}
+        supported: {type: integer, minimum: 0}
+        deprecated: {type: integer, minimum: 0}
+        blocked: {type: integer, minimum: 0}
+    EcosystemOnboardingCheck:
+      type: object
+      additionalProperties: false
+      required: [id, label, required, state, updated_at]
+      properties:
+        id: {type: string, maxLength: 96}
+        label: {type: string, minLength: 1, maxLength: 192}
+        required: {type: boolean}
+        state: {type: string, enum: [pending, passed, failed, skipped]}
+        evidence_ref: {type: string, maxLength: 192}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    EcosystemOnboardingRun:
+      type: object
+      additionalProperties: false
+      required: [id, resource_id, state, checks, owner_ref, idempotency_key, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        resource_id: {type: string, maxLength: 192}
+        state: {type: string, enum: [draft, running, ready, blocked, rolled_back]}
+        checks: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/EcosystemOnboardingCheck'}}
+        owner_ref: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    EcosystemPartnerCertification:
+      type: object
+      additionalProperties: false
+      required: [id, partner_ref, tier, state, expires_at, idempotency_key, version, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        partner_ref: {type: string, maxLength: 192}
+        tier: {type: string, enum: [referral, implementation, certified_solution, managed_operations, support_escalation]}
+        state: {type: string, enum: [applied, sandbox_ready, certified, suspended, revoked, expired]}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
+        idempotency_key: {type: string, maxLength: 128}
+        version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    EcosystemMobileSurface:
+      type: object
+      additionalProperties: false
+      required: [id, target, supported_os, offline_policy, capabilities, release_channel, status]
+      properties:
+        id: {type: string, maxLength: 192}
+        target: {type: string, maxLength: 64}
+        supported_os: {type: array, maxItems: 16, items: {type: string, maxLength: 128}}
+        offline_policy: {type: string, maxLength: 128}
+        capabilities: {type: array, maxItems: 32, items: {type: string, maxLength: 128}}
+        release_channel: {type: string, maxLength: 32}
+        status: {type: string, enum: [integrated, verified, ready, qualified, supported, deprecated, blocked]}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+    EcosystemHostedTier:
+      type: object
+      additionalProperties: false
+      required: [id, name, deployment, data_residency, availability_bps, api_response_p95_ms, recovery_point_minutes, recovery_time_minutes, support_level, sla_claimable]
+      properties:
+        id: {type: string, maxLength: 96}
+        name: {type: string, maxLength: 128}
+        deployment: {type: string, maxLength: 64}
+        data_residency: {type: string, maxLength: 64}
+        availability_bps: {type: integer, minimum: 0, maximum: 10000}
+        api_response_p95_ms: {type: integer, minimum: 0}
+        recovery_point_minutes: {type: integer, minimum: 0}
+        recovery_time_minutes: {type: integer, minimum: 0}
+        support_level: {type: string, maxLength: 64}
+        sla_claimable: {type: boolean}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+    EcosystemSupportPolicy:
+      type: object
+      additionalProperties: false
+      required: [tier, coverage, first_response_minutes, resolution_target_minutes, owner]
+      properties:
+        tier: {type: string, maxLength: 64}
+        coverage: {type: string, maxLength: 128}
+        first_response_minutes: {type: integer, minimum: 1}
+        resolution_target_minutes: {type: integer, minimum: 1}
+        owner: {type: string, maxLength: 192}
+    EcosystemSupportSnapshot:
+      type: object
+      additionalProperties: false
+      required: [open_cases, at_risk_cases, policies, diagnostics]
+      properties:
+        open_cases: {type: integer, minimum: 0}
+        at_risk_cases: {type: integer, minimum: 0}
+        policies: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/EcosystemSupportPolicy'}}
+        diagnostics: {type: string, maxLength: 256}
+    EcosystemOutcomeMetric:
+      type: object
+      additionalProperties: false
+      required: [name, value, unit, state, as_of]
+      properties:
+        name: {type: string, maxLength: 128}
+        value: {type: integer, minimum: 0}
+        unit: {type: string, maxLength: 32}
+        state: {type: string, maxLength: 32}
+        as_of: {type: string, format: date-time, pattern: 'Z$'}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+    EcosystemOverview:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generated_at, consistency, status_counts, portfolio, visible_apps, onboarding, partners, mobile, hosted_tiers, support, metrics, external_gates]
+      properties:
+        schema_version: {type: integer, minimum: 1}
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        consistency: {type: string, enum: [best_effort]}
+        status_counts: {$ref: '#/components/schemas/EcosystemStatusCounts'}
+        portfolio: {type: array, maxItems: 2048, items: {$ref: '#/components/schemas/EcosystemPortfolioItem'}}
+        visible_apps: {type: integer, minimum: 0}
+        onboarding: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/EcosystemOnboardingRun'}}
+        partners: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/EcosystemPartnerCertification'}}
+        mobile: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/EcosystemMobileSurface'}}
+        hosted_tiers: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/EcosystemHostedTier'}}
+        support: {$ref: '#/components/schemas/EcosystemSupportSnapshot'}
+        metrics: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/EcosystemOutcomeMetric'}}
+        external_gates: {type: array, maxItems: 32, items: {type: string, maxLength: 128}}
+    EcosystemMetricsResponse:
+      type: object
+      additionalProperties: false
+      required: [generated_at, consistency, metrics]
+      properties:
+        generated_at: {type: string, format: date-time, pattern: 'Z$'}
+        consistency: {type: string, enum: [best_effort]}
+        metrics: {type: array, maxItems: 128, items: {$ref: '#/components/schemas/EcosystemOutcomeMetric'}}
+    EcosystemOnboardingPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/EcosystemOnboardingRun'}}
+    EcosystemOnboardingWrite:
+      type: object
+      additionalProperties: false
+      required: [resource_id, checks]
+      properties:
+        resource_id: {type: string, minLength: 1, maxLength: 192}
+        checks: {type: array, minItems: 1, maxItems: 64, items: {$ref: '#/components/schemas/EcosystemOnboardingCheck'}}
+    EcosystemPartnerCertificationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/EcosystemPartnerCertification'}}
+    EcosystemPartnerCertificationWrite:
+      type: object
+      additionalProperties: false
+      required: [partner_ref, tier, state, expires_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        partner_ref: {type: string, minLength: 1, maxLength: 192}
+        tier: {type: string, enum: [referral, implementation, certified_solution, managed_operations, support_escalation]}
+        state: {type: string, enum: [applied, sandbox_ready, certified, suspended, revoked, expired]}
+        evidence: {$ref: '#/components/schemas/EcosystemEvidence'}
+        expires_at: {type: string, format: date-time, pattern: 'Z$'}
     MarketplaceOperation:
       type: object
       additionalProperties: false

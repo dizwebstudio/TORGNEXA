@@ -84,12 +84,12 @@ func (k ResourceKind) Valid() bool {
 // Evidence is a redacted pointer to retained evidence. It must not contain a
 // token, a remote payload or a production customer identifier.
 type Evidence struct {
-	Kind       string    `json:"kind"`
-	SourceRef  string    `json:"source_ref"`
-	Digest     string    `json:"digest"`
-	CheckedAt  time.Time `json:"checked_at"`
-	ExpiresAt  time.Time `json:"expires_at,omitempty"`
-	Environment string   `json:"environment"`
+	Kind        string    `json:"kind"`
+	SourceRef   string    `json:"source_ref"`
+	Digest      string    `json:"digest"`
+	CheckedAt   time.Time `json:"checked_at"`
+	ExpiresAt   time.Time `json:"expires_at,omitempty"`
+	Environment string    `json:"environment"`
 }
 
 func (e Evidence) Validate(now time.Time) error {
@@ -105,22 +105,22 @@ func (e Evidence) Validate(now time.Time) error {
 // PortfolioItem is the common customer-facing catalog row for integrations,
 // apps and delivery services.
 type PortfolioItem struct {
-	ID             string       `json:"id"`
-	Kind           ResourceKind `json:"kind"`
-	Tier           string       `json:"tier"`
-	DisplayName    string       `json:"display_name"`
-	Status         Status       `json:"status"`
-	Owner          string       `json:"owner"`
-	Priority       string       `json:"priority"`
-	Decision       string       `json:"decision"`
-	NextAction     string       `json:"next_action"`
-	SupportLevel   string       `json:"support_level"`
-	Deployment     string       `json:"deployment"`
-	UseCases       []string     `json:"use_cases"`
-	Capabilities   []string     `json:"capabilities"`
-	Evidence       *Evidence    `json:"evidence,omitempty"`
-	Version        int64        `json:"version"`
-	UpdatedAt      time.Time    `json:"updated_at"`
+	ID           string       `json:"id"`
+	Kind         ResourceKind `json:"kind"`
+	Tier         string       `json:"tier"`
+	DisplayName  string       `json:"display_name"`
+	Status       Status       `json:"status"`
+	Owner        string       `json:"owner"`
+	Priority     string       `json:"priority"`
+	Decision     string       `json:"decision"`
+	NextAction   string       `json:"next_action"`
+	SupportLevel string       `json:"support_level"`
+	Deployment   string       `json:"deployment"`
+	UseCases     []string     `json:"use_cases"`
+	Capabilities []string     `json:"capabilities"`
+	Evidence     *Evidence    `json:"evidence,omitempty"`
+	Version      int64        `json:"version"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 func (p PortfolioItem) Validate(now time.Time) error {
@@ -178,15 +178,17 @@ const (
 	CheckSkipped CheckState = "skipped"
 )
 
-func (s CheckState) Valid() bool { return s == CheckPending || s == CheckPassed || s == CheckFailed || s == CheckSkipped }
+func (s CheckState) Valid() bool {
+	return s == CheckPending || s == CheckPassed || s == CheckFailed || s == CheckSkipped
+}
 
 type OnboardingCheck struct {
-	ID         string     `json:"id"`
-	Label      string     `json:"label"`
-	Required   bool       `json:"required"`
-	State      CheckState `json:"state"`
-	EvidenceRef string    `json:"evidence_ref,omitempty"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID          string     `json:"id"`
+	Label       string     `json:"label"`
+	Required    bool       `json:"required"`
+	State       CheckState `json:"state"`
+	EvidenceRef string     `json:"evidence_ref,omitempty"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 func (c OnboardingCheck) Validate() error {
@@ -202,10 +204,10 @@ func (c OnboardingCheck) Validate() error {
 type OnboardingState string
 
 const (
-	OnboardingDraft     OnboardingState = "draft"
-	OnboardingRunning   OnboardingState = "running"
-	OnboardingReady     OnboardingState = "ready"
-	OnboardingBlocked   OnboardingState = "blocked"
+	OnboardingDraft      OnboardingState = "draft"
+	OnboardingRunning    OnboardingState = "running"
+	OnboardingReady      OnboardingState = "ready"
+	OnboardingBlocked    OnboardingState = "blocked"
 	OnboardingRolledBack OnboardingState = "rolled_back"
 )
 
@@ -214,15 +216,15 @@ func (s OnboardingState) Valid() bool {
 }
 
 type OnboardingRun struct {
-	ID             string          `json:"id"`
-	ResourceID     string          `json:"resource_id"`
-	State          OnboardingState `json:"state"`
+	ID             string            `json:"id"`
+	ResourceID     string            `json:"resource_id"`
+	State          OnboardingState   `json:"state"`
 	Checks         []OnboardingCheck `json:"checks"`
-	OwnerRef       string          `json:"owner_ref"`
-	IdempotencyKey string          `json:"idempotency_key"`
-	Version        int64           `json:"version"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	OwnerRef       string            `json:"owner_ref"`
+	IdempotencyKey string            `json:"idempotency_key"`
+	Version        int64             `json:"version"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
 }
 
 func (r OnboardingRun) Validate() error {
@@ -274,11 +276,11 @@ func EvaluateOnboarding(run OnboardingRun) (OnboardingRun, error) {
 type PartnerTier string
 
 const (
-	PartnerReferral           PartnerTier = "referral"
-	PartnerImplementation     PartnerTier = "implementation"
-	PartnerCertifiedSolution  PartnerTier = "certified_solution"
-	PartnerManagedOperations  PartnerTier = "managed_operations"
-	PartnerSupportEscalation  PartnerTier = "support_escalation"
+	PartnerReferral          PartnerTier = "referral"
+	PartnerImplementation    PartnerTier = "implementation"
+	PartnerCertifiedSolution PartnerTier = "certified_solution"
+	PartnerManagedOperations PartnerTier = "managed_operations"
+	PartnerSupportEscalation PartnerTier = "support_escalation"
 )
 
 func (t PartnerTier) Valid() bool {
@@ -288,8 +290,8 @@ func (t PartnerTier) Valid() bool {
 type PartnerState string
 
 const (
-	PartnerApplied  PartnerState = "applied"
-	PartnerSandbox  PartnerState = "sandbox_ready"
+	PartnerApplied   PartnerState = "applied"
+	PartnerSandbox   PartnerState = "sandbox_ready"
 	PartnerCertified PartnerState = "certified"
 	PartnerSuspended PartnerState = "suspended"
 	PartnerRevoked   PartnerState = "revoked"
@@ -301,15 +303,15 @@ func (s PartnerState) Valid() bool {
 }
 
 type PartnerCertification struct {
-	ID             string        `json:"id"`
-	PartnerRef     string        `json:"partner_ref"`
-	Tier           PartnerTier   `json:"tier"`
-	State          PartnerState  `json:"state"`
-	Evidence       *Evidence     `json:"evidence,omitempty"`
-	ExpiresAt      time.Time     `json:"expires_at,omitempty"`
-	IdempotencyKey string        `json:"idempotency_key"`
-	Version        int64         `json:"version"`
-	UpdatedAt      time.Time     `json:"updated_at"`
+	ID             string       `json:"id"`
+	PartnerRef     string       `json:"partner_ref"`
+	Tier           PartnerTier  `json:"tier"`
+	State          PartnerState `json:"state"`
+	Evidence       *Evidence    `json:"evidence,omitempty"`
+	ExpiresAt      time.Time    `json:"expires_at,omitempty"`
+	IdempotencyKey string       `json:"idempotency_key"`
+	Version        int64        `json:"version"`
+	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
 func (p PartnerCertification) Validate(now time.Time) error {
@@ -331,13 +333,13 @@ func (p PartnerCertification) Validate(now time.Time) error {
 }
 
 type MobileSurface struct {
-	ID             string   `json:"id"`
-	Target         string   `json:"target"`
-	SupportedOS    []string `json:"supported_os"`
-	OfflinePolicy  string   `json:"offline_policy"`
-	Capabilities   []string `json:"capabilities"`
-	ReleaseChannel string   `json:"release_channel"`
-	Status         Status   `json:"status"`
+	ID             string    `json:"id"`
+	Target         string    `json:"target"`
+	SupportedOS    []string  `json:"supported_os"`
+	OfflinePolicy  string    `json:"offline_policy"`
+	Capabilities   []string  `json:"capabilities"`
+	ReleaseChannel string    `json:"release_channel"`
+	Status         Status    `json:"status"`
 	Evidence       *Evidence `json:"evidence,omitempty"`
 }
 
@@ -357,17 +359,17 @@ func (m MobileSurface) Validate(now time.Time) error {
 }
 
 type HostedTier struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	Deployment            string `json:"deployment"`
-	DataResidency         string `json:"data_residency"`
-	AvailabilityBPS       int64  `json:"availability_bps"`
-	APIResponseP95MS      int64  `json:"api_response_p95_ms"`
-	RecoveryPointMinutes  int64  `json:"recovery_point_minutes"`
-	RecoveryTimeMinutes   int64  `json:"recovery_time_minutes"`
-	SupportLevel          string `json:"support_level"`
-	SLAClaimable          bool   `json:"sla_claimable"`
-	Evidence              *Evidence `json:"evidence,omitempty"`
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	Deployment           string    `json:"deployment"`
+	DataResidency        string    `json:"data_residency"`
+	AvailabilityBPS      int64     `json:"availability_bps"`
+	APIResponseP95MS     int64     `json:"api_response_p95_ms"`
+	RecoveryPointMinutes int64     `json:"recovery_point_minutes"`
+	RecoveryTimeMinutes  int64     `json:"recovery_time_minutes"`
+	SupportLevel         string    `json:"support_level"`
+	SLAClaimable         bool      `json:"sla_claimable"`
+	Evidence             *Evidence `json:"evidence,omitempty"`
 }
 
 func (t HostedTier) Validate(now time.Time) error {
@@ -384,11 +386,11 @@ func (t HostedTier) Validate(now time.Time) error {
 }
 
 type SupportPolicy struct {
-	Tier                 string `json:"tier"`
-	Coverage             string `json:"coverage"`
-	FirstResponseMinutes int64  `json:"first_response_minutes"`
-	ResolutionTargetMinutes int64 `json:"resolution_target_minutes"`
-	Owner                string `json:"owner"`
+	Tier                    string `json:"tier"`
+	Coverage                string `json:"coverage"`
+	FirstResponseMinutes    int64  `json:"first_response_minutes"`
+	ResolutionTargetMinutes int64  `json:"resolution_target_minutes"`
+	Owner                   string `json:"owner"`
 }
 
 func (p SupportPolicy) Validate() error {
@@ -399,11 +401,11 @@ func (p SupportPolicy) Validate() error {
 }
 
 type SupportSnapshot struct {
-	OpenCases       int64          `json:"open_cases"`
-	AtRiskCases     int64          `json:"at_risk_cases"`
-	Policies        []SupportPolicy `json:"policies"`
-	Diagnostics     string         `json:"diagnostics"`
-	}
+	OpenCases   int64           `json:"open_cases"`
+	AtRiskCases int64           `json:"at_risk_cases"`
+	Policies    []SupportPolicy `json:"policies"`
+	Diagnostics string          `json:"diagnostics"`
+}
 
 func (s SupportSnapshot) Validate() error {
 	if s.OpenCases < 0 || s.AtRiskCases < 0 || s.AtRiskCases > s.OpenCases || len(s.Policies) == 0 || len(s.Policies) > 16 || !safeRef(s.Diagnostics, 256) {
@@ -418,12 +420,12 @@ func (s SupportSnapshot) Validate() error {
 }
 
 type OutcomeMetric struct {
-	Name      string    `json:"name"`
-	Value     int64     `json:"value"`
-	Unit      string    `json:"unit"`
-	State     string    `json:"state"`
-	AsOf      time.Time `json:"as_of"`
-	Evidence  *Evidence `json:"evidence,omitempty"`
+	Name     string    `json:"name"`
+	Value    int64     `json:"value"`
+	Unit     string    `json:"unit"`
+	State    string    `json:"state"`
+	AsOf     time.Time `json:"as_of"`
+	Evidence *Evidence `json:"evidence,omitempty"`
 }
 
 func (m OutcomeMetric) Validate(now time.Time) error {
@@ -447,33 +449,33 @@ type StatusCounts struct {
 }
 
 type Overview struct {
-	SchemaVersion     int                    `json:"schema_version"`
-	GeneratedAt       time.Time              `json:"generated_at"`
-	Consistency       string                 `json:"consistency"`
-	StatusCounts      StatusCounts            `json:"status_counts"`
-	Portfolio         []PortfolioItem         `json:"portfolio"`
-	VisibleApps       int                    `json:"visible_apps"`
-	Onboarding        []OnboardingRun         `json:"onboarding"`
-	Partners          []PartnerCertification  `json:"partners"`
-	Mobile            []MobileSurface         `json:"mobile"`
-	HostedTiers       []HostedTier            `json:"hosted_tiers"`
-	Support           SupportSnapshot         `json:"support"`
-	Metrics           []OutcomeMetric         `json:"metrics"`
-	ExternalGates     []string                `json:"external_gates"`
+	SchemaVersion int                    `json:"schema_version"`
+	GeneratedAt   time.Time              `json:"generated_at"`
+	Consistency   string                 `json:"consistency"`
+	StatusCounts  StatusCounts           `json:"status_counts"`
+	Portfolio     []PortfolioItem        `json:"portfolio"`
+	VisibleApps   int                    `json:"visible_apps"`
+	Onboarding    []OnboardingRun        `json:"onboarding"`
+	Partners      []PartnerCertification `json:"partners"`
+	Mobile        []MobileSurface        `json:"mobile"`
+	HostedTiers   []HostedTier           `json:"hosted_tiers"`
+	Support       SupportSnapshot        `json:"support"`
+	Metrics       []OutcomeMetric        `json:"metrics"`
+	ExternalGates []string               `json:"external_gates"`
 }
 
 // OverviewInput is assembled by the application layer from canonical domain
 // readers. The core only validates and aggregates the projection.
 type OverviewInput struct {
-	Now          time.Time
-	Portfolio    []PortfolioItem
-	VisibleApps  int
-	Onboarding   []OnboardingRun
-	Partners     []PartnerCertification
-	Mobile       []MobileSurface
-	HostedTiers  []HostedTier
-	Support      SupportSnapshot
-	Metrics      []OutcomeMetric
+	Now           time.Time
+	Portfolio     []PortfolioItem
+	VisibleApps   int
+	Onboarding    []OnboardingRun
+	Partners      []PartnerCertification
+	Mobile        []MobileSurface
+	HostedTiers   []HostedTier
+	Support       SupportSnapshot
+	Metrics       []OutcomeMetric
 	ExternalGates []string
 }
 
@@ -558,10 +560,33 @@ func DefaultSurfaces(now time.Time) ([]MobileSurface, []HostedTier, SupportSnaps
 	return mobile, hosted, support, nil
 }
 
-func digestFor(value string) string { sum := sha256.Sum256([]byte(value)); return hex.EncodeToString(sum[:]) }
+func digestFor(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
 func utc(value time.Time) bool { return !value.IsZero() && value.Location() == time.UTC }
-func safeRef(value string, max int) bool { return strings.TrimSpace(value) != "" && len(value) <= max && !strings.ContainsAny(value, "\r\n\x00") }
-func isHex(value string) bool { for _, r := range value { if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) { return false } }; return true }
+func safeRef(value string, max int) bool {
+	return strings.TrimSpace(value) != "" && len(value) <= max && !strings.ContainsAny(value, "\r\n\x00")
+}
+func isHex(value string) bool {
+	for _, r := range value {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
 func cloneStrings(values []string) []string { return append([]string(nil), values...) }
-func clonePortfolio(value PortfolioItem) PortfolioItem { value.UseCases = cloneStrings(value.UseCases); value.Capabilities = cloneStrings(value.Capabilities); if value.Evidence != nil { copy := *value.Evidence; value.Evidence = &copy }; return value }
-func cloneOnboarding(value OnboardingRun) OnboardingRun { value.Checks = append([]OnboardingCheck(nil), value.Checks...); return value }
+func clonePortfolio(value PortfolioItem) PortfolioItem {
+	value.UseCases = cloneStrings(value.UseCases)
+	value.Capabilities = cloneStrings(value.Capabilities)
+	if value.Evidence != nil {
+		copy := *value.Evidence
+		value.Evidence = &copy
+	}
+	return value
+}
+func cloneOnboarding(value OnboardingRun) OnboardingRun {
+	value.Checks = append([]OnboardingCheck(nil), value.Checks...)
+	return value
+}

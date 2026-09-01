@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "54d2d0f004cd79085ecb8e2dd19a0545f7dfaf0cfc77f50957752c9c6dd4a294",
+    "sha256": "59d8507f4f0dd9e27adcccfc4b6f9f6f0c20298f8873b5924a0023e702b0e899",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -233,6 +233,16 @@
       "operation_id": "createDemoOrders",
       "method": "POST",
       "path": "/orders/demo"
+    },
+    {
+      "operation_id": "createEcosystemOnboarding",
+      "method": "POST",
+      "path": "/ecosystem/onboarding"
+    },
+    {
+      "operation_id": "createEcosystemPartnerCertification",
+      "method": "POST",
+      "path": "/ecosystem/partners/certifications"
     },
     {
       "operation_id": "createInventoryWarehouse",
@@ -603,6 +613,16 @@
       "operation_id": "getCustomerServiceThread",
       "method": "GET",
       "path": "/customer-service/threads/{conversation_id}"
+    },
+    {
+      "operation_id": "getEcosystemMetrics",
+      "method": "GET",
+      "path": "/ecosystem/metrics"
+    },
+    {
+      "operation_id": "getEcosystemOverview",
+      "method": "GET",
+      "path": "/ecosystem/overview"
     },
     {
       "operation_id": "getFinancialCompleteness",
@@ -1023,6 +1043,16 @@
       "operation_id": "listCustomerServiceReviews",
       "method": "GET",
       "path": "/customer-service/reviews"
+    },
+    {
+      "operation_id": "listEcosystemOnboarding",
+      "method": "GET",
+      "path": "/ecosystem/onboarding"
+    },
+    {
+      "operation_id": "listEcosystemPartnerCertifications",
+      "method": "GET",
+      "path": "/ecosystem/partners/certifications"
     },
     {
       "operation_id": "listFXRates",

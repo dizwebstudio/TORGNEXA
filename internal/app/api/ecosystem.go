@@ -15,15 +15,15 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	connectorSDK "github.com/torgnexa/torgnexa/internal/platform/connectors"
-	"github.com/torgnexa/torgnexa/internal/platform/postgres/ecosystemrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/ecosystemrepo"
 )
 
 const (
-	EcosystemOverviewPath       = "/api/v1/ecosystem/overview"
-	EcosystemMetricsPath        = "/api/v1/ecosystem/metrics"
-	EcosystemOnboardingPath     = "/api/v1/ecosystem/onboarding"
-	EcosystemPartnersPath       = "/api/v1/ecosystem/partners/certifications"
+	EcosystemOverviewPath   = "/api/v1/ecosystem/overview"
+	EcosystemMetricsPath    = "/api/v1/ecosystem/metrics"
+	EcosystemOnboardingPath = "/api/v1/ecosystem/onboarding"
+	EcosystemPartnersPath   = "/api/v1/ecosystem/partners/certifications"
 )
 
 type ecosystemCustomerServiceReader interface {
@@ -31,11 +31,11 @@ type ecosystemCustomerServiceReader interface {
 }
 
 type ecosystemAPI struct {
-	repository     *ecosystemrepo.Repository
-	plugins        pluginListingReader
-	cloud          cloudSubscriptionReader
+	repository      *ecosystemrepo.Repository
+	plugins         pluginListingReader
+	cloud           cloudSubscriptionReader
 	customerService ecosystemCustomerServiceReader
-	audit          auditCapturer
+	audit           auditCapturer
 }
 
 func newEcosystemRoutes(repository *ecosystemrepo.Repository, plugins pluginListingReader, cloud cloudSubscriptionReader, customerService ecosystemCustomerServiceReader, auditor auditCapturer) []ProtectedRoute {
@@ -115,8 +115,8 @@ func (api ecosystemAPI) createOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var input struct {
-		ResourceID string                         `json:"resource_id"`
-		Checks     []ecosystem.OnboardingCheck   `json:"checks"`
+		ResourceID string                      `json:"resource_id"`
+		Checks     []ecosystem.OnboardingCheck `json:"checks"`
 	}
 	if decodeStrictJSON(r, &input) != nil {
 		writeProblem(w, http.StatusBadRequest, "Invalid onboarding checks")
@@ -260,12 +260,15 @@ func (api ecosystemAPI) buildOverview(ctx context.Context, scope tenancy.Scope) 
 			return ecosystem.Overview{}, err
 		}
 	}
-	metrics = append(metrics, ecosystem.OutcomeMetric{Name: "onboarding.runs", Value: int64(len(onboarding)), Unit: "runs", State: "observed", AsOf: now}, {Name: "partners.certified", Value: int64(countCertifiedPartners(partners)), Unit: "partners", State: "observed", AsOf: now})
+	metrics = append(metrics, ecosystem.OutcomeMetric{Name: "onboarding.runs", Value: int64(len(onboarding)), Unit: "runs", State: "observed", AsOf: now}, ecosystem.OutcomeMetric{Name: "partners.certified", Value: int64(countCertifiedPartners(partners)), Unit: "partners", State: "observed", AsOf: now})
 	return ecosystem.BuildOverview(ecosystem.OverviewInput{Now: now, Portfolio: portfolio, VisibleApps: visibleApps, Onboarding: onboarding, Partners: partners, Mobile: mobile, HostedTiers: hosted, Support: support, Metrics: metrics, ExternalGates: []string{"credentialed_connector_qualification", "partner_uat_and_rollback", "hosted_topology_slo_drill", "mobile_device_matrix", "production_backup_restore"}})
 }
 
 func ecosystemStaticPortfolio(now time.Time) []ecosystem.PortfolioItem {
-	items := []struct{ id, kind, tier, name, owner, priority, decision, next, support, deployment string; status ecosystem.Status }{
+	items := []struct {
+		id, kind, tier, name, owner, priority, decision, next, support, deployment string
+		status                                                                     ecosystem.Status
+	}{
 		{"app-marketplace", string(ecosystem.KindApp), "distribution", "Marketplace приложений", "platform-governance", "wave_1", "maintain", "publisher_review", "repository", "community_self_hosted", ecosystem.StatusVerified},
 		{"developer-platform", string(ecosystem.KindApp), "developer", "Developer API и SDK", "developer-platform", "wave_1", "maintain", "partner_sandbox", "repository", "community_self_hosted", ecosystem.StatusVerified},
 		{"partner-delivery", string(ecosystem.KindPartner), "services", "Партнёрское внедрение", "ecosystem-operations", "wave_2", "build", "certification_uat", "qualification_required", "partner_managed", ecosystem.StatusIntegrated},
@@ -288,9 +291,31 @@ func ecosystemEvidence(kind, source string, value any, now time.Time) *ecosystem
 	return &ecosystem.Evidence{Kind: kind, SourceRef: source, Digest: hex.EncodeToString(sum[:]), CheckedAt: now, Environment: "repository"}
 }
 
-func readinessCapabilityNames(profile connectorSDK.ReadinessProfile) []string { names := make([]string, 0, len(profile.Capabilities)); for _, capability := range profile.Capabilities { names = append(names, capability.Name) }; return names }
-func readyCapabilityCount(matrix connectorSDK.ReadinessMatrix) int { count := 0; for _, profile := range matrix.Profiles { if profile.Status == connectorSDK.ReadinessReady || profile.Status == connectorSDK.ReadinessQualified { count += len(profile.Capabilities) } }; return count }
-func countCertifiedPartners(items []ecosystem.PartnerCertification) int { count := 0; for _, item := range items { if item.State == ecosystem.PartnerCertified { count++ } }; return count }
+func readinessCapabilityNames(profile connectorSDK.ReadinessProfile) []string {
+	names := make([]string, 0, len(profile.Capabilities))
+	for _, capability := range profile.Capabilities {
+		names = append(names, capability.Name)
+	}
+	return names
+}
+func readyCapabilityCount(matrix connectorSDK.ReadinessMatrix) int {
+	count := 0
+	for _, profile := range matrix.Profiles {
+		if profile.Status == connectorSDK.ReadinessReady || profile.Status == connectorSDK.ReadinessQualified {
+			count += len(profile.Capabilities)
+		}
+	}
+	return count
+}
+func countCertifiedPartners(items []ecosystem.PartnerCertification) int {
+	count := 0
+	for _, item := range items {
+		if item.State == ecosystem.PartnerCertified {
+			count++
+		}
+	}
+	return count
+}
 func auditEntryForEcosystem(principal Principal, key, action, resourceType, resourceID string, summary map[string]any) audit.Entry {
 	return audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api.ecosystem", Action: action, ResourceType: resourceType, ResourceID: resourceID, CorrelationID: key, Risk: audit.RiskWriteSafe, Summary: summary}
 }
