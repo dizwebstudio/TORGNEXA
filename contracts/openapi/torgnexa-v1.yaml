@@ -1605,6 +1605,194 @@ paths:
       responses:
         '200': {description: Batch handed off to the local pack area, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseTaskBatch'}}}}
         '409': {description: Version or batch state conflict}
+  /warehouse-mobile/summary:
+    get:
+      operationId: getWarehouseMobileSummary
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Bounded mobile warehouse counters, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileSummary'}}}}
+        '403': {description: Caller lacks stock.read}
+  /warehouse-mobile/plans:
+    get:
+      operationId: listWarehouseMobilePlans
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: mode, in: query, required: false, schema: {type: string, enum: [fbs, fbo, hybrid, split]}}
+        - {name: state, in: query, required: false, schema: {type: string, enum: [active, pending, unknown, complete, cancelled, manual_attention]}}
+        - {name: warehouse_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Tenant-scoped FBS/FBO/hybrid mobile plans, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlanPage'}}}}
+    post:
+      operationId: createWarehouseMobilePlan
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlanWrite'}}}}
+      responses:
+        '201': {description: Mobile plan created, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
+        '200': {description: Idempotent replay of a mobile plan, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
+        '409': {description: Idempotency or ownership conflict}
+  /warehouse-mobile/plans/{plan_id}:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: string}}]
+    get:
+      operationId: getWarehouseMobilePlan
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: One mobile fulfillment plan, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
+        '404': {description: Mobile plan not found}
+  /warehouse-mobile/plans/{plan_id}/advance:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: advanceWarehouseMobilePlan
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlanAdvanceWrite'}}}}
+      responses:
+        '200': {description: Plan stage receipt, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
+        '409': {description: Ownership, version or stage conflict}
+  /warehouse-mobile/plans/{plan_id}/pick-batches:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: createWarehouseMobilePickBatchForPlan
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePickBatchWrite'}}}}
+      responses:
+        '201': {description: Mobile pick route created over existing WMS tasks, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePickBatch'}}}}
+        '409': {description: FBO/local ownership or task conflict}
+  /warehouse-mobile/batches:
+    get:
+      operationId: listWarehouseMobilePickBatches
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: plan_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+      responses:
+        '200': {description: Mobile pick route page, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePickBatchPage'}}}}
+    post:
+      operationId: createWarehouseMobilePickBatch
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePickBatchWrite'}}}}
+      responses:
+        '201': {description: Mobile pick route created, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePickBatch'}}}}
+        '409': {description: Task already belongs to a route or ownership conflict}
+  /warehouse-mobile/scans:
+    post:
+      operationId: recordWarehouseMobileScan
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileScanWrite'}}}}
+      responses:
+        '200': {description: Scan receipt with digest-only evidence, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileScan'}}}}
+        '409': {description: Version, assignment, duplicate or device conflict}
+  /warehouse-mobile/packs:
+    get:
+      operationId: listWarehouseMobilePacks
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: plan_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+      responses:
+        '200': {description: Pack session page, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePackPage'}}}}
+    post:
+      operationId: createWarehouseMobilePack
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePackWrite'}}}}
+      responses:
+        '201': {description: Pack session opened, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePack'}}}}
+        '409': {description: FBO or package conflict}
+  /warehouse-mobile/packs/{pack_id}/close:
+    parameters: [{name: pack_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: closeWarehouseMobilePack
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileVersionCommand'}}}}
+      responses:
+        '200': {description: Pack session closed, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePack'}}}}
+        '409': {description: Pack version or lifecycle conflict}
+  /warehouse-mobile/print-jobs:
+    get:
+      operationId: listWarehouseMobilePrintJobs
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: plan_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+      responses:
+        '200': {description: Host-owned print queue, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintJobPage'}}}}
+    post:
+      operationId: queueWarehouseMobilePrint
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintWrite'}}}}
+      responses:
+        '202': {description: Print intent queued without claiming physical acceptance, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintJob'}}}}
+        '409': {description: Printer/capability or FBO ownership conflict}
+  /warehouse-mobile/print-jobs/{print_job_id}/status:
+    parameters: [{name: print_job_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: recordWarehouseMobilePrintStatus
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintStatusWrite'}}}}
+      responses:
+        '200': {description: Printer receipt state, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePrintJob'}}}}
+        '409': {description: Print version, duplicate or unknown state conflict}
+  /warehouse-mobile/devices:
+    get:
+      operationId: listWarehouseMobileDevices
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: warehouse_id, in: query, required: false, schema: {type: string}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+      responses:
+        '200': {description: Warehouse device registry, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileDevicePage'}}}}
+    post:
+      operationId: registerWarehouseMobileDevice
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileDeviceWrite'}}}}
+      responses:
+        '201': {description: Device registered without storing credentials, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileDevice'}}}}
+  /warehouse-mobile/devices/{device_id}/revoke:
+    parameters: [{name: device_id, in: path, required: true, schema: {type: string}}]
+    post:
+      operationId: revokeWarehouseMobileDevice
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileVersionCommand'}}}}
+      responses:
+        '200': {description: Device revoked and fenced, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileDevice'}}}}
+        '409': {description: Device version conflict}
+  /warehouse-mobile/offline-intents:
+    get:
+      operationId: listWarehouseMobileOfflineIntents
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: device_id, in: query, required: false, schema: {type: string}}
+        - {name: state, in: query, required: false, schema: {type: string, enum: [pending, applied, rejected, unknown, needs_attention]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 100}}
+      responses:
+        '200': {description: Offline reconnect receipts, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileOfflineIntentPage'}}}}
+    post:
+      operationId: replayWarehouseMobileOfflineScan
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileOfflineReplayWrite'}}}}
+      responses:
+        '200': {description: Reconnect receipt with no retained raw scan value, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileOfflineIntent'}}}}
+        '409': {description: Offline version, device or duplicate conflict}
+  /warehouse-mobile/observations:
+    post:
+      operationId: recordWarehouseMobileRemoteObservation
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobileObservationWrite'}}}}
+      responses:
+        '200': {description: Provider-authoritative remote observation, content: {application/json: {schema: {$ref: '#/components/schemas/WarehouseMobilePlan'}}}}
+        '409': {description: Observation or plan version conflict}
   /inventory/import:
     post:
       operationId: importInventory
@@ -9488,3 +9676,319 @@ components:
           type: string
           format: date-time
           pattern: Z$
+    WarehouseMobileSummary:
+      title: Mobile warehouse summary
+      type: object
+      additionalProperties: false
+      required: [active_plans, fbs_plans, fbo_plans, hybrid_plans, split_plans, pending_tasks, exception_tasks, pending_prints, offline_pending]
+      properties:
+        active_plans: {type: integer, minimum: 0}
+        fbs_plans: {type: integer, minimum: 0}
+        fbo_plans: {type: integer, minimum: 0}
+        hybrid_plans: {type: integer, minimum: 0}
+        split_plans: {type: integer, minimum: 0}
+        pending_tasks: {type: integer, minimum: 0}
+        exception_tasks: {type: integer, minimum: 0}
+        pending_prints: {type: integer, minimum: 0}
+        offline_pending: {type: integer, minimum: 0}
+    WarehouseMobilePlan:
+      title: Mobile fulfillment plan
+      type: object
+      additionalProperties: false
+      required: [id, mode, owner, stage, state, local_execution, version, created_at, updated_at]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 192}
+        order_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        mode: {type: string, enum: [fbs, fbo, hybrid, split]}
+        owner: {type: string, enum: [seller_warehouse, marketplace, carrier]}
+        stage: {type: string, enum: [pick, pack, print, handoff, tracking, remote_visibility, complete, manual_attention]}
+        state: {type: string, enum: [active, pending, unknown, complete, cancelled, manual_attention]}
+        local_execution: {type: boolean}
+        remote_reference_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobilePlanPage:
+      title: Mobile fulfillment plan page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WarehouseMobilePlan'}}
+    WarehouseMobilePlanWrite:
+      title: Create mobile fulfillment plan
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        order_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        mode: {type: string, enum: [fbs, fbo, hybrid, split]}
+        remote_reference_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    WarehouseMobilePlanAdvanceWrite:
+      title: Advance mobile fulfillment plan
+      type: object
+      additionalProperties: false
+      required: [stage, state, version]
+      properties:
+        stage: {type: string, enum: [pick, pack, print, handoff, tracking, remote_visibility, complete, manual_attention]}
+        state: {type: string, enum: [active, pending, unknown, complete, cancelled, manual_attention]}
+        remote_reference_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        version: {type: integer, minimum: 1}
+    WarehouseMobilePickBatch:
+      title: Mobile pick batch
+      type: object
+      additionalProperties: false
+      required: [id, plan_id, warehouse_id, strategy, state, task_ids, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        strategy: {type: string, enum: [order, wave, zone, batch]}
+        state: {type: string, enum: [ready, in_progress, complete, exception, cancelled]}
+        route_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        task_ids: {type: array, minItems: 1, maxItems: 100, uniqueItems: true, items: {type: string, maxLength: 192}}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobilePickBatchPage:
+      title: Mobile pick batch page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WarehouseMobilePickBatch'}}
+    WarehouseMobilePickBatchWrite:
+      title: Create mobile pick batch
+      type: object
+      additionalProperties: false
+      required: [plan_id, warehouse_id, strategy, task_ids]
+      properties:
+        plan_id: {type: string, maxLength: 192}
+        order_id: {type: string, maxLength: 192}
+        warehouse_id: {type: string, maxLength: 192}
+        strategy: {type: string, enum: [order, wave, zone, batch]}
+        route_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        task_ids: {type: array, maxItems: 100, uniqueItems: true, items: {type: string, maxLength: 192}}
+    WarehouseMobileScan:
+      title: Mobile scan receipt
+      type: object
+      additionalProperties: false
+      required: [id, plan_id, task_id, device_id, kind, code_digest, quantity, result, occurred_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        task_id: {type: string, maxLength: 192}
+        device_id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [product, location, package, serial, label]}
+        code_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        location_code: {type: string, maxLength: 128}
+        quantity: {$ref: '#/components/schemas/WarehouseTaskQuantity'}
+        result: {type: string, enum: [applied, rejected, unknown, pending]}
+        occurred_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobileScanWrite:
+      title: Mobile scan command
+      description: The code is transient request data and is never persisted; the response contains only its digest.
+      type: object
+      additionalProperties: false
+      required: [plan_id, task_id, device_id, kind, code, location_code, quantity, version]
+      properties:
+        plan_id: {type: string, maxLength: 192}
+        task_id: {type: string, maxLength: 192}
+        device_id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [product, location, package, serial, label]}
+        code: {type: string, minLength: 1, maxLength: 256}
+        location_code: {type: string, maxLength: 128}
+        quantity: {type: string, pattern: '^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$'}
+        version: {type: integer, minimum: 1}
+    WarehouseMobilePack:
+      title: Mobile pack session
+      type: object
+      additionalProperties: false
+      required: [id, plan_id, package_count, weight_grams, length_mm, width_mm, height_mm, state, facts_digest, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        batch_id: {type: string, maxLength: 192}
+        packaging_type: {type: string, maxLength: 128}
+        package_count: {type: integer, minimum: 1, maximum: 100}
+        weight_grams: {type: integer, minimum: 0, maximum: 2000000}
+        length_mm: {type: integer, minimum: 0, maximum: 10000}
+        width_mm: {type: integer, minimum: 0, maximum: 10000}
+        height_mm: {type: integer, minimum: 0, maximum: 10000}
+        state: {type: string, enum: [open, closed, repacked, exception, cancelled]}
+        facts_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobilePackPage:
+      title: Mobile pack page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WarehouseMobilePack'}}
+    WarehouseMobilePackWrite:
+      title: Open mobile pack session
+      type: object
+      additionalProperties: false
+      required: [plan_id, package_count, weight_grams, length_mm, width_mm, height_mm, facts_digest]
+      properties:
+        plan_id: {type: string, maxLength: 192}
+        batch_id: {type: string, maxLength: 192}
+        package_count: {type: integer, minimum: 1, maximum: 100}
+        weight_grams: {type: integer, minimum: 0, maximum: 2000000}
+        length_mm: {type: integer, minimum: 0, maximum: 10000}
+        width_mm: {type: integer, minimum: 0, maximum: 10000}
+        height_mm: {type: integer, minimum: 0, maximum: 10000}
+        packaging_type: {type: string, maxLength: 128}
+        facts_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    WarehouseMobileVersionCommand:
+      title: Mobile optimistic version command
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+    WarehouseMobilePrintJob:
+      title: Mobile print job
+      type: object
+      additionalProperties: false
+      required: [id, plan_id, printer_id, document, template_version, language, copies, state, reprint, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        pack_id: {type: string, maxLength: 192}
+        printer_id: {type: string, maxLength: 192}
+        document: {type: string, enum: [label, pick_list, packing_slip, manifest, internal_barcode]}
+        template_version: {type: string, maxLength: 64}
+        media_size: {type: string, maxLength: 32}
+        language: {type: string, minLength: 2, maxLength: 16}
+        copies: {type: integer, minimum: 1, maximum: 20}
+        state: {type: string, enum: [queued, printed, failed, unknown, cancelled]}
+        reprint: {type: boolean}
+        reason_code: {type: string, maxLength: 128}
+        artifact_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        error_code: {type: string, maxLength: 128}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobilePrintJobPage:
+      title: Mobile print job page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WarehouseMobilePrintJob'}}
+    WarehouseMobilePrintWrite:
+      title: Queue mobile print job
+      type: object
+      additionalProperties: false
+      required: [plan_id, printer_id, document, template_version, language, copies]
+      properties:
+        plan_id: {type: string, maxLength: 192}
+        pack_id: {type: string, maxLength: 192}
+        printer_id: {type: string, maxLength: 192}
+        document: {type: string, enum: [label, pick_list, packing_slip, manifest, internal_barcode]}
+        template_version: {type: string, maxLength: 64}
+        media_size: {type: string, maxLength: 32}
+        language: {type: string, minLength: 2, maxLength: 16}
+        copies: {type: integer, minimum: 1, maximum: 20}
+        reprint: {type: boolean}
+        reason_code: {type: string, maxLength: 128}
+        artifact_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    WarehouseMobilePrintStatusWrite:
+      title: Mobile print status receipt
+      type: object
+      additionalProperties: false
+      required: [state, version]
+      properties:
+        state: {type: string, enum: [printed, failed, unknown, cancelled]}
+        error_code: {type: string, maxLength: 128}
+        version: {type: integer, minimum: 1}
+    WarehouseMobileDevice:
+      title: Mobile device registration
+      type: object
+      additionalProperties: false
+      required: [id, label, warehouse_id, kind, state, operator_id, version, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        label: {type: string, minLength: 1, maxLength: 160}
+        warehouse_id: {type: string, maxLength: 192}
+        zone_code: {type: string, maxLength: 128}
+        kind: {type: string, enum: [handheld, camera, scanner_station, scale_station]}
+        state: {type: string, enum: [active, revoked, expired]}
+        operator_id: {type: string, maxLength: 192}
+        last_seen_at: {type: string, format: date-time, pattern: Z$}
+        version: {type: integer, minimum: 1}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobileDevicePage:
+      title: Mobile device page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WarehouseMobileDevice'}}
+    WarehouseMobileDeviceWrite:
+      title: Register mobile device
+      type: object
+      additionalProperties: false
+      required: [label, warehouse_id, kind]
+      properties:
+        label: {type: string, minLength: 1, maxLength: 160}
+        warehouse_id: {type: string, maxLength: 192}
+        zone_code: {type: string, maxLength: 128}
+        kind: {type: string, enum: [handheld, camera, scanner_station, scale_station]}
+    WarehouseMobileOfflineIntent:
+      title: Mobile offline intent receipt
+      type: object
+      additionalProperties: false
+      required: [id, device_id, plan_id, operation, payload_digest, sequence_no, state, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        device_id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        operation: {type: string, enum: [scan, pack, print, handoff]}
+        payload_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        sequence_no: {type: integer, minimum: 0}
+        state: {type: string, enum: [pending, applied, rejected, unknown, needs_attention]}
+        error_code: {type: string, maxLength: 128}
+        created_at: {type: string, format: date-time, pattern: Z$}
+        updated_at: {type: string, format: date-time, pattern: Z$}
+    WarehouseMobileOfflineIntentPage:
+      title: Mobile offline intent page
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/WarehouseMobileOfflineIntent'}}
+    WarehouseMobileOfflineReplayWrite:
+      title: Replay mobile offline scan
+      description: The raw code is accepted only transiently during reconnect and is represented by a digest in storage and response.
+      type: object
+      additionalProperties: false
+      required: [intent_id, plan_id, task_id, device_id, kind, code, location_code, quantity, version, sequence_no]
+      properties:
+        intent_id: {type: string, maxLength: 192}
+        plan_id: {type: string, maxLength: 192}
+        task_id: {type: string, maxLength: 192}
+        device_id: {type: string, maxLength: 192}
+        kind: {type: string, enum: [product, serial]}
+        code: {type: string, minLength: 1, maxLength: 256}
+        location_code: {type: string, maxLength: 128}
+        quantity: {type: string, pattern: '^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$'}
+        version: {type: integer, minimum: 1}
+        sequence_no: {type: integer, minimum: 0}
+    WarehouseMobileObservationWrite:
+      title: Record mobile remote observation
+      type: object
+      additionalProperties: false
+      required: [plan_id, stage, state, version]
+      properties:
+        plan_id: {type: string, maxLength: 192}
+        stage: {type: string, enum: [remote_visibility, handoff, tracking, complete, manual_attention]}
+        state: {type: string, enum: [pending, observed, accepted, unknown, manual_attention]}
+        remote_reference_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        version: {type: integer, minimum: 1}

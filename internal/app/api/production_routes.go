@@ -150,6 +150,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newPublicationQualityRoutes(deps.publicationQuality)...)
 	routes = append(routes, newInventoryRoutes(deps.inventory)...)
 	routes = append(routes, newWMSTaskRoutes(deps.inventory)...)
+	routes = append(routes, newMobileWarehouseRoutes(deps.inventory)...)
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
 	routes = append(routes, newMarketplaceListingRoutes(deps.marketplaceListing, deps.approvals)...)

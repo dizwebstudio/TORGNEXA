@@ -35,3 +35,21 @@ pick tasks from one warehouse. The batch is visible and auditable through the
 WMS API and can be handed off to a local pack area. Marketplace orders write,
 labels, Честный знак, shipment confirmation and automatic on-hand consumption
 are not claimed by this slice.
+
+## Mobile warehouse workspace (Task 229)
+
+The mobile surface at `/warehouse/mobile` is a projection over the same WMS
+tasks; it is not a second inventory ledger. It provides bounded pick batching,
+digest-only barcode/GTIN/DataMatrix scan evidence, exact grams/mm package facts,
+host-owned print jobs, registered devices and offline reconnect receipts.
+
+FBS uses the local `pick → scan → pack → print → handoff` path. FBO is
+marketplace-owned: the UI exposes inbound/order visibility and remote
+observations, while local pick/pack/print is blocked. Hybrid and split plans
+keep seller-owned and remote-owned work separate.
+
+The API is under `/api/v1/warehouse-mobile`; all writes are tenant-scoped,
+idempotent and version-checked. See
+`docs/operations/229-mobile-warehouse-fulfillment.md` for recovery and
+qualification rules. Repository qualification does not replace credentialed
+marketplace or scanner/scale/printer evidence.

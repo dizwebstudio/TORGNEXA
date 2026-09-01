@@ -24,6 +24,7 @@ const OrdersPage = lazy(() => import("../pages/OrdersPage").then(module => ({def
 const ReturnsPage = lazy(() => import("../pages/ReturnsPage").then(module => ({default: module.ReturnsPage})));
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
 const InventoryPage = lazy(() => import("../pages/InventoryPage").then(module => ({default: module.InventoryPage})));
+const MobileWarehousePage = lazy(() => import("../pages/MobileWarehousePage").then(module => ({default: module.MobileWarehousePage})));
 const ReplenishmentPage = lazy(() => import("../pages/ReplenishmentPage").then(module => ({default: module.ReplenishmentPage})));
 const PricingPage = lazy(() => import("../pages/PricingPage").then(module => ({default: module.PricingPage})));
 const CounterpartiesPage = lazy(() => import("../pages/CounterpartiesPage").then(module => ({default: module.CounterpartiesPage})));
@@ -61,6 +62,7 @@ function content(path: string) {
   if (path === "/orders" || path.startsWith("/orders/")) return <OrdersPage />;
   if (path === "/returns" || path.startsWith("/returns/")) return <ReturnsPage />;
   if (path === "/inventory") return <InventoryPage />;
+  if (path === "/warehouse/mobile") return <MobileWarehousePage />;
   if (path === "/replenishment") return <ReplenishmentPage />;
   if (path === "/pricing") return <PricingPage />;
   if (path === "/incidents" || path.startsWith("/incidents/")) return <IncidentCenterPage />;

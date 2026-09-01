@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-mobile-task-changed-v1.json",
+  "title": "commerce.fulfillment.mobile_task_changed.v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "mode", "owner", "stage", "state", "warehouse_id", "local_execution", "version", "change"],
+      "properties": {
+        "plan_id": {"$ref": "#/$defs/id"}, "mode": {"enum": ["fbs", "fbo", "hybrid", "split"]}, "owner": {"enum": ["seller_warehouse", "marketplace", "carrier"]}, "stage": {"type": "string", "maxLength": 32}, "state": {"type": "string", "maxLength": 32}, "warehouse_id": {"type": "string", "maxLength": 191}, "local_execution": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1}, "change": {"type": "string", "maxLength": 32}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["batch_id", "plan_id", "warehouse_id", "strategy", "state", "task_ids", "version", "change"],
+      "properties": {
+        "batch_id": {"$ref": "#/$defs/id"}, "plan_id": {"$ref": "#/$defs/id"}, "warehouse_id": {"type": "string", "maxLength": 191}, "strategy": {"enum": ["order", "wave", "zone", "batch"]}, "state": {"type": "string", "maxLength": 32}, "task_ids": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/id"}}, "version": {"type": "integer", "minimum": 1}, "change": {"type": "string", "maxLength": 32}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_id", "plan_id", "batch_id", "state", "facts_digest", "package_count", "weight_grams", "length_mm", "width_mm", "height_mm", "version", "change"],
+      "properties": {
+        "pack_id": {"$ref": "#/$defs/id"}, "plan_id": {"$ref": "#/$defs/id"}, "batch_id": {"type": "string", "maxLength": 191}, "state": {"type": "string", "maxLength": 32}, "facts_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "package_count": {"type": "integer", "minimum": 1, "maximum": 100}, "weight_grams": {"type": "integer", "minimum": 0}, "length_mm": {"type": "integer", "minimum": 0}, "width_mm": {"type": "integer", "minimum": 0}, "height_mm": {"type": "integer", "minimum": 0}, "version": {"type": "integer", "minimum": 1}, "change": {"type": "string", "maxLength": 32}
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}
+  }
+}

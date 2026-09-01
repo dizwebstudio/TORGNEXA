@@ -46,6 +46,18 @@
       "payload_schema": "events/fulfillment-batch-changed-v1.schema.json"
     },
     {
+      "event_type": "commerce.fulfillment.mobile_print_job_changed.v1",
+      "payload_schema": "events/fulfillment-mobile-print-job-changed-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.fulfillment.mobile_scan_recorded.v1",
+      "payload_schema": "events/fulfillment-mobile-scan-recorded-v1.schema.json"
+    },
+    {
+      "event_type": "commerce.fulfillment.mobile_task_changed.v1",
+      "payload_schema": "events/fulfillment-mobile-task-changed-v1.schema.json"
+    },
+    {
       "event_type": "commerce.fulfillment.shipment_changed.v1",
       "payload_schema": "events/shipment-changed-v1.schema.json"
     },

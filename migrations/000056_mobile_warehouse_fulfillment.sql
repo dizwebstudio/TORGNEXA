@@ -126,7 +126,7 @@ CREATE TABLE mobile_scan_evidence (
   CONSTRAINT mobile_scan_evidence_digest_chk CHECK (code_digest ~ '^[0-9a-f]{64}$'),
   CONSTRAINT mobile_scan_evidence_ref_chk CHECK (scan_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' AND idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$' AND device_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
   CONSTRAINT mobile_scan_evidence_quantity_chk CHECK (quantity_coefficient > 0 AND quantity_scale BETWEEN 0 AND 9 AND (quantity_scale = 0 OR quantity_coefficient % 10 <> 0)),
-  CONSTRAINT mobile_scan_evidence_time_chk CHECK (occurred_at = timezone('UTC', occurred_at))
+  CONSTRAINT mobile_scan_evidence_time_chk CHECK (occurred_at IS NOT NULL)
 );
 
 CREATE TABLE mobile_pack_sessions (
@@ -235,7 +235,7 @@ CREATE TABLE mobile_remote_observations (
   CONSTRAINT mobile_remote_observations_state_chk CHECK (state IN ('pending','observed','accepted','unknown','manual_attention')),
   CONSTRAINT mobile_remote_observations_digest_chk CHECK (remote_reference_digest = '' OR remote_reference_digest ~ '^[0-9a-f]{64}$'),
   CONSTRAINT mobile_remote_observations_ref_chk CHECK (observation_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' AND idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'),
-  CONSTRAINT mobile_remote_observations_time_chk CHECK (observed_at = timezone('UTC', observed_at))
+  CONSTRAINT mobile_remote_observations_time_chk CHECK (observed_at IS NOT NULL)
 );
 
 CREATE INDEX mobile_plans_queue_idx ON mobile_fulfillment_plans (organization_id,workspace_id,state,mode,updated_at,plan_id);

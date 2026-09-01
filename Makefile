@@ -3,7 +3,7 @@ SHELL := /bin/bash
 export GOTOOLCHAIN := local
 export GOWORK := off
 
-.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance connector-readiness-qualification financial-completeness-qualification customer-service-qualification marking-qualification marketplace-publication-qualification marketplace-listing-qualification marketplace-growth-qualification order-fulfillment-qualification performance workflow-qualification production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-demo-user community-e2e community-down community-status package-index package-index-check check build
+.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime backup-restore-runtime upgrade-runtime policy sandbox conformance connector-readiness-qualification financial-completeness-qualification customer-service-qualification mobile-warehouse-qualification marking-qualification marketplace-publication-qualification marketplace-listing-qualification marketplace-growth-qualification order-fulfillment-qualification performance workflow-qualification production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-demo-user community-e2e community-down community-status package-index package-index-check check build
 fmt:
 	find . -type f -name '*.go' -not -path './vendor/*' -print0 | xargs -0 -r gofmt -w
 fmt-check:
@@ -52,6 +52,8 @@ financial-completeness-qualification:
 	./scripts/check-financial-completeness.sh
 customer-service-qualification:
 	./scripts/check-customer-service.sh
+mobile-warehouse-qualification:
+	./scripts/check-mobile-warehouse.sh
 marking-qualification:
 	./scripts/check-marking-qualification.sh
 marketplace-publication-qualification:
@@ -98,6 +100,6 @@ package-index:
 	python3 scripts/generate-package-index.py
 package-index-check:
 	python3 scripts/generate-package-index.py --check
-check: fmt-check test vet contracts architecture migrations policy sandbox conformance connector-readiness-qualification financial-completeness-qualification performance sdk-check frontend-check js-policy p4-policy community-check package-index-check
+check: fmt-check test vet contracts architecture migrations policy sandbox conformance connector-readiness-qualification financial-completeness-qualification mobile-warehouse-qualification performance sdk-check frontend-check js-policy p4-policy community-check package-index-check
 build:
 	go build -trimpath -buildvcs=false ./cmd/...

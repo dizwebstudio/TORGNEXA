@@ -37,6 +37,12 @@ type CreateMobilePlan struct {
 	RemoteReferenceDigest                    string
 }
 
+// AdvanceMobilePlanCommand moves a plan through a provider-neutral local or
+// remote stage. It never performs an external write by itself.
+type AdvanceMobilePlanCommand struct {
+	PlanID, Stage, State, RemoteReferenceDigest string
+}
+
 // MobilePickBatch groups existing WMS pick tasks for a mobile route.
 type MobilePickBatch struct {
 	ID, IdempotencyKey, PlanID, WarehouseID string
@@ -77,34 +83,34 @@ type CreateMobilePack struct {
 // MobilePackSession is a durable packing station session.
 type MobilePackSession struct {
 	ID, IdempotencyKey, PlanID, BatchID, PackagingType string
-	Facts                                               inventory.PackageFacts
+	Facts                                              inventory.PackageFacts
 	State, FactsDigest                                 string
-	Version                                             int64
-	CreatedAt, UpdatedAt                                time.Time
+	Version                                            int64
+	CreatedAt, UpdatedAt                               time.Time
 }
 
 // QueueMobilePrint creates a host-owned print intent. It never claims that a
 // physical printer accepted the document.
 type QueueMobilePrint struct {
 	ID, IdempotencyKey, PlanID, PackID, PrinterID string
-	Document                                    inventory.MobilePrintDocument
-	TemplateVersion, MediaSize, Language        string
-	Copies                                      int
-	Reprint                                     bool
-	ReasonCode, ArtifactDigest                  string
+	Document                                      inventory.MobilePrintDocument
+	TemplateVersion, MediaSize, Language          string
+	Copies                                        int
+	Reprint                                       bool
+	ReasonCode, ArtifactDigest                    string
 }
 
 // MobilePrintJob is the redacted state of a print intent.
 type MobilePrintJob struct {
 	ID, IdempotencyKey, PlanID, PackID, PrinterID string
-	Document                                     inventory.MobilePrintDocument
-	TemplateVersion, MediaSize, Language         string
-	Copies                                       int
-	State                                        string
-	Reprint                                      bool
+	Document                                      inventory.MobilePrintDocument
+	TemplateVersion, MediaSize, Language          string
+	Copies                                        int
+	State                                         string
+	Reprint                                       bool
 	ReasonCode, ArtifactDigest, ErrorCode         string
-	Version                                      int64
-	CreatedAt, UpdatedAt                         time.Time
+	Version                                       int64
+	CreatedAt, UpdatedAt                          time.Time
 }
 
 // RegisterMobileDevice registers a warehouse-scoped handheld or station.
@@ -125,10 +131,10 @@ type MobileDevice struct {
 // digest and the server receipt state. Raw command payloads are transient.
 type RecordMobileOfflineIntent struct {
 	ID, IdempotencyKey, DeviceID, PlanID string
-	Operation                              inventory.MobileOperation
-	PayloadDigest                          string
-	SequenceNo                             int64
-	State, ErrorCode                       string
+	Operation                            inventory.MobileOperation
+	PayloadDigest                        string
+	SequenceNo                           int64
+	State, ErrorCode                     string
 }
 
 // MobileOfflineIntent is a durable reconnect receipt.
@@ -144,21 +150,21 @@ type MobileOfflineIntent struct {
 // RecordMobileObservation records provider-authoritative FBO/handoff facts.
 type RecordMobileObservation struct {
 	ID, IdempotencyKey, PlanID, Stage, State string
-	RemoteReferenceDigest                   string
-	ObservedAt                              time.Time
+	RemoteReferenceDigest                    string
+	ObservedAt                               time.Time
 }
 
 // MobileSummary contains bounded counters for the handheld home screen.
 type MobileSummary struct {
-	ActivePlans, FBSPlans, FBOPlans, HybridPlans, SplitPlans int64
+	ActivePlans, FBSPlans, FBOPlans, HybridPlans, SplitPlans    int64
 	PendingTasks, ExceptionTasks, PendingPrints, OfflinePending int64
 }
 
 var (
-	ErrMobilePlanMode       = errors.New("inventory repository: mobile plan does not allow local operation")
-	ErrMobileDeviceRevoked  = errors.New("inventory repository: mobile device is revoked")
-	ErrMobilePrintState     = errors.New("inventory repository: invalid mobile print state")
-	ErrMobilePlanState      = errors.New("inventory repository: invalid mobile plan state")
+	ErrMobilePlanMode      = errors.New("inventory repository: mobile plan does not allow local operation")
+	ErrMobileDeviceRevoked = errors.New("inventory repository: mobile device is revoked")
+	ErrMobilePrintState    = errors.New("inventory repository: invalid mobile print state")
+	ErrMobilePlanState     = errors.New("inventory repository: invalid mobile plan state")
 )
 
 const mobilePlanSelect = `SELECT plan_id,idempotency_key,COALESCE(order_id,''),COALESCE(warehouse_id,''),mode,owner,stage,state,local_execution,remote_reference_digest,version,created_at,updated_at FROM mobile_fulfillment_plans WHERE organization_id=$1 AND workspace_id=$2`
@@ -274,6 +280,54 @@ func (r *Repository) MobilePlan(ctx context.Context, s inventory.Scope, id strin
 		var err error
 		out, err = loadMobilePlan(ctx, tx, s, id, false)
 		return err
+	})
+	return out, err
+}
+
+// AdvanceMobilePlan records a durable stage transition. FBO plans can only
+// move through remote visibility/tracking stages; seller-owned plans can use
+// local pick/pack/print/handoff stages.
+func (r *Repository) AdvanceMobilePlan(ctx context.Context, s inventory.Scope, command AdvanceMobilePlanCommand, expectedVersion int64, mutation inventory.Mutation) (MobilePlan, error) {
+	if err := validateMutation(ctx, r, s, mutation); err != nil || !validSortableIDValue(command.PlanID) || !validMobilePlanStage(command.Stage) || !validMobilePlanState(command.State) || expectedVersion < 1 || (command.RemoteReferenceDigest != "" && !validDigest(command.RemoteReferenceDigest)) {
+		return MobilePlan{}, inventory.ErrInvalidRecord
+	}
+	var out MobilePlan
+	err := r.withTx(ctx, false, s, func(tx *sql.Tx) error {
+		current, err := loadMobilePlan(ctx, tx, s, command.PlanID, true)
+		if err != nil {
+			return err
+		}
+		if current.Stage == command.Stage && current.State == command.State && (command.RemoteReferenceDigest == "" || current.RemoteReferenceDigest == command.RemoteReferenceDigest) {
+			out = current
+			return nil
+		}
+		if current.Version != expectedVersion {
+			return inventory.ErrConflict
+		}
+		if current.Mode == inventory.FulfillmentFBO && command.Stage != "remote_visibility" && command.Stage != "tracking" && command.Stage != "complete" && command.Stage != "manual_attention" {
+			return ErrMobilePlanMode
+		}
+		if current.Mode != inventory.FulfillmentFBO && command.Stage == "remote_visibility" {
+			return ErrMobilePlanMode
+		}
+		if command.Stage != "manual_attention" && current.Stage != "manual_attention" && mobilePlanStageRank(command.Stage) < mobilePlanStageRank(current.Stage) {
+			return ErrMobilePlanState
+		}
+		if command.Stage == "complete" && command.State != "complete" || command.State == "complete" && command.Stage != "complete" {
+			return ErrMobilePlanState
+		}
+		row := tx.QueryRowContext(ctx, `UPDATE mobile_fulfillment_plans SET stage=$4,state=$5,remote_reference_digest=CASE WHEN $6='' THEN remote_reference_digest ELSE $6 END,version=version+1,updated_at=$7 WHERE organization_id=$1 AND workspace_id=$2 AND plan_id=$3 AND version=$8 RETURNING plan_id,idempotency_key,COALESCE(order_id,''),COALESCE(warehouse_id,''),mode,owner,stage,state,local_execution,remote_reference_digest,version,created_at,updated_at`, s.OrganizationID(), s.WorkspaceID(), command.PlanID, command.Stage, command.State, command.RemoteReferenceDigest, mutation.OccurredAt.UTC(), expectedVersion)
+		out, err = scanMobilePlan(row)
+		if errors.Is(err, inventory.ErrNotFound) {
+			return inventory.ErrConflict
+		}
+		if err != nil {
+			return err
+		}
+		if err := appendAudit(ctx, tx, s, mutation, "mobile.fulfillment_plan.advanced", "mobile_fulfillment_plan", out.ID, audit.RiskWriteSafe, map[string]any{"stage": out.Stage, "state": out.State, "version": out.Version, "remote_reference_digest": out.RemoteReferenceDigest}); err != nil {
+			return err
+		}
+		return enqueueMobilePlanEvent(ctx, tx, s, mutation, out, "advanced")
 	})
 	return out, err
 }
@@ -404,6 +458,37 @@ func (r *Repository) ListMobilePickBatches(ctx context.Context, s inventory.Scop
 	return items, err
 }
 
+// ListMobilePacks returns recent packing sessions for the warehouse workspace.
+func (r *Repository) ListMobilePacks(ctx context.Context, s inventory.Scope, planID string, limit int) ([]MobilePackSession, error) {
+	if err := validate(ctx, r, s); err != nil || limit < 1 || limit > 100 || (planID != "" && !validSortableIDValue(planID)) {
+		return nil, inventory.ErrInvalidRecord
+	}
+	items := make([]MobilePackSession, 0, limit)
+	err := r.withTx(ctx, true, s, func(tx *sql.Tx) error {
+		args := []any{s.OrganizationID(), s.WorkspaceID()}
+		where := ""
+		if planID != "" {
+			args = append(args, planID)
+			where = " AND plan_id=$3"
+		}
+		args = append(args, limit)
+		rows, err := tx.QueryContext(ctx, mobilePackSelect+where+fmt.Sprintf(" ORDER BY updated_at DESC,pack_id DESC LIMIT $%d", len(args)), args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			item, err := scanMobilePack(rows)
+			if err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
 // RecordMobileScan records metadata after the canonical WMS scan has been
 // applied. The API intentionally calls WMSScanTask first so progress cannot
 // be advanced by the mobile projection alone.
@@ -435,6 +520,9 @@ func (r *Repository) RecordMobileScan(ctx context.Context, s inventory.Scope, ev
 		err = tx.QueryRowContext(ctx, `SELECT scan_id FROM mobile_scan_evidence WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), evidence.IdempotencyKey).Scan(&existingID)
 		if err == nil {
 			out, err = loadMobileScan(ctx, tx, s, existingID)
+			if err == nil && (out.PlanID != evidence.PlanID || out.TaskID != evidence.TaskID || out.DeviceID != evidence.DeviceID || out.Kind != evidence.Kind || out.CodeDigest != evidence.CodeDigest || out.LocationCode != evidence.LocationCode || !sameWMSQuantity(out.Quantity, evidence.Quantity)) {
+				return inventory.ErrConflict
+			}
 			return err
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -482,6 +570,13 @@ func (r *Repository) CreateMobilePack(ctx context.Context, s inventory.Scope, co
 			}
 			if batchPlan != command.PlanID {
 				return inventory.ErrConflict
+			}
+			var incomplete int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM mobile_pick_batch_tasks t JOIN wms_execution_tasks w ON w.organization_id=t.organization_id AND w.workspace_id=t.workspace_id AND w.task_id=t.task_id WHERE t.organization_id=$1 AND t.workspace_id=$2 AND t.batch_id=$3 AND w.state <> 'completed'`, s.OrganizationID(), s.WorkspaceID(), command.BatchID).Scan(&incomplete); err != nil {
+				return err
+			}
+			if incomplete > 0 {
+				return ErrMobilePlanState
 			}
 		}
 		var existingID string
@@ -581,6 +676,9 @@ func (r *Repository) QueueMobilePrint(ctx context.Context, s inventory.Scope, co
 		err = tx.QueryRowContext(ctx, `SELECT print_job_id FROM mobile_print_jobs WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existingID)
 		if err == nil {
 			out, err = loadMobilePrint(ctx, tx, s, existingID)
+			if err == nil && !sameMobilePrint(out, command) {
+				return inventory.ErrConflict
+			}
 			return err
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -642,15 +740,15 @@ func (r *Repository) RecordMobilePrintStatus(ctx context.Context, s inventory.Sc
 		if err != nil {
 			return err
 		}
-		if current.Version != expectedVersion {
-			return inventory.ErrConflict
-		}
 		if current.State != "queued" && current.State != "unknown" {
 			if current.State == state && current.ErrorCode == errorCode {
 				out = current
 				return nil
 			}
 			return ErrMobilePrintState
+		}
+		if current.Version != expectedVersion {
+			return inventory.ErrConflict
 		}
 		if state == "printed" && current.Reprint && current.ReasonCode == "" {
 			return inventory.ErrInvalidRecord
@@ -775,6 +873,9 @@ func (r *Repository) RecordMobileOfflineIntent(ctx context.Context, s inventory.
 		err := tx.QueryRowContext(ctx, `SELECT intent_id FROM mobile_offline_intents WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existingID)
 		if err == nil {
 			out, err = loadMobileIntent(ctx, tx, s, existingID)
+			if err == nil && (out.DeviceID != command.DeviceID || out.PlanID != command.PlanID || out.Operation != command.Operation || out.PayloadDigest != command.PayloadDigest || out.SequenceNo != command.SequenceNo) {
+				return inventory.ErrConflict
+			}
 			return err
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -837,9 +938,6 @@ func (r *Repository) RecordMobileObservation(ctx context.Context, s inventory.Sc
 		if err != nil {
 			return err
 		}
-		if plan.Version != expectedVersion {
-			return inventory.ErrConflict
-		}
 		var existing string
 		if err := tx.QueryRowContext(ctx, `SELECT observation_id FROM mobile_remote_observations WHERE organization_id=$1 AND workspace_id=$2 AND idempotency_key=$3`, s.OrganizationID(), s.WorkspaceID(), command.IdempotencyKey).Scan(&existing); err == nil {
 			out = plan
@@ -847,10 +945,20 @@ func (r *Repository) RecordMobileObservation(ctx context.Context, s inventory.Sc
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		if plan.Version != expectedVersion {
+			return inventory.ErrConflict
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO mobile_remote_observations(organization_id,workspace_id,observation_id,idempotency_key,plan_id,stage,state,remote_reference_digest,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, s.OrganizationID(), s.WorkspaceID(), command.ID, command.IdempotencyKey, command.PlanID, command.Stage, command.State, command.RemoteReferenceDigest, command.ObservedAt.UTC()); err != nil {
 			return err
 		}
-		row := tx.QueryRowContext(ctx, `UPDATE mobile_fulfillment_plans SET stage=$4,state=$5,remote_reference_digest=$6,version=version+1,updated_at=$7 WHERE organization_id=$1 AND workspace_id=$2 AND plan_id=$3 AND version=$8 RETURNING plan_id,idempotency_key,COALESCE(order_id,''),COALESCE(warehouse_id,''),mode,owner,stage,state,local_execution,remote_reference_digest,version,created_at,updated_at`, s.OrganizationID(), s.WorkspaceID(), command.PlanID, command.Stage, command.State, command.RemoteReferenceDigest, mutation.OccurredAt.UTC(), expectedVersion)
+		planState := command.State
+		if command.State == "observed" || command.State == "accepted" {
+			planState = "active"
+		}
+		if command.Stage == "complete" {
+			planState = "complete"
+		}
+		row := tx.QueryRowContext(ctx, `UPDATE mobile_fulfillment_plans SET stage=$4,state=$5,remote_reference_digest=$6,version=version+1,updated_at=$7 WHERE organization_id=$1 AND workspace_id=$2 AND plan_id=$3 AND version=$8 RETURNING plan_id,idempotency_key,COALESCE(order_id,''),COALESCE(warehouse_id,''),mode,owner,stage,state,local_execution,remote_reference_digest,version,created_at,updated_at`, s.OrganizationID(), s.WorkspaceID(), command.PlanID, command.Stage, planState, command.RemoteReferenceDigest, mutation.OccurredAt.UTC(), expectedVersion)
 		out, err = scanMobilePlan(row)
 		if errors.Is(err, inventory.ErrNotFound) {
 			return inventory.ErrConflict
@@ -885,7 +993,7 @@ func (r *Repository) MobileSummary(ctx context.Context, s inventory.Scope) (Mobi
 		return MobileSummary{}, err
 	}
 	err = r.withTx(ctx, true, s, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE state='queued'),COUNT(*) FILTER (WHERE state='pending') FROM mobile_print_jobs p LEFT JOIN mobile_offline_intents i ON false WHERE p.organization_id=$1 AND p.workspace_id=$2`, s.OrganizationID(), s.WorkspaceID()).Scan(&out.PendingPrints, new(int64))
+		return tx.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE state='queued') FROM mobile_print_jobs WHERE organization_id=$1 AND workspace_id=$2`, s.OrganizationID(), s.WorkspaceID()).Scan(&out.PendingPrints)
 	})
 	if err != nil {
 		return MobileSummary{}, err
@@ -944,6 +1052,34 @@ func validMobilePlanState(value string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func validMobilePlanStage(value string) bool {
+	switch value {
+	case "pick", "pack", "print", "handoff", "tracking", "remote_visibility", "complete", "manual_attention":
+		return true
+	default:
+		return false
+	}
+}
+
+func mobilePlanStageRank(value string) int {
+	switch value {
+	case "pick":
+		return 1
+	case "pack":
+		return 2
+	case "print":
+		return 3
+	case "handoff":
+		return 4
+	case "tracking", "remote_visibility":
+		return 5
+	case "complete":
+		return 6
+	default:
+		return 0
 	}
 }
 
@@ -1105,6 +1241,10 @@ func sameMobilePack(existing MobilePackSession, command CreateMobilePack) bool {
 	return existing.PlanID == command.PlanID && existing.BatchID == command.BatchID && existing.Facts == command.Facts && existing.PackagingType == command.PackagingType && existing.FactsDigest == command.FactsDigest
 }
 
+func sameMobilePrint(existing MobilePrintJob, command QueueMobilePrint) bool {
+	return existing.PlanID == command.PlanID && existing.PackID == command.PackID && existing.PrinterID == command.PrinterID && existing.Document == command.Document && existing.TemplateVersion == command.TemplateVersion && existing.MediaSize == command.MediaSize && existing.Language == command.Language && existing.Copies == command.Copies && existing.Reprint == command.Reprint && existing.ReasonCode == command.ReasonCode && existing.ArtifactDigest == command.ArtifactDigest
+}
+
 func loadMobilePrint(ctx context.Context, tx *sql.Tx, s inventory.Scope, id string) (MobilePrintJob, error) {
 	return scanMobilePrint(tx.QueryRowContext(ctx, mobilePrintSelect+` AND print_job_id=$3`, s.OrganizationID(), s.WorkspaceID(), id))
 }
@@ -1159,10 +1299,15 @@ func scanMobileIntent(row scanner) (MobileOfflineIntent, error) {
 
 func enqueueMobilePlanEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, plan MobilePlan, change string) error {
 	payload, err := json.Marshal(struct {
-		PlanID, Mode, Owner, Stage, State, WarehouseID string
-		LocalExecution                                  bool  `json:"local_execution"`
-		Version                                        int64 `json:"version"`
-		Change                                         string `json:"change"`
+		PlanID         string `json:"plan_id"`
+		Mode           string `json:"mode"`
+		Owner          string `json:"owner"`
+		Stage          string `json:"stage"`
+		State          string `json:"state"`
+		WarehouseID    string `json:"warehouse_id"`
+		LocalExecution bool   `json:"local_execution"`
+		Version        int64  `json:"version"`
+		Change         string `json:"change"`
 	}{plan.ID, string(plan.Mode), string(plan.Owner), plan.Stage, plan.State, plan.WarehouseID, plan.LocalExecution, plan.Version, change})
 	if err != nil {
 		return err
@@ -1176,10 +1321,14 @@ func enqueueMobilePlanEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, 
 
 func enqueueMobileBatchEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, batch MobilePickBatch, change string) error {
 	payload, err := json.Marshal(struct {
-		BatchID, PlanID, WarehouseID, Strategy, State string
-		TaskIDs                                    []string `json:"task_ids"`
-		Version                                    int64    `json:"version"`
-		Change                                     string   `json:"change"`
+		BatchID     string   `json:"batch_id"`
+		PlanID      string   `json:"plan_id"`
+		WarehouseID string   `json:"warehouse_id"`
+		Strategy    string   `json:"strategy"`
+		State       string   `json:"state"`
+		TaskIDs     []string `json:"task_ids"`
+		Version     int64    `json:"version"`
+		Change      string   `json:"change"`
 	}{batch.ID, batch.PlanID, batch.WarehouseID, batch.Strategy, batch.State, batch.TaskIDs, batch.Version, change})
 	if err != nil {
 		return err
@@ -1193,8 +1342,15 @@ func enqueueMobileBatchEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope,
 
 func enqueueMobileScanEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, scan MobileScanEvidence) error {
 	payload, err := json.Marshal(struct {
-		ScanID, PlanID, TaskID, DeviceID, Kind, CodeDigest, LocationCode, Result string
-		Quantity                                                     wmsWireQuantity `json:"quantity"`
+		ScanID       string          `json:"scan_id"`
+		PlanID       string          `json:"plan_id"`
+		TaskID       string          `json:"task_id"`
+		DeviceID     string          `json:"device_id"`
+		Kind         string          `json:"kind"`
+		CodeDigest   string          `json:"code_digest"`
+		LocationCode string          `json:"location_code"`
+		Result       string          `json:"result"`
+		Quantity     wmsWireQuantity `json:"quantity"`
 	}{scan.ID, scan.PlanID, scan.TaskID, scan.DeviceID, string(scan.Kind), scan.CodeDigest, scan.LocationCode, scan.Result, wmsWireQuantity{scan.Quantity.Value.String(), scan.Quantity.Unit.String()}})
 	if err != nil {
 		return err
@@ -1208,11 +1364,18 @@ func enqueueMobileScanEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, 
 
 func enqueueMobilePackEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, pack MobilePackSession, change string) error {
 	payload, err := json.Marshal(struct {
-		PackID, PlanID, BatchID, State, FactsDigest string
-		PackageCount                               int    `json:"package_count"`
-		WeightGrams, LengthMM, WidthMM, HeightMM  int64  `json:"weight_grams"`
-		Version                                   int64  `json:"version"`
-		Change                                    string `json:"change"`
+		PackID       string `json:"pack_id"`
+		PlanID       string `json:"plan_id"`
+		BatchID      string `json:"batch_id"`
+		State        string `json:"state"`
+		FactsDigest  string `json:"facts_digest"`
+		PackageCount int    `json:"package_count"`
+		WeightGrams  int64  `json:"weight_grams"`
+		LengthMM     int64  `json:"length_mm"`
+		WidthMM      int64  `json:"width_mm"`
+		HeightMM     int64  `json:"height_mm"`
+		Version      int64  `json:"version"`
+		Change       string `json:"change"`
 	}{pack.ID, pack.PlanID, pack.BatchID, pack.State, pack.FactsDigest, pack.Facts.PackageCount, pack.Facts.WeightGrams, pack.Facts.LengthMM, pack.Facts.WidthMM, pack.Facts.HeightMM, pack.Version, change})
 	if err != nil {
 		return err
@@ -1226,11 +1389,17 @@ func enqueueMobilePackEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, 
 
 func enqueueMobilePrintEvent(ctx context.Context, tx *sql.Tx, s inventory.Scope, mutation inventory.Mutation, job MobilePrintJob, change string) error {
 	payload, err := json.Marshal(struct {
-		PrintJobID, PlanID, PackID, PrinterID, Document, State, ErrorCode string
-		Copies                                                        int    `json:"copies"`
-		Reprint                                                       bool   `json:"reprint"`
-		Version                                                       int64  `json:"version"`
-		Change                                                        string `json:"change"`
+		PrintJobID string `json:"print_job_id"`
+		PlanID     string `json:"plan_id"`
+		PackID     string `json:"pack_id"`
+		PrinterID  string `json:"printer_id"`
+		Document   string `json:"document"`
+		State      string `json:"state"`
+		ErrorCode  string `json:"error_code"`
+		Copies     int    `json:"copies"`
+		Reprint    bool   `json:"reprint"`
+		Version    int64  `json:"version"`
+		Change     string `json:"change"`
 	}{job.ID, job.PlanID, job.PackID, job.PrinterID, string(job.Document), job.State, job.ErrorCode, job.Copies, job.Reprint, job.Version, change})
 	if err != nil {
 		return err

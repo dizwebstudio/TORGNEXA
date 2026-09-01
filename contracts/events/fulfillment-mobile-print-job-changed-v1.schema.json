@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-mobile-print-job-changed-v1.json",
+  "title": "commerce.fulfillment.mobile_print_job_changed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["print_job_id", "plan_id", "pack_id", "printer_id", "document", "state", "error_code", "copies", "reprint", "version", "change"],
+  "properties": {
+    "print_job_id": {"$ref": "#/$defs/id"},
+    "plan_id": {"$ref": "#/$defs/id"},
+    "pack_id": {"type": "string", "maxLength": 191},
+    "printer_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "document": {"enum": ["label", "pick_list", "packing_slip", "manifest", "internal_barcode"]},
+    "state": {"enum": ["queued", "printed", "failed", "unknown", "cancelled"]},
+    "error_code": {"type": "string", "maxLength": 128},
+    "copies": {"type": "integer", "minimum": 1, "maximum": 20},
+    "reprint": {"type": "boolean"},
+    "version": {"type": "integer", "minimum": 1},
+    "change": {"enum": ["queued", "printed", "failed", "unknown", "cancelled"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"}
+  }
+}

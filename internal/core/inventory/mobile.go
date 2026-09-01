@@ -31,12 +31,12 @@ const (
 type MobileOperation string
 
 const (
-	MobileOperationPick     MobileOperation = "pick"
-	MobileOperationPack     MobileOperation = "pack"
-	MobileOperationPrint    MobileOperation = "print"
-	MobileOperationHandoff  MobileOperation = "handoff"
-	MobileOperationScan     MobileOperation = "scan"
-	MobileOperationObserve  MobileOperation = "observe"
+	MobileOperationPick    MobileOperation = "pick"
+	MobileOperationPack    MobileOperation = "pack"
+	MobileOperationPrint   MobileOperation = "print"
+	MobileOperationHandoff MobileOperation = "handoff"
+	MobileOperationScan    MobileOperation = "scan"
+	MobileOperationObserve MobileOperation = "observe"
 )
 
 // MobileScanKind separates location, product, package and label scans.

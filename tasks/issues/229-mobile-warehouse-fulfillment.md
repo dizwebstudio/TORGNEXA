@@ -2,10 +2,10 @@
 
 ## Статус
 
-`planned` — desktop WMS workspace, durable allocations, pick/pack tasks и
-логистические label ports уже существуют в Tasks 055, 117, 170 и 224. Не
-закрыт единый mobile-first процесс оператора, печать складских документов,
-устойчивый scan flow и единая модель FBO/FBS.
+`repository-complete` — desktop WMS workspace, durable allocations, pick/pack
+tasks и логистические label ports уже существуют в Tasks 055, 117, 170 и 224.
+Единый mobile-first процесс оператора, печать складских документов,
+устойчивый scan flow и модель FBO/FBS реализованы в repository-контуре.
 
 ## Цель
 
@@ -368,3 +368,19 @@ retained evidence.
 - Пройдены `gofmt`, `go test ./...`, `go vet ./...`,
   `./scripts/check-contracts.sh`, `make architecture`, `make migrations`,
   frontend typecheck/build и connector conformance на целевой topology.
+
+## Repository result
+
+Закрыты 229.1–229.11 и repository-части 229.13–229.14: добавлены ADR,
+expand-only migration 000056, FBS/FBO/hybrid plan policy, device registry,
+pick batches поверх canonical WMS tasks, digest-only scan evidence, exact pack
+facts, print queue, offline reconnect receipts, optimistic stage advance,
+OpenAPI/Go/Python/TypeScript SDK, versioned events, RLS/audit, frontend
+`/warehouse/mobile`, static qualification gate и эксплуатационный runbook.
+
+Остался только внешний release-gate 229.12/229.14: нужны credentialed
+sandbox/live проверки выбранных FBS/FBO marketplace/carrier connector-ов и
+конкретных scanner/camera, scale и printer profiles на целевой topology. До
+появления redacted evidence эти capabilities честно остаются
+`read_only`/`partially_supported`/`qualification_required`; repository-complete
+не означает production-qualified.

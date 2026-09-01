@@ -1195,7 +1195,7 @@ See `tasks/issues/228-customer-service-operational-maturity.md`.
 
 ## Epic 184 — Мобильная и складская работа
 
-Task 229 is planned as the mobile/WMS release closure. Tasks 055, 117 and 170
+Task 229 is repository-complete as the mobile/WMS release closure. Tasks 055, 117 and 170
 already provide durable warehouse tasks, allocations, scan commands and a
 desktop operator workspace; Task 224 provides the broader order fulfillment
 path and Task 074 provides logistics label/shipment ports. Task 229 adds
@@ -1204,6 +1204,10 @@ offline-safe command sync, FBS/FBO/hybrid ownership and connector/hardware
 qualification. Mobile state is not authoritative and FBO remote execution is
 not presented as local warehouse work. See
 `tasks/issues/229-mobile-warehouse-fulfillment.md`.
+
+The repository gate is `make mobile-warehouse-qualification`; credentialed
+marketplace/carrier and scanner/scale/printer checks remain an external release
+gate until redacted target-topology evidence is retained.
 
 ## Epic 185 — Массовое управление каталогом
 

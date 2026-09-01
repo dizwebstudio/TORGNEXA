@@ -444,7 +444,7 @@ func writeWMSError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, inventory.ErrNotFound), errors.Is(err, sql.ErrNoRows):
 		writeProblem(w, http.StatusNotFound, "Not Found")
-	case errors.Is(err, inventory.ErrConflict), errors.Is(err, inventoryrepo.ErrWMSTaskState), errors.Is(err, inventoryrepo.ErrWMSTaskAssignment), errors.Is(err, inventoryrepo.ErrWMSBatchState):
+	case errors.Is(err, inventory.ErrConflict), errors.Is(err, inventoryrepo.ErrWMSTaskState), errors.Is(err, inventoryrepo.ErrWMSTaskAssignment), errors.Is(err, inventoryrepo.ErrWMSBatchState), errors.Is(err, inventoryrepo.ErrMobilePlanMode), errors.Is(err, inventoryrepo.ErrMobileDeviceRevoked), errors.Is(err, inventoryrepo.ErrMobilePrintState), errors.Is(err, inventoryrepo.ErrMobilePlanState):
 		writeProblem(w, http.StatusConflict, "Conflict")
 	case errors.Is(err, inventory.ErrInvalidRecord), errors.Is(err, inventory.ErrInsufficientAvailable), errors.Is(err, inventory.ErrWarehouseInactive):
 		writeProblem(w, http.StatusBadRequest, "Bad Request")

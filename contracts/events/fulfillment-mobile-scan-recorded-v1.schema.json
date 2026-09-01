@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/events/fulfillment-mobile-scan-recorded-v1.json",
+  "title": "commerce.fulfillment.mobile_scan_recorded.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scan_id", "plan_id", "task_id", "device_id", "kind", "code_digest", "location_code", "quantity", "result"],
+  "properties": {
+    "scan_id": {"$ref": "#/$defs/id"},
+    "plan_id": {"$ref": "#/$defs/id"},
+    "task_id": {"$ref": "#/$defs/id"},
+    "device_id": {"$ref": "#/$defs/id"},
+    "kind": {"enum": ["product", "location", "package", "serial", "label"]},
+    "code_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "location_code": {"type": "string", "maxLength": 128},
+    "quantity": {"$ref": "#/$defs/quantity"},
+    "result": {"enum": ["applied", "rejected", "unknown", "pending"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-7][0-9A-HJKMNP-TV-Z]{25})$"},
+    "quantity": {"type": "object", "additionalProperties": false, "required": ["value", "unit"], "properties": {"value": {"type": "string", "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,9})?$"}, "unit": {"type": "string", "pattern": "^[A-Z][A-Z0-9._-]{0,15}$"}}}
+  }
+}
