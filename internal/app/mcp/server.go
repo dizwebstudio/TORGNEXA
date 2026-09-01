@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
+	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
@@ -128,22 +129,24 @@ type Dependencies struct {
 	Search           search.Provider
 	LegalParties     LegalPartySearcher
 	PriceChanges     PriceChangeRequester
+	ListingPreviewer ListingPreviewer
 	AllowedOrigins   []string
 	Edge             securityedge.Config
 	Limiter          *securityedge.Limiter
 }
 
 type Server struct {
-	logger       *slog.Logger
-	resolver     IdentityResolver
-	authorizer   Authorizer
-	governor     AgentGovernor
-	auditor      Auditor
-	search       search.Provider
-	legalParties LegalPartySearcher
-	priceChanges PriceChangeRequester
-	edge         securityedge.Config
-	limiter      *securityedge.Limiter
+	logger         *slog.Logger
+	resolver       IdentityResolver
+	authorizer     Authorizer
+	governor       AgentGovernor
+	auditor        Auditor
+	search         search.Provider
+	legalParties   LegalPartySearcher
+	priceChanges   PriceChangeRequester
+	listingPreview ListingPreviewer
+	edge           securityedge.Config
+	limiter        *securityedge.Limiter
 }
 
 func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
@@ -172,7 +175,26 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	if limiter == nil {
 		limiter = securityedge.NewLimiter()
 	}
-	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, edge: edge, limiter: limiter}, nil
+	return &Server{logger: logger, resolver: deps.IdentityResolver, authorizer: deps.Authorizer, governor: deps.Governor, auditor: deps.Auditor, search: deps.Search, legalParties: deps.LegalParties, priceChanges: deps.PriceChanges, listingPreview: deps.ListingPreviewer, edge: edge, limiter: limiter}, nil
+}
+
+type localListingPreviewer struct{}
+
+func (localListingPreviewer) PreviewListing(_ context.Context, identity Identity, input ListingPreviewInput) (marketplacelisting.BatchPreview, error) {
+	if !identity.Valid() || strings.TrimSpace(input.ConnectorAccountID) == "" || strings.TrimSpace(input.ConnectorID) == "" || input.Taxonomy.Validate() != nil || input.Taxonomy.ConnectorID != input.ConnectorID || len(input.Items) == 0 || len(input.Items) > marketplacelisting.MaxBatchItems {
+		return marketplacelisting.BatchPreview{}, ErrInvalid
+	}
+	for _, item := range input.Items {
+		if item.Before.OrganizationID != identity.Tenant.OrganizationID().String() || item.Before.WorkspaceID != identity.Tenant.WorkspaceID().String() || item.Before.SKU != item.SKU {
+			return marketplacelisting.BatchPreview{}, ErrForbidden
+		}
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		return marketplacelisting.BatchPreview{}, ErrInvalid
+	}
+	digest := sha256.Sum256(data)
+	return marketplacelisting.BuildBatchPreview("mcp.preview."+hex.EncodeToString(digest[:])[:32], identity.Tenant.OrganizationID().String(), identity.Tenant.WorkspaceID().String(), input.ConnectorAccountID, input.ConnectorID, input.Taxonomy, input.Items, input.Operations, time.Now().UTC())
 }
 
 func (s *Server) Handler() http.Handler {
@@ -436,6 +458,15 @@ func (s *Server) executeTool(ctx context.Context, identity Identity, name string
 			return nil, ErrInvalid
 		}
 		return s.priceChanges.RequestPriceChange(ctx, identity, input)
+	case "commerce.marketplace.listing.preview":
+		if s.listingPreview == nil {
+			return nil, ErrUnavailable
+		}
+		var input ListingPreviewInput
+		if err := decodeArguments(raw, &input); err != nil {
+			return nil, ErrInvalid
+		}
+		return s.listingPreview.PreviewListing(ctx, identity, input)
 	default:
 		return nil, ErrInvalid
 	}
@@ -447,6 +478,7 @@ func (s *Server) descriptors() []toolDescriptor {
 		orderTool(s.search != nil),
 		counterpartyTool(s.legalParties != nil),
 		priceChangeTool(s.priceChanges != nil),
+		listingPreviewTool(s.listingPreview != nil),
 	}
 }
 func (s *Server) descriptor(name string) (toolDescriptor, bool) {
@@ -555,7 +587,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
 	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
-	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, Edge: edge, Limiter: securityedge.NewLimiter()})
+	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err
 	}

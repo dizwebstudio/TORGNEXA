@@ -1,9 +1,11 @@
 package mcp
 
 import (
+	"context"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
+	"github.com/torgnexa/torgnexa/internal/core/marketplacelisting"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/search"
@@ -16,6 +18,22 @@ type Tool struct {
 	InputSchema  map[string]any `json:"inputSchema"`
 	OutputSchema map[string]any `json:"outputSchema,omitempty"`
 	Annotations  map[string]any `json:"annotations,omitempty"`
+}
+
+// ListingPreviewInput is the provider-neutral, dry-run input accepted by the
+// MCP listing tool. It cannot carry credentials or trigger a remote write.
+type ListingPreviewInput struct {
+	ConnectorAccountID string                              `json:"connector_account_id"`
+	ConnectorID        string                              `json:"connector_id"`
+	Taxonomy           marketplacelisting.Taxonomy         `json:"taxonomy"`
+	Items              []marketplacelisting.BatchItem      `json:"items"`
+	Operations         []marketplacelisting.BatchOperation `json:"operations,omitempty"`
+}
+
+// ListingPreviewer is deliberately read-only. Applying a batch is only
+// available through the authenticated HTTP approval boundary.
+type ListingPreviewer interface {
+	PreviewListing(context.Context, Identity, ListingPreviewInput) (marketplacelisting.BatchPreview, error)
 }
 
 type toolDescriptor struct {
@@ -90,6 +108,21 @@ func priceChangeTool(available bool) toolDescriptor {
 			"idempotency_key":  stringProp("Caller-generated canonical UUIDv7/ULID stable retry id", 26, 36),
 		}, []string{"price_id", "expected_version", "currency", "minor_units", "idempotency_key"}),
 		Annotations: map[string]any{"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "sensitive_write", "torgnexaApprovalRequired": true},
+	}}
+}
+
+func listingPreviewTool(available bool) toolDescriptor {
+	return toolDescriptor{available: available, permission: permissionProductsRead, risk: audit.RiskRead, agentRisk: agentgovernance.RiskRead, outputKind: "source_facts", tool: Tool{
+		Name: "commerce.marketplace.listing.preview", Title: "Preview marketplace listing batch",
+		Description: "Validate marketplace taxonomy, content, media and a mass-edit batch up to 1000 SKU. This tool is a dry-run only; it cannot publish or apply changes.",
+		InputSchema: objectSchema(map[string]any{
+			"connector_account_id": stringProp("Marketplace account reference", 1, 192),
+			"connector_id":         stringProp("Connector reference", 1, 192),
+			"taxonomy":             map[string]any{"type": "object"},
+			"items":                map[string]any{"type": "array", "minItems": 1, "maxItems": marketplacelisting.MaxBatchItems, "items": map[string]any{"type": "object"}},
+			"operations":           map[string]any{"type": "array", "maxItems": 512, "items": map[string]any{"type": "object"}},
+		}, []string{"connector_account_id", "connector_id", "taxonomy", "items"}),
+		Annotations: map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "torgnexaRiskClass": "read", "torgnexaApplyBoundary": "http_approval_only"},
 	}}
 }
 

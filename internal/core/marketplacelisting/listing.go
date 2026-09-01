@@ -27,21 +27,22 @@ var (
 const MaxBatchItems = 1000
 
 var (
-	refPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
-	codePattern   = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
-	localePattern = regexp.MustCompile(`^[a-z]{2}(?:-[A-Z]{2})?$`)
-	countryPattern = regexp.MustCompile(`^[A-Z]{2}$`)
-	decimalPattern = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$`)
-	integerPattern = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
-	datePattern    = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
-	digestPattern  = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	refPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+	codePattern        = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
+	localePattern      = regexp.MustCompile(`^[a-z]{2}(?:-[A-Z]{2})?$`)
+	countryPattern     = regexp.MustCompile(`^[A-Z]{2}$`)
+	decimalPattern     = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$`)
+	integerPattern     = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
+	datePattern        = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
+	digestPattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	mediaFormatPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9.+-]+$`)
 )
 
 type Requirement string
 
 const (
-	RequirementOptional   Requirement = "optional"
-	RequirementRequired   Requirement = "required"
+	RequirementOptional    Requirement = "optional"
+	RequirementRequired    Requirement = "required"
 	RequirementConditional Requirement = "conditional"
 )
 
@@ -92,15 +93,15 @@ func (c Condition) Validate() error {
 }
 
 type AttributeDefinition struct {
-	Code          string        `json:"code"`
-	Name          string        `json:"name"`
-	ValueType     ValueType     `json:"value_type"`
-	Requirement   Requirement   `json:"requirement"`
-	Unit          string        `json:"unit,omitempty"`
-	EnumValues    []EnumValue   `json:"enum_values,omitempty"`
-	Conditions    []Condition   `json:"conditions,omitempty"`
-	Min           string        `json:"min,omitempty"`
-	Max           string        `json:"max,omitempty"`
+	Code          string            `json:"code"`
+	Name          string            `json:"name"`
+	ValueType     ValueType         `json:"value_type"`
+	Requirement   Requirement       `json:"requirement"`
+	Unit          string            `json:"unit,omitempty"`
+	EnumValues    []EnumValue       `json:"enum_values,omitempty"`
+	Conditions    []Condition       `json:"conditions,omitempty"`
+	Min           string            `json:"min,omitempty"`
+	Max           string            `json:"max,omitempty"`
 	LocalizedName map[string]string `json:"localized_name,omitempty"`
 }
 
@@ -135,9 +136,9 @@ func (a AttributeDefinition) Validate() error {
 }
 
 type Category struct {
-	Code          string   `json:"code"`
-	Name          string   `json:"name"`
-	ParentCode    string   `json:"parent_code,omitempty"`
+	Code           string   `json:"code"`
+	Name           string   `json:"name"`
+	ParentCode     string   `json:"parent_code,omitempty"`
 	AttributeCodes []string `json:"attribute_codes,omitempty"`
 }
 
@@ -159,13 +160,13 @@ func (c Category) Validate() error {
 }
 
 type MediaSlot struct {
-	Code          string   `json:"code"`
-	Name          string   `json:"name"`
-	Required      bool     `json:"required"`
-	MaxItems      int      `json:"max_items"`
-	Formats       []string `json:"formats,omitempty"`
-	MinWidth      int      `json:"min_width,omitempty"`
-	MinHeight     int      `json:"min_height,omitempty"`
+	Code      string   `json:"code"`
+	Name      string   `json:"name"`
+	Required  bool     `json:"required"`
+	MaxItems  int      `json:"max_items"`
+	Formats   []string `json:"formats,omitempty"`
+	MinWidth  int      `json:"min_width,omitempty"`
+	MinHeight int      `json:"min_height,omitempty"`
 }
 
 func (m MediaSlot) Validate() error {
@@ -173,7 +174,7 @@ func (m MediaSlot) Validate() error {
 		return ErrInvalid
 	}
 	for _, format := range m.Formats {
-		if !codePattern.MatchString(strings.ToLower(format)) {
+		if !mediaFormatPattern.MatchString(strings.ToLower(format)) {
 			return ErrInvalid
 		}
 	}
@@ -181,18 +182,18 @@ func (m MediaSlot) Validate() error {
 }
 
 type Taxonomy struct {
-	ID          string               `json:"id"`
-	ConnectorID string               `json:"connector_id"`
-	Locale      string               `json:"locale"`
-	Jurisdiction string              `json:"jurisdiction"`
-	Version     int64                `json:"version"`
-	Source      string               `json:"source"`
-	Fingerprint string               `json:"fingerprint"`
-	ObservedAt  time.Time            `json:"observed_at"`
-	FreshUntil  time.Time            `json:"fresh_until"`
-	Categories  []Category           `json:"categories"`
-	Attributes  []AttributeDefinition `json:"attributes"`
-	MediaSlots  []MediaSlot          `json:"media_slots"`
+	ID           string                `json:"id"`
+	ConnectorID  string                `json:"connector_id"`
+	Locale       string                `json:"locale"`
+	Jurisdiction string                `json:"jurisdiction"`
+	Version      int64                 `json:"version"`
+	Source       string                `json:"source"`
+	Fingerprint  string                `json:"fingerprint"`
+	ObservedAt   time.Time             `json:"observed_at"`
+	FreshUntil   time.Time             `json:"fresh_until"`
+	Categories   []Category            `json:"categories"`
+	Attributes   []AttributeDefinition `json:"attributes"`
+	MediaSlots   []MediaSlot           `json:"media_slots"`
 }
 
 func (t Taxonomy) Validate() error {
@@ -293,16 +294,16 @@ type MediaRef struct {
 }
 
 func (m MediaRef) Validate() error {
-	if !refPattern.MatchString(m.ID) || !codePattern.MatchString(m.Slot) || !strings.HasPrefix(m.ReleasedObjectRef, "upl_") || !refPattern.MatchString(m.ReleasedObjectRef) || !isDigest(m.Digest) || !codePattern.MatchString(strings.ToLower(m.Format)) || m.Bytes < 1 || m.Bytes > 100*1024*1024 || m.Width < 0 || m.Height < 0 || m.Position < 0 || m.Position > 1000 {
+	if !refPattern.MatchString(m.ID) || !codePattern.MatchString(m.Slot) || !strings.HasPrefix(m.ReleasedObjectRef, "upl_") || !refPattern.MatchString(m.ReleasedObjectRef) || !isDigest(m.Digest) || !mediaFormatPattern.MatchString(strings.ToLower(m.Format)) || m.Bytes < 1 || m.Bytes > 100*1024*1024 || m.Width < 0 || m.Height < 0 || m.Position < 0 || m.Position > 1000 {
 		return ErrInvalid
 	}
 	return nil
 }
 
 type Variant struct {
-	ID         string            `json:"id"`
-	SKU        string            `json:"sku"`
-	Axes       map[string]string `json:"axes,omitempty"`
+	ID         string                    `json:"id"`
+	SKU        string                    `json:"sku"`
+	Axes       map[string]string         `json:"axes,omitempty"`
 	Attributes map[string]AttributeValue `json:"attributes,omitempty"`
 }
 
@@ -337,7 +338,7 @@ type ListingDraft struct {
 	Attributes          map[string]AttributeValue `json:"attributes,omitempty"`
 	Content             Content                   `json:"content"`
 	Variants            []Variant                 `json:"variants,omitempty"`
-	Media               []MediaRef               `json:"media,omitempty"`
+	Media               []MediaRef                `json:"media,omitempty"`
 }
 
 func (d ListingDraft) Validate() error {
@@ -559,12 +560,12 @@ type MappingEntry struct {
 }
 
 type Mapping struct {
-	ID              string         `json:"id"`
-	Version         int64          `json:"version"`
-	TaxonomyFingerprint string      `json:"taxonomy_fingerprint"`
-	Entries         []MappingEntry `json:"entries"`
-	Manual          bool           `json:"manual"`
-	Reason          string         `json:"reason,omitempty"`
+	ID                  string         `json:"id"`
+	Version             int64          `json:"version"`
+	TaxonomyFingerprint string         `json:"taxonomy_fingerprint"`
+	Entries             []MappingEntry `json:"entries"`
+	Manual              bool           `json:"manual"`
+	Reason              string         `json:"reason,omitempty"`
 }
 
 func (m Mapping) Validate() error {
@@ -657,7 +658,7 @@ func (o BatchOperation) Validate() error {
 }
 
 type BatchItem struct {
-	SKU   string       `json:"sku"`
+	SKU    string       `json:"sku"`
 	Before ListingDraft `json:"before"`
 }
 
@@ -673,19 +674,19 @@ type BatchRow struct {
 }
 
 type BatchPreview struct {
-	ID                  string          `json:"id"`
-	OrganizationID      string          `json:"organization_id"`
-	WorkspaceID         string          `json:"workspace_id"`
-	ConnectorAccountID  string          `json:"connector_account_id"`
-	ConnectorID         string          `json:"connector_id"`
-	TaxonomyFingerprint string          `json:"taxonomy_fingerprint"`
-	RuleVersion         int64           `json:"rule_version"`
-	InputDigest         string          `json:"input_digest"`
-	AffectedCount       int             `json:"affected_count"`
-	EligibleCount       int             `json:"eligible_count"`
-	BlockedCount        int             `json:"blocked_count"`
-	Rows                []BatchRow      `json:"rows"`
-	CreatedAt           time.Time       `json:"created_at"`
+	ID                  string     `json:"id"`
+	OrganizationID      string     `json:"organization_id"`
+	WorkspaceID         string     `json:"workspace_id"`
+	ConnectorAccountID  string     `json:"connector_account_id"`
+	ConnectorID         string     `json:"connector_id"`
+	TaxonomyFingerprint string     `json:"taxonomy_fingerprint"`
+	RuleVersion         int64      `json:"rule_version"`
+	InputDigest         string     `json:"input_digest"`
+	AffectedCount       int        `json:"affected_count"`
+	EligibleCount       int        `json:"eligible_count"`
+	BlockedCount        int        `json:"blocked_count"`
+	Rows                []BatchRow `json:"rows"`
+	CreatedAt           time.Time  `json:"created_at"`
 }
 
 func (p BatchPreview) Validate() error {
@@ -752,8 +753,8 @@ func BuildBatchPreview(id, organizationID, workspaceID, accountID, connectorID s
 		rows = append(rows, BatchRow{SKU: item.SKU, BeforeDigest: beforeDigest, AfterDigest: afterDigest, Before: item.Before, After: after, Changed: beforeDigest != afterDigest, Eligible: eligible, Diagnostics: diagnostics})
 	}
 	input := struct {
-		TaxonomyFingerprint string          `json:"taxonomy_fingerprint"`
-		Items               []BatchItem     `json:"items"`
+		TaxonomyFingerprint string           `json:"taxonomy_fingerprint"`
+		Items               []BatchItem      `json:"items"`
 		Operations          []BatchOperation `json:"operations"`
 	}{fingerprint, rowsInput, operations}
 	inputJSON, _ := json.Marshal(input)
@@ -848,12 +849,12 @@ func DraftDigest(draft ListingDraft) (string, error) {
 type BatchState string
 
 const (
-	BatchQueued    BatchState = "queued"
+	BatchQueued     BatchState = "queued"
 	BatchProcessing BatchState = "processing"
-	BatchCompleted BatchState = "completed"
-	BatchPartial   BatchState = "partial"
-	BatchUnknown   BatchState = "unknown"
-	BatchRejected  BatchState = "rejected"
+	BatchCompleted  BatchState = "completed"
+	BatchPartial    BatchState = "partial"
+	BatchUnknown    BatchState = "unknown"
+	BatchRejected   BatchState = "rejected"
 )
 
 func (s BatchState) Valid() bool {
@@ -861,24 +862,25 @@ func (s BatchState) Valid() bool {
 }
 
 type BatchRun struct {
-	ID             string      `json:"id"`
-	PreviewID      string      `json:"preview_id"`
-	OrganizationID string      `json:"organization_id"`
-	WorkspaceID    string      `json:"workspace_id"`
-	IdempotencyKey string      `json:"idempotency_key"`
-	ApprovalRef    string      `json:"approval_ref,omitempty"`
-	State          BatchState  `json:"state"`
-	Rows           []BatchRow  `json:"rows"`
-	CreatedAt      time.Time   `json:"created_at"`
-	UpdatedAt      time.Time   `json:"updated_at"`
+	ID             string     `json:"id"`
+	PreviewID      string     `json:"preview_id"`
+	OrganizationID string     `json:"organization_id"`
+	WorkspaceID    string     `json:"workspace_id"`
+	IdempotencyKey string     `json:"idempotency_key"`
+	ApprovalRef    string     `json:"approval_ref,omitempty"`
+	State          BatchState `json:"state"`
+	InputDigest    string     `json:"input_digest"`
+	Rows           []BatchRow `json:"rows"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 func (b BatchRun) Validate() error {
-	if !refPattern.MatchString(b.ID) || !refPattern.MatchString(b.PreviewID) || !refPattern.MatchString(b.OrganizationID) || !refPattern.MatchString(b.WorkspaceID) || b.IdempotencyKey == "" || len(b.IdempotencyKey) > 128 || !b.State.Valid() || len(b.Rows) > MaxBatchItems || !isUTC(b.CreatedAt) || !isUTC(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
+	if !refPattern.MatchString(b.ID) || !refPattern.MatchString(b.PreviewID) || !refPattern.MatchString(b.OrganizationID) || !refPattern.MatchString(b.WorkspaceID) || b.IdempotencyKey == "" || len(b.IdempotencyKey) > 128 || !b.State.Valid() || !isDigest(b.InputDigest) || len(b.Rows) > MaxBatchItems || !isUTC(b.CreatedAt) || !isUTC(b.UpdatedAt) || b.UpdatedAt.Before(b.CreatedAt) {
 		return ErrInvalid
 	}
 	for _, row := range b.Rows {
-		if validText(row.SKU, 200) != true {
+		if validText(row.SKU, 200) != true || !isDigest(row.BeforeDigest) || !isDigest(row.AfterDigest) || row.Before.Validate() != nil || row.After.Validate() != nil {
 			return ErrInvalid
 		}
 	}
@@ -886,11 +888,11 @@ func (b BatchRun) Validate() error {
 }
 
 type RemoteObservation struct {
-	RemoteID      string    `json:"remote_id"`
-	SnapshotDigest string   `json:"snapshot_digest"`
-	Status        string    `json:"status"`
-	CategoryCode  string    `json:"category_code,omitempty"`
-	ObservedAt    time.Time `json:"observed_at"`
+	RemoteID       string    `json:"remote_id"`
+	SnapshotDigest string    `json:"snapshot_digest"`
+	Status         string    `json:"status"`
+	CategoryCode   string    `json:"category_code,omitempty"`
+	ObservedAt     time.Time `json:"observed_at"`
 }
 
 type DriftType string
@@ -935,7 +937,9 @@ func Reconcile(expected ListingDraft, expectedDigest string, observation RemoteO
 		return nil, ErrInvalid
 	}
 	drifts := make([]Drift, 0, 3)
-	add := func(kind DriftType) { drifts = append(drifts, Drift{Type: kind, ExpectedDigest: expectedDigest, ObservedDigest: observation.SnapshotDigest, RemoteID: observation.RemoteID, ObservedStatus: observation.Status, DetectedAt: observation.ObservedAt}) }
+	add := func(kind DriftType) {
+		drifts = append(drifts, Drift{Type: kind, ExpectedDigest: expectedDigest, ObservedDigest: observation.SnapshotDigest, RemoteID: observation.RemoteID, ObservedStatus: observation.Status, DetectedAt: observation.ObservedAt})
+	}
 	if observation.Status == "unknown" {
 		add(DriftUnknownOutcome)
 	}
@@ -969,12 +973,27 @@ func findCategory(t Taxonomy, code string) (Category, bool) {
 	}
 	return Category{}, false
 }
-func cloneAttributes(values map[string]AttributeValue) map[string]AttributeValue { result := make(map[string]AttributeValue, len(values)); for key, value := range values { result[key] = value }; return result }
-func containsFold(values []string, value string) bool { for _, item := range values { if strings.EqualFold(item, value) { return true } }; return false }
-func validText(value string, max int) bool { return value != "" && value == strings.TrimSpace(value) && len([]rune(value)) <= max && !strings.ContainsAny(value, "\x00\r\n") }
+func cloneAttributes(values map[string]AttributeValue) map[string]AttributeValue {
+	result := make(map[string]AttributeValue, len(values))
+	for key, value := range values {
+		result[key] = value
+	}
+	return result
+}
+func containsFold(values []string, value string) bool {
+	for _, item := range values {
+		if strings.EqualFold(item, value) {
+			return true
+		}
+	}
+	return false
+}
+func validText(value string, max int) bool {
+	return value != "" && value == strings.TrimSpace(value) && len([]rune(value)) <= max && !strings.ContainsAny(value, "\x00\r\n")
+}
 func validOptionalText(value string, max int) bool { return value == "" || validText(value, max) }
-func isDigest(value string) bool { return len(value) == 64 && digestPattern.MatchString(value) }
-func isUTC(value time.Time) bool { return !value.IsZero() && value.Location() == time.UTC }
+func isDigest(value string) bool                   { return len(value) == 64 && digestPattern.MatchString(value) }
+func isUTC(value time.Time) bool                   { return !value.IsZero() && value.Location() == time.UTC }
 func compareDecimal(left, right string) int {
 	l, lok := new(big.Rat).SetString(left)
 	r, rok := new(big.Rat).SetString(right)

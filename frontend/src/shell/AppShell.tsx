@@ -19,6 +19,7 @@ const DashboardPage = lazy(() => import("../pages/DashboardPage").then(module =>
 const CatalogPage = lazy(() => import("../pages/CatalogPage").then(module => ({default: module.CatalogPage})));
 const PublicationQualityPage = lazy(() => import("../pages/PublicationQualityPage").then(module => ({default: module.PublicationQualityPage})));
 const MarketplacePublicationPage = lazy(() => import("../pages/MarketplacePublicationPage").then(module => ({default: module.MarketplacePublicationPage})));
+const MarketplaceListingPage = lazy(() => import("../pages/MarketplaceListingPage").then(module => ({default: module.MarketplaceListingPage})));
 const OrdersPage = lazy(() => import("../pages/OrdersPage").then(module => ({default: module.OrdersPage})));
 const ReturnsPage = lazy(() => import("../pages/ReturnsPage").then(module => ({default: module.ReturnsPage})));
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage").then(module => ({default: module.NotificationsPage})));
@@ -55,6 +56,7 @@ function content(path: string) {
   if (path === "/catalog" || path.startsWith("/catalog/")) return <CatalogPage />;
   if (path === "/publication-quality") return <PublicationQualityPage />;
   if (path === "/marketplace-publications") return <MarketplacePublicationPage />;
+  if (path === "/marketplace-listings") return <MarketplaceListingPage />;
   if (path === "/orders" || path.startsWith("/orders/")) return <OrdersPage />;
   if (path === "/returns" || path.startsWith("/returns/")) return <ReturnsPage />;
   if (path === "/inventory") return <InventoryPage />;

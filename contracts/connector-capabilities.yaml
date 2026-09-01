@@ -26,6 +26,12 @@ capabilities:
   promotions.read: Read promotion calendar/participation
   promotions.manage: Change promotion participation
   finance.settlements.read: Read settlement/fee/payout data
+  marketplace.listings.taxonomy.read: Read normalized marketplace category and attribute taxonomy
+  marketplace.listings.content.write: Write qualified marketplace listing content
+  marketplace.listings.attributes.write: Write qualified marketplace listing attributes
+  marketplace.listings.media.write: Write qualified marketplace listing media references
+  marketplace.listings.batch.write: Apply an approved marketplace listing batch
+  marketplace.listings.status.read: Read normalized marketplace listing publication status
   social.post.text: Publish text
   social.post.media: Publish media
   social.post.video: Publish video

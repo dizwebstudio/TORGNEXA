@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "27251b61c3ec83d955aa6cf538100301944e307ab1e4e0ff5b08dd177a61d81e",
+    "sha256": "cea8ad9f757a9f71cdd063d09bea1c701c5dd31e8b9c19df4a5f82107afa3338",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -23,6 +23,11 @@
       "operation_id": "analyzeWithAIProvider",
       "method": "POST",
       "path": "/settings/ai-providers:analyze"
+    },
+    {
+      "operation_id": "applyMarketplaceListingBatch",
+      "method": "POST",
+      "path": "/marketplace-listings/batch/apply"
     },
     {
       "operation_id": "applyMarketplaceOperationFindingAction",
@@ -533,6 +538,16 @@
       "operation_id": "getMCPAgentKillSwitch",
       "method": "GET",
       "path": "/settings/mcp-agents:kill-switch"
+    },
+    {
+      "operation_id": "getMarketplaceListingBatch",
+      "method": "GET",
+      "path": "/marketplace-listings/batches/{batch_id}"
+    },
+    {
+      "operation_id": "getMarketplaceListingTaxonomy",
+      "method": "GET",
+      "path": "/marketplace-listings/taxonomy"
     },
     {
       "operation_id": "getMarketplaceOperationFlow",
@@ -1075,6 +1090,11 @@
       "path": "/connector-accounts:bootstrap-preview"
     },
     {
+      "operation_id": "previewMarketplaceListingBatch",
+      "method": "POST",
+      "path": "/marketplace-listings/batch/preview"
+    },
+    {
       "operation_id": "previewProcurementPriceList",
       "method": "POST",
       "path": "/procurement/price-lists/preview"
@@ -1113,6 +1133,11 @@
       "operation_id": "putWarehouseFailoverRoute",
       "method": "PUT",
       "path": "/inventory/warehouses/{warehouse_id}/failover-routes/{destination_warehouse_id}"
+    },
+    {
+      "operation_id": "readAfterWriteMarketplaceListing",
+      "method": "POST",
+      "path": "/marketplace-listings/read-after-write"
     },
     {
       "operation_id": "readLogisticsLabel",

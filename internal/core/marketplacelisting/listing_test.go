@@ -39,7 +39,7 @@ func testDraft(t *testing.T, taxonomy Taxonomy, now time.Time, sku string, color
 		},
 		Content: Content{Locale: "ru-RU", Title: "Товар " + sku},
 		Media: []MediaRef{{
-			ID: "media-" + sku, Slot: "main", ReleasedObjectRef: "upl-" + sku,
+			ID: "media-" + sku, Slot: "main", ReleasedObjectRef: "upl_" + sku,
 			Digest: strings.Repeat("a", 64), Format: "image/jpeg", Bytes: 1024,
 			Width: 1000, Height: 1000, Released: true, Safe: true,
 		}},

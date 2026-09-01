@@ -88,6 +88,54 @@ paths:
       responses:
         '200': {description: Redacted reconciliation findings for the operation, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplacePublicationDriftPage'}}}}
         '404': {description: Publication operation not found}
+  /marketplace-listings/taxonomy:
+    get:
+      operationId: getMarketplaceListingTaxonomy
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: taxonomy_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: connector_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: locale, in: query, required: false, schema: {type: string, maxLength: 16}}
+        - {name: jurisdiction, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{2}$'}}
+      responses:
+        '200': {description: Normalized channel taxonomy, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingTaxonomy'}}}}
+        '404': {description: Taxonomy is not stored for this tenant}
+  /marketplace-listings/batch/preview:
+    post:
+      operationId: previewMarketplaceListingBatch
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingBatchPreviewRequest'}}}}
+      responses:
+        '200': {description: Deterministic before/after preview for up to 1000 SKU, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingBatchPreview'}}}}
+        '413': {description: Batch exceeds the 1000 SKU limit}
+  /marketplace-listings/batch/apply:
+    post:
+      operationId: applyMarketplaceListingBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: Approval-Request-ID, in: header, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingBatchApplyRequest'}}}}
+      responses:
+        '202': {description: Approved batch durably queued for a qualified connector, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingBatchRun'}}}}
+        '409': {description: Matching approval or connector qualification is unavailable}
+  /marketplace-listings/batches/{batch_id}:
+    get:
+      operationId: getMarketplaceListingBatch
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: batch_id, in: path, required: true, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+      responses:
+        '200': {description: Durable listing batch state, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingBatchRun'}}}}
+        '404': {description: Batch not found}
+  /marketplace-listings/read-after-write:
+    post:
+      operationId: readAfterWriteMarketplaceListing
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingReadAfterWrite'}}}}
+      responses:
+        '200': {description: Normalized remote observation and reconciliation drifts, content: {application/json: {schema: {$ref: '#/components/schemas/MarketplaceListingReconciliation'}}}}
+        '409': {description: Remote state is not consistent with the expected draft}
   /social/channels:
     get:
       operationId: listSocialChannels
@@ -4098,6 +4146,255 @@ components:
         valid_until: {type: string, format: date-time, pattern: 'Z$'}
         run_id: {type: string, maxLength: 192}
         version: {type: integer, minimum: 1}
+    MarketplaceListingEnumValue:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        label: {type: string, minLength: 1, maxLength: 300}
+        deprecated: {type: boolean}
+    MarketplaceListingCondition:
+      type: object
+      additionalProperties: false
+      required: [when_field, equals]
+      properties:
+        when_field: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        equals: {type: string, minLength: 1, maxLength: 256}
+    MarketplaceListingAttributeDefinition:
+      type: object
+      additionalProperties: false
+      required: [code, name, value_type, requirement]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        name: {type: string, minLength: 1, maxLength: 300}
+        value_type: {type: string, enum: [text, enum, multi_enum, integer, decimal, boolean, dimension, weight, date, media]}
+        requirement: {type: string, enum: [optional, required, conditional]}
+        unit: {type: string, maxLength: 128}
+        enum_values: {type: array, maxItems: 256, items: {$ref: '#/components/schemas/MarketplaceListingEnumValue'}}
+        conditions: {type: array, maxItems: 16, items: {$ref: '#/components/schemas/MarketplaceListingCondition'}}
+        min: {type: string, pattern: '^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$'}
+        max: {type: string, pattern: '^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$'}
+        localized_name: {type: object, additionalProperties: {type: string, maxLength: 300}}
+    MarketplaceListingCategory:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        name: {type: string, minLength: 1, maxLength: 300}
+        parent_code: {type: string, maxLength: 128}
+        attribute_codes: {type: array, maxItems: 512, items: {type: string, maxLength: 128}}
+    MarketplaceListingMediaSlot:
+      type: object
+      additionalProperties: false
+      required: [code, name, required, max_items]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        name: {type: string, minLength: 1, maxLength: 300}
+        required: {type: boolean}
+        max_items: {type: integer, minimum: 1, maximum: 64}
+        formats: {type: array, maxItems: 32, items: {type: string, maxLength: 128}}
+        min_width: {type: integer, minimum: 0}
+        min_height: {type: integer, minimum: 0}
+    MarketplaceListingTaxonomy:
+      type: object
+      additionalProperties: false
+      required: [id, connector_id, locale, jurisdiction, version, source, fingerprint, observed_at, fresh_until, categories, attributes, media_slots]
+      properties:
+        id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        locale: {type: string, maxLength: 16}
+        jurisdiction: {type: string, pattern: '^[A-Z]{2}$'}
+        version: {type: integer, minimum: 1}
+        source: {type: string, maxLength: 256}
+        fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+        fresh_until: {type: string, format: date-time, pattern: 'Z$'}
+        categories: {type: array, maxItems: 50000, items: {$ref: '#/components/schemas/MarketplaceListingCategory'}}
+        attributes: {type: array, maxItems: 512, items: {$ref: '#/components/schemas/MarketplaceListingAttributeDefinition'}}
+        media_slots: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceListingMediaSlot'}}
+    MarketplaceListingAttributeValue:
+      type: object
+      additionalProperties: false
+      required: [value]
+      properties:
+        value: {type: string, minLength: 1, maxLength: 2000}
+        unit: {type: string, maxLength: 128}
+    MarketplaceListingContent:
+      type: object
+      additionalProperties: false
+      required: [locale, title]
+      properties:
+        locale: {type: string, maxLength: 16}
+        title: {type: string, minLength: 1, maxLength: 500}
+        description: {type: string, maxLength: 10000}
+        bullets: {type: array, maxItems: 32, items: {type: string, minLength: 1, maxLength: 500}}
+        brand: {type: string, maxLength: 300}
+        provenance: {type: string, maxLength: 128}
+        model_id: {type: string, maxLength: 192}
+        prompt_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+    MarketplaceListingMediaRef:
+      type: object
+      additionalProperties: false
+      required: [id, slot, released_object_ref, digest, format, bytes, width, height, position, released, safe]
+      properties:
+        id: {type: string, maxLength: 192}
+        slot: {type: string, maxLength: 128}
+        released_object_ref: {type: string, pattern: '^upl_[A-Za-z0-9._:/-]{1,191}$'}
+        digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        format: {type: string, maxLength: 128}
+        bytes: {type: integer, minimum: 1, maximum: 104857600}
+        width: {type: integer, minimum: 0}
+        height: {type: integer, minimum: 0}
+        position: {type: integer, minimum: 0, maximum: 1000}
+        released: {type: boolean}
+        safe: {type: boolean}
+    MarketplaceListingVariant:
+      type: object
+      additionalProperties: false
+      required: [id, sku]
+      properties:
+        id: {type: string, maxLength: 192}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        axes: {type: object, additionalProperties: {type: string, maxLength: 256}}
+        attributes: {type: object, additionalProperties: {$ref: '#/components/schemas/MarketplaceListingAttributeValue'}}
+    MarketplaceListingDraft:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, product_id, sku, category_code, taxonomy_fingerprint, product_version, offer_version, content]
+      properties:
+        id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        product_id: {type: string, maxLength: 192}
+        offer_id: {type: string, maxLength: 192}
+        sku: {type: string, minLength: 1, maxLength: 200}
+        category_code: {type: string, maxLength: 128}
+        taxonomy_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        product_version: {type: integer, minimum: 1}
+        offer_version: {type: integer, minimum: 0}
+        attributes: {type: object, additionalProperties: {$ref: '#/components/schemas/MarketplaceListingAttributeValue'}}
+        content: {$ref: '#/components/schemas/MarketplaceListingContent'}
+        variants: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/MarketplaceListingVariant'}}
+        media: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceListingMediaRef'}}
+    MarketplaceListingBatchItem:
+      type: object
+      additionalProperties: false
+      required: [sku, before]
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 200}
+        before: {$ref: '#/components/schemas/MarketplaceListingDraft'}
+    MarketplaceListingBatchOperation:
+      type: object
+      additionalProperties: false
+      required: [kind, field]
+      properties:
+        kind: {type: string, enum: [set, replace, map, append, remove, normalize, copy]}
+        field: {type: string, maxLength: 128}
+        value: {type: string, maxLength: 2000}
+        from_field: {type: string, maxLength: 128}
+    MarketplaceListingBatchPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [connector_account_id, connector_id, taxonomy, items]
+      properties:
+        connector_account_id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        taxonomy: {$ref: '#/components/schemas/MarketplaceListingTaxonomy'}
+        items: {type: array, minItems: 1, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceListingBatchItem'}}
+        operations: {type: array, maxItems: 512, items: {$ref: '#/components/schemas/MarketplaceListingBatchOperation'}}
+    MarketplaceListingDiagnostic:
+      type: object
+      additionalProperties: false
+      required: [code, severity, field_path, message, remediation]
+      properties:
+        code: {type: string, maxLength: 128}
+        severity: {type: string, enum: [block, warn]}
+        field_path: {type: string, maxLength: 256}
+        message: {type: string, maxLength: 300}
+        expected: {type: string, maxLength: 256}
+        observed: {type: string, maxLength: 256}
+        remediation: {type: string, maxLength: 300}
+    MarketplaceListingBatchRow:
+      type: object
+      additionalProperties: false
+      required: [sku, before_digest, after_digest, before, after, changed, eligible]
+      properties:
+        sku: {type: string, maxLength: 200}
+        before_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        after_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        before: {$ref: '#/components/schemas/MarketplaceListingDraft'}
+        after: {$ref: '#/components/schemas/MarketplaceListingDraft'}
+        changed: {type: boolean}
+        eligible: {type: boolean}
+        diagnostics: {type: array, maxItems: 64, items: {$ref: '#/components/schemas/MarketplaceListingDiagnostic'}}
+    MarketplaceListingBatchPreview:
+      type: object
+      additionalProperties: false
+      required: [id, organization_id, workspace_id, connector_account_id, connector_id, taxonomy_fingerprint, rule_version, input_digest, affected_count, eligible_count, blocked_count, rows, created_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        connector_account_id: {type: string, maxLength: 192}
+        connector_id: {type: string, maxLength: 192}
+        taxonomy_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        rule_version: {type: integer, minimum: 1}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        affected_count: {type: integer, minimum: 0, maximum: 1000}
+        eligible_count: {type: integer, minimum: 0, maximum: 1000}
+        blocked_count: {type: integer, minimum: 0, maximum: 1000}
+        rows: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceListingBatchRow'}}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceListingBatchApplyRequest:
+      type: object
+      additionalProperties: false
+      required: [preview]
+      properties:
+        preview: {$ref: '#/components/schemas/MarketplaceListingBatchPreview'}
+    MarketplaceListingBatchRun:
+      type: object
+      additionalProperties: false
+      required: [id, preview_id, organization_id, workspace_id, idempotency_key, approval_ref, state, input_digest, rows, created_at, updated_at]
+      properties:
+        id: {type: string, maxLength: 192}
+        preview_id: {type: string, maxLength: 192}
+        organization_id: {type: string, maxLength: 192}
+        workspace_id: {type: string, maxLength: 192}
+        idempotency_key: {type: string, maxLength: 128}
+        approval_ref: {type: string, maxLength: 192}
+        state: {type: string, enum: [queued, processing, completed, partial, unknown, rejected]}
+        input_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        rows: {type: array, maxItems: 1000, items: {$ref: '#/components/schemas/MarketplaceListingBatchRow'}}
+        created_at: {type: string, format: date-time, pattern: 'Z$'}
+        updated_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceListingRemoteObservation:
+      type: object
+      additionalProperties: false
+      required: [remote_id, status, observed_at]
+      properties:
+        remote_id: {type: string, maxLength: 192}
+        snapshot_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {type: string, maxLength: 64}
+        category_code: {type: string, maxLength: 128}
+        observed_at: {type: string, format: date-time, pattern: 'Z$'}
+    MarketplaceListingReadAfterWrite:
+      type: object
+      additionalProperties: false
+      required: [expected, observation]
+      properties:
+        expected: {$ref: '#/components/schemas/MarketplaceListingDraft'}
+        expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        observation: {$ref: '#/components/schemas/MarketplaceListingRemoteObservation'}
+    MarketplaceListingReconciliation:
+      type: object
+      additionalProperties: false
+      required: [expected_digest, decision, drifts]
+      properties:
+        expected_digest: {type: string, pattern: '^[0-9a-f]{64}$'}
+        decision: {type: string, enum: [reconciled, needs_attention]}
+        drifts: {type: array, maxItems: 16, items: {type: object, additionalProperties: false}}
     MarketplacePublicationTarget:
       type: object
       additionalProperties: false
