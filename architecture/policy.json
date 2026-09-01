@@ -103,11 +103,11 @@
       "kind": "core_domain"
     },
     {
-      "path": "internal/core/marketplacelisting",
+      "path": "internal/core/marketplacegrowth",
       "kind": "core_domain"
     },
     {
-      "path": "internal/core/marketplacegrowth",
+      "path": "internal/core/marketplacelisting",
       "kind": "core_domain"
     },
     {
@@ -447,11 +447,11 @@
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/marketplacelistingrepo",
+      "path": "internal/platform/postgres/marketplacegrowthrepo",
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/marketplacegrowthrepo",
+      "path": "internal/platform/postgres/marketplacelistingrepo",
       "kind": "infrastructure_adapter"
     },
     {

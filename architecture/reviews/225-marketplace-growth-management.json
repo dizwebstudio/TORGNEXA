@@ -24,6 +24,7 @@
     "internal/core/marketplacegrowth/growth.go",
     "internal/core/marketplacegrowth/growth_test.go",
     "internal/platform/connectors/marketplace_growth.go",
+    "internal/platform/migration/catalog_test.go",
     "internal/platform/postgres/marketplacegrowthrepo/repository.go",
     "migrations/000053_marketplace_growth_management.sql",
     "migrations/catalog.json",
