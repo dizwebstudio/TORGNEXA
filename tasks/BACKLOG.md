@@ -1163,3 +1163,27 @@ sync/reconciliation, Integration Center status, quotas and release evidence.
 Manifest, SDK presence or health-check alone cannot promote a connector to
 `ready` or `qualified`. See
 `tasks/issues/226-connector-depth-and-readiness.md`.
+
+## Epic 182 — Финансовая полнота
+
+Task 227 is planned as the release closure for the remaining financial gaps.
+Tasks 167 and 219 already provide channel unit economics, P&L, cash/report
+quality and FIFO foundations; Tasks 058–059 provide settlement/reconciliation;
+Tasks 089/131 provide historical FX; Task 220 provides read-only advertising
+facts. Task 227 adds bank receipts, complete marketplace/acquirer payouts,
+historical COGS backfill, FX integration into financial runs, advertising
+attribution, completeness-aware reporting, reconciliation, UI and live/sandbox
+qualification. Missing facts remain visible and are never zero-filled. See
+`tasks/issues/227-financial-completeness.md`.
+
+## Epic 183 — Клиентский сервис и единый inbox
+
+Task 228 is planned as the operational maturity closure for customer service.
+Task 057 already provides the provider-neutral Conversation/Message/Case/
+Assignment/SLA foundation, Task 056 provides claims/disputes, and Task 009
+provides inbox idempotency. Task 228 adds the unified inbox, reviews, product
+questions and answers, privacy-safe customer timeline, routing, SLA calendars
+and escalations, reply delivery, claims/returns/refund links, connector
+qualification, UI, reconciliation and authenticated E2E. Unsupported channel
+operations remain `read_only`, `not_available` or `qualification_required`.
+See `tasks/issues/228-customer-service-operational-maturity.md`.

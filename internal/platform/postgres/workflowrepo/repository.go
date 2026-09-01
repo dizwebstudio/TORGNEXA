@@ -367,7 +367,21 @@ func (r *Repository) ClaimRuns(ctx context.Context, scope workflow.Scope, worker
 	}
 	claimed := make([]ClaimedRun, 0, batch)
 	err := r.tx(ctx, scope, false, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `WITH active AS (SELECT count(*) AS count FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND status IN ('queued','running','waiting_approval','waiting_retry')), due AS (SELECT w.id FROM workflow_runs w CROSS JOIN active WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.status IN ('queued','running','waiting_retry','waiting_approval') AND w.available_at<=clock_timestamp() AND (w.lease_until IS NULL OR w.lease_until<clock_timestamp()) ORDER BY w.available_at,w.id FOR UPDATE SKIP LOCKED LIMIT LEAST($3,GREATEST(0,8-active.count))) UPDATE workflow_runs w SET lease_token=$4,lease_until=clock_timestamp()+$5::interval,version=version+1 FROM due WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.id=due.id RETURNING w.id,w.organization_id,w.workspace_id,w.workflow_id,w.workflow_version,w.trigger_kind,w.trigger_ref,w.idempotency_key,w.input_digest,w.status,w.attempt_count,w.available_at,w.started_at,w.completed_at,w.last_error_code,w.version`, scope.OrganizationID(), scope.WorkspaceID(), batch, leaseToken, intervalLiteral(lease))
+		var active int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM workflow_runs WHERE organization_id=$1 AND workspace_id=$2 AND status IN ('queued','running','waiting_approval','waiting_retry')`, scope.OrganizationID(), scope.WorkspaceID()).Scan(&active); err != nil {
+			return err
+		}
+		claimLimit := batch
+		if remaining := 8 - active; claimLimit > remaining {
+			claimLimit = remaining
+		}
+		if claimLimit <= 0 {
+			return nil
+		}
+		// PostgreSQL does not allow a correlated value in LIMIT. Calculate the
+		// bounded concurrency budget in the same transaction, then pass the
+		// resulting scalar limit to the locked claim query.
+		rows, err := tx.QueryContext(ctx, `WITH due AS (SELECT w.id FROM workflow_runs w WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.status IN ('queued','running','waiting_retry','waiting_approval') AND w.available_at<=clock_timestamp() AND (w.lease_until IS NULL OR w.lease_until<clock_timestamp()) ORDER BY w.available_at,w.id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE workflow_runs w SET lease_token=$4,lease_until=clock_timestamp()+$5::interval,version=version+1 FROM due WHERE w.organization_id=$1 AND w.workspace_id=$2 AND w.id=due.id RETURNING w.id,w.organization_id,w.workspace_id,w.workflow_id,w.workflow_version,w.trigger_kind,w.trigger_ref,w.idempotency_key,w.input_digest,w.status,w.attempt_count,w.available_at,w.started_at,w.completed_at,w.last_error_code,w.version`, scope.OrganizationID(), scope.WorkspaceID(), claimLimit, leaseToken, intervalLiteral(lease))
 		if err != nil {
 			return err
 		}

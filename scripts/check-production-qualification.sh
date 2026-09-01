@@ -20,6 +20,31 @@ if [[ ! -f .env ]]; then
   ./scripts/init-community-env.sh >/dev/null
   generated_env=1
 fi
+
+# The qualification stack is disposable and must be runnable alongside a
+# developer or staging stack. Resolve free host ports instead of inheriting
+# the shared compose defaults from .env (6379/8080/etc.). The container-side
+# ports remain unchanged, so service-to-service URLs and the scenario itself
+# are not affected.
+pick_free_port() {
+  python3 - <<'PY'
+import socket
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+}
+export POSTGRES_PORT="$(pick_free_port)"
+export KAFKA_PORT="$(pick_free_port)"
+export VALKEY_PORT="$(pick_free_port)"
+export CLICKHOUSE_HTTP_PORT="$(pick_free_port)"
+export CLICKHOUSE_NATIVE_PORT="$(pick_free_port)"
+export S3_PORT="$(pick_free_port)"
+export KEYCLOAK_PORT="$(pick_free_port)"
+export TORGNEXA_API_PORT="$(pick_free_port)"
+export TORGNEXA_MCP_PORT="$(pick_free_port)"
+export TORGNEXA_FRONTEND_PORT="$(pick_free_port)"
 cleanup() {
   if [[ "${TORGNEXA_QUALIFICATION_KEEP_CONTAINERS:-0}" == "1" ]]; then
     echo "qualification containers kept for inspection: $project" >&2
