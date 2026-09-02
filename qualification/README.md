@@ -36,7 +36,19 @@ Required inputs:
 
 The GitHub branch-rules capture must prove an active ruleset workflow pinned by SHA to `.github/workflows/architecture-required.yml`, deletion/force-push protection, pull-request approvals and a required Team reviewer for architecture paths. It is not possible to replace those hosted facts with a local `PASS` flag.
 
-Live connector plans contain account/connector IDs only. Every connector account that is `active` in the target tenant must be listed; omission fails P4. Each listed account receives two consecutive remote health checks. `run_sync` is off by default; when deliberately enabled, the caller must additionally set `TORGNEXA_P4_ALLOW_REMOTE_SYNC=I_UNDERSTAND_THIS_MAY_WRITE` because the account's active sync policy may write provider state.
+Live connector plans contain account/connector IDs and the exact capability
+names that the run is expected to exercise; they never contain credentials or
+secret references. Every connector account that is `active` in the target
+tenant must be listed; omission fails P4. Each listed account must have a
+configured opaque SecretProvider reference, every `required_capabilities` entry
+must be enabled on the account, and the runner performs two consecutive remote
+health checks. This proves credentialed runtime reachability and account
+configuration; it does not promote a business capability to `qualified` and
+does not prove remote read-after-write. That requires the separate marketplace
+evidence gate below. `run_sync` is off by default; when deliberately enabled,
+the caller must additionally set
+`TORGNEXA_P4_ALLOW_REMOTE_SYNC=I_UNDERSTAND_THIS_MAY_WRITE` because the account's
+active sync policy may write provider state.
 
 A successful run writes `p4-go-live.json` plus digested subordinate evidence below `qualification/evidence/p4-<UTC>/`. This directory is not source material and must remain ignored by Git and Docker build contexts.
 

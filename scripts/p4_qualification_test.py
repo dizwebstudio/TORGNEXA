@@ -38,6 +38,24 @@ class P4PolicyTests(unittest.TestCase):
             p.write_text(json.dumps({'schema_version':1,'accounts':[{'account_id':'x','connector_id':'INVALID_provider'}]}))
             with self.assertRaises(QualificationError): p4_live_connectors.parse_plan(str(p))
 
+    def test_connector_plan_parses_required_capabilities_and_rejects_duplicates(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=pathlib.Path(d)/'p.json'
+            p.write_text(json.dumps({'schema_version':1,'accounts':[{'account_id':'wb','connector_id':'wildberries','required_capabilities':['products.read','inventory.read']}]}))
+            result=p4_live_connectors.parse_plan(str(p))
+            self.assertEqual(result['accounts'][0]['required_capabilities'],['inventory.read','products.read'])
+            p.write_text(json.dumps({'schema_version':1,'accounts':[{'account_id':'wb','connector_id':'wildberries','required_capabilities':['products.read','products.read']}]}))
+            with self.assertRaises(QualificationError): p4_live_connectors.parse_plan(str(p))
+
+    def test_credentialed_account_requires_secret_reference_and_capabilities(self):
+        spec={'account_id':'wb','required_capabilities':['products.read','inventory.read']}
+        account={'secret_reference':'sec:v1:0123456789abcdef0123456789abcdef','capabilities':[{'capability':'products.read','enabled':True},{'capability':'inventory.read','enabled':True}]}
+        p4_live_connectors.validate_credentialed_account(account,spec)
+        missing=dict(account); missing.pop('secret_reference')
+        with self.assertRaises(QualificationError): p4_live_connectors.validate_credentialed_account(missing,spec)
+        disabled={'secret_reference':account['secret_reference'],'capabilities':[{'capability':'products.read','enabled':True},{'capability':'inventory.read','enabled':False}]}
+        with self.assertRaises(QualificationError): p4_live_connectors.validate_credentialed_account(disabled,spec)
+
 
     def test_connector_pagination_collects_all_pages(self):
         class FakeAPI:

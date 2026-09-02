@@ -4,17 +4,32 @@
     {
       "account_id": "replace-with-wildberries-account",
       "connector_id": "wildberries",
-      "run_sync": false
+      "run_sync": false,
+      "required_capabilities": [
+        "inventory.read",
+        "orders.read",
+        "products.read"
+      ]
     },
     {
       "account_id": "replace-with-ozon-account",
       "connector_id": "ozon",
-      "run_sync": false
+      "run_sync": false,
+      "required_capabilities": [
+        "inventory.read",
+        "orders.read",
+        "products.read"
+      ]
     },
     {
       "account_id": "replace-with-yandex-market-account",
       "connector_id": "yandex-market",
-      "run_sync": false
+      "run_sync": false,
+      "required_capabilities": [
+        "inventory.read",
+        "orders.read",
+        "products.read"
+      ]
     }
   ]
 }
