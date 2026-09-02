@@ -24,16 +24,17 @@ var errorCode = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,63}$`)
 type Kind string
 
 const (
-	KindReconciliation    Kind = "reconciliation"
-	KindUpload            Kind = "upload"
-	KindPrivacy           Kind = "privacy"
-	KindWarehouseIncident Kind = "warehouse_incident"
-	KindSocialPublication Kind = "social_publication"
-	KindOperatorAssistant Kind = "operator_assistant"
+	KindReconciliation        Kind = "reconciliation"
+	KindUpload                Kind = "upload"
+	KindPrivacy               Kind = "privacy"
+	KindWarehouseIncident     Kind = "warehouse_incident"
+	KindSocialPublication     Kind = "social_publication"
+	KindOperatorAssistant     Kind = "operator_assistant"
+	KindMarketplaceOperations Kind = "marketplace_operations"
 )
 
 func (k Kind) Valid() bool {
-	return k == KindReconciliation || k == KindUpload || k == KindPrivacy || k == KindWarehouseIncident || k == KindSocialPublication || k == KindOperatorAssistant
+	return k == KindReconciliation || k == KindUpload || k == KindPrivacy || k == KindWarehouseIncident || k == KindSocialPublication || k == KindOperatorAssistant || k == KindMarketplaceOperations
 }
 
 type Job struct {
@@ -127,7 +128,7 @@ func (r *Repository) Claim(ctx context.Context, kind Kind, workerID string, batc
 	if err != nil {
 		normalized := normalizeSchemaError(err)
 		var state sqlStateError
-		if (kind == KindPrivacy || kind == KindWarehouseIncident || kind == KindSocialPublication || kind == KindOperatorAssistant) && errors.As(err, &state) && state.SQLState() == "22023" {
+		if (kind == KindPrivacy || kind == KindWarehouseIncident || kind == KindSocialPublication || kind == KindOperatorAssistant || kind == KindMarketplaceOperations) && errors.As(err, &state) && state.SQLState() == "22023" {
 			normalized = ErrSchemaUnavailable // rolling upgrade: older function does not know this job kind
 		}
 		return nil, fmt.Errorf("worker repository: claim %s: %w", kind, normalized)

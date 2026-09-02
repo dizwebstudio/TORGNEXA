@@ -559,14 +559,14 @@ func TestMarketplaceCommerceWriteAdmissionIsExact(t *testing.T) {
 		t.Fatalf("Wildberries inventory writer unavailable: %v", err)
 	}
 	ozon := supportTestAccount(t, "ozon")
-	if !registry.SupportsPriceWrite(ozon) || registry.SupportsInventoryWrite(ozon) || !SupportsCapability("ozon", "prices.write") || !SupportsSync("ozon", "prices", "outbound") {
+	if !registry.SupportsPriceWrite(ozon) || !registry.SupportsInventoryWrite(ozon) || !SupportsCapability("ozon", "prices.write") || !SupportsCapability("ozon", "inventory.write") || !SupportsSync("ozon", "prices", "outbound") || !SupportsSync("ozon", "inventory", "outbound") {
 		t.Fatal("Ozon marketplace write support is not admitted exactly")
 	}
 	if _, err := registry.PriceWriter(ozon, supportTestRuntime{}, nil); err != nil {
 		t.Fatalf("Ozon price writer unavailable: %v", err)
 	}
-	if _, err := registry.InventoryWriter(ozon, supportTestRuntime{}, nil); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("unadmitted Ozon inventory writer resolved: %v", err)
+	if _, err := registry.InventoryWriter(ozon, supportTestRuntime{}, nil); err != nil {
+		t.Fatalf("Ozon inventory writer unavailable: %v", err)
 	}
 }
 

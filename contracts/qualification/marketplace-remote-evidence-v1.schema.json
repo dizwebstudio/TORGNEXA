@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://torgnexa.dev/contracts/qualification/marketplace-remote-evidence-v1.schema.json",
+  "$id": "https://torgnexa.local/schemas/qualification/marketplace-remote-evidence-v1.json",
   "title": "TORGNEXA marketplace remote qualification evidence v1",
   "description": "Redacted evidence retained after an external marketplace qualification run. This contract does not assert that the run was live.",
   "type": "object",

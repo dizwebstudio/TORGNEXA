@@ -206,6 +206,21 @@ func (r *commerceWriteRoute) routeInventory(ctx context.Context, scope tenancy.S
 	if err != nil {
 		return eventbus.Permanent("commerce_sync_invalid_inventory")
 	}
+	coreScope, err := catalog.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return eventbus.Permanent("commerce_sync_invalid_scope")
+	}
+	offerID, err := catalog.ParseOfferID(payload.OfferID)
+	if err != nil {
+		return eventbus.Permanent("commerce_sync_invalid_inventory")
+	}
+	offer, err := r.catalog.Offer(ctx, coreScope, offerID)
+	if errors.Is(err, catalog.ErrNotFound) || errors.Is(err, catalog.ErrInvalidRecord) {
+		return eventbus.Permanent("commerce_sync_offer_missing")
+	}
+	if err != nil {
+		return eventbus.Retryable("commerce_sync_offer_read_failed")
+	}
 	return r.route(ctx, scope, event, commerceInventoryEntity, payload.PositionID, "offer", payload.OfferID, payload.Version, false, func(account sdk.Account, runtime sdk.Runtime, policy syncengine.Policy, remoteID string) (sdk.CommerceWriteReceipt, error) {
 		warehouse, mappingErr := r.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, "warehouse", payload.WarehouseID)
 		if errors.Is(mappingErr, sdk.ErrMappingNotFound) {
@@ -217,11 +232,18 @@ func (r *commerceWriteRoute) routeInventory(ctx context.Context, scope tenancy.S
 		if warehouse.RemoteID == "" {
 			return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
 		}
+		productRemoteID := ""
+		productMapping, productMappingErr := r.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, "product", offer.ProductID.String())
+		if productMappingErr == nil {
+			productRemoteID = productMapping.RemoteID
+		} else if !errors.Is(productMappingErr, sdk.ErrMappingNotFound) {
+			return sdk.CommerceWriteReceipt{}, productMappingErr
+		}
 		writer, err := r.registry.inventoryWriter(scope, account, runtime)
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}
-		receipt, err := writer.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{VariantRemoteID: remoteID, LocationRemoteID: warehouse.RemoteID, Quantity: quantity, IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
+		receipt, err := writer.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{ProductRemoteID: productRemoteID, VariantRemoteID: remoteID, LocationRemoteID: warehouse.RemoteID, Quantity: quantity, IdempotencyKey: commerceSyncIdempotencyKey(policy.ID, event.ID)})
 		if err != nil {
 			return sdk.CommerceWriteReceipt{}, err
 		}

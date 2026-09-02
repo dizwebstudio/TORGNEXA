@@ -87,7 +87,8 @@ p4-publish:
 	./scripts/promote-github-release.sh
 p4-policy:
 	PYTHONDONTWRITEBYTECODE=1 python3 scripts/p4_qualification_test.py
-	PYTHONDONTWRITEBYTECODE=1 python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ["scripts/p4_common.py","scripts/p4_hosting_rules.py","scripts/p4_live_connectors.py","scripts/p4_posture.py","scripts/p4_release_stage.py","scripts/p4_root_evidence.py"]]'
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify_p4_release_evidence_test.py
+	PYTHONDONTWRITEBYTECODE=1 python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ["scripts/p4_common.py","scripts/p4_hosting_rules.py","scripts/p4_live_connectors.py","scripts/p4_posture.py","scripts/p4_release_stage.py","scripts/p4_root_evidence.py","scripts/verify-p4-release-evidence.py"]]'
 	@for script in scripts/check-p4-go-live.sh scripts/package-release-evidence.sh scripts/stage-github-release.sh scripts/promote-github-release.sh scripts/verify-release-evidence-external.sh; do bash -n $$script; done
 community-check:
 	./scripts/check-community-deployment.sh

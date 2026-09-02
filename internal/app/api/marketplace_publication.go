@@ -13,7 +13,6 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
 	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
-	"github.com/torgnexa/torgnexa/internal/platform/marketplacetaxonomy"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
@@ -120,7 +119,7 @@ func (api marketplacePublicationAPI) enqueue(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if !request.DryRun {
-		if err := marketplacetaxonomy.RemoteOperationAdmission(request.Snapshot.Target.ConnectorID, request.Operation); err != nil {
+		if err := builtinruntime.RemoteOperationAdmission(request.Snapshot.Target.ConnectorID, request.Operation); err != nil {
 			writeProblem(w, http.StatusConflict, "Provider qualification is required before remote publication")
 			return
 		}

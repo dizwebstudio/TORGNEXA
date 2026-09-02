@@ -259,3 +259,11 @@ Task 118 separates staging from publication. A protected tag release that passes
 `make p4-qualification` is the independent go-live layer. It requires the exact tagged tree and real P3 topology evidence, captures the active GitHub rules applying to the protected branch, requires a SHA-pinned ruleset workflow plus a Team architecture reviewer, independently re-verifies every first-party Sigstore bundle and SLSA provenance identity, compares GitHub Release asset SHA-256 digests with the locally verified staged bytes, validates reviewed non-secret production posture, and performs two consecutive remote health checks for every active production connector account.
 
 Only a retained `p4-go-live.json` with `status: PASS` can authorize `make p4-publish`. Promotion re-hashes all subordinate P4 evidence, requires the exact clean release tag, rechecks every staged asset digest/size with no extras, uploads the root go-live report itself, and only then clears the draft flag. The promoter re-reads the GitHub draft and refuses promotion unless the expected evidence bundle, manifest and four first-party binaries are present. Thus Task 118 provides publication machinery without converting repository completion into a fabricated operational PASS.
+
+The production SSH deployment workflow has the same boundary: before creating
+an archive or contacting the production host, it fetches the public release for
+the requested exact tag and verifies the `p4-go-live.json` asset's GitHub
+SHA-256/size, published non-prerelease state, PASS status and repository,
+version and commit identity. The sanitized verification result is retained for
+90 days with the deployment run. Missing, changed, draft, prerelease or
+identity-mismatched evidence blocks rollout.

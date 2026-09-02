@@ -23,6 +23,14 @@ The provider adapter runs all thirteen Task-064 checks. Its sandbox portion uses
 - product snapshot create/update uses the documented Content API path, forwards
   idempotency metadata, never sends an arbitrary media URL and keeps accepted
   distinct from published;
+- provider taxonomy reads use the Content API parent-category, subject and
+  subject-characteristic dictionaries, normalize only bounded category and
+  attribute definitions, and reject malformed/duplicate identities;
+- FBS order cancellation uses `PATCH /api/v3/orders/{orderId}/cancel`, while
+  unsupported confirmation/handoff actions are rejected before remote IO;
+- advertising launch/pause/stop, budget deposit and product bid writes validate exact
+  campaign/card identifiers, forward idempotency metadata and preserve
+  accepted versus reconciled state;
 - provider package imports only the Connector SDK prefix and approved standard library.
 
 ## Sandbox / network qualification

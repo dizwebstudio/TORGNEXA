@@ -2669,6 +2669,17 @@ const generatedReadinessMatrixJSON = `{
           "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
         },
         {
+          "name": "inventory.write",
+          "status": "ready",
+          "direction": "write",
+          "required_scopes": [],
+          "risk_class": "write_sensitive",
+          "idempotency": "required",
+          "read_after_write": "required",
+          "webhook_or_reconciliation": false,
+          "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
+        },
+        {
           "name": "orders.read",
           "status": "ready",
           "direction": "read",
@@ -2677,6 +2688,17 @@ const generatedReadinessMatrixJSON = `{
           "idempotency": "not_applicable",
           "read_after_write": "not_applicable",
           "webhook_or_reconciliation": false,
+          "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
+        },
+        {
+          "name": "orders.status.write",
+          "status": "ready",
+          "direction": "write",
+          "required_scopes": [],
+          "risk_class": "write_sensitive",
+          "idempotency": "required",
+          "read_after_write": "required",
+          "webhook_or_reconciliation": true,
           "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
         },
         {
@@ -4548,6 +4570,17 @@ const generatedReadinessMatrixJSON = `{
       "health_only": false,
       "capabilities": [
         {
+          "name": "ads.manage",
+          "status": "ready",
+          "direction": "write",
+          "required_scopes": [],
+          "risk_class": "write_sensitive",
+          "idempotency": "required",
+          "read_after_write": "required",
+          "webhook_or_reconciliation": false,
+          "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
+        },
+        {
           "name": "ads.read",
           "status": "ready",
           "direction": "read",
@@ -4589,6 +4622,17 @@ const generatedReadinessMatrixJSON = `{
           "idempotency": "not_applicable",
           "read_after_write": "not_applicable",
           "webhook_or_reconciliation": false,
+          "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
+        },
+        {
+          "name": "orders.status.write",
+          "status": "ready",
+          "direction": "write",
+          "required_scopes": [],
+          "risk_class": "write_sensitive",
+          "idempotency": "required",
+          "read_after_write": "required",
+          "webhook_or_reconciliation": true,
           "runtime_evidence": "contracts/connectors/builtin-runtime-support-v1.json"
         },
         {

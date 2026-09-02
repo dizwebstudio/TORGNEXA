@@ -9,9 +9,10 @@ Admit Ozon as the second marketplace reference provider and reuse the same addit
 | `products.read` | `/v3/product/list`; `/v3/product/info/list` | enabled |
 | `inventory.read` | `/v2/warehouse/list`; `/v2/product/info/stocks-by-warehouse/fbs` | enabled |
 | `orders.read` | `/v3/posting/fbs/list` | enabled for bounded import/status projection |
+| `orders.status.write` | `/v4/posting/fbs/ship`; `/v2/posting/fbs/cancel`; `/v2/fbs/posting/sent-by-seller` | enabled for bounded confirm/cancel/handoff; reconciliation required |
 | `products.write` | `/v2/product/import`; `/v1/product/import/info` | enabled for bounded import/status slice; media and field-level attributes deferred |
 | `prices.write` | `/v1/product/import/prices` | enabled for bounded offer submit; reconciliation required |
-| `inventory.write` | Seller stock mutation API | deferred |
+| `inventory.write` | `POST /v2/products/stocks` | enabled for one-row exact stock submit; reconciliation required |
 | returns/finance/ads writes/chats | additional Seller API surfaces | deferred |
 
 ## Provider-neutral proof
@@ -30,6 +31,13 @@ optional old price and currency, and requires Ozon's per-offer response to repor
 `updated=true`. The receipt is `applied` but not `reconciled`; the host must run
 the price read/reconciliation path before treating the remote state as confirmed.
 Transport failures are reported as `write_outcome_unknown`.
+
+The bounded inventory writer submits one `offer_id`, its separately resolved
+numeric `product_id`, `warehouse_id` and exact integer stock through
+`/v2/products/stocks`. A response is accepted only when Ozon returns the same
+three identities with `updated=true`; transport failures remain
+`write_outcome_unknown`. The host resolves `product_id` from the canonical
+offer-to-product mapping and never treats an offer ID as a product ID.
 
 ## Current compatibility notes
 

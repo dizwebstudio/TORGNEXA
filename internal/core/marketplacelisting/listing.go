@@ -27,15 +27,17 @@ var (
 const MaxBatchItems = 1000
 
 var (
-	refPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
-	codePattern        = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
-	localePattern      = regexp.MustCompile(`^[a-z]{2}(?:-[A-Z]{2})?$`)
-	countryPattern     = regexp.MustCompile(`^[A-Z]{2}$`)
-	decimalPattern     = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$`)
-	integerPattern     = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
-	datePattern        = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
-	digestPattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	mediaFormatPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9.+-]+$`)
+	refPattern          = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
+	codePattern         = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
+	localePattern       = regexp.MustCompile(`^[a-z]{2}(?:-[A-Z]{2})?$`)
+	countryPattern      = regexp.MustCompile(`^[A-Z]{2}$`)
+	decimalPattern      = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,9})?$`)
+	integerPattern      = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
+	datePattern         = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
+	digestPattern       = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	mediaFormatPattern  = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9.+-]+$`)
+	categoryCodePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,127}$`)
+	taxonomyCodePattern = regexp.MustCompile(`^[\p{L}][\p{L}\p{N}._-]{0,127}$`)
 )
 
 type Requirement string
@@ -86,7 +88,7 @@ type Condition struct {
 }
 
 func (c Condition) Validate() error {
-	if !codePattern.MatchString(c.WhenField) || c.Equals == "" || len(c.Equals) > 256 {
+	if !taxonomyCodePattern.MatchString(c.WhenField) || c.Equals == "" || len(c.Equals) > 256 {
 		return ErrInvalid
 	}
 	return nil
@@ -106,7 +108,7 @@ type AttributeDefinition struct {
 }
 
 func (a AttributeDefinition) Validate() error {
-	if !codePattern.MatchString(a.Code) || strings.TrimSpace(a.Name) != a.Name || a.Name == "" || len(a.Name) > 300 || !a.ValueType.Valid() || !a.Requirement.Valid() || (a.Unit != "" && !codePattern.MatchString(a.Unit)) || len(a.EnumValues) > 256 || len(a.Conditions) > 16 {
+	if !taxonomyCodePattern.MatchString(a.Code) || strings.TrimSpace(a.Name) != a.Name || a.Name == "" || len(a.Name) > 300 || !a.ValueType.Valid() || !a.Requirement.Valid() || (a.Unit != "" && !codePattern.MatchString(a.Unit)) || len(a.EnumValues) > 256 || len(a.Conditions) > 16 {
 		return ErrInvalid
 	}
 	if a.Requirement == RequirementConditional && len(a.Conditions) == 0 {
@@ -146,12 +148,12 @@ type Category struct {
 }
 
 func (c Category) Validate() error {
-	if !codePattern.MatchString(c.Code) || strings.TrimSpace(c.Name) != c.Name || c.Name == "" || len(c.Name) > 300 || (c.ParentCode != "" && !codePattern.MatchString(c.ParentCode)) || len(c.AttributeCodes) > 512 {
+	if !categoryCodePattern.MatchString(c.Code) || strings.TrimSpace(c.Name) != c.Name || c.Name == "" || len(c.Name) > 300 || (c.ParentCode != "" && !categoryCodePattern.MatchString(c.ParentCode)) || len(c.AttributeCodes) > 512 {
 		return ErrInvalid
 	}
 	seen := map[string]struct{}{}
 	for _, code := range c.AttributeCodes {
-		if !codePattern.MatchString(code) {
+		if !taxonomyCodePattern.MatchString(code) {
 			return ErrInvalid
 		}
 		if _, ok := seen[code]; ok {
@@ -185,26 +187,26 @@ func (m MediaSlot) Validate() error {
 }
 
 type Taxonomy struct {
-	ID              string                     `json:"id"`
-	ChannelID       string                     `json:"connector_id"`
-	Locale          string                     `json:"locale"`
-	Jurisdiction    string                     `json:"jurisdiction"`
-	Version         int64                      `json:"version"`
-	Source          string                     `json:"source"`
-	Fingerprint     string                     `json:"fingerprint"`
-	ObservedAt      time.Time                  `json:"observed_at"`
-	FreshUntil      time.Time                  `json:"fresh_until"`
-	Categories      []Category                 `json:"categories"`
-	Attributes      []AttributeDefinition      `json:"attributes"`
-	MediaSlots      []MediaSlot                `json:"media_slots"`
-	ProviderProfile *ProviderTaxonomyProfile   `json:"provider_profile,omitempty"`
+	ID             string                   `json:"id"`
+	ChannelID      string                   `json:"connector_id"`
+	Locale         string                   `json:"locale"`
+	Jurisdiction   string                   `json:"jurisdiction"`
+	Version        int64                    `json:"version"`
+	Source         string                   `json:"source"`
+	Fingerprint    string                   `json:"fingerprint"`
+	ObservedAt     time.Time                `json:"observed_at"`
+	FreshUntil     time.Time                `json:"fresh_until"`
+	Categories     []Category               `json:"categories"`
+	Attributes     []AttributeDefinition    `json:"attributes"`
+	MediaSlots     []MediaSlot              `json:"media_slots"`
+	AdapterProfile *ProviderTaxonomyProfile `json:"provider_profile,omitempty"`
 }
 
 // ProviderTaxonomyProfile records the typed adapter contract used to turn the
 // normalized taxonomy into one provider request. It is metadata only: raw
 // provider schemas and credentials never cross the connector boundary.
 type ProviderTaxonomyProfile struct {
-	ConnectorID        string `json:"connector_id"`
+	ChannelID          string `json:"connector_id"`
 	SchemaVersion      string `json:"schema_version"`
 	CategoryCodeKind   string `json:"category_code_kind"`
 	AttributeKeyKind   string `json:"attribute_key_kind"`
@@ -214,7 +216,7 @@ type ProviderTaxonomyProfile struct {
 }
 
 func (profile ProviderTaxonomyProfile) Validate() error {
-	if !refPattern.MatchString(profile.ConnectorID) || !validText(profile.SchemaVersion, 64) || !validTaxonomyProfileCode(profile.CategoryCodeKind, "numeric", "string") || !validTaxonomyProfileCode(profile.AttributeKeyKind, "provider_id", "provider_name", "normalized_code") || !validTaxonomyProfileCode(profile.BulkApplyMode, "bounded_single_item_calls", "provider_batch") || !validTaxonomyProfileCode(profile.ReadAfterWriteMode, "catalog_read", "async_status", "catalog_read_or_async_status") || !validTaxonomyProfileCode(profile.Qualification, "synthetic", "qualification_required", "qualified") {
+	if !refPattern.MatchString(profile.ChannelID) || !validText(profile.SchemaVersion, 64) || !validTaxonomyProfileCode(profile.CategoryCodeKind, "numeric", "string") || !validTaxonomyProfileCode(profile.AttributeKeyKind, "provider_id", "provider_name", "normalized_code") || !validTaxonomyProfileCode(profile.BulkApplyMode, "bounded_single_item_calls", "provider_batch") || !validTaxonomyProfileCode(profile.ReadAfterWriteMode, "catalog_read", "async_status", "catalog_read_or_async_status") || !validTaxonomyProfileCode(profile.Qualification, "synthetic", "qualification_required", "qualified") {
 		return ErrInvalid
 	}
 	return nil
@@ -233,7 +235,7 @@ func (t Taxonomy) Validate() error {
 	if !refPattern.MatchString(t.ID) || !refPattern.MatchString(t.ChannelID) || !localePattern.MatchString(t.Locale) || !countryPattern.MatchString(t.Jurisdiction) || t.Version < 1 || strings.TrimSpace(t.Source) != t.Source || t.Source == "" || len(t.Source) > 256 || !isUTC(t.ObservedAt) || !isUTC(t.FreshUntil) || !t.FreshUntil.After(t.ObservedAt) || len(t.Categories) > 50_000 || len(t.Attributes) > 512 || len(t.MediaSlots) > 64 {
 		return ErrInvalid
 	}
-	if t.ProviderProfile != nil && (t.ProviderProfile.Validate() != nil || t.ProviderProfile.ConnectorID != t.ChannelID) {
+	if !validAttachedTaxonomyContract(t.AdapterProfile, t.ChannelID) {
 		return ErrInvalid
 	}
 	if t.Fingerprint != "" && !isDigest(t.Fingerprint) {
@@ -317,12 +319,19 @@ func (t Taxonomy) Validate() error {
 	return nil
 }
 
+func validAttachedTaxonomyContract(profile *ProviderTaxonomyProfile, channelID string) bool {
+	if profile == nil {
+		return true
+	}
+	return profile.Validate() == nil && profile.ChannelID == channelID
+}
+
 func (t Taxonomy) ComputeFingerprint() (string, error) {
 	copyTaxonomy := t
 	copyTaxonomy.Fingerprint = ""
-	// ProviderProfile describes adapter semantics rather than remote taxonomy
+	// AdapterProfile describes adapter semantics rather than remote taxonomy
 	// content, so adding it must not invalidate previously stored evidence.
-	copyTaxonomy.ProviderProfile = nil
+	copyTaxonomy.AdapterProfile = nil
 	data, err := json.Marshal(copyTaxonomy)
 	if err != nil {
 		return "", err
@@ -401,7 +410,7 @@ func (v Variant) Validate() error {
 		}
 	}
 	for key, value := range v.Attributes {
-		if !codePattern.MatchString(key) || !validText(value.Value, 2000) || (value.Unit != "" && !codePattern.MatchString(value.Unit)) {
+		if !taxonomyCodePattern.MatchString(key) || !validText(value.Value, 2000) || (value.Unit != "" && !codePattern.MatchString(value.Unit)) {
 			return ErrInvalid
 		}
 	}
@@ -426,11 +435,11 @@ type ListingDraft struct {
 }
 
 func (d ListingDraft) Validate() error {
-	if !refPattern.MatchString(d.ID) || !refPattern.MatchString(d.OrganizationID) || !refPattern.MatchString(d.WorkspaceID) || !refPattern.MatchString(d.ProductID) || (d.OfferID != "" && !refPattern.MatchString(d.OfferID)) || !validText(d.SKU, 200) || !codePattern.MatchString(d.CategoryCode) || !isDigest(d.TaxonomyFingerprint) || d.ProductVersion < 1 || d.OfferVersion < 0 || len(d.Attributes) > 512 || len(d.Variants) > 100 || len(d.Media) > 64 || d.Content.Validate() != nil {
+	if !refPattern.MatchString(d.ID) || !refPattern.MatchString(d.OrganizationID) || !refPattern.MatchString(d.WorkspaceID) || !refPattern.MatchString(d.ProductID) || (d.OfferID != "" && !refPattern.MatchString(d.OfferID)) || !validText(d.SKU, 200) || !categoryCodePattern.MatchString(d.CategoryCode) || !isDigest(d.TaxonomyFingerprint) || d.ProductVersion < 1 || d.OfferVersion < 0 || len(d.Attributes) > 512 || len(d.Variants) > 100 || len(d.Media) > 64 || d.Content.Validate() != nil {
 		return ErrInvalid
 	}
 	for key, value := range d.Attributes {
-		if !codePattern.MatchString(key) || !validText(value.Value, 2000) || (value.Unit != "" && !codePattern.MatchString(value.Unit)) {
+		if !taxonomyCodePattern.MatchString(key) || !validText(value.Value, 2000) || (value.Unit != "" && !codePattern.MatchString(value.Unit)) {
 			return ErrInvalid
 		}
 	}
@@ -975,7 +984,7 @@ func validBatchField(value string) bool {
 	case "category_code", "content.title", "content.description":
 		return true
 	default:
-		return strings.HasPrefix(value, "attributes.") && codePattern.MatchString(strings.TrimPrefix(value, "attributes."))
+		return strings.HasPrefix(value, "attributes.") && taxonomyCodePattern.MatchString(strings.TrimPrefix(value, "attributes."))
 	}
 }
 

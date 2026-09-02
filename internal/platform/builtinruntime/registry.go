@@ -1346,6 +1346,24 @@ func (r *Registry) ProductPublicationWriter(account sdk.Account, runtime sdk.Run
 	}
 }
 
+// MarketplaceListingTaxonomyReader resolves the provider-specific taxonomy
+// adapter behind the normalized listing contract. Only an adapter with an
+// implemented, bounded dictionary reader is admitted here; a manifest entry
+// alone never creates a taxonomy runtime.
+func (r *Registry) MarketplaceListingTaxonomyReader(account sdk.Account, runtime sdk.Runtime) (MarketplaceListingTaxonomyReader, error) {
+	if r == nil || r.http == nil || account.Validate() != nil || runtime == nil || !SupportsCapability(account.ConnectorID, "products.read") {
+		return nil, ErrUnavailable
+	}
+	switch account.ConnectorID {
+	case "wildberries":
+		return normalizedListingTaxonomyReader{reader: wildberries.New(wbHTTP{r.http}, nil)}, nil
+	case "ozon":
+		return normalizedListingTaxonomyReader{reader: ozon.New(ozonHTTP{r.http}, nil)}, nil
+	default:
+		return nil, ErrUnavailable
+	}
+}
+
 // ProductPublicationStatusReader resolves the normalized read-after-write
 // surface for marketplace publication operations.
 func (r *Registry) ProductPublicationStatusReader(account sdk.Account, runtime sdk.Runtime, load ConfigLoader) (sdk.ProductPublicationStatusReader, error) {
@@ -1949,6 +1967,8 @@ func (r *Registry) InventoryWriter(account sdk.Account, runtime sdk.Runtime, loa
 			return nil, ErrConfigurationNeeded
 		}
 		return woocommerce.New(wooHTTP{r.http}, wooConfigSource{load: load}, nil), nil
+	case "ozon":
+		return ozon.New(ozonHTTP{r.http}, nil), nil
 	case "yandex-market":
 		if load == nil {
 			return nil, ErrConfigurationNeeded

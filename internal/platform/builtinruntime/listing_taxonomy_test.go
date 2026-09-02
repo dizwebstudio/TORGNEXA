@@ -1,4 +1,4 @@
-package marketplacetaxonomy
+package builtinruntime
 
 import (
 	"errors"
@@ -8,28 +8,28 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/marketplacepublication"
 )
 
-func TestProfilesAreTypedAndAttachToTaxonomy(t *testing.T) {
+func TestListingTaxonomyProfilesAreTypedAndAttached(t *testing.T) {
 	for _, connectorID := range []string{"wildberries", "ozon", "yandex-market"} {
 		profile, ok := ProfileFor(connectorID)
 		if !ok || profile.Validate() != nil {
 			t.Fatalf("profile %q is not valid", connectorID)
 		}
-		taxonomy := AttachProfile(marketplacelisting.Taxonomy{ChannelID: connectorID, Fingerprint: "fingerprint"})
-		if taxonomy.ProviderProfile == nil || taxonomy.ProviderProfile.ConnectorID != connectorID || taxonomy.Fingerprint != "fingerprint" {
-			t.Fatalf("profile %q was not attached safely: %#v", connectorID, taxonomy.ProviderProfile)
+		taxonomy := AttachListingTaxonomyProfile(marketplacelisting.Taxonomy{ChannelID: connectorID, Fingerprint: "fingerprint"})
+		if taxonomy.AdapterProfile == nil || taxonomy.AdapterProfile.ChannelID != connectorID || taxonomy.Fingerprint != "fingerprint" {
+			t.Fatalf("profile %q was not attached safely: %#v", connectorID, taxonomy.AdapterProfile)
 		}
 	}
 }
 
-func TestUnknownConnectorHasNoInventedProfile(t *testing.T) {
+func TestUnknownListingTaxonomyConnectorHasNoInventedProfile(t *testing.T) {
 	taxonomy := marketplacelisting.Taxonomy{ChannelID: "custom-connector", Fingerprint: "fingerprint"}
-	result := AttachProfile(taxonomy)
-	if result.ProviderProfile != nil || result.Fingerprint != taxonomy.Fingerprint {
-		t.Fatalf("unknown connector received an invented profile: %#v", result)
+	result := AttachListingTaxonomyProfile(taxonomy)
+	if result.AdapterProfile != nil || result.Fingerprint != taxonomy.Fingerprint {
+		t.Fatalf("unknown connector received an invented profile: %#v", result.AdapterProfile)
 	}
 }
 
-func TestRemoteWriteFailsClosedUntilQualification(t *testing.T) {
+func TestListingRemoteWriteFailsClosedUntilQualification(t *testing.T) {
 	if err := RemoteOperationAdmission("wildberries", marketplacepublication.OperationCreateProduct); !errors.Is(err, ErrRemoteOperationNotQualified) {
 		t.Fatalf("unqualified write error = %v, want qualification gate", err)
 	}

@@ -98,11 +98,11 @@ func TestMarketplaceListingApplyRequiresMatchingApproval(t *testing.T) {
 
 func TestMarketplaceListingRemoteIdentityMatchesOperation(t *testing.T) {
 	cases := []struct {
-		name                        string
-		kind                        marketplacepublication.OperationKind
-		remoteID                    string
-		remoteOperationID           string
-		want                        bool
+		name              string
+		kind              marketplacepublication.OperationKind
+		remoteID          string
+		remoteOperationID string
+		want              bool
 	}{
 		{name: "create has no remote identity", kind: marketplacepublication.OperationCreateProduct, want: true},
 		{name: "create rejects prefilled identity", kind: marketplacepublication.OperationCreateProduct, remoteID: "remote-1", want: false},

@@ -114,10 +114,23 @@ type MarketplaceOrderActionRequest struct {
 }
 
 func (request MarketplaceOrderActionRequest) Validate() error {
-	if !validRemoteID(request.OrderRemoteID) || !request.Action.Valid() || (request.ReasonCode != "" && !safeCodePattern.MatchString(request.ReasonCode)) || !validIdempotencyKey(request.IdempotencyKey) {
+	if !validRemoteID(request.OrderRemoteID) || !request.Action.Valid() || (request.ReasonCode != "" && !validProviderReasonCode(request.ReasonCode)) || !validIdempotencyKey(request.IdempotencyKey) {
 		return ErrInvalidMarketplaceOperation
 	}
 	return nil
+}
+
+func validProviderReasonCode(value string) bool {
+	if len(value) < 1 || len(value) > 64 || value != strings.TrimSpace(value) {
+		return false
+	}
+	for index, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || (index > 0 && (char == '.' || char == '_' || char == '-' || char == '/')) {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // MarketplaceOrderActionWriter is the qualified outbound order status port.

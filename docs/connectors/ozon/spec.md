@@ -62,6 +62,15 @@ Product `last_id` is opaque and bounded. Reusing the same continuation value for
 
 Unknown additive response fields are ignored, while identity/type/boundedness mismatches are treated as remote-contract failure.
 
+## Marketplace taxonomy
+
+The listing workspace can load a bounded provider taxonomy for a selected Ozon
+category. The adapter reads the category tree, category attributes and bounded
+dictionary values, then returns only normalized categories, required fields,
+types and enum labels. The tree and attribute responses are never persisted as
+raw provider payloads. A current credentialed qualification is still required
+before a listing write may be admitted.
+
 ## `products.write`
 
 Task 217 admits a bounded import slice through `POST /v2/product/import` and
@@ -77,8 +86,17 @@ Ozon responses, credentials and arbitrary URLs never enter the host receipt.
 The bounded price writer uses `POST /v1/product/import/prices` for one offer at
 a time, validates the per-offer `updated` result and keeps the receipt
 unreconciled until a subsequent price read confirms the remote value. Ozon
-inventory writes remain deferred because the current host contract does not yet
-carry the product identity required by the verified stock mutation API.
+inventory writes use `POST /v2/products/stocks`. The host must supply the
+numeric product identity separately from the seller offer mapping and the Ozon
+warehouse identity; the connector rejects an incomplete tuple. It accepts only
+an exact matching per-row response with `updated=true`, while reconciliation
+still remains the source of confirmed remote state.
+
+The bounded FBS order writer supports confirmation (`/v4/posting/fbs/ship`),
+cancellation (`/v2/posting/fbs/cancel`) and seller handoff
+(`/v2/fbs/posting/sent-by-seller`). Cancellation requires the provider's
+numeric reason ID. A successful confirmation is accepted-but-unreconciled:
+the host reads the posting again before presenting the final state.
 
 ## `orders.read`
 

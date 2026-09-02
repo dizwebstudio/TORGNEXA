@@ -19,6 +19,12 @@ The provider adapter runs all thirteen Task-064 checks through the shared `confo
 - malformed/duplicate/missing product data and response drift fail closed;
 - warehouse list rejects duplicates and partial pagination;
 - stock selection uses bounded `offer_id`, subtracts reserved from present, represents missing warehouse stock as zero and rejects unsafe/partial rows;
+- stock mutation submits the separately mapped numeric `product_id`, `offer_id`,
+  `warehouse_id` and exact quantity, and accepts only a matching
+  `updated=true` response; timeout remains an unknown outcome;
+- order actions cover confirm, cancel and seller handoff with bounded payloads,
+  numeric cancellation reasons, unknown transport outcomes and no false
+  read-after-write claim;
 - raw remote bodies and raw transport errors never escape normalized errors;
 - product import sends only snapshot fields, returns a bounded task ID and
   resolves success through import-info status rather than a partial response;
@@ -26,4 +32,4 @@ The provider adapter runs all thirteen Task-064 checks through the shared `confo
 
 ## Live qualification
 
-Repository qualification is deterministic and offline. Before enabling a real seller account, run a least-privilege smoke test with a dedicated Ozon key: health, one bounded product page/details call, warehouse list and bounded FBS stock read. Do not retain production credentials or seller payloads as conformance evidence.
+Repository qualification is deterministic and offline. Before enabling a real seller account, run a least-privilege smoke test with a dedicated Ozon key: health, one bounded product page/details call, warehouse list, bounded FBS stock read and one non-production stock write with read-after-write reconciliation. Do not retain production credentials or seller payloads as conformance evidence.

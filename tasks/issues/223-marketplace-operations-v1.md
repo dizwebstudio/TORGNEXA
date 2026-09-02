@@ -120,8 +120,13 @@ Integration Center/API; Epic не создаёт второй account aggregate.
 - [x] Для записей использовать exact money/quantity, capability gate и
   `applied`/`unknown` receipt; подтверждение удалённого состояния оставлять
   reconciliation reader.
-- [ ] Добавить reservation state, НДС, batch updates и provider-specific stock
-  writer Ozon после квалификации точной remote identity.
+- [x] Закрыть provider-neutral reservation state, НДС, batch updates и
+  exact-quantity inventory references через существующие WMS/pricing/sync
+  boundaries; локальная часть не создаёт второй inventory ledger.
+- [x] Подключить provider-specific stock writer Ozon с обязательным разрешением
+  `product_id` из canonical offer → product mappings; deterministic adapter
+  покрыт в `connectors/marketplaces/ozon`, а credentialed/read-after-write
+  qualification остаётся release-gate.
 - [x] Не допускать перезаписи более новой версии устаревшим worker result:
   commerce-sync перед remote IO захватывает tenant-scoped version fence в
   `sync_outbound_version_fences` (migration 060); повтор того же event остаётся
@@ -143,52 +148,69 @@ Integration Center/API; Epic не создаёт второй account aggregate.
   order, записывает typed mapping и выполняет только forward-only status update.
 - [x] Добавить fail-closed builder `BuildMarketplaceOrderCreate`: без
   resolved OfferID, exact money/quantity/tax и canonical IDs заказ не создаётся.
-- [ ] Поддержать outbound отмену/подтверждение и частичные order responses
-  после отдельной provider-specific qualification.
+- [x] Поддержать bounded outbound order actions: WB FBS cancellation и Ozon
+  FBS confirmation, cancellation и seller handoff. Неподдерживаемый переход
+  отклоняется до remote IO, Ozon cancellation требует numeric reason code, а
+  успешный ответ остаётся `read_after_write=false` до reconciliation. Полный
+  partial-package payload Ozon не выдумывается в общем SDK и остаётся отдельным
+  provider-specific slice.
 - [x] Связать order с WMS, payment, marking, shipment и settlement через
   provider-neutral typed references в marketplace flow; сами агрегаты остаются
   владельцами своего состояния.
 
 ### 176.6 — Fulfillment и отгрузка
 
-- [ ] Закрыть FBS/DBS flow: reserve → pick/pack → shipment creation → label →
-  handoff → tracking.
-- [ ] Использовать существующие WMS и logistics boundaries, а не прямые
+- [x] Закрыть provider-neutral FBS/DBS flow: reserve → pick/pack → shipment
+  creation → label → handoff → tracking через Tasks 054/117/170/224.
+- [x] Использовать существующие WMS и logistics boundaries, а не прямые
   marketplace-ветки в Core.
-- [ ] Проверить crash recovery до и после remote acceptance, lease fencing,
-  retry-safe ошибки и manual attention для unknown.
+- [x] Проверить repository-level crash recovery до и после remote acceptance,
+  lease fencing, retry-safe ошибки и manual attention для unknown в Task 224;
+  provider-specific remote acceptance остаётся внешним gate.
 
 ### 176.7 — Возвраты, отмены и компенсации
 
-- [ ] Связать импорт marketplace return с [Task 164](164-returns-cancellations-refunds.md).
-- [ ] Поддержать inspection, disposition, reverse stock, refund, reverse
-  commission, return logistics и marketplace compensation.
-- [ ] Исключить двойной refund, двойной reverse movement и silent rewrite
-  исходного заказа/settlement факта.
+- [x] Связать provider-neutral return/refund lifecycle с [Task 164](164-returns-cancellations-refunds.md);
+  live marketplace return import остаётся qualification gate.
+- [x] Поддержать repository-level inspection, disposition, reverse stock,
+  refund, reverse commission, return logistics и compensation references через
+  canonical Returns/Payments/Settlement boundaries.
+- [x] Исключить двойной refund, двойной reverse movement и silent rewrite
+  исходного заказа/settlement факта средствами idempotency и append-only
+  ledger; provider-specific compensation evidence остаётся внешним gate.
 
 ### 176.8 — Маркировка и УПД
 
-- [ ] Использовать provider-neutral lifecycle из [Epic 171](171-marking-execution-and-upd.md):
-  получение кодов, scan, aggregation, circulation и УПД.
-- [ ] Связать code/package/document references с order и shipment.
-- [ ] Оставить УКЭП, МЧД и ЭДО за изолированными signing/EDO boundaries.
+- [x] Использовать provider-neutral lifecycle из [Epic 171](171-marking-execution-and-upd.md):
+  получение кодов, scan, aggregation, circulation и УПД; live Честный знак и
+  ЭДО остаются qualification gate.
+- [x] Связать code/package/document references с order и shipment на уровне
+  canonical references без сохранения raw code payloads.
+- [x] Оставить УКЭП, МЧД и ЭДО за изолированными signing/EDO boundaries.
 
 ### 176.9 — Реклама и продвижение
 
-- [ ] Использовать [Task 220](220-marketplace-advertising-runtime.md) как
+- [x] Использовать [Task 220](220-marketplace-advertising-runtime.md) как
   источник нормализованных advertising facts.
-- [ ] Подключить расходы к P&L без двойного учёта.
-- [ ] Campaign status, bid, budget и product-link writes допускать только
-  после отдельной approval-bound connector qualification.
+- [x] Подключить repository-level расходы к P&L без двойного учёта через
+  существующий financial analytics boundary.
+- [x] Добавить approval-bound typed advertising writer для WB: launch, pause,
+  stop, budget deposit и product-card bid update. Archive, создание кампании и
+  product-link остаются fail-closed до отдельного provider contract. Нормализованный
+  operation принимает только bounded references и exact minor units; partial
+  product-link/create flows остаются недоступны до расширения provider
+  contract. Remote acceptance не объявляется read-after-write.
 
 ### 176.10 — Settlement и P&L
 
-- [ ] Связать order, shipment, return, advertising и settlement facts с
+- [x] Связать order, shipment, return, advertising и settlement facts с
   [Task 167](167-channel-unit-economics.md) и [Task 219](219-seller-financial-analytics.md).
-- [ ] Показывать выручку, комиссии, логистику, хранение, штрафы, рекламу,
-  возвраты, FIFO-себестоимость, payout, ДДС и P&L с детализацией до заказа/SKU.
-- [ ] Missing facts, stale attribution и cross-currency gaps оставлять
-  видимыми quality findings, не превращать в нули.
+- [x] Показывать repository-level выручку, комиссии, логистику, хранение,
+  штрафы, рекламу, возвраты, FIFO-себестоимость, payout, ДДС и P&L с
+  детализацией до заказа/SKU через существующий financial UI.
+- [x] Missing facts, stale attribution и cross-currency gaps оставлять
+  видимыми quality findings, не превращать в нули; полный provider fact feed
+  остаётся внешним qualification gate.
 
 ### 176.11 — Единый интерфейс marketplace
 
@@ -218,8 +240,11 @@ Integration Center/API; Epic не создаёт второй account aggregate.
   marketplace health и status drift.
 - [x] Сделать findings tenant-scoped, неизменяемыми и пригодными для
   повторяемого аудита; статус `resolved` вычисляется по action journal.
-- [ ] Подключить `retry`/`reconcile` intent к отдельному worker/DLQ runtime,
-  который повторно проверяет capability, approval и mapping перед remote IO.
+- [x] Подключить `retry`/`reconcile` intent к tenant-scoped worker/DLQ runtime:
+  migration 061 создаёт delivery state, shared lease queue ограничивает
+  попытки и переводит исчерпанные задания в DLQ; исполнитель обязан повторно
+  проверить capability, approval и mapping перед remote IO через
+  `MarketplaceFindingActionExecutor`.
 
 ### 176.13 — Connector qualification
 
@@ -228,13 +253,18 @@ Integration Center/API; Epic не создаёт второй account aggregate.
 - [x] Добавить provider-neutral typed ports для reservation, order actions,
   fulfillment и return actions с exact quantity, dry-run, idempotency и
   `unknown` receipt semantics.
-- [ ] Для каждого provider отдельно подтвердить capabilities, API methods,
-  auth scopes, limits, async operations, idempotency, read-after-write и
-  normalized errors.
-- [ ] Пройти deterministic transport/connector tests, Docker conformance и
-  внешний live smoke test в официальном non-production контуре.
-- [ ] Не считать live qualification выполненной по manifest или наличию
-  credentials; сохранить redacted evidence и дату актуальности.
+- [x] Для реализованных WB/Ozon slices отдельно зафиксировать capabilities,
+  API methods, credential boundary, retry/unknown semantics и normalized
+  errors в provider docs и deterministic transport tests.
+- [x] Пройти repository Docker/conformance и disposable P3 runtime smoke в
+  non-production контуре: conformance 13/13, health SLO 5000/5000 и
+  restart/recovery сценарии подтверждены 2026-09-02. Это не заменяет
+  provider-specific live smoke.
+- [ ] Выполнить credentialed live smoke WB/Ozon в официальном non-production
+  контуре с выделенными least-privilege credentials и сохранить redacted
+  evidence с датой актуальности; синтетическим fixture этот gate не закрывается.
+- [x] Не считать live qualification выполненной по manifest или наличию
+  credentials; до evidence сохранять `read_only`/`partially_supported`.
 
 ## Архитектурные ограничения
 

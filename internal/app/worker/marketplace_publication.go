@@ -9,10 +9,10 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/marketplacepublication"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
-	"github.com/torgnexa/torgnexa/internal/platform/marketplacetaxonomy"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
@@ -78,9 +78,9 @@ func processMarketplacePublication(ctx context.Context, store marketplacePublica
 	}
 	account, err := accounts.AccountByID(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation.Target.ConnectorAccountID)
 	accountTarget := marketplacepublication.Target{OrganizationID: account.OrganizationID, WorkspaceID: account.WorkspaceID, ConnectorAccountID: account.ID, ConnectorID: account.ConnectorID}
-	requiredCapability := "products.write"
+	requiredCapability := sdk.Capability("products.write")
 	if operation.Kind == marketplacepublication.OperationStatusRead {
-		requiredCapability = "products.read"
+		requiredCapability = sdk.Capability("products.read")
 	}
 	if err != nil || account.Status != sdk.AccountActive || !operation.Target.SameAccount(accountTarget) || !sdk.CapabilityEnabled(mustAccountCapabilities(ctx, accounts, scope, account.ID), requiredCapability) {
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateNeedsAttention, "capability_unavailable")
@@ -90,7 +90,7 @@ func processMarketplacePublication(ctx context.Context, store marketplacePublica
 		return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateUnknown, "runtime_unavailable")
 	}
 	if !operation.DryRun {
-		if err := marketplacetaxonomy.RemoteOperationAdmission(operation.Target.ConnectorID, operation.Kind); err != nil {
+		if err := builtinruntime.RemoteOperationAdmission(operation.Target.ConnectorID, operation.Kind); err != nil {
 			return updateMarketplacePublicationFailure(ctx, store, scope, operation, marketplacepublication.StateNeedsAttention, "provider_qualification_required")
 		}
 	}

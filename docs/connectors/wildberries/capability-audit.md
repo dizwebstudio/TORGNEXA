@@ -13,8 +13,9 @@ Admit the read baseline and the bounded marketplace publication slice needed to 
 | `prices.read` | Prices/discounts APIs | deferred |
 | `inventory.write` | `PUT /api/v3/stocks/{warehouseId}` | enabled for bounded outbound submit; reconciliation required |
 | `orders.read` | FBS `GET /api/v3/orders` | enabled for bounded assembly-order projection |
-| `orders.status.write` | marketplace order mutation APIs | denied |
-| returns/reviews/messages/ads/promotions/finance | dedicated WB categories | deferred |
+| `orders.status.write` | FBS `PATCH /api/v3/orders/{orderId}/cancel` | enabled for bounded seller cancellation; reconciliation required |
+| `ads.manage` | Promotion `/adv/v0/start`, `/adv/v0/pause`, `/adv/v0/stop`, `/adv/v1/budget/deposit`, `/api/advert/v1/bids` | enabled for bounded launch/pause/stop, budget deposit and bid updates; archive, campaign creation and product linking remain fail-closed; approval and live qualification required |
+| returns/reviews/messages/promotions/finance | dedicated WB categories | deferred |
 
 ## Current compatibility notes
 
@@ -39,6 +40,12 @@ their official fixtures and upload pipeline are qualified. Price writes require
 both the parent `nmID` mapping and the variant `chrtID`; a missing parent mapping
 fails closed. A successful HTTP response is `applied`, not `reconciled`, until a
 subsequent prices/inventory read confirms the remote state.
+
+FBS cancellation uses the numeric order ID and fails closed for confirm/handoff,
+because those transitions are not part of the WB FBS assembly-order contract.
+Advertising writes use exact minor units (kopecks for WB), cap bid batches at
+50 product cards and never claim read-after-write without a later campaign
+observation.
 
 ## Release rule
 

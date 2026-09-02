@@ -90,8 +90,39 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	if !reflect.DeepEqual(got.Canonical(), Manifest().Canonical()) {
 		t.Fatalf("manifest drift")
 	}
-	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") {
-		t.Fatal("marketplace product publication capability is not declared exactly")
+	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || !Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") || !Manifest().Supports("orders.status.write") {
+		t.Fatal("marketplace product and inventory capabilities are not declared exactly")
+	}
+}
+
+func TestApplyMarketplaceOrderActionUsesTypedFBSCommands(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"result":["awaiting_deliver"]}`)},
+		{StatusCode: 200, Body: []byte(`{"result":true}`)},
+	}}
+	connector := New(transport, nil)
+	receipt, err := connector.ApplyMarketplaceOrderAction(context.Background(), testAccount(), testRuntime{creds()}, sdk.MarketplaceOrderActionRequest{OrderRemoteID: "00000000-0001-1", Action: sdk.MarketplaceOrderConfirm, IdempotencyKey: "ozon-confirm-1"})
+	if err != nil || receipt.Status != sdk.MarketplaceOperationApplied || receipt.RemoteID != "00000000-0001-1" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	var confirm ozonPostingNumberBody
+	if request := transport.requests[0]; request.Path != "/v4/posting/fbs/ship" || request.IdempotencyKey != "ozon-confirm-1" || json.Unmarshal(request.Body, &confirm) != nil || confirm.PostingNumber != "00000000-0001-1" || !confirm.With.AdditionalData {
+		t.Fatalf("confirm request=%+v body=%s", transport.requests[0], transport.requests[0].Body)
+	}
+	receipt, err = connector.ApplyMarketplaceOrderAction(context.Background(), testAccount(), testRuntime{creds()}, sdk.MarketplaceOrderActionRequest{OrderRemoteID: "00000000-0001-1", Action: sdk.MarketplaceOrderCancel, ReasonCode: "123", IdempotencyKey: "ozon-cancel-1"})
+	if err != nil || receipt.Status != sdk.MarketplaceOperationApplied {
+		t.Fatalf("cancel receipt=%+v err=%v", receipt, err)
+	}
+	var cancel ozonCancelBody
+	if request := transport.requests[1]; request.Path != "/v2/posting/fbs/cancel" || json.Unmarshal(request.Body, &cancel) != nil || cancel.PostingNumber != "00000000-0001-1" || cancel.CancelReasonID != 123 {
+		t.Fatalf("cancel request=%+v body=%s", request, request.Body)
+	}
+}
+
+func TestApplyMarketplaceOrderActionRequiresCancelReason(t *testing.T) {
+	_, err := New(&scriptedTransport{}, nil).ApplyMarketplaceOrderAction(context.Background(), testAccount(), testRuntime{creds()}, sdk.MarketplaceOrderActionRequest{OrderRemoteID: "posting-1", Action: sdk.MarketplaceOrderCancel, IdempotencyKey: "ozon-cancel-invalid"})
+	if !errors.Is(err, sdk.ErrInvalidMarketplaceOperation) {
+		t.Fatalf("err=%v", err)
 	}
 }
 
@@ -122,6 +153,42 @@ func TestWritePriceRejectsPerOfferFailure(t *testing.T) {
 	var remote *sdk.RemoteError
 	if !errors.As(err, &remote) || remote.Category != sdk.ErrorInvalidRequest || remote.Code != "remote_rejected" {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestWriteInventoryUsesOfferProductAndWarehouseIdentity(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"result":[{"offer_id":"OZ-RED-M","product_id":313455276,"stock":0,"warehouse_id":22142605386000,"updated":true,"errors":[]}]}`)}}}
+	receipt, err := New(transport, nil).WriteInventory(context.Background(), testAccount(), testRuntime{creds()}, sdk.InventoryWriteRequest{
+		ProductRemoteID: "313455276", VariantRemoteID: "OZ-RED-M", LocationRemoteID: "22142605386000", Quantity: 7, IdempotencyKey: "inventory-write-1",
+	})
+	if err != nil || receipt.RemoteID != "OZ-RED-M" || !receipt.Applied || receipt.Reconciled || receipt.Duplicate {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	request := transport.requests[0]
+	if request.Method != "POST" || request.Host != apiHost || request.Path != "/v2/products/stocks" || request.IdempotencyKey != "inventory-write-1" || string(request.ClientID) != "123456" || strings.Contains(string(request.Body), "synthetic-api-key") {
+		t.Fatalf("unexpected or unsafe request: %+v body=%s", request, request.Body)
+	}
+	var body stockUpdateRequest
+	if err := json.Unmarshal(request.Body, &body); err != nil || len(body.Stocks) != 1 || body.Stocks[0].OfferID != "OZ-RED-M" || body.Stocks[0].ProductID != 313455276 || body.Stocks[0].WarehouseID != 22142605386000 || body.Stocks[0].Stock != 7 {
+		t.Fatalf("body=%s err=%v", request.Body, err)
+	}
+}
+
+func TestWriteInventoryRejectsMissingProductIdentityAndRemoteRejection(t *testing.T) {
+	connector := New(&scriptedTransport{}, nil)
+	_, err := connector.WriteInventory(context.Background(), testAccount(), testRuntime{creds()}, sdk.InventoryWriteRequest{
+		VariantRemoteID: "OZ-RED-M", LocationRemoteID: "22142605386000", Quantity: 1, IdempotencyKey: "inventory-write-invalid",
+	})
+	if !errors.Is(err, sdk.ErrInvalidCommerceWrite) {
+		t.Fatalf("missing product identity err=%v", err)
+	}
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: []byte(`{"result":[{"offer_id":"OZ-RED-M","product_id":313455276,"stock":0,"warehouse_id":22142605386000,"updated":false,"errors":[{"code":"warehouse_rejected"}]}]}`)}}}
+	_, err = New(transport, nil).WriteInventory(context.Background(), testAccount(), testRuntime{creds()}, sdk.InventoryWriteRequest{
+		ProductRemoteID: "313455276", VariantRemoteID: "OZ-RED-M", LocationRemoteID: "22142605386000", Quantity: 1, IdempotencyKey: "inventory-write-rejected",
+	})
+	var remote *sdk.RemoteError
+	if !errors.As(err, &remote) || remote.Category != sdk.ErrorInvalidRequest || remote.Code != "remote_rejected" {
+		t.Fatalf("remote rejection err=%v", err)
 	}
 }
 
@@ -270,6 +337,27 @@ func TestReadProductsRejectsMalformedAndDriftedResponses(t *testing.T) {
 		t.Fatalf("info drift err=%v", err)
 	}
 }
+
+func TestReadMarketplaceListingTaxonomyUsesCategoryAndAttributeDictionaries(t *testing.T) {
+	tr := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"result":[{"category_id":10,"title":"Одежда","children":[{"category_id":20,"title":"Куртки","children":[]}]}]}`)},
+		{StatusCode: 200, Body: []byte(`{"result":[{"attributes":[{"id":5,"name":"Цвет","is_required":true,"dictionary_id":99,"type":"STRING"}]}]}`)},
+		{StatusCode: 200, Body: []byte(`{"has_next":false,"result":[{"id":1,"value":"Красный"}]}`)},
+	}}
+	taxonomy, err := New(tr, nil).ReadMarketplaceListingTaxonomy(context.Background(), testAccount(), testRuntime{creds()}, sdk.MarketplaceListingTaxonomyRequest{Locale: "ru-RU", Jurisdiction: "RU", CategoryCode: "20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if taxonomy.ChannelID != "ozon" || taxonomy.Fingerprint == "" || len(taxonomy.Categories) != 2 || len(taxonomy.Attributes) != 1 || taxonomy.Attributes[0].Code != "ozon.attribute.5" || taxonomy.Attributes[0].ValueType != "enum" || len(taxonomy.Attributes[0].EnumValues) != 1 || taxonomy.Attributes[0].EnumValues[0].Label != "Красный" {
+		t.Fatalf("taxonomy=%+v", taxonomy)
+	}
+	if got := tr.requests[0]; got.Method != "POST" || got.Path != "/v1/category/tree" || string(got.ClientID) != "123456" || len(got.APIKey) == 0 {
+		t.Fatalf("tree request=%+v", got)
+	}
+	if got := tr.requests[1]; got.Path != "/v3/category/attribute" {
+		t.Fatalf("attribute request=%+v", got)
+	}
+}
 func TestInventoryRejectsPartialPaginationAndUnsafeRows(t *testing.T) {
 	wh := []byte(`{"warehouses":[{"warehouse_id":1,"name":"A"},{"warehouse_id":1,"name":"B"}],"cursor":""}`)
 	tr := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: wh}}}
@@ -341,4 +429,5 @@ func TestInterfaces(t *testing.T) {
 	var _ sdk.InventoryReader = (*Connector)(nil)
 	var _ sdk.PriceWriter = (*Connector)(nil)
 	var _ sdk.OrderReader = (*Connector)(nil)
+	var _ sdk.MarketplaceListingTaxonomyReader = (*Connector)(nil)
 }

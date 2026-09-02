@@ -14,10 +14,15 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/marketplacepublication"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
-	"github.com/torgnexa/torgnexa/internal/platform/marketplacetaxonomy"
+	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
+	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacelistingrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
 
 const (
@@ -46,6 +51,10 @@ type marketplaceListingAPI struct {
 type marketplaceListingRemoteDependencies struct {
 	publications *marketplacepublicationrepo.Repository
 	quality      *publicationqualityrepo.Repository
+	accounts     *connectorrepo.Repository
+	secrets      secrets.SecretProvider
+	oauthRefresh connectorauth.RefreshCoordinator
+	registry     *builtinruntime.Registry
 }
 
 func newMarketplaceListingRoutes(store *marketplacelistingrepo.Repository, approvals marketplacePublicationApproval, remote ...marketplaceListingRemoteDependencies) []ProtectedRoute {
@@ -66,6 +75,8 @@ func newMarketplaceListingRoutes(store *marketplacelistingrepo.Repository, appro
 type marketplaceListingTaxonomyQuery struct {
 	TaxonomyID   string
 	ChannelID    string
+	AccountID    string
+	CategoryCode string
 	Locale       string
 	Jurisdiction string
 }
@@ -76,7 +87,7 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 		writeProblem(w, http.StatusServiceUnavailable, "Marketplace listing workspace is unavailable")
 		return
 	}
-	query := marketplaceListingTaxonomyQuery{TaxonomyID: strings.TrimSpace(r.URL.Query().Get("taxonomy_id")), ChannelID: strings.TrimSpace(r.URL.Query().Get("connector_id")), Locale: strings.TrimSpace(r.URL.Query().Get("locale")), Jurisdiction: strings.TrimSpace(r.URL.Query().Get("jurisdiction"))}
+	query := marketplaceListingTaxonomyQuery{TaxonomyID: strings.TrimSpace(r.URL.Query().Get("taxonomy_id")), ChannelID: strings.TrimSpace(r.URL.Query().Get("connector_id")), AccountID: strings.TrimSpace(r.URL.Query().Get("connector_account_id")), CategoryCode: strings.TrimSpace(r.URL.Query().Get("category_code")), Locale: strings.TrimSpace(r.URL.Query().Get("locale")), Jurisdiction: strings.TrimSpace(r.URL.Query().Get("jurisdiction"))}
 	if query.Locale == "" {
 		query.Locale = "ru-RU"
 	}
@@ -87,6 +98,31 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 	var err error
 	if query.ChannelID == "demo" && query.TaxonomyID == "" {
 		taxonomy = marketplacelisting.DemoTaxonomy(query.ChannelID, query.Locale, query.Jurisdiction, api.now())
+	} else if query.TaxonomyID == "" && safePublicationID(query.ChannelID) && safePublicationID(query.AccountID) && api.remote.accounts != nil && api.remote.secrets != nil && api.remote.registry != nil {
+		account, accountErr := api.remote.accounts.AccountByID(r.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), query.AccountID)
+		if accountErr != nil || account.Status != sdk.AccountActive || account.ConnectorID != query.ChannelID || account.Family != sdk.FamilyMarketplace {
+			writeProblem(w, http.StatusConflict, "Marketplace account is not active for this connector")
+			return
+		}
+		capabilities, capabilityErr := api.remote.accounts.AccountCapabilities(r.Context(), scope, account.ID)
+		if capabilityErr != nil || !sdk.CapabilityEnabled(capabilities, "products.read") {
+			writeProblem(w, http.StatusConflict, "products.read is disabled for this account")
+			return
+		}
+		runtime, runtimeErr := connectorruntime.NewForAccount(api.remote.secrets, api.remote.oauthRefresh, scope, account)
+		if runtimeErr != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "Marketplace connector runtime is unavailable")
+			return
+		}
+		reader, readerErr := api.remote.registry.MarketplaceListingTaxonomyReader(account, runtime)
+		if readerErr != nil {
+			writeProblem(w, http.StatusConflict, "Provider taxonomy is not available for this connector")
+			return
+		}
+		taxonomy, err = reader.ReadMarketplaceListingTaxonomy(r.Context(), account, runtime, sdk.MarketplaceListingTaxonomyRequest{Locale: query.Locale, Jurisdiction: query.Jurisdiction, CategoryCode: query.CategoryCode})
+		if err == nil {
+			err = api.store.SaveTaxonomy(r.Context(), scope, taxonomy)
+		}
 	} else if safePublicationID(query.TaxonomyID) {
 		taxonomy, err = api.store.Taxonomy(r.Context(), scope, query.TaxonomyID)
 	} else {
@@ -97,7 +133,7 @@ func (api marketplaceListingAPI) taxonomy(w http.ResponseWriter, r *http.Request
 		writeMarketplaceListingError(w, err)
 		return
 	}
-	taxonomy = marketplacetaxonomy.AttachProfile(taxonomy)
+	taxonomy = builtinruntime.AttachListingTaxonomyProfile(taxonomy)
 	fingerprint, fingerprintErr := taxonomy.ComputeFingerprint()
 	if fingerprintErr != nil {
 		writeMarketplaceListingError(w, marketplacelisting.ErrInvalid)
@@ -126,7 +162,7 @@ func (api marketplaceListingAPI) preview(w http.ResponseWriter, r *http.Request)
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	request.Taxonomy = marketplacetaxonomy.AttachProfile(request.Taxonomy)
+	request.Taxonomy = builtinruntime.AttachListingTaxonomyProfile(request.Taxonomy)
 	if !safePublicationID(request.ChannelAccountID) || !safePublicationID(request.ChannelID) || request.Taxonomy.Validate() != nil || request.Taxonomy.ChannelID != request.ChannelID || len(request.Items) == 0 || len(request.Items) > marketplacelisting.MaxBatchItems {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
@@ -168,12 +204,12 @@ type marketplaceListingApplyRequest struct {
 // listing projection to the existing immutable publication snapshot. The
 // listing API never assembles provider payloads and never stores credentials.
 type marketplaceListingRemoteItem struct {
-	SKU              string                               `json:"sku"`
-	Snapshot         marketplacepublication.Snapshot     `json:"snapshot"`
-	Operation        marketplacepublication.OperationKind `json:"operation"`
-	RemoteID         string                               `json:"remote_id,omitempty"`
-	RemoteOperationID string                              `json:"remote_operation_id,omitempty"`
-	QualityReceiptID string                               `json:"quality_receipt_id"`
+	SKU               string                               `json:"sku"`
+	Snapshot          marketplacepublication.Snapshot      `json:"snapshot"`
+	Operation         marketplacepublication.OperationKind `json:"operation"`
+	RemoteID          string                               `json:"remote_id,omitempty"`
+	RemoteOperationID string                               `json:"remote_operation_id,omitempty"`
+	QualityReceiptID  string                               `json:"quality_receipt_id"`
 }
 
 func (api marketplaceListingAPI) apply(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +258,7 @@ func (api marketplaceListingAPI) apply(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusConflict, "Duplicate SKU in remote publication plan")
 			return
 		}
-		if err := marketplacetaxonomy.RemoteOperationAdmission(request.Preview.ChannelID, item.Operation); err != nil {
+		if err := builtinruntime.RemoteOperationAdmission(request.Preview.ChannelID, item.Operation); err != nil {
 			writeMarketplaceListingError(w, err)
 			return
 		}
@@ -317,7 +353,7 @@ func writeMarketplaceListingError(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 	case errors.Is(err, marketplacepublication.ErrInvalid):
 		writeProblem(w, http.StatusBadRequest, "Remote publication plan is invalid")
-	case errors.Is(err, marketplacetaxonomy.ErrRemoteOperationNotQualified):
+	case errors.Is(err, builtinruntime.ErrRemoteOperationNotQualified):
 		writeProblem(w, http.StatusConflict, "Provider qualification is required before remote listing apply")
 	case errors.Is(err, marketplacepublication.ErrConflict), errors.Is(err, marketplacepublicationrepo.ErrConflict):
 		writeProblem(w, http.StatusConflict, "Publication operation conflicts with existing evidence")

@@ -4,8 +4,10 @@ package marketplaceoperationsrepo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -369,9 +371,166 @@ func (r *Repository) ApplyFindingAction(ctx context.Context, scope tenancy.Scope
 			return err
 		}
 		out.OccurredAt = out.OccurredAt.UTC()
+		if out.Action == marketplaceoperations.FindingActionRetry || out.Action == marketplaceoperations.FindingActionReconcile {
+			jobID := findingActionJobID(scope, out)
+			if _, err := tx.ExecContext(ctx, `INSERT INTO marketplace_operation_action_jobs (organization_id,workspace_id,job_id,finding_id,action_id,action,available_at) VALUES ($1,$2,$3,$4,$5,$6,clock_timestamp())`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID, out.FindingID, out.ID, string(out.Action)); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO worker_runtime_jobs (kind,organization_id,workspace_id,item_id,available_at,updated_at) VALUES ('marketplace_operations',$1,$2,$3,clock_timestamp(),clock_timestamp())`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	return out, duplicate, mapFindingError(err)
+}
+
+// FindingActionJob is the normalized, tenant-scoped payload loaded by the
+// marketplace action worker. It contains no provider response or secret.
+type FindingActionJob struct {
+	JobID   string
+	Finding marketplaceoperations.Finding
+	Action  marketplaceoperations.FindingAction
+}
+
+// FindingActionJob loads one pending retry/reconcile intent by its opaque
+// worker lease item ID.
+func (r *Repository) FindingActionJob(ctx context.Context, scope tenancy.Scope, jobID string) (FindingActionJob, error) {
+	if err := r.validate(ctx, scope); err != nil {
+		return FindingActionJob{}, err
+	}
+	if !validActionJobID(jobID) {
+		return FindingActionJob{}, marketplaceoperations.ErrInvalidFinding
+	}
+	var out FindingActionJob
+	err := r.tx(ctx, scope, true, func(tx *sql.Tx) error {
+		var stage, kind, severity, status, actionKind string
+		var finding marketplaceoperations.Finding
+		var action marketplaceoperations.FindingAction
+		err := tx.QueryRowContext(ctx, `SELECT f.finding_id,f.organization_id,f.workspace_id,f.flow_id,f.account_id,f.stage,f.kind,f.entity_kind,f.entity_id,f.severity,CASE WHEN EXISTS (SELECT 1 FROM marketplace_operation_finding_actions ar WHERE ar.organization_id=f.organization_id AND ar.workspace_id=f.workspace_id AND ar.finding_id=f.finding_id AND ar.action='resolve') THEN 'resolved' ELSE f.status END,f.reason_code,f.expected_value,f.observed_value,f.evidence_digest,f.detected_at,a.action_id,a.finding_id,a.action,a.idempotency_key,a.actor_id,a.occurred_at FROM marketplace_operation_action_jobs j JOIN marketplace_operation_findings f ON f.organization_id=j.organization_id AND f.workspace_id=j.workspace_id AND f.finding_id=j.finding_id JOIN marketplace_operation_finding_actions a ON a.organization_id=j.organization_id AND a.workspace_id=j.workspace_id AND a.finding_id=j.finding_id AND a.action_id=j.action_id WHERE j.organization_id=$1 AND j.workspace_id=$2 AND j.job_id=$3 AND j.completed_at IS NULL AND j.dead_lettered_at IS NULL`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID).Scan(&finding.ID, &finding.OrganizationID, &finding.WorkspaceID, &finding.FlowID, &finding.AccountID, &stage, &kind, &finding.EntityKind, &finding.EntityID, &severity, &status, &finding.ReasonCode, &finding.Expected, &finding.Observed, &finding.EvidenceDigest, &finding.DetectedAt, &action.ID, &action.FindingID, &actionKind, &action.IdempotencyKey, &action.ActorID, &action.OccurredAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return marketplaceoperations.ErrFlowNotFound
+		}
+		if err != nil {
+			return err
+		}
+		finding.Stage = marketplaceoperations.FlowStage(stage)
+		finding.Kind = marketplaceoperations.FindingKind(kind)
+		finding.Severity = marketplaceoperations.FindingSeverity(severity)
+		finding.Status = marketplaceoperations.FindingStatus(status)
+		finding.DetectedAt = finding.DetectedAt.UTC()
+		action.Action = marketplaceoperations.FindingActionKind(actionKind)
+		action.OccurredAt = action.OccurredAt.UTC()
+		validationFinding := finding
+		if validationFinding.Status == marketplaceoperations.FindingResolved {
+			validationFinding.Status = marketplaceoperations.FindingOpen
+		}
+		if validationFinding.Validate() != nil || (finding.Status != marketplaceoperations.FindingOpen && finding.Status != marketplaceoperations.FindingResolved) || action.Validate() != nil || action.Action == marketplaceoperations.FindingActionResolve {
+			return marketplaceoperations.ErrInvalidFinding
+		}
+		out = FindingActionJob{JobID: jobID, Finding: finding, Action: action}
+		return nil
+	})
+	return out, mapFindingError(err)
+}
+
+// CompleteFindingActionJob commits the action delivery and releases its
+// shared worker lease atomically. A stale lease cannot acknowledge work.
+func (r *Repository) CompleteFindingActionJob(ctx context.Context, scope tenancy.Scope, jobID, leaseToken string) error {
+	if err := r.validate(ctx, scope); err != nil {
+		return err
+	}
+	if !validActionJobID(jobID) || !validActionJobID(leaseToken) {
+		return marketplaceoperations.ErrInvalidFinding
+	}
+	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE marketplace_operation_action_jobs SET completed_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND job_id=$3 AND completed_at IS NULL AND dead_lettered_at IS NULL`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID)
+		if err != nil {
+			return err
+		}
+		updated, err := result.RowsAffected()
+		if err != nil || updated != 1 {
+			return errors.New("marketplace operations repository: action job is not pending")
+		}
+		result, err = tx.ExecContext(ctx, `DELETE FROM worker_runtime_jobs WHERE kind='marketplace_operations' AND organization_id=$1 AND workspace_id=$2 AND item_id=$3 AND lease_token=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID, leaseToken)
+		if err != nil {
+			return err
+		}
+		deleted, err := result.RowsAffected()
+		if err != nil || deleted != 1 {
+			return errors.New("marketplace operations repository: stale action job lease")
+		}
+		return nil
+	})
+}
+
+// DeadLetterFindingActionJob makes a repeatedly failing intent visible to the
+// operations center without deleting its immutable action or finding history.
+func (r *Repository) DeadLetterFindingActionJob(ctx context.Context, scope tenancy.Scope, jobID, leaseToken, errorCode string) error {
+	if err := r.validate(ctx, scope); err != nil {
+		return err
+	}
+	if !validActionJobID(jobID) || !validActionJobID(leaseToken) || !validErrorCode(errorCode) {
+		return marketplaceoperations.ErrInvalidFinding
+	}
+	return r.tx(ctx, scope, false, func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE marketplace_operation_action_jobs SET dead_lettered_at=clock_timestamp(),last_error_code=$4 WHERE organization_id=$1 AND workspace_id=$2 AND job_id=$3 AND completed_at IS NULL AND dead_lettered_at IS NULL`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID, errorCode)
+		if err != nil {
+			return err
+		}
+		updated, err := result.RowsAffected()
+		if err != nil || updated != 1 {
+			return errors.New("marketplace operations repository: action job is not pending")
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO marketplace_operation_findings (organization_id,workspace_id,finding_id,flow_id,account_id,stage,kind,entity_kind,entity_id,severity,status,reason_code,expected_value,observed_value,evidence_digest,detected_at)
+SELECT f.organization_id,f.workspace_id,'mkt_dlq_'||md5($3),f.flow_id,f.account_id,f.stage,'dead_letter',f.entity_kind,f.entity_id,'block','open','marketplace_action_dead_letter',j.action,$4,'',clock_timestamp()
+FROM marketplace_operation_action_jobs j
+JOIN marketplace_operation_findings f ON f.organization_id=j.organization_id AND f.workspace_id=j.workspace_id AND f.finding_id=j.finding_id
+WHERE j.organization_id=$1 AND j.workspace_id=$2 AND j.job_id=$3
+ON CONFLICT DO NOTHING`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID, errorCode); err != nil {
+			return err
+		}
+		result, err = tx.ExecContext(ctx, `DELETE FROM worker_runtime_jobs WHERE kind='marketplace_operations' AND organization_id=$1 AND workspace_id=$2 AND item_id=$3 AND lease_token=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID, leaseToken)
+		if err != nil {
+			return err
+		}
+		deleted, err := result.RowsAffected()
+		if err != nil || deleted != 1 {
+			return errors.New("marketplace operations repository: stale action job lease")
+		}
+		return nil
+	})
+}
+
+func findingActionJobID(scope tenancy.Scope, action marketplaceoperations.FindingAction) string {
+	digest := sha256.Sum256([]byte(scope.OrganizationID().String() + "\x00" + scope.WorkspaceID().String() + "\x00" + action.FindingID + "\x00" + action.ID))
+	return "mkt_action_" + hex.EncodeToString(digest[:])
+}
+
+func validActionJobID(value string) bool {
+	if len(value) < 1 || len(value) > 127 {
+		return false
+	}
+	for index, char := range value {
+		if (char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || (index > 0 && (char == '.' || char == '_' || char == ':' || char == '/' || char == '-')) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validErrorCode(value string) bool {
+	if len(value) < 1 || len(value) > 63 {
+		return false
+	}
+	for index, char := range value {
+		if (char >= 'a' && char <= 'z') || (index > 0 && ((char >= '0' && char <= '9') || char == '.' || char == '_' || char == '-')) {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 type findingCursor struct {

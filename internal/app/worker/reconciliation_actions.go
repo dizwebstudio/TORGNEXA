@@ -406,11 +406,55 @@ func (e *reconciliationActionExecutor) autoFixInventoryLocalToRemote(ctx context
 	if err != nil {
 		return err
 	}
-	receipt, err := writer.WriteInventory(ctx, ac.account, ac.runtime, sdk.InventoryWriteRequest{VariantRemoteID: variantID, LocationRemoteID: locationID, Quantity: available.Value.Coefficient(), IdempotencyKey: req.IdempotencyKey})
+	productRemoteID, err := e.productRemoteIDForVariant(ctx, scope, ac.account.ID, variantID)
+	if err != nil {
+		return err
+	}
+	receipt, err := writer.WriteInventory(ctx, ac.account, ac.runtime, sdk.InventoryWriteRequest{ProductRemoteID: productRemoteID, VariantRemoteID: variantID, LocationRemoteID: locationID, Quantity: available.Value.Coefficient(), IdempotencyKey: req.IdempotencyKey})
 	if err != nil {
 		return err
 	}
 	return receipt.Validate()
+}
+
+// productRemoteIDForVariant resolves the parent product identity needed by
+// providers whose inventory API addresses a variant and its parent product
+// together. It deliberately walks canonical offer -> product mappings rather
+// than treating a variant ID as a product ID.
+func (e *reconciliationActionExecutor) productRemoteIDForVariant(ctx context.Context, scope tenancy.Scope, accountID, variantRemoteID string) (string, error) {
+	if e == nil || e.mappings == nil || e.catalog == nil || !scope.Valid() || accountID == "" || variantRemoteID == "" {
+		return "", reconciliation.ErrActionUnsafe
+	}
+	offerMapping, err := e.mappings.MappingByRemote(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, "offer", variantRemoteID)
+	if errors.Is(err, sdk.ErrMappingNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	offerID, err := catalog.ParseOfferID(offerMapping.LocalEntityID)
+	if err != nil {
+		return "", reconciliation.ErrActionUnsafe
+	}
+	coreScope, err := catalog.ParseScope(scope.OrganizationID().String(), scope.WorkspaceID().String())
+	if err != nil {
+		return "", err
+	}
+	offer, err := e.catalog.Offer(ctx, coreScope, offerID)
+	if err != nil {
+		return "", err
+	}
+	productMapping, err := e.mappings.MappingByLocal(ctx, scope.OrganizationID().String(), scope.WorkspaceID().String(), accountID, "product", offer.ProductID.String())
+	if errors.Is(err, sdk.ErrMappingNotFound) {
+		return "", reconciliation.ErrActionUnsafe
+	}
+	if err != nil {
+		return "", err
+	}
+	if productMapping.RemoteID == "" {
+		return "", reconciliation.ErrActionUnsafe
+	}
+	return productMapping.RemoteID, nil
 }
 
 func (e *reconciliationActionExecutor) findRemotePrice(ctx context.Context, scope tenancy.Scope, ac actionContext, remoteID string) (sdk.RemotePrice, error) {

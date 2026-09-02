@@ -95,6 +95,8 @@ paths:
       parameters:
         - {name: taxonomy_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
         - {name: connector_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: connector_account_id, in: query, required: false, schema: {type: string, maxLength: 192, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$'}}
+        - {name: category_code, in: query, required: false, schema: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
         - {name: locale, in: query, required: false, schema: {type: string, maxLength: 16}}
         - {name: jurisdiction, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{2}$'}}
       responses:
@@ -5490,14 +5492,14 @@ components:
       additionalProperties: false
       required: [when_field, equals]
       properties:
-        when_field: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        when_field: {type: string, pattern: '^[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё0-9._-]{0,127}$'}
         equals: {type: string, minLength: 1, maxLength: 256}
     MarketplaceListingAttributeDefinition:
       type: object
       additionalProperties: false
       required: [code, name, value_type, requirement]
       properties:
-        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        code: {type: string, pattern: '^[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё0-9._-]{0,127}$'}
         name: {type: string, minLength: 1, maxLength: 300}
         value_type: {type: string, enum: [text, enum, multi_enum, integer, decimal, boolean, dimension, weight, date, media]}
         requirement: {type: string, enum: [optional, required, conditional]}
@@ -5512,10 +5514,10 @@ components:
       additionalProperties: false
       required: [code, name]
       properties:
-        code: {type: string, pattern: '^[a-z][a-z0-9._-]{0,127}$'}
+        code: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
         name: {type: string, minLength: 1, maxLength: 300}
-        parent_code: {type: string, maxLength: 128}
-        attribute_codes: {type: array, maxItems: 512, items: {type: string, maxLength: 128}}
+        parent_code: {type: string, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'}
+        attribute_codes: {type: array, maxItems: 512, items: {type: string, pattern: '^[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё0-9._-]{0,127}$'}}
     MarketplaceListingMediaSlot:
       type: object
       additionalProperties: false

@@ -80,8 +80,68 @@ func TestManifestMatchesCommittedJSON(t *testing.T) {
 	if !reflect.DeepEqual(fromFile.Canonical(), Manifest().Canonical()) {
 		t.Fatalf("manifest drift: %#v != %#v", fromFile, Manifest())
 	}
-	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || !Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") {
+	if !Manifest().Supports("products.write") || !Manifest().Supports("prices.write") || !Manifest().Supports("inventory.write") || !Manifest().Supports("orders.read") || !Manifest().Supports("orders.status.write") {
 		t.Fatal("marketplace product publication capability is not declared exactly")
+	}
+}
+
+func TestApplyMarketplaceOrderActionCancelsAssemblyOrder(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 204}}}
+	receipt, err := New(transport, nil).ApplyMarketplaceOrderAction(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.MarketplaceOrderActionRequest{OrderRemoteID: "13833711", Action: sdk.MarketplaceOrderCancel, IdempotencyKey: "wb-cancel-1"})
+	if err != nil || receipt.Status != sdk.MarketplaceOperationApplied || receipt.RemoteID != "13833711" {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+	if request := transport.requests[0]; request.Method != "PATCH" || request.Host != marketplaceHost || request.Path != "/api/v3/orders/13833711/cancel" || request.IdempotencyKey != "wb-cancel-1" {
+		t.Fatalf("request=%+v", request)
+	}
+}
+
+func TestApplyMarketplaceOrderActionRejectsUnsupportedConfirmation(t *testing.T) {
+	_, err := New(&scriptedTransport{}, nil).ApplyMarketplaceOrderAction(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.MarketplaceOrderActionRequest{OrderRemoteID: "13833711", Action: sdk.MarketplaceOrderConfirm, IdempotencyKey: "wb-confirm-1"})
+	if !errors.Is(err, sdk.ErrInvalidMarketplaceOperation) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestApplyAdvertisingOperationUsesWBManagementEndpoints(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{{StatusCode: 200}, {StatusCode: 200, Body: []byte(`{"total":5000}`)}, {StatusCode: 200, Body: []byte(`{"bids":[]}`)}}}
+	connector := New(transport, nil)
+	operations := []sdk.AdvertisingOperation{
+		{Name: sdk.AdvertisingLaunch, CampaignID: "123", IdempotencyKey: "wb-ads-launch-1"},
+		{Name: sdk.AdvertisingSetBudget, CampaignID: "123", AmountMinor: 5000, Currency: "RUB", IdempotencyKey: "wb-ads-budget-1"},
+		{Name: sdk.AdvertisingSetBid, CampaignID: "123", AmountMinor: 250, Currency: "RUB", ProductIDs: []string{"456"}, IdempotencyKey: "wb-ads-bid-1"},
+	}
+	for _, operation := range operations {
+		result, err := connector.ApplyAdvertisingOperation(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, operation)
+		if err != nil || result.State != sdk.AdvertisingAccepted || result.ReadAfterWrite {
+			t.Fatalf("operation=%+v result=%+v err=%v", operation, result, err)
+		}
+	}
+	if got := transport.requests[0]; got.Method != "GET" || got.Path != "/adv/v0/start" || len(got.Query) != 1 || got.Query[0].Value != "123" || got.IdempotencyKey != "wb-ads-launch-1" {
+		t.Fatalf("launch request=%+v", got)
+	}
+	if got := transport.requests[1]; got.Method != "POST" || got.Path != "/adv/v1/budget/deposit" {
+		t.Fatalf("budget request=%+v", got)
+	}
+	var budget wbBudgetDeposit
+	if json.Unmarshal(transport.requests[1].Body, &budget) != nil || budget.Sum != 5000 || budget.Type != 1 || !budget.Return {
+		t.Fatalf("budget body=%s", transport.requests[1].Body)
+	}
+	if got := transport.requests[2]; got.Method != "PATCH" || got.Path != "/api/advert/v1/bids" {
+		t.Fatalf("bid request=%+v", got)
+	}
+	var bids wbBidsRequest
+	if json.Unmarshal(transport.requests[2].Body, &bids) != nil || len(bids.Bids) != 1 || bids.Bids[0].AdvertID != 123 || len(bids.Bids[0].NMBids) != 1 || bids.Bids[0].NMBids[0].NMID != 456 || bids.Bids[0].NMBids[0].BidKopecks != 250 {
+		t.Fatalf("bid body=%s", transport.requests[2].Body)
+	}
+}
+
+func TestApplyAdvertisingOperationTransportFailureIsUnknown(t *testing.T) {
+	transport := &scriptedTransport{errs: []error{errors.New("dial token=must-not-leak")}}
+	_, err := New(transport, nil).ApplyAdvertisingOperation(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.AdvertisingOperation{Name: sdk.AdvertisingPause, CampaignID: "123", IdempotencyKey: "wb-ads-pause-1"})
+	var remote *sdk.RemoteError
+	if !errors.As(err, &remote) || remote.Code != "write_outcome_unknown" || strings.Contains(err.Error(), "must-not-leak") {
+		t.Fatalf("err=%v", err)
 	}
 }
 
@@ -236,6 +296,32 @@ func TestReadProductsMapsRemoteIDsAndCursor(t *testing.T) {
 	}
 }
 
+func TestReadMarketplaceListingTaxonomyUsesOfficialContentDictionaries(t *testing.T) {
+	transport := &scriptedTransport{responses: []Response{
+		{StatusCode: 200, Body: []byte(`{"data":[{"id":479,"name":"Электроника","isVisible":true}]}`)},
+		{StatusCode: 200, Body: []byte(`{"data":[{"subjectID":105,"subjectName":"Кроссовки","parentID":479,"parentName":"Электроника","isVisible":true}]}`)},
+		{StatusCode: 200, Body: []byte(`{"data":[{"charcID":54337,"subjectID":105,"name":"Размер","required":true,"unitName":"см","charcType":4}]}`)},
+	}}
+	taxonomy, err := New(transport, nil).ReadMarketplaceListingTaxonomy(context.Background(), testAccount(), testRuntime{secret: []byte("token")}, sdk.MarketplaceListingTaxonomyRequest{Locale: "ru-RU", Jurisdiction: "RU", CategoryCode: "105"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if taxonomy.ChannelID != "wildberries" || taxonomy.Fingerprint == "" || len(taxonomy.Categories) != 2 || len(taxonomy.Attributes) != 1 || taxonomy.Attributes[0].Code != "размер" || taxonomy.Attributes[0].Unit != "cm" {
+		t.Fatalf("taxonomy=%+v", taxonomy)
+	}
+	for _, category := range taxonomy.Categories {
+		if category.Code == "105" && len(category.AttributeCodes) != 1 || category.Code == "105" && category.AttributeCodes[0] != "размер" {
+			t.Fatalf("subject attributes=%+v", category)
+		}
+	}
+	if got := transport.requests[0]; got.Method != "GET" || got.Host != contentHost || got.Path != "/content/v2/object/parent/all" || len(got.Query) != 1 || got.Query[0].Value != "ru" {
+		t.Fatalf("parent request=%+v", got)
+	}
+	if got := transport.requests[2]; got.Path != "/content/v2/object/charcs/105" {
+		t.Fatalf("characteristics request=%+v", got)
+	}
+}
+
 func TestInventoryReadsWarehousesAndChrtIDs(t *testing.T) {
 	transport := &scriptedTransport{responses: []Response{{StatusCode: 200, Body: warehousesFixture}, {StatusCode: 200, Body: stocksFixture}}}
 	connector := New(transport, nil)
@@ -276,6 +362,7 @@ func TestProductAndInventoryInterfaces(t *testing.T) {
 	var _ sdk.Connector = (*Connector)(nil)
 	var _ sdk.ProductReader = (*Connector)(nil)
 	var _ sdk.InventoryReader = (*Connector)(nil)
+	var _ sdk.MarketplaceListingTaxonomyReader = (*Connector)(nil)
 	var _ sdk.OrderReader = (*Connector)(nil)
 }
 

@@ -37,6 +37,9 @@ Close the P4 repository gap between P3 code/runtime qualification and an auditab
 - `.github/workflows/architecture-required.yml`;
 - production posture and live connector plan examples;
 - release workflow draft-first publisher integration;
+- production deployment preflight that verifies the published exact-tag
+  `p4-go-live.json` asset digest, size, PASS status and release identity before
+  any SSH or remote rollout step;
 - ADR-0093 and ARCH-118 review.
 
 ## Acceptance
@@ -47,3 +50,10 @@ Close the P4 repository gap between P3 code/runtime qualification and an auditab
 - a real P4 run emits `p4-go-live.json` with `status: PASS` only after P3, hosting, posture, independent release and connector evidence pass;
 - missing Docker, wrong Go toolchain, dirty/un-tagged source, absent live token, missing hosted workflow rule, failed Sigstore verification, unhealthy connector or insecure production posture is a hard failure;
 - repository completion does not claim `deployment_qualified` until the external command has actually passed and its evidence has been retained.
+
+The production deployment workflow independently fetches the public GitHub
+Release for the requested tag and fails closed unless it is a published,
+non-prerelease release with exactly one uploaded `p4-go-live.json` asset. It
+verifies the GitHub-reported asset size and SHA-256, the root PASS decision, the
+exact repository/version/commit and all six subordinate evidence paths, then
+retains a sanitized verification record for the deployment run.

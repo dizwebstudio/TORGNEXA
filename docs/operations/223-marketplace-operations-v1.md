@@ -43,12 +43,16 @@ release gate для marketplace, а не отдельный provider adapter. О
   tenant-scoped findings: stale data, missing mapping, duplicate order,
   price/stock mismatch, partial response, health и dead-letter состояния.
   `POST /api/v1/marketplace-operations/findings/{finding_id}/actions` пишет
-  append-only intent `retry`/`reconcile`/`resolve`; сам endpoint не выполняет
-  удалённый побочный эффект.
+  append-only intent `retry`/`reconcile`/`resolve`; для `retry` и `reconcile`
+  одновременно создаётся durable tenant-scoped worker job, а сам endpoint не
+  выполняет удалённый побочный эффект.
 - Миграции `000048_marketplace_operations_runtime.sql` и
   `000049_marketplace_operations_findings.sql` хранят только
   provider-neutral projection и ссылки на канонические записи; raw payloads,
   токены и credentials в таблицах отсутствуют.
+- Миграция `000061_marketplace_operation_action_runtime.sql` добавляет
+  tenant-scoped delivery state для retry/reconcile actions и расширяет общую
+  lease-очередь worker-ов; старые findings/actions остаются append-only.
 - Каталог/публикация, WMS reservations, возвраты, settlement/P&L и реклама
   используются через существующие bounded contexts, без второй модели заказа
   или товара.
@@ -65,6 +69,13 @@ Marketplace-заказ материализуется только через ho
 налог и canonical status, записывает remote identity в обычный mapping и
 двигает статус заказа только вперёд. Провайдерские ответы, токены и raw
 payloads в canonical Orders не попадают.
+
+Для outbound order actions и рекламы действует тот же fail-closed принцип. WB
+имеет bounded cancel и advertising lifecycle/bid/budget adapter; Ozon FBS имеет
+confirm/cancel/handoff adapter. Каждый adapter передаёт idempotency key,
+нормализует transport failure в `unknown` и не объявляет read-after-write до
+reconciliation. Product-link/create для рекламы и partial-package payload не
+подменяются общим контрактом до отдельного provider-specific qualification.
 
 ## Статусы поддержки
 
@@ -114,6 +125,14 @@ Finding создаётся один раз с digest безопасного evid
 не меняется: решение оператора добавляется отдельной строкой action journal,
 а статус `resolved` вычисляется по журналу. Это сохраняет историю и позволяет
 повторить аудит без хранения ответа marketplace.
+
+Для `retry` и `reconcile` action journal связан с mutable delivery state в
+`marketplace_operation_action_jobs` (migration 061). Worker использует lease,
+bounded backoff и DLQ. Внешний вызов разрешён только через внедрённый
+`MarketplaceFindingActionExecutor`, который перед remote IO повторно проверяет
+capability, approval, mapping и актуальность remote state. Без такого
+provider-specific executor задача остаётся pending и не получает ложный
+успешный статус.
 
 ## Критерий выпуска
 

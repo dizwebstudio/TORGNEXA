@@ -78,6 +78,25 @@ jobs:
           ssh-keygen -y -f "$RUNNER_TEMP/torgnexa-ssh/id_deploy" >/dev/null
           test -s "$RUNNER_TEMP/torgnexa-ssh/known_hosts"
 
+      - name: Verify public P4 Go-Live evidence for the exact release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/verify-p4-release-evidence.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --version "$VERSION" \
+            --commit "$RELEASE_REVISION" \
+            --output "$RUNNER_TEMP/torgnexa-p4-release-verification.json"
+
+      - name: Retain the production deployment gate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: production-p4-gate-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-p4-release-verification.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Prepare an archive from the checked-out tag
         shell: bash
         run: |

@@ -65,7 +65,7 @@ func TestMarketplaceOrderImporterIsIdempotentAndAdvancesOnlyForward(t *testing.T
 	rate, _ := orders.NewDecimal(0, 0)
 	tax := orders.TaxSnapshot{Jurisdiction: "RU", Category: "zero", Rate: rate, PriceIncludesTax: false}
 	remote := sdk.RemoteOrder{RemoteID: "posting-1", ExternalID: "ORDER-1", StatusRemoteID: "processing", CreatedAt: now, UpdatedAt: now, Items: []sdk.RemoteOrderItem{{RemoteID: "line-1", VariantRemoteID: "offer-remote-1", Quantity: 2}}}
-	materialization := MarketplaceOrderMaterialization{OrderID: orders.OrderID(materializationOrderID), Number: "ORDER-1", Currency: currency, ShippingTotal: zero, PlacedAt: now, Lines: []MarketplaceOrderLine{{RemoteItemID: "line-1", OfferID: orders.OfferID(materializationOfferID), SKU: "SKU-1", Quantity: quantity, UnitPrice: price, Subtotal: subtotal, Discount: zero, TaxTotal: zero, LineTotal: subtotal, Tax: tax, ItemID: orders.OrderItemID(materializationItemID)}}
+	materialization := MarketplaceOrderMaterialization{OrderID: orders.OrderID(materializationOrderID), Number: "ORDER-1", Currency: currency, ShippingTotal: zero, PlacedAt: now, Lines: []MarketplaceOrderLine{{RemoteItemID: "line-1", OfferID: orders.OfferID(materializationOfferID), SKU: "SKU-1", Quantity: quantity, UnitPrice: price, Subtotal: subtotal, Discount: zero, TaxTotal: zero, LineTotal: subtotal, Tax: tax, ItemID: orders.OrderItemID(materializationItemID)}}}
 	store := newImporterOrderStore()
 	mappings := newImporterMappingStore()
 	importer, err := NewMarketplaceOrderImporter(store, mappings)
@@ -97,11 +97,13 @@ func TestMarketplaceOrderImporterIsIdempotentAndAdvancesOnlyForward(t *testing.T
 }
 
 type importerOrderStore struct {
-	orders map[orders.OrderID]orders.Order
+	orders  map[orders.OrderID]orders.Order
 	creates int
 }
 
-func newImporterOrderStore() *importerOrderStore { return &importerOrderStore{orders: map[orders.OrderID]orders.Order{}} }
+func newImporterOrderStore() *importerOrderStore {
+	return &importerOrderStore{orders: map[orders.OrderID]orders.Order{}}
+}
 
 func (s *importerOrderStore) Order(_ context.Context, _ orders.Scope, id orders.OrderID) (orders.Order, error) {
 	order, ok := s.orders[id]
@@ -146,7 +148,9 @@ type importerMappingStore struct {
 	byRemote map[string]sdk.EntityMapping
 }
 
-func newImporterMappingStore() *importerMappingStore { return &importerMappingStore{byRemote: map[string]sdk.EntityMapping{}} }
+func newImporterMappingStore() *importerMappingStore {
+	return &importerMappingStore{byRemote: map[string]sdk.EntityMapping{}}
+}
 
 func (s *importerMappingStore) MappingByRemote(_ context.Context, _, _, account, entity, remoteID string) (sdk.EntityMapping, error) {
 	mapping, ok := s.byRemote[account+":"+entity+":"+remoteID]

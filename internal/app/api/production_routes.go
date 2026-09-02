@@ -161,7 +161,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newMobileWarehouseRoutes(deps.inventory)...)
 	routes = append(routes, newMarkingRoutes(deps.marking)...)
 	routes = append(routes, newMarketplacePublicationRoutes(deps.marketplacePublication, deps.publicationQuality, deps.accounts, deps.approvals, deps.aiRegistry)...)
-	routes = append(routes, newMarketplaceListingRoutes(deps.marketplaceListing, deps.approvals, marketplaceListingRemoteDependencies{publications: deps.marketplacePublication, quality: deps.publicationQuality})...)
+	routes = append(routes, newMarketplaceListingRoutes(deps.marketplaceListing, deps.approvals, marketplaceListingRemoteDependencies{publications: deps.marketplacePublication, quality: deps.publicationQuality, accounts: deps.accounts, secrets: deps.secretProvider, oauthRefresh: deps.oauthRefresh, registry: deps.aiRegistry})...)
 	routes = append(routes, newMarketplaceGrowthRoutes(deps.marketplaceGrowth, deps.approvals)...)
 	routes = append(routes, newProcurementRoutes(deps.procurement, deps.approvals, deps.uploadAccess, deps.uploadContent)...)
 	routes = append(routes, newReplenishmentRoutes(deps.replenishment)...)

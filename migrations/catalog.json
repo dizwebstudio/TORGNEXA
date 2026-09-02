@@ -1224,17 +1224,35 @@
       "policy": "v1",
       "history_mode": "atomic",
       "requires_backup": true,
-      "dependencies": [6, 49],
+      "dependencies": [6, 49, 59],
       "compatibility": {
         "old_readers": true,
         "old_writers": true,
-        "new_binary_on_old_schema": false,
-        "contract_preconditions": [
-          "sync outbound workers must not start before migration 60"
-        ]
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
       },
       "backfill": null,
       "sha256": "928ab18d9ecdf302a6d1ade86dd75410f7a8c42e790d1237eb7903e71190c21a"
+    },
+    {
+      "version": 61,
+      "name": "marketplace_operation_action_runtime",
+      "file": "000061_marketplace_operation_action_runtime.sql",
+      "phase": "expand",
+      "risk": "high",
+      "transaction": "embedded",
+      "policy": "v1",
+      "history_mode": "atomic",
+      "requires_backup": true,
+      "dependencies": [49, 60],
+      "compatibility": {
+        "old_readers": true,
+        "old_writers": true,
+        "new_binary_on_old_schema": true,
+        "contract_preconditions": []
+      },
+      "backfill": null,
+      "sha256": "59a9b9b14e3ada816b065fc8083ad71d925b4c82b5447f1e14a2fff034aa2b71"
     }
   ]
 }

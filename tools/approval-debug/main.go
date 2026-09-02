@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {

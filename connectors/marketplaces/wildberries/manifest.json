@@ -4,7 +4,7 @@
   "family": "marketplace",
   "version": "1.0.0",
   "sdk_version": 1,
-  "capabilities": ["ads.read", "inventory.read", "inventory.write", "orders.read", "prices.write", "products.read", "products.write"],
+  "capabilities": ["ads.manage", "ads.read", "inventory.read", "inventory.write", "orders.read", "orders.status.write", "prices.write", "products.read", "products.write"],
   "auth": [{"kind": "bearer", "secret_class": "marketplace.token", "required": true}],
   "connection_test": {"url": "https://marketplace-api.wildberries.ru/ping", "method": "GET", "headers": {"Authorization": "${secret}"}},
   "rate_limit": {

@@ -75,6 +75,10 @@ type PriceWriter interface {
 }
 
 type InventoryWriteRequest struct {
+	// ProductRemoteID is required by providers whose stock endpoint needs both
+	// the offer/variant identity and its parent product identity. It remains
+	// optional for providers keyed only by the variant.
+	ProductRemoteID  string `json:"product_remote_id,omitempty"`
 	VariantRemoteID  string `json:"variant_remote_id"`
 	LocationRemoteID string `json:"location_remote_id,omitempty"`
 	Quantity         int64  `json:"quantity"`
@@ -82,7 +86,7 @@ type InventoryWriteRequest struct {
 }
 
 func (request InventoryWriteRequest) Validate() error {
-	if !validRemoteID(request.VariantRemoteID) || !validOptionalRemoteID(request.LocationRemoteID) || request.Quantity < 0 || !validIdempotencyKey(request.IdempotencyKey) {
+	if !validOptionalRemoteID(request.ProductRemoteID) || !validRemoteID(request.VariantRemoteID) || !validOptionalRemoteID(request.LocationRemoteID) || request.Quantity < 0 || !validIdempotencyKey(request.IdempotencyKey) {
 		return ErrInvalidCommerceWrite
 	}
 	return nil

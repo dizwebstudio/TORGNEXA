@@ -4702,6 +4702,58 @@
       }
     },
     {
+      "schema": "qualification/marketplace-remote-evidence-v1.schema.json",
+      "valid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "environment": "non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "ozon",
+        "account_ref": "sandbox-account-01",
+        "qualified_at": "2026-09-01T00:00:00Z",
+        "taxonomy": {
+          "version": "sandbox-2026-01",
+          "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "mapping_ref": "mapping-01",
+          "source_ref": "official-sandbox-schema"
+        },
+        "capabilities": {
+          "products.read": {"status": "qualified", "evidence_ref": "products-read"},
+          "products.write": {"status": "qualified", "evidence_ref": "products-write"}
+        },
+        "checks": [
+          {"id": "taxonomy_read", "status": "PASS", "evidence_ref": "taxonomy-read"},
+          {"id": "taxonomy_mapping", "status": "PASS", "evidence_ref": "taxonomy-mapping"},
+          {"id": "batch_apply", "status": "PASS", "evidence_ref": "batch-apply"},
+          {"id": "rate_limit", "status": "PASS", "evidence_ref": "rate-limit"},
+          {"id": "idempotency", "status": "PASS", "evidence_ref": "idempotency"},
+          {"id": "partial_result", "status": "PASS", "evidence_ref": "partial-result"},
+          {"id": "read_after_write", "status": "PASS", "evidence_ref": "read-after-write"},
+          {"id": "unknown_outcome", "status": "PASS", "evidence_ref": "unknown-outcome"},
+          {"id": "reconciliation", "status": "PASS", "evidence_ref": "reconciliation"},
+          {"id": "rollback", "status": "PASS", "evidence_ref": "rollback"
+          }
+        ],
+        "rollback": {"verified": true, "evidence_ref": "rollback"}
+      },
+      "invalid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "environment": "non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "not-a-commit",
+        "connector_id": "ozon",
+        "account_ref": "sandbox-account-01",
+        "qualified_at": "2026-09-01T00:00:00Z",
+        "taxonomy": {},
+        "capabilities": {},
+        "checks": [],
+        "rollback": {"verified": false, "evidence_ref": "rollback"},
+        "token": "must-not-be-retained"
+      }
+    },
+    {
       "schema": "reconciliation/action-v1.schema.json",
       "valid": {
         "id": "rca_test_014",
@@ -5551,58 +5603,6 @@
         "outcome": "completed",
         "observed_at": "bad",
         "extra": true
-      }
-    },
-    {
-      "schema": "qualification/marketplace-remote-evidence-v1.schema.json",
-      "valid": {
-        "schema_version": 1,
-        "status": "PASS",
-        "environment": "non-production",
-        "repository": "dizwebstudio/TORGNEXA",
-        "release_commit": "0123456789abcdef0123456789abcdef01234567",
-        "connector_id": "ozon",
-        "account_ref": "sandbox-account-01",
-        "qualified_at": "2026-09-01T00:00:00Z",
-        "taxonomy": {
-          "version": "sandbox-2026-01",
-          "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "mapping_ref": "mapping-01",
-          "source_ref": "official-sandbox-schema"
-        },
-        "capabilities": {
-          "products.read": {"status": "qualified", "evidence_ref": "products-read"},
-          "products.write": {"status": "qualified", "evidence_ref": "products-write"}
-        },
-        "checks": [
-          {"id": "taxonomy_read", "status": "PASS", "evidence_ref": "taxonomy-read"},
-          {"id": "taxonomy_mapping", "status": "PASS", "evidence_ref": "taxonomy-mapping"},
-          {"id": "batch_apply", "status": "PASS", "evidence_ref": "batch-apply"},
-          {"id": "rate_limit", "status": "PASS", "evidence_ref": "rate-limit"},
-          {"id": "idempotency", "status": "PASS", "evidence_ref": "idempotency"},
-          {"id": "partial_result", "status": "PASS", "evidence_ref": "partial-result"},
-          {"id": "read_after_write", "status": "PASS", "evidence_ref": "read-after-write"},
-          {"id": "unknown_outcome", "status": "PASS", "evidence_ref": "unknown-outcome"},
-          {"id": "reconciliation", "status": "PASS", "evidence_ref": "reconciliation"},
-          {"id": "rollback", "status": "PASS", "evidence_ref": "rollback"
-          }
-        ],
-        "rollback": {"verified": true, "evidence_ref": "rollback"}
-      },
-      "invalid": {
-        "schema_version": 1,
-        "status": "PASS",
-        "environment": "non-production",
-        "repository": "dizwebstudio/TORGNEXA",
-        "release_commit": "not-a-commit",
-        "connector_id": "ozon",
-        "account_ref": "sandbox-account-01",
-        "qualified_at": "2026-09-01T00:00:00Z",
-        "taxonomy": {},
-        "capabilities": {},
-        "checks": [],
-        "rollback": {"verified": false, "evidence_ref": "rollback"},
-        "token": "must-not-be-retained"
       }
     }
   ]

@@ -437,7 +437,7 @@ tokens, credentials or private tenant data.
 
 ## P4 go-live gate
 
-`118` requires an exact tagged release and combines P3 topology/restart/restore evidence with hosted GitHub rules, protected signed-release evidence, reviewed production posture and live connector health. A successful repository build is insufficient; only retained `p4-go-live.json: PASS` may authorize `make p4-publish`.
+`118` requires an exact tagged release and combines P3 topology/restart/restore evidence with hosted GitHub rules, protected signed-release evidence, reviewed production posture and live connector health. A successful repository build is insufficient; only retained `p4-go-live.json: PASS` may authorize `make p4-publish` or the production deployment workflow, whose preflight independently verifies the published exact-tag root asset.
 
 ## Final gate
 

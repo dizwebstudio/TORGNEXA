@@ -679,7 +679,7 @@ Repository-complete: durable fulfillment allocations, transactional warehouse re
 
 ## Task 118 — P4 go-live production readiness
 
-Repository-complete: exact-tag `make p4-qualification`, GitHub applied-rules verification for a SHA-pinned required architecture workflow and Team reviewer, independent Sigstore/SLSA verification, staged GitHub Release asset-digest binding, non-secret production posture validation, live connector health/sync qualification, non-public draft staging and PASS-gated public promotion. A deployment may claim P4 only from retained evidence produced on the actual tagged release and production/hosting environment.
+Repository-complete: exact-tag `make p4-qualification`, GitHub applied-rules verification for a SHA-pinned required architecture workflow and Team reviewer, independent Sigstore/SLSA verification, staged GitHub Release asset-digest binding, non-secret production posture validation, live connector health/sync qualification, non-public draft staging, PASS-gated public promotion, and production-deploy preflight verification of the published exact-tag `p4-go-live.json` asset. A deployment may claim P4 only from retained evidence produced on the actual tagged release and production/hosting environment.
 
 ## Task 119 — UI product experience closure
 
@@ -1110,6 +1110,11 @@ qualification evidence. See `tasks/issues/223-marketplace-operations-v1.md`.
 Retained redacted marketplace evidence is checked fail-closed by
 `make marketplace-remote-evidence`; this structural check does not create live
 provider evidence or promote an account to `qualified`.
+Retry/reconcile actions now have a tenant-scoped durable delivery/DLQ boundary
+(`000061_marketplace_operation_action_runtime.sql`); provider-specific action
+executors and live remote acceptance remain qualification-gated. The Ozon
+inventory writer now has an explicit product-mapping requirement; its
+credentialed/read-after-write evidence is still a release gate.
 
 ## Epic 177 — Массовые цены, repricing, Buy Box и продвижение
 

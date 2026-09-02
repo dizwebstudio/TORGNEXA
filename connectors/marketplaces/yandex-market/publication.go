@@ -83,14 +83,21 @@ func (connector *Connector) ReadProductPublicationStatus(ctx context.Context, ac
 	if connector == nil || query.Validate() != nil || query.RemoteID == "" {
 		return sdk.ProductPublicationReceipt{}, sdk.ErrInvalidProductPublication
 	}
-	page, err := connector.ReadProducts(ctx, account, runtime, sdk.PageRequest{Limit: 100})
-	if err != nil {
-		return sdk.ProductPublicationReceipt{}, err
-	}
-	for _, product := range page.Items {
-		if product.RemoteID == query.RemoteID {
-			return sdk.ProductPublicationReceipt{Status: sdk.PublicationPublished, RemoteID: query.RemoteID, ObservedAt: connector.now().UTC()}, nil
+	cursor := ""
+	for pageNumber := 0; pageNumber < 100; pageNumber++ {
+		page, err := connector.ReadProducts(ctx, account, runtime, sdk.PageRequest{Limit: 100, Cursor: cursor})
+		if err != nil {
+			return sdk.ProductPublicationReceipt{}, err
 		}
+		for _, product := range page.Items {
+			if product.RemoteID == query.RemoteID {
+				return sdk.ProductPublicationReceipt{Status: sdk.PublicationPublished, RemoteID: query.RemoteID, ObservedAt: connector.now().UTC()}, nil
+			}
+		}
+		if page.NextCursor == "" || page.NextCursor == cursor {
+			break
+		}
+		cursor = page.NextCursor
 	}
 	return sdk.ProductPublicationReceipt{Status: sdk.PublicationUnknown, RemoteID: query.RemoteID, ObservedAt: connector.now().UTC()}, nil
 }

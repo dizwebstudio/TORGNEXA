@@ -79,6 +79,15 @@ The manifest uses a conservative `200 ms` minimum interval, concurrency `2`, 15-
 
 The connector maps status classes into SDK `RemoteError` categories only. Response bodies, URLs, headers other than pre-normalized request/retry metadata, tokens and remote text are discarded. Transport failures become `unavailable/transport_unavailable` without propagating raw transport error strings.
 
+## Marketplace taxonomy
+
+The listing workspace can load the current Content API dictionaries for parent
+categories, subjects and the selected subject's characteristics. The adapter
+returns normalized numeric category identities, localized names, required
+flags, bounded types and units; raw WB JSON and credentials stay inside the
+connector boundary. A current credentialed qualification is still required
+before a listing write may be admitted.
+
 ## Writes
 
 Task 217 admits card create and update through the official Content API
@@ -104,5 +113,12 @@ FBS assembly orders are read from `GET /api/v3/orders` with the documented
 `dateFrom`/`dateTo`, `limit` and `next` cursor. The connector keeps the cursor
 opaque, bounds the response and projects only order identity, timestamps,
 status and item references. The current endpoint does not provide the complete
-order lifecycle, so remote `assembly` is normalized in the runtime and
-outbound order mutations remain denied.
+order lifecycle, so remote `assembly` is normalized in the runtime.
+
+The bounded order writer supports seller cancellation through
+`PATCH /api/v3/orders/{orderId}/cancel`. Confirmation and handoff are rejected
+for this connector because the FBS assembly-order API does not expose those
+transitions as a generic seller status write. The promotion adapter supports
+campaign launch, pause, stop, budget deposit and product-card bid changes;
+these writes remain approval-bound and require live qualification before a
+production account can use them.

@@ -40,6 +40,32 @@ type stocksResponse struct {
 	Cursor string `json:"cursor"`
 }
 
+// stockUpdateRequest is the exact single-row form accepted by Ozon's stock
+// mutation. Ozon requires the parent product ID in addition to the seller
+// offer ID, so the host must resolve both identities from typed mappings.
+type stockUpdateRequest struct {
+	Stocks []stockUpdateItem `json:"stocks"`
+}
+
+type stockUpdateItem struct {
+	OfferID     string `json:"offer_id"`
+	ProductID   int64  `json:"product_id"`
+	Stock       int64  `json:"stock"`
+	WarehouseID int64  `json:"warehouse_id"`
+}
+
+type stockUpdateResponse struct {
+	Result []struct {
+		Errors []struct {
+			Code string `json:"code"`
+		} `json:"errors"`
+		OfferID     string `json:"offer_id"`
+		ProductID   int64  `json:"product_id"`
+		Updated     bool   `json:"updated"`
+		WarehouseID int64  `json:"warehouse_id"`
+	} `json:"result"`
+}
+
 func (connector *Connector) ListInventoryLocations(ctx context.Context, account sdk.Account, runtime sdk.Runtime) ([]sdk.RemoteLocation, error) {
 	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.read") != nil {
 		return nil, sdk.ErrInvalidReadRequest
@@ -154,3 +180,65 @@ func (connector *Connector) ReadInventory(ctx context.Context, account sdk.Accou
 	})
 	return result, err
 }
+
+// WriteInventory updates one Ozon FBS warehouse stock. Both the seller offer
+// and parent product identities are required because Ozon accepts the stock
+// mutation as a tuple of offer_id, product_id and warehouse_id. A transport
+// error is returned as an unknown remote outcome; the host must reconcile
+// before attempting another write.
+func (connector *Connector) WriteInventory(ctx context.Context, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest) (sdk.CommerceWriteReceipt, error) {
+	if connector == nil || connector.transport == nil || runtime == nil || runtime.Secrets() == nil || sdk.ValidateAccountAgainstManifest(account, Manifest()) != nil || sdk.RequireCapability(Manifest(), "inventory.write") != nil || request.Validate() != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	productID, err := strconv.ParseInt(request.ProductRemoteID, 10, 64)
+	if err != nil || productID <= 0 {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	warehouseID, err := strconv.ParseInt(request.LocationRemoteID, 10, 64)
+	if err != nil || warehouseID <= 0 || request.Quantity > 2_000_000_000 {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	item := stockUpdateItem{OfferID: request.VariantRemoteID, ProductID: productID, Stock: request.Quantity, WarehouseID: warehouseID}
+	body, err := json.Marshal(stockUpdateRequest{Stocks: []stockUpdateItem{item}})
+	if err != nil {
+		return sdk.CommerceWriteReceipt{}, sdk.ErrInvalidCommerceWrite
+	}
+	var receipt sdk.CommerceWriteReceipt
+	err = connector.withCredentials(ctx, runtime, account.SecretReference, func(clientID, apiKey []byte) error {
+		response, callErr := connector.transport.Do(ctx, Request{
+			Method:         "POST",
+			Host:           apiHost,
+			Path:           "/v2/products/stocks",
+			Body:           body,
+			ClientID:       clientID,
+			APIKey:         apiKey,
+			IdempotencyKey: request.IdempotencyKey,
+		})
+		if callErr != nil {
+			return writeOutcomeUnknown()
+		}
+		if remote := normalizeHTTP(response); remote != nil {
+			return remote
+		}
+		var parsed stockUpdateResponse
+		if len(response.Body) == 0 || len(response.Body) > maxBodyBytes || json.Unmarshal(response.Body, &parsed) != nil || len(parsed.Result) != 1 {
+			return ErrInvalidResponse
+		}
+		result := parsed.Result[0]
+		if result.OfferID != item.OfferID || result.ProductID != item.ProductID || result.WarehouseID != item.WarehouseID || !validRemoteText(result.OfferID, 200) {
+			return ErrInvalidResponse
+		}
+		if !result.Updated || len(result.Errors) != 0 {
+			remote, remoteErr := sdk.NewRemoteError(sdk.ErrorInvalidRequest, "remote_rejected", "", 0)
+			if remoteErr != nil {
+				return ErrInvalidResponse
+			}
+			return remote
+		}
+		receipt = sdk.CommerceWriteReceipt{RemoteID: request.VariantRemoteID, Applied: true}
+		return receipt.Validate()
+	})
+	return receipt, err
+}
+
+var _ sdk.InventoryWriter = (*Connector)(nil)

@@ -7,8 +7,9 @@ repository: provider-neutral taxonomy/mapping/content/media/variant contracts,
 quality diagnostics, bounded 1,000-SKU preview, approval-gated durable batch
 journal, RLS/audit boundaries, typed connector ports, OpenAPI/SDK/MCP preview,
 frontend workspace and synthetic qualification. The canonical PIM/catalog
-records remain the source of truth. Official provider taxonomy, remote batch
-write and credentialed read-after-write remain explicit release gates.
+records remain the source of truth. WB/Ozon taxonomy adapters and the durable
+per-SKU remote batch queue are implemented; credentialed live qualification
+remains the release gate.
 
 ## Objective
 
@@ -24,12 +25,13 @@ write and credentialed read-after-write remain explicit release gates.
   the implementation does not add provider-specific fields to canonical
   Product truth or expose raw provider payloads;
 - the task documentation now distinguishes repository functionality from the
-  later connector taxonomy, batch-edit and live read-after-write gate.
+  remaining credentialed connector qualification gate; WB and Ozon taxonomy
+  adapters now read their provider dictionaries through the Connector SDK.
 
-This closes the repository content/publication slice. The remaining items are
-external qualification gates and must be admitted only after official
-taxonomy/attribute contracts, batch evidence, approval and connector
-read-after-write checks are available.
+This closes the repository content/publication slice and the provider taxonomy
+runtime slice. The remaining item is external qualification: a dedicated
+least-privilege account must prove batch publication and read-after-write for
+the current provider contract before a connector is marked `qualified`.
 
 ## Repository completion matrix
 
@@ -37,7 +39,7 @@ read-after-write checks are available.
 | --- | --- |
 | 222.1–222.7 | Closed: ownership, taxonomy, mapping, content, media, variants and preflight contracts are implemented. |
 | 222.8–222.9 | Closed: deterministic preview/apply journal, 1,000-SKU bound, idempotency, RLS and append-only evidence are implemented. |
-| 222.10–222.11 | Closed: typed taxonomy-reader/listing-writer/status-reader capabilities, OpenAPI, generated SDK, read-after-write API and MCP dry-run boundary are implemented. |
+| 222.10–222.11 | Closed: typed taxonomy-reader/listing-writer/status-reader capabilities, WB/Ozon provider taxonomy adapters, OpenAPI, generated SDK, read-after-write API and MCP dry-run boundary are implemented. |
 | 222.12–222.13 | Closed: `/marketplace-listings` UI, diagnostics, approval status, redaction and operational guards are implemented. |
 | 222.14 | Closed for synthetic repository qualification; official live connector qualification remains a release gate. |
 
