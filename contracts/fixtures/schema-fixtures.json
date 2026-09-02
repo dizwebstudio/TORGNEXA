@@ -4702,6 +4702,56 @@
       }
     },
     {
+      "schema": "qualification/marketplace-live-smoke-v1.schema.json",
+      "valid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "scope": "qualification",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "ozon",
+        "account_ref": "sandbox-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "credential_mode": "env_only_secret_accessor",
+        "taxonomy": {
+          "status": "PASS",
+          "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source": "official-adapter-taxonomy"
+        },
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "marketplace-live-smoke/health"},
+          {"id": "products_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/products_read"},
+          {"id": "inventory_locations_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_locations_read"},
+          {"id": "inventory_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_read"},
+          {"id": "orders_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/orders_read"},
+          {"id": "taxonomy_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/taxonomy_read"},
+          {"id": "inventory_write", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_write"},
+          {"id": "read_after_write", "status": "PASS", "evidence_ref": "marketplace-live-smoke/read_after_write"},
+          {"id": "cleanup", "status": "PASS", "evidence_ref": "marketplace-live-smoke/cleanup"}
+        ],
+        "write": {"attempted": true, "read_after_write": true, "restored": true}
+      },
+      "invalid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "scope": "qualification",
+        "environment": "production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "not-a-commit",
+        "connector_id": "ozon",
+        "account_ref": "sandbox-account-01",
+        "qualified_at": "bad",
+        "credential_mode": "plaintext",
+        "taxonomy": {"status": "NOT_RUN", "fingerprint": "", "source": ""},
+        "checks": [],
+        "write": {"attempted": true, "read_after_write": false, "restored": false},
+        "api_key": "must-not-be-retained"
+      }
+    },
+    {
       "schema": "qualification/marketplace-remote-evidence-v1.schema.json",
       "valid": {
         "schema_version": 1,

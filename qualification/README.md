@@ -97,3 +97,39 @@ publication operations, reconciliation projection и evidence validator,
 Наличие manifest, SDK-типа, credentials или локального синтетического PASS не
 закрывает ни один из этих пунктов. Такой результат появляется только после
 сохранения redacted evidence из фактического окружения.
+
+## Marketplace credentialed live smoke
+
+Для минимального credentialed smoke WB/Ozon добавлен отдельный bounded runner:
+`cmd/torgnexa-marketplace-live-smoke`. Он принимает provider credentials только
+из environment release-runner, передаёт их адаптеру через `SecretAccessor`,
+ограничивает HTTPS hosts и сохраняет только redacted evidence с правами `0600`.
+
+Общие обязательные параметры:
+
+```bash
+export TORGNEXA_MARKETPLACE_SMOKE_CONNECTOR=wildberries # или ozon
+export TORGNEXA_MARKETPLACE_SMOKE_ENVIRONMENT=non-production
+export TORGNEXA_MARKETPLACE_SMOKE_TARGET=dedicated-non-production
+export TORGNEXA_MARKETPLACE_SMOKE_ACCOUNT_REF=marketplace-sandbox-01
+export TORGNEXA_MARKETPLACE_SMOKE_RELEASE_COMMIT=$(git rev-parse HEAD)
+export TORGNEXA_MARKETPLACE_SMOKE_CATEGORY_CODE=123
+export TORGNEXA_MARKETPLACE_SMOKE_OUTPUT=/absolute/path/marketplace-live-smoke.json
+make marketplace-live-smoke
+```
+
+WB выполняет две health-проверки, bounded products/inventory/orders reads и
+taxonomy read; его smoke намеренно read-only. Ozon выполняет тот же read-срез,
+а в `qualification` scope дополнительно меняет остаток выбранного dedicated
+non-production offer на `+1`, подтверждает read-after-write и восстанавливает
+исходное значение. Для Ozon write scope требуется явное подтверждение:
+
+```bash
+export TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES=I_UNDERSTAND_THIS_IS_NON_PRODUCTION
+```
+
+Результат валидируется контрактом
+`contracts/qualification/marketplace-live-smoke-v1.schema.json`. Команда не
+создаёт live qualification без реальных credentials и подходящего
+non-production account; при отсутствии внешнего доступа она завершается с
+`FAIL`, сохраняя redacted failure evidence.
