@@ -58,3 +58,27 @@ canonical references, duplicate/idempotency и unknown outcome. Sandbox/live
 scopes, topology и redacted retained evidence. До этого соответствующие
 capabilities остаются `read_only`, `partially_supported` или
 `qualification_required`.
+
+## Production release gate
+
+Полный release-runner gate выполняется командой:
+
+```bash
+make production-golden-path
+```
+
+Команда сначала выполняет provider-neutral synthetic qualification, затем
+fail-closed проверяет aggregate evidence из
+`TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE` и пять сохранённых redacted
+артефактов: full marketplace qualification, credentialed marketplace smoke,
+carrier, payment и fiscal. Каждый артефакт должен быть regular non-symlink JSON,
+иметь совпадающие repository/release SHA/account refs, а SHA-256 должен быть
+записан в aggregate manifest. Manifest обязан содержать PASS для всех стадий
+golden path, failure matrix, rollback и отдельный owner каждой проверки.
+
+Схемы evidence: `contracts/qualification/production-golden-path-v1.schema.json`
+и `contracts/qualification/connector-golden-path-evidence-v1.schema.json`.
+Внешний runner сохраняет только redacted evidence; токены, raw payloads,
+remote IDs, штрихкоды и private signing material в него не попадают. Без
+credentialed non-production evidence gate завершается ошибкой и release
+остаётся заблокированным.

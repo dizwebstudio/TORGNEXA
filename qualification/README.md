@@ -133,3 +133,42 @@ export TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES=I_UNDERSTAND_THIS_IS_NON_PRODUCTI
 создаёт live qualification без реальных credentials и подходящего
 non-production account; при отсутствии внешнего доступа она завершается с
 `FAIL`, сохраняя redacted failure evidence.
+
+## Полный production golden path
+
+Для release-runner добавлен объединяющий fail-closed gate:
+`make production-golden-path`. Он сначала запускает
+`make order-fulfillment-qualification`, а затем требует retained redacted
+evidence, привязанный к текущему `HEAD`:
+
+- полный marketplace evidence (`TORGNEXA_MARKETPLACE_EVIDENCE_FILE`, только
+  `full` scope) и credentialed marketplace live smoke;
+- отдельные credentialed non-production evidence для carrier, payment и
+  fiscal (`TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE`,
+  `TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE`,
+  `TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE`);
+- aggregate manifest в
+  `TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE`.
+
+Пример запуска на защищённом release-runner:
+
+```bash
+export TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE=/evidence/production-golden-path.json
+export TORGNEXA_MARKETPLACE_EVIDENCE_FILE=/evidence/marketplace-remote-full.json
+export TORGNEXA_MARKETPLACE_LIVE_SMOKE_EVIDENCE_FILE=/evidence/marketplace-live-smoke.json
+export TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE=/evidence/carrier-golden-path.json
+export TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE=/evidence/payment-golden-path.json
+export TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE=/evidence/fiscal-golden-path.json
+export TORGNEXA_P4_REPOSITORY=OWNER/NAME
+make production-golden-path
+```
+
+Контракты aggregate и connector evidence находятся в
+`contracts/qualification/production-golden-path-v1.schema.json` и
+`contracts/qualification/connector-golden-path-evidence-v1.schema.json`.
+Gate проверяет SHA-256 всех пяти файлов, один release commit/repository,
+совпадение connector/account refs, полный путь order → reservation →
+pick/pack → label → shipment → return → refund → settlement → P&L →
+reconciliation, а также duplicate/out-of-order/timeout/approval/rate-limit и
+rollback checks. Он не принимает synthetic fixture вместо внешнего evidence,
+не вызывает провайдеры и не принимает credentials в аргументах или файлах.

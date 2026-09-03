@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/qualification/financial-warehouse-qualification-v1.json",
+  "title": "TORGNEXA external financial and warehouse qualification v1",
+  "description": "Redacted release evidence binding synthetic finance/WMS gates to credentialed non-production external subjects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "scope",
+    "environment",
+    "target",
+    "repository",
+    "release_commit",
+    "qualified_at",
+    "subjects",
+    "artifacts",
+    "checks",
+    "failure_matrix",
+    "rollback"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "status": {"const": "PASS"},
+    "scope": {"const": "credentialed-financial-warehouse"},
+    "environment": {"const": "non-production"},
+    "target": {"const": "dedicated-non-production"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,139}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "qualified_at": {"type": "string", "format": "date-time"},
+    "subjects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bank", "acquirer", "marketplace_payout", "fx", "advertising", "fbs", "fbo", "hardware"],
+      "properties": {
+        "bank": {"$ref": "#/$defs/subject"},
+        "acquirer": {"$ref": "#/$defs/subject"},
+        "marketplace_payout": {"$ref": "#/$defs/subject"},
+        "fx": {"$ref": "#/$defs/subject"},
+        "advertising": {"$ref": "#/$defs/subject"},
+        "fbs": {"$ref": "#/$defs/subject"},
+        "fbo": {"$ref": "#/$defs/subject"},
+        "hardware": {"$ref": "#/$defs/subject"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "evidence_ref", "sha256"],
+        "properties": {
+          "kind": {"enum": ["bank", "acquirer", "marketplace_payout", "fx", "advertising", "fbs", "fbo", "hardware"]},
+          "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "status", "evidence_ref"],
+        "properties": {
+          "id": {
+            "enum": [
+              "bank_statement_sync",
+              "acquirer_payment_refund",
+              "payout_import",
+              "payout_order_match",
+              "fx_conversion_snapshot",
+              "advertising_attribution",
+              "financial_reconciliation",
+              "financial_duplicate_idempotency",
+              "fbs_order_to_handoff",
+              "fbo_inbound_acceptance",
+              "warehouse_read_after_write",
+              "warehouse_reconciliation",
+              "warehouse_idempotency",
+              "hardware_safe_fallback",
+              "device_matrix",
+              "financial_unknown_recovery",
+              "warehouse_unknown_recovery"
+            ]
+          },
+          "owner": {"enum": ["bank", "acquirer", "marketplace_payout", "fx", "advertising", "fbs", "fbo", "hardware", "platform"]},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+        }
+      }
+    },
+    "failure_matrix": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {
+            "enum": [
+              "duplicate_statement_or_payout",
+              "duplicate_scan_or_print",
+              "unknown_remote_commit",
+              "stale_fx_or_currency_mismatch",
+              "unattributed_advertising",
+              "cross_tenant",
+              "revoked_device",
+              "printer_outage",
+              "offline_reconnect_conflict",
+              "fbo_local_pick_denied",
+              "fbs_handoff_timeout",
+              "approval_denial",
+              "rate_limit",
+              "worker_crash_resume"
+            ]
+          },
+          "status": {"const": "PASS"},
+          "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "evidence_ref"],
+      "properties": {
+        "verified": {"const": true},
+        "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+      }
+    }
+  },
+  "$defs": {
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "account_ref", "evidence_ref"],
+      "properties": {
+        "subject_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "account_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+        "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+      }
+    }
+  }
+}

@@ -2,10 +2,11 @@
 
 ## Статус
 
-`repository-complete` (2026-09-01) — provider-neutral сквозной контур,
-контракты, API/UI, timeline, synthetic qualification и миграционный gate
-собраны. Production/live readiness официальных marketplace, carrier и
-payment/fiscal accounts остаётся отдельным external release-gate.
+`repository-complete` (2026-09-03) — provider-neutral сквозной контур,
+  контракты, API/UI, timeline, synthetic qualification, миграционный gate и
+  fail-closed production evidence gate собраны. Production/live readiness
+  официальных marketplace, carrier и payment/fiscal accounts остаётся
+  external release-gate до запуска на целевых non-production accounts.
 
 ## Цель
 
@@ -72,7 +73,7 @@ non-production credentials и retained evidence соответствующий c
 | 224.10 | Закрыта: flow detail/timeline API, SDK и операторский Marketplace UI. |
 | 224.11 | Repository gate закрыт; credentialed official connector gate остаётся открытым. |
 | 224.12 | Закрыта: findings, reconciliation actions, unknown/attention и operator visibility. |
-| 224.13 | Synthetic repository gate закрыт командой `make order-fulfillment-qualification`; production gate требует внешнего evidence. |
+| 224.13 | Synthetic repository gate закрыт командой `make order-fulfillment-qualification`; полный release gate закрыт командой `make production-golden-path`, credentialed evidence остаётся внешним входом. |
 
 ## Подзадачи
 

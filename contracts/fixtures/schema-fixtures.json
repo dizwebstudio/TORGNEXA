@@ -4702,6 +4702,43 @@
       }
     },
     {
+      "schema": "qualification/connector-golden-path-evidence-v1.schema.json",
+      "valid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "scope": "connector",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "cdek-sandbox",
+        "account_ref": "carrier-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "carrier/health"},
+          {"id": "rate", "status": "PASS", "evidence_ref": "carrier/rate"},
+          {"id": "label", "status": "PASS", "evidence_ref": "carrier/label"},
+          {"id": "shipment_handoff", "status": "PASS", "evidence_ref": "carrier/shipment-handoff"},
+          {"id": "return_inspection", "status": "PASS", "evidence_ref": "carrier/return-inspection"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "carrier/rollback"}
+      },
+      "invalid": {
+        "schema_version": 1,
+        "status": "FAIL",
+        "scope": "connector",
+        "environment": "production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "not-a-commit",
+        "connector_id": "cdek-sandbox",
+        "account_ref": "carrier-account-01",
+        "qualified_at": "bad",
+        "checks": [],
+        "rollback": {"verified": false, "evidence_ref": "carrier/rollback"}
+      }
+    },
+    {
       "schema": "qualification/marketplace-live-smoke-v1.schema.json",
       "valid": {
         "schema_version": 1,
@@ -4801,6 +4838,76 @@
         "checks": [],
         "rollback": {"verified": false, "evidence_ref": "rollback"},
         "token": "must-not-be-retained"
+      }
+    },
+    {
+      "schema": "qualification/production-golden-path-v1.schema.json",
+      "valid": {
+        "schema_version": 1,
+        "status": "PASS",
+        "scope": "credentialed-full",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "connectors": {
+          "marketplace": {"connector_id": "ozon", "account_ref": "marketplace-account-01", "evidence_ref": "evidence/marketplace-remote"},
+          "carrier": {"connector_id": "cdek-sandbox", "account_ref": "carrier-account-01", "evidence_ref": "evidence/carrier"},
+          "payment": {"connector_id": "payment-sandbox", "account_ref": "payment-account-01", "evidence_ref": "evidence/payment"},
+          "fiscal": {"connector_id": "fiscal-sandbox", "account_ref": "fiscal-account-01", "evidence_ref": "evidence/fiscal"}
+        },
+        "artifacts": [
+          {"kind": "marketplace-remote", "evidence_ref": "evidence/marketplace-remote", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "marketplace-live-smoke", "evidence_ref": "evidence/marketplace-live-smoke", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+          {"kind": "carrier", "evidence_ref": "evidence/carrier", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+          {"kind": "payment", "evidence_ref": "evidence/payment", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+          {"kind": "fiscal", "evidence_ref": "evidence/fiscal", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"}
+        ],
+        "checks": [
+          {"id": "marketplace_live_smoke", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/marketplace-live-smoke"},
+          {"id": "order_import", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/order-import"},
+          {"id": "reservation", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/reservation"},
+          {"id": "pick_pack", "owner": "platform", "status": "PASS", "evidence_ref": "path/pick-pack"},
+          {"id": "label", "owner": "carrier", "status": "PASS", "evidence_ref": "path/label"},
+          {"id": "shipment_handoff", "owner": "carrier", "status": "PASS", "evidence_ref": "path/shipment-handoff"},
+          {"id": "return_inspection", "owner": "carrier", "status": "PASS", "evidence_ref": "path/return-inspection"},
+          {"id": "refund_settlement", "owner": "payment", "status": "PASS", "evidence_ref": "path/refund-settlement"},
+          {"id": "marking_edo", "owner": "fiscal", "status": "PASS", "evidence_ref": "path/marking-edo"},
+          {"id": "settlement_reconciliation", "owner": "payment", "status": "PASS", "evidence_ref": "path/settlement-reconciliation"},
+          {"id": "profitability", "owner": "platform", "status": "PASS", "evidence_ref": "path/profitability"},
+          {"id": "reconciliation", "owner": "platform", "status": "PASS", "evidence_ref": "path/reconciliation"}
+        ],
+        "failure_matrix": [
+          {"id": "duplicate_commands", "status": "PASS", "evidence_ref": "failure/duplicate-commands"},
+          {"id": "duplicate_webhooks", "status": "PASS", "evidence_ref": "failure/duplicate-webhooks"},
+          {"id": "out_of_order_events", "status": "PASS", "evidence_ref": "failure/out-of-order-events"},
+          {"id": "worker_crash_resume", "status": "PASS", "evidence_ref": "failure/worker-crash-resume"},
+          {"id": "lease_loss", "status": "PASS", "evidence_ref": "failure/lease-loss"},
+          {"id": "timeout_after_remote_commit", "status": "PASS", "evidence_ref": "failure/timeout-after-remote-commit"},
+          {"id": "insufficient_stock", "status": "PASS", "evidence_ref": "failure/insufficient-stock"},
+          {"id": "expired_label", "status": "PASS", "evidence_ref": "failure/expired-label"},
+          {"id": "over_refund", "status": "PASS", "evidence_ref": "failure/over-refund"},
+          {"id": "cross_tenant_access", "status": "PASS", "evidence_ref": "failure/cross-tenant-access"},
+          {"id": "approval_denial", "status": "PASS", "evidence_ref": "failure/approval-denial"},
+          {"id": "rate_limit", "status": "PASS", "evidence_ref": "failure/rate-limit"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "evidence/rollback"}
+      },
+      "invalid": {
+        "schema_version": 1,
+        "status": "FAIL",
+        "scope": "credentialed-full",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "connectors": {},
+        "artifacts": [],
+        "checks": [],
+        "failure_matrix": [],
+        "rollback": {"verified": false, "evidence_ref": "rollback"}
       }
     },
     {

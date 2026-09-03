@@ -1145,9 +1145,12 @@ shipment handoff, partial return/inspection, refund allocation, settlement
 lineage, redacted flow timeline, API/SDK/UI and synthetic golden-path gate are
 connected without creating a second domain aggregate. `label` is explicit
 between `pick_pack` and `shipment`; unknown remote outcomes remain visible and
-require reconciliation. Production readiness remains blocked until at least
-one official marketplace, carrier and payment/fiscal path passes credentialed
-live or sandbox qualification with retained evidence. See
+require reconciliation. The fail-closed release gate
+`make production-golden-path` now binds the synthetic run to retained
+credentialed marketplace, carrier and payment/fiscal evidence. Production
+readiness remains blocked until at least one official marketplace, carrier and
+payment/fiscal path passes credentialed live or sandbox qualification with
+retained evidence. See
 `tasks/issues/224-order-fulfillment-golden-path.md` and
 `docs/operations/224-order-fulfillment-golden-path.md`.
 
