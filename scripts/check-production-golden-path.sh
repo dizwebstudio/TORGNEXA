@@ -11,9 +11,12 @@ cd -- "$root"
 golden_evidence="${TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE:-}"
 marketplace_evidence="${TORGNEXA_MARKETPLACE_EVIDENCE_FILE:-}"
 marketplace_live_smoke="${TORGNEXA_MARKETPLACE_LIVE_SMOKE_EVIDENCE_FILE:-}"
+marketplace_compensation="${TORGNEXA_MARKETPLACE_COMPENSATION_EVIDENCE_FILE:-}"
 carrier_evidence="${TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE:-}"
 payment_evidence="${TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE:-}"
 fiscal_evidence="${TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE:-}"
+marking_evidence="${TORGNEXA_MARKING_GOLDEN_PATH_EVIDENCE_FILE:-}"
+edo_evidence="${TORGNEXA_EDO_GOLDEN_PATH_EVIDENCE_FILE:-}"
 
 require_absolute_file() {
   local name="$1"
@@ -31,9 +34,12 @@ require_absolute_file() {
 require_absolute_file TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE "$golden_evidence"
 require_absolute_file TORGNEXA_MARKETPLACE_EVIDENCE_FILE "$marketplace_evidence"
 require_absolute_file TORGNEXA_MARKETPLACE_LIVE_SMOKE_EVIDENCE_FILE "$marketplace_live_smoke"
+require_absolute_file TORGNEXA_MARKETPLACE_COMPENSATION_EVIDENCE_FILE "$marketplace_compensation"
 require_absolute_file TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE "$carrier_evidence"
 require_absolute_file TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE "$payment_evidence"
 require_absolute_file TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE "$fiscal_evidence"
+require_absolute_file TORGNEXA_MARKING_GOLDEN_PATH_EVIDENCE_FILE "$marking_evidence"
+require_absolute_file TORGNEXA_EDO_GOLDEN_PATH_EVIDENCE_FILE "$edo_evidence"
 
 release_commit="$(git rev-parse HEAD)"
 synthetic_dir="$(mktemp -d "${TMPDIR:-/tmp}/torgnexa-production-golden-path.XXXXXX")"
@@ -68,9 +74,12 @@ validator_args=(
   --input "$golden_evidence"
   --marketplace-evidence "$marketplace_evidence"
   --marketplace-live-smoke "$marketplace_live_smoke"
+  --marketplace-compensation "$marketplace_compensation"
   --carrier-evidence "$carrier_evidence"
   --payment-evidence "$payment_evidence"
   --fiscal-evidence "$fiscal_evidence"
+  --marking-evidence "$marking_evidence"
+  --edo-evidence "$edo_evidence"
   --expected-release-commit "$release_commit"
 )
 if [[ -n "$expected_repository" ]]; then

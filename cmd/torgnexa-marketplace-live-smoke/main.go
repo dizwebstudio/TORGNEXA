@@ -13,9 +13,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,8 +20,7 @@ import (
 	"strings"
 	"time"
 
-	ozon "github.com/torgnexa/torgnexa/connectors/marketplaces/ozon"
-	wildberries "github.com/torgnexa/torgnexa/connectors/marketplaces/wildberries"
+	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
@@ -34,7 +30,6 @@ const (
 	smokeOrganizationID  = "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001"
 	smokeWorkspaceID     = "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002"
 	writeAcknowledgement = "I_UNDERSTAND_THIS_IS_NON_PRODUCTION"
-	maxSmokeBodyBytes    = 12 << 20
 )
 
 var (
@@ -43,22 +38,37 @@ var (
 	accountRefPattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
 )
 
+// goldenPathFlow contains only opaque, redacted references. It is populated
+// when the smoke is one artifact of a complete production golden path.
+type goldenPathFlow struct {
+	FlowRef        string `json:"flow_ref"`
+	OrderRef       string `json:"order_ref"`
+	ReservationRef string `json:"reservation_ref"`
+	ShipmentRef    string `json:"shipment_ref"`
+	ReturnRef      string `json:"return_ref"`
+	RefundRef      string `json:"refund_ref"`
+	SettlementRef  string `json:"settlement_ref"`
+	MarkingRef     string `json:"marking_ref"`
+	EDORef         string `json:"edo_ref"`
+}
+
 type config struct {
-	Connector       string
-	Environment     string
-	Target          string
-	AccountRef      string
-	ReleaseCommit   string
-	Output          string
-	Scope           string
-	Locale          string
-	Jurisdiction    string
-	CategoryCode    string
-	WBWarehouseID   string
-	WBVariantID     string
-	OzonWarehouseID string
-	OzonOfferID     string
-	RunID           string
+	Connector      string
+	Environment    string
+	Target         string
+	AccountRef     string
+	ReleaseCommit  string
+	Output         string
+	Scope          string
+	Locale         string
+	Jurisdiction   string
+	CategoryCode   string
+	WarehouseID    string
+	VariantID      string
+	Secret         string
+	WriteInventory bool
+	RunID          string
+	Flow           *goldenPathFlow
 }
 
 type checkEvidence struct {
@@ -95,6 +105,7 @@ type smokeEvidence struct {
 	Taxonomy       taxonomyEvidence   `json:"taxonomy"`
 	Checks         []checkEvidence    `json:"checks"`
 	Write          writeEvidenceState `json:"write"`
+	Flow           *goldenPathFlow    `json:"flow,omitempty"`
 	Failure        *failureEvidence   `json:"failure,omitempty"`
 }
 
@@ -139,90 +150,9 @@ func (accessor secretAccessor) UseSecret(ctx context.Context, reference sdk.Secr
 	return callback(value)
 }
 
-type httpTransport struct {
-	client       *http.Client
-	allowedHosts map[string]struct{}
-}
-
-func newHTTPTransport() httpTransport {
-	return httpTransport{
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		},
-		allowedHosts: map[string]struct{}{
-			"content-api.wildberries.ru":     {},
-			"marketplace-api.wildberries.ru": {},
-			"api-seller.ozon.ru":             {},
-		},
-	}
-}
-
-func (transport httpTransport) call(ctx context.Context, method, host, path string, query url.Values, body []byte, headers map[string]string) (int, []byte, string, int64, error) {
-	if _, ok := transport.allowedHosts[host]; !ok || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\x00\r\n") {
-		return 0, nil, "", 0, errors.New("remote host or path is not allowlisted")
-	}
-	remoteURL := url.URL{Scheme: "https", Host: host, Path: path, RawQuery: query.Encode()}
-	request, err := http.NewRequestWithContext(ctx, method, remoteURL.String(), strings.NewReader(string(body)))
-	if err != nil {
-		return 0, nil, "", 0, errors.New("remote request could not be created")
-	}
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "torgnexa-marketplace-live-smoke/1")
-	if len(body) > 0 {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	for name, value := range headers {
-		request.Header.Set(name, value)
-	}
-	response, err := transport.client.Do(request)
-	if err != nil {
-		return 0, nil, "", 0, err
-	}
-	defer response.Body.Close()
-	limited := io.LimitReader(response.Body, maxSmokeBodyBytes+1)
-	responseBody, err := io.ReadAll(limited)
-	if err != nil || len(responseBody) > maxSmokeBodyBytes {
-		return 0, nil, "", 0, errors.New("remote response exceeded smoke bound")
-	}
-	return response.StatusCode, responseBody, response.Header.Get("X-Request-ID"), retryAfterMillis(response.Header.Get("Retry-After")), nil
-}
-
-func retryAfterMillis(value string) int64 {
-	seconds, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-	if err != nil || seconds < 0 || seconds > 24*60*60 {
-		return 0
-	}
-	return seconds * 1000
-}
-
-type wildberriesTransport struct{ httpTransport }
-
-func (transport wildberriesTransport) Do(ctx context.Context, request wildberries.Request) (wildberries.Response, error) {
-	query := url.Values{}
-	for _, parameter := range request.Query {
-		query.Set(parameter.Name, parameter.Value)
-	}
-	status, body, requestID, retryAfter, err := transport.call(ctx, request.Method, request.Host, request.Path, query, request.Body, map[string]string{"Authorization": string(request.Token), "X-Idempotency-Key": request.IdempotencyKey})
-	return wildberries.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
-}
-
-type ozonTransport struct{ httpTransport }
-
-func (transport ozonTransport) Do(ctx context.Context, request ozon.Request) (ozon.Response, error) {
-	query := url.Values{}
-	for _, parameter := range request.Query {
-		query.Set(parameter.Name, parameter.Value)
-	}
-	status, body, requestID, retryAfter, err := transport.call(ctx, request.Method, request.Host, request.Path, query, request.Body, map[string]string{"Client-Id": string(request.ClientID), "Api-Key": string(request.APIKey), "X-Idempotency-Key": request.IdempotencyKey})
-	return ozon.Response{StatusCode: status, Body: body, RequestID: requestID, RetryAfterMS: retryAfter}, err
-}
-
 func main() {
 	var connector, output string
-	flag.StringVar(&connector, "connector", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_CONNECTOR"), "wildberries or ozon")
+	flag.StringVar(&connector, "connector", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_CONNECTOR"), "admitted marketplace connector ID")
 	flag.StringVar(&output, "output", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_OUTPUT"), "absolute redacted evidence path")
 	flag.Parse()
 
@@ -248,21 +178,17 @@ func main() {
 		Taxonomy:       taxonomyEvidence{Status: "NOT_RUN"},
 		Checks:         []checkEvidence{},
 	}
+	if cfg.Flow != nil {
+		evidence.SchemaVersion = 2
+		evidence.Flow = cfg.Flow
+	}
 	if evidence.Repository == "" {
 		evidence.Repository = "external-release-runner"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	var smokeErr *smokeFailure
-	switch cfg.Connector {
-	case "wildberries":
-		smokeErr = runWildberries(ctx, cfg, &evidence)
-	case "ozon":
-		smokeErr = runOzon(ctx, cfg, &evidence)
-	default:
-		smokeErr = &smokeFailure{CheckID: "configuration", ErrorCode: "connector_not_supported"}
-	}
+	smokeErr := runMarketplace(ctx, cfg, &evidence, builtinruntime.New())
 	if smokeErr != nil {
 		evidence.Failure = &failureEvidence{CheckID: smokeErr.CheckID, ErrorCode: smokeErr.ErrorCode}
 	} else {
@@ -281,23 +207,23 @@ func main() {
 
 func loadConfig(connector, output string) (config, error) {
 	cfg := config{
-		Connector:       strings.TrimSpace(connector),
-		Environment:     strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ENVIRONMENT")),
-		Target:          strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_TARGET")),
-		AccountRef:      strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ACCOUNT_REF")),
-		ReleaseCommit:   strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_RELEASE_COMMIT")),
-		Output:          strings.TrimSpace(output),
-		Scope:           strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_SCOPE")),
-		Locale:          valueOr(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_LOCALE"), "ru-RU"),
-		Jurisdiction:    valueOr(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_JURISDICTION"), "RU"),
-		CategoryCode:    strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_CATEGORY_CODE")),
-		WBWarehouseID:   strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_WB_WAREHOUSE_ID")),
-		WBVariantID:     strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_WB_VARIANT_ID")),
-		OzonWarehouseID: strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_OZON_WAREHOUSE_ID")),
-		OzonOfferID:     strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_OZON_OFFER_ID")),
+		Connector:     strings.TrimSpace(connector),
+		Environment:   strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ENVIRONMENT")),
+		Target:        strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_TARGET")),
+		AccountRef:    strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ACCOUNT_REF")),
+		ReleaseCommit: strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_RELEASE_COMMIT")),
+		Output:        strings.TrimSpace(output),
+		Scope:         strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_SCOPE")),
+		Locale:        valueOr(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_LOCALE"), "ru-RU"),
+		Jurisdiction:  valueOr(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_JURISDICTION"), "RU"),
+		CategoryCode:  strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_CATEGORY_CODE")),
+		WarehouseID:   strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_WAREHOUSE_ID")),
+		VariantID:     strings.TrimSpace(os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_VARIANT_ID")),
+		Secret:        os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_SECRET"),
 	}
-	if cfg.Connector != "wildberries" && cfg.Connector != "ozon" {
-		return config{}, errors.New("TORGNEXA_MARKETPLACE_SMOKE_CONNECTOR must be wildberries or ozon")
+	profile, ok := builtinruntime.MarketplaceSmokeProfileFor(cfg.Connector)
+	if !ok {
+		return config{}, errors.New("TORGNEXA_MARKETPLACE_SMOKE_CONNECTOR is not admitted for marketplace smoke")
 	}
 	if cfg.Environment != "non-production" {
 		return config{}, errors.New("TORGNEXA_MARKETPLACE_SMOKE_ENVIRONMENT must be non-production")
@@ -323,13 +249,60 @@ func loadConfig(connector, output string) (config, error) {
 	if len(cfg.Locale) < 2 || len(cfg.Locale) > 16 || len(cfg.Jurisdiction) != 2 || cfg.Jurisdiction != strings.ToUpper(cfg.Jurisdiction) || !categoryCodePattern.MatchString(cfg.CategoryCode) {
 		return config{}, errors.New("locale, jurisdiction and category code are required for taxonomy qualification")
 	}
-	if cfg.Connector == "ozon" && cfg.Scope == "qualification" && os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES") != writeAcknowledgement {
-		return config{}, errors.New("Ozon qualification requires TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES=" + writeAcknowledgement)
+	cfg.WriteInventory = cfg.Scope == "qualification" && profile.InventoryWrite
+	if cfg.WriteInventory && os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES") != writeAcknowledgement {
+		return config{}, errors.New("inventory qualification requires TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES=" + writeAcknowledgement)
 	}
-	if cfg.Connector == "wildberries" && os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES") != "" {
-		return config{}, errors.New("Wildberries smoke does not permit writes")
+	if !cfg.WriteInventory && os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES") != "" {
+		return config{}, errors.New("write acknowledgement is not permitted for this smoke profile")
 	}
+	flow, err := loadGoldenPathFlow()
+	if err != nil {
+		return config{}, err
+	}
+	cfg.Flow = flow
 	return cfg, nil
+}
+
+func loadGoldenPathFlow() (*goldenPathFlow, error) {
+	values := []struct {
+		name  string
+		value string
+	}{
+		{"TORGNEXA_MARKETPLACE_SMOKE_FLOW_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_FLOW_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_ORDER_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_ORDER_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_RESERVATION_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_RESERVATION_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_SHIPMENT_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_SHIPMENT_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_RETURN_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_RETURN_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_REFUND_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_REFUND_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_SETTLEMENT_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_SETTLEMENT_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_MARKING_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_MARKING_REF")},
+		{"TORGNEXA_MARKETPLACE_SMOKE_EDO_REF", os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_EDO_REF")},
+	}
+	anySet := false
+	for _, value := range values {
+		if strings.TrimSpace(value.value) != "" {
+			anySet = true
+			break
+		}
+	}
+	if !anySet {
+		return nil, nil
+	}
+	flow := &goldenPathFlow{}
+	fields := []*string{
+		&flow.FlowRef, &flow.OrderRef, &flow.ReservationRef, &flow.ShipmentRef,
+		&flow.ReturnRef, &flow.RefundRef, &flow.SettlementRef, &flow.MarkingRef,
+		&flow.EDORef,
+	}
+	for index := range values {
+		value := strings.TrimSpace(values[index].value)
+		if value == "" || accountRefPattern.FindString(value) != value {
+			return nil, errors.New(values[index].name + " must be a safe non-secret golden path reference")
+		}
+		*fields[index] = value
+	}
+	return flow, nil
 }
 
 func valueOr(value, fallback string) string {
@@ -344,16 +317,17 @@ func smokeAccount(connectorID string) sdk.Account {
 	return sdk.Account{ID: smokeAccountID, OrganizationID: smokeOrganizationID, WorkspaceID: smokeWorkspaceID, ConnectorID: connectorID, Family: sdk.FamilyMarketplace, Status: sdk.AccountActive, SecretReference: smokeSecretReference, Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: created, UpdatedAt: created}
 }
 
-func runWildberries(ctx context.Context, cfg config, evidence *smokeEvidence) *smokeFailure {
-	token := os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_WB_TOKEN")
-	if token == "" {
-		return &smokeFailure{CheckID: "configuration", ErrorCode: "wildberries_token_missing"}
+func runMarketplace(ctx context.Context, cfg config, evidence *smokeEvidence, registry *builtinruntime.Registry) *smokeFailure {
+	if cfg.Secret == "" {
+		return &smokeFailure{CheckID: "configuration", ErrorCode: "secret_missing"}
 	}
-	connector := wildberries.New(wildberriesTransport{newHTTPTransport()}, nil)
-	account := smokeAccount("wildberries")
-	runtime := secretRuntime{value: token}
+	if registry == nil {
+		return &smokeFailure{CheckID: "configuration", ErrorCode: "runtime_unavailable"}
+	}
+	account := smokeAccount(cfg.Connector)
+	runtime := secretRuntime{value: cfg.Secret}
 	for attempt := 0; attempt < 2; attempt++ {
-		health, err := connector.Health(ctx, account, runtime)
+		health, err := registry.Health(ctx, account, runtime, nil)
 		if err != nil {
 			return connectorFailure("health", err)
 		}
@@ -363,85 +337,36 @@ func runWildberries(ctx context.Context, cfg config, evidence *smokeEvidence) *s
 	}
 	pass(evidence, "health")
 
-	products, err := connector.ReadProducts(ctx, account, runtime, sdk.PageRequest{Limit: 10})
+	productsReader, err := registry.MarketplaceProductReader(account, runtime)
 	if err != nil {
 		return connectorFailure("products_read", err)
 	}
-	variant, ok := selectWildberriesProduct(products.Items, cfg.WBVariantID)
+	products, err := productsReader.ReadProducts(ctx, account, runtime, sdk.PageRequest{Limit: 10})
+	if err != nil {
+		return connectorFailure("products_read", err)
+	}
+	product, variant, ok := selectProduct(products.Items, cfg.VariantID)
 	if !ok {
 		return &smokeFailure{CheckID: "products_read", ErrorCode: "test_product_variant_missing"}
 	}
 	pass(evidence, "products_read")
 
-	locations, err := connector.ListInventoryLocations(ctx, account, runtime)
+	inventoryReader, err := registry.InventoryReader(account, runtime, nil)
 	if err != nil {
 		return connectorFailure("inventory_locations_read", err)
 	}
-	location, ok := selectLocation(locations, cfg.WBWarehouseID)
-	if !ok {
-		return &smokeFailure{CheckID: "inventory_locations_read", ErrorCode: "test_warehouse_missing"}
-	}
-	pass(evidence, "inventory_locations_read")
-	if _, err = connector.ReadInventory(ctx, account, runtime, sdk.InventoryQuery{LocationRemoteID: location.RemoteID, VariantRemoteIDs: []string{variant.RemoteID}}); err != nil {
-		return connectorFailure("inventory_read", err)
-	}
-	pass(evidence, "inventory_read")
-	if _, err = connector.ReadOrders(ctx, account, runtime, sdk.PageRequest{Limit: 10}); err != nil {
-		return connectorFailure("orders_read", err)
-	}
-	pass(evidence, "orders_read")
-	taxonomy, err := connector.ReadMarketplaceListingTaxonomy(ctx, account, runtime, sdk.MarketplaceListingTaxonomyRequest{Locale: cfg.Locale, Jurisdiction: cfg.Jurisdiction, CategoryCode: cfg.CategoryCode})
-	if err != nil {
-		return connectorFailure("taxonomy_read", err)
-	}
-	setTaxonomy(evidence, taxonomy.Source, taxonomy.Fingerprint)
-	pass(evidence, "taxonomy_read")
-	evidence.Write = writeEvidenceState{Attempted: false, ReadAfterWrite: false, Restored: true}
-	return nil
-}
-
-func runOzon(ctx context.Context, cfg config, evidence *smokeEvidence) *smokeFailure {
-	clientID := os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_OZON_CLIENT_ID")
-	apiKey := os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_OZON_API_KEY")
-	if clientID == "" || apiKey == "" {
-		return &smokeFailure{CheckID: "configuration", ErrorCode: "ozon_credentials_missing"}
-	}
-	connector := ozon.New(ozonTransport{newHTTPTransport()}, nil)
-	account := smokeAccount("ozon")
-	runtime := secretRuntime{value: clientID + "\n" + apiKey}
-	for attempt := 0; attempt < 2; attempt++ {
-		health, err := connector.Health(ctx, account, runtime)
-		if err != nil {
-			return connectorFailure("health", err)
-		}
-		if health.Status != sdk.HealthHealthy {
-			return &smokeFailure{CheckID: "health", ErrorCode: valueOr(health.ReasonCode, "not_healthy")}
-		}
-	}
-	pass(evidence, "health")
-
-	products, err := connector.ReadProducts(ctx, account, runtime, sdk.PageRequest{Limit: 10})
-	if err != nil {
-		return connectorFailure("products_read", err)
-	}
-	product, variant, ok := selectOzonProduct(products.Items, cfg.OzonOfferID)
-	if !ok {
-		return &smokeFailure{CheckID: "products_read", ErrorCode: "test_product_offer_missing"}
-	}
-	pass(evidence, "products_read")
-
-	locations, err := connector.ListInventoryLocations(ctx, account, runtime)
+	locations, err := inventoryReader.ListInventoryLocations(ctx, account, runtime)
 	if err != nil {
 		return connectorFailure("inventory_locations_read", err)
 	}
-	location, ok := selectLocation(locations, cfg.OzonWarehouseID)
+	location, ok := selectLocation(locations, cfg.WarehouseID)
 	if !ok {
 		return &smokeFailure{CheckID: "inventory_locations_read", ErrorCode: "test_warehouse_missing"}
 	}
 	pass(evidence, "inventory_locations_read")
 
 	readInventory := func() ([]sdk.RemoteInventory, *smokeFailure) {
-		items, readErr := connector.ReadInventory(ctx, account, runtime, sdk.InventoryQuery{LocationRemoteID: location.RemoteID, VariantRemoteIDs: []string{variant.RemoteID}})
+		items, readErr := inventoryReader.ReadInventory(ctx, account, runtime, sdk.InventoryQuery{LocationRemoteID: location.RemoteID, VariantRemoteIDs: []string{variant.RemoteID}})
 		if readErr != nil {
 			return nil, connectorFailure("inventory_read", readErr)
 		}
@@ -455,41 +380,58 @@ func runOzon(ctx context.Context, cfg config, evidence *smokeEvidence) *smokeFai
 		return failure
 	}
 	pass(evidence, "inventory_read")
-	if _, err = connector.ReadOrders(ctx, account, runtime, sdk.PageRequest{Limit: 10}); err != nil {
+
+	ordersReader, err := registry.OrderReader(ctx, account, runtime, nil)
+	if err != nil {
+		return connectorFailure("orders_read", err)
+	}
+	if _, err = ordersReader.Read(ctx, sdk.PageRequest{Limit: 10}); err != nil {
 		return connectorFailure("orders_read", err)
 	}
 	pass(evidence, "orders_read")
-	taxonomy, err := connector.ReadMarketplaceListingTaxonomy(ctx, account, runtime, sdk.MarketplaceListingTaxonomyRequest{Locale: cfg.Locale, Jurisdiction: cfg.Jurisdiction, CategoryCode: cfg.CategoryCode})
+
+	taxonomyReader, err := registry.MarketplaceListingTaxonomyReader(account, runtime)
+	if err != nil {
+		return connectorFailure("taxonomy_read", err)
+	}
+	taxonomy, err := taxonomyReader.ReadMarketplaceListingTaxonomy(ctx, account, runtime, sdk.MarketplaceListingTaxonomyRequest{Locale: cfg.Locale, Jurisdiction: cfg.Jurisdiction, CategoryCode: cfg.CategoryCode})
 	if err != nil {
 		return connectorFailure("taxonomy_read", err)
 	}
 	setTaxonomy(evidence, taxonomy.Source, taxonomy.Fingerprint)
 	pass(evidence, "taxonomy_read")
 
-	if cfg.Scope == "read" {
+	if !cfg.WriteInventory {
 		evidence.Write = writeEvidenceState{Attempted: false, ReadAfterWrite: false, Restored: true}
 		return nil
 	}
 	if initial[0].Quantity >= 2_000_000_000 {
 		return &smokeFailure{CheckID: "inventory_write", ErrorCode: "test_quantity_overflow"}
 	}
+	writer, err := registry.InventoryWriter(account, runtime, nil)
+	if err != nil {
+		return connectorFailure("inventory_write", err)
+	}
 	testQuantity := initial[0].Quantity + 1
 	evidence.Write.Attempted = true
 	writeKey := smokeKey(cfg, "stock-write")
-	_, writeErr := connector.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{ProductRemoteID: product.RemoteID, VariantRemoteID: variant.RemoteID, LocationRemoteID: location.RemoteID, Quantity: testQuantity, IdempotencyKey: writeKey})
+	writeRequest := sdk.InventoryWriteRequest{ProductRemoteID: product.RemoteID, VariantRemoteID: variant.RemoteID, LocationRemoteID: location.RemoteID, Quantity: testQuantity, IdempotencyKey: writeKey}
+	_, writeErr := writer.WriteInventory(ctx, account, runtime, writeRequest)
 	if writeErr != nil {
-		return reconcileOzonAfterWriteError(ctx, cfg, connector, account, runtime, product.RemoteID, location.RemoteID, variant.RemoteID, initial[0].Quantity, testQuantity, readInventory, evidence, writeErr)
+		return reconcileAfterWriteError(ctx, cfg, writer, account, runtime, writeRequest, initial[0].Quantity, testQuantity, readInventory, evidence, writeErr)
 	}
-	observed, observedValid, failure := waitOzonQuantity(ctx, readInventory, testQuantity)
+	observed, observedValid, failure := waitInventoryQuantity(ctx, readInventory, testQuantity)
 	if failure != nil {
-		return restoreOzonStock(ctx, cfg, connector, account, runtime, product.RemoteID, location.RemoteID, variant.RemoteID, initial[0].Quantity, observed, observedValid, readInventory, evidence, failure)
+		return restoreInventory(ctx, cfg, writer, account, runtime, writeRequest, initial[0].Quantity, observed, observedValid, readInventory, evidence, failure)
 	}
 	evidence.Write.ReadAfterWrite = true
-	restoreKey := smokeKey(cfg, "stock-restore")
-	if _, err = connector.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{ProductRemoteID: product.RemoteID, VariantRemoteID: variant.RemoteID, LocationRemoteID: location.RemoteID, Quantity: initial[0].Quantity, IdempotencyKey: restoreKey}); err != nil {
+	restoreRequest := writeRequest
+	restoreRequest.Quantity = initial[0].Quantity
+	restoreRequest.IdempotencyKey = smokeKey(cfg, "stock-restore")
+	if _, err = writer.WriteInventory(ctx, account, runtime, restoreRequest); err != nil {
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: normalizedErrorCode(err)}
 	}
-	if _, _, failure = waitOzonQuantity(ctx, readInventory, initial[0].Quantity); failure != nil {
+	if _, _, failure = waitInventoryQuantity(ctx, readInventory, initial[0].Quantity); failure != nil {
 		return failure
 	}
 	evidence.Write.Restored = true
@@ -499,21 +441,10 @@ func runOzon(ctx context.Context, cfg config, evidence *smokeEvidence) *smokeFai
 	return nil
 }
 
-func selectWildberriesProduct(products []sdk.RemoteProduct, wantedVariant string) (sdk.RemoteVariant, bool) {
+func selectProduct(products []sdk.RemoteProduct, wantedVariant string) (sdk.RemoteProduct, sdk.RemoteVariant, bool) {
 	for _, product := range products {
 		for _, variant := range product.Variants {
 			if wantedVariant == "" || variant.RemoteID == wantedVariant {
-				return variant, true
-			}
-		}
-	}
-	return sdk.RemoteVariant{}, false
-}
-
-func selectOzonProduct(products []sdk.RemoteProduct, wantedOffer string) (sdk.RemoteProduct, sdk.RemoteVariant, bool) {
-	for _, product := range products {
-		for _, variant := range product.Variants {
-			if wantedOffer == "" || variant.RemoteID == wantedOffer {
 				return product, variant, true
 			}
 		}
@@ -530,7 +461,7 @@ func selectLocation(locations []sdk.RemoteLocation, wanted string) (sdk.RemoteLo
 	return sdk.RemoteLocation{}, false
 }
 
-func waitOzonQuantity(ctx context.Context, read func() ([]sdk.RemoteInventory, *smokeFailure), wanted int64) (int64, bool, *smokeFailure) {
+func waitInventoryQuantity(ctx context.Context, read func() ([]sdk.RemoteInventory, *smokeFailure), wanted int64) (int64, bool, *smokeFailure) {
 	var observed int64
 	var observedValid bool
 	for attempt := 0; attempt < 6; attempt++ {
@@ -554,7 +485,7 @@ func waitOzonQuantity(ctx context.Context, read func() ([]sdk.RemoteInventory, *
 	return observed, observedValid, &smokeFailure{CheckID: "read_after_write", ErrorCode: "quantity_mismatch"}
 }
 
-func restoreOzonStock(ctx context.Context, cfg config, connector *ozon.Connector, account sdk.Account, runtime sdk.Runtime, productID, locationID, offerID string, original, observed int64, observedValid bool, read func() ([]sdk.RemoteInventory, *smokeFailure), evidence *smokeEvidence, failure *smokeFailure) *smokeFailure {
+func restoreInventory(ctx context.Context, cfg config, writer sdk.InventoryWriter, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest, original, observed int64, observedValid bool, read func() ([]sdk.RemoteInventory, *smokeFailure), evidence *smokeEvidence, failure *smokeFailure) *smokeFailure {
 	if !observedValid {
 		evidence.Write.Restored = false
 		return failure
@@ -567,11 +498,13 @@ func restoreOzonStock(ctx context.Context, cfg config, connector *ozon.Connector
 		evidence.Write.Restored = false
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: "unexpected_remote_quantity"}
 	}
-	if _, err := connector.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{ProductRemoteID: productID, VariantRemoteID: offerID, LocationRemoteID: locationID, Quantity: original, IdempotencyKey: smokeKey(cfg, "stock-restore")}); err != nil {
+	request.Quantity = original
+	request.IdempotencyKey = smokeKey(cfg, "stock-restore")
+	if _, err := writer.WriteInventory(ctx, account, runtime, request); err != nil {
 		evidence.Write.Restored = false
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: normalizedErrorCode(err)}
 	}
-	if _, restoredValid, restoreFailure := waitOzonQuantity(ctx, read, original); restoreFailure != nil || !restoredValid {
+	if _, restoredValid, restoreFailure := waitInventoryQuantity(ctx, read, original); restoreFailure != nil || !restoredValid {
 		evidence.Write.Restored = false
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: "restore_not_confirmed"}
 	}
@@ -579,7 +512,7 @@ func restoreOzonStock(ctx context.Context, cfg config, connector *ozon.Connector
 	return failure
 }
 
-func reconcileOzonAfterWriteError(ctx context.Context, cfg config, connector *ozon.Connector, account sdk.Account, runtime sdk.Runtime, productID, locationID, offerID string, original, testQuantity int64, read func() ([]sdk.RemoteInventory, *smokeFailure), evidence *smokeEvidence, writeErr error) *smokeFailure {
+func reconcileAfterWriteError(ctx context.Context, cfg config, writer sdk.InventoryWriter, account sdk.Account, runtime sdk.Runtime, request sdk.InventoryWriteRequest, original, testQuantity int64, read func() ([]sdk.RemoteInventory, *smokeFailure), evidence *smokeEvidence, writeErr error) *smokeFailure {
 	items, readFailure := read()
 	if readFailure != nil {
 		return &smokeFailure{CheckID: "inventory_write", ErrorCode: "write_outcome_unknown"}
@@ -593,10 +526,12 @@ func reconcileOzonAfterWriteError(ctx context.Context, cfg config, connector *oz
 	if observed != testQuantity {
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: "unexpected_remote_quantity"}
 	}
-	if _, restoreErr := connector.WriteInventory(ctx, account, runtime, sdk.InventoryWriteRequest{ProductRemoteID: productID, VariantRemoteID: offerID, LocationRemoteID: locationID, Quantity: original, IdempotencyKey: smokeKey(cfg, "stock-restore")}); restoreErr != nil {
+	request.Quantity = original
+	request.IdempotencyKey = smokeKey(cfg, "stock-restore")
+	if _, restoreErr := writer.WriteInventory(ctx, account, runtime, request); restoreErr != nil {
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: normalizedErrorCode(restoreErr)}
 	}
-	if _, restoredValid, restoreFailure := waitOzonQuantity(ctx, read, original); restoreFailure != nil || !restoredValid {
+	if _, restoredValid, restoreFailure := waitInventoryQuantity(ctx, read, original); restoreFailure != nil || !restoredValid {
 		evidence.Write.Restored = false
 		return &smokeFailure{CheckID: "cleanup", ErrorCode: "restore_not_confirmed"}
 	}

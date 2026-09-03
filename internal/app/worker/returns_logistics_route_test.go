@@ -129,7 +129,7 @@ func returnLogisticsRouteForTest(t *testing.T, store *returnLogisticsStoreStub, 
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	account := sdk.Account{ID: "pochta-account", OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ConnectorID: "pochta-russia", Family: sdk.FamilyLogistics, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: now, UpdatedAt: now}
+	account := sdk.Account{ID: "logistics-account", OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ConnectorID: "logistics-a", Family: sdk.FamilyLogistics, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: now, UpdatedAt: now}
 	accounts := logisticsCancelAccountStub{account: account, settings: []sdk.AccountCapabilitySetting{{Capability: "logistics.return.create", Direction: sdk.CapabilityWrite, Risk: sdk.CapabilityRiskWriteSensitive, ApprovalRequired: true, Enabled: true}}}
 	route, err := newReturnLogisticsRoute(store, accounts, runtime, func(context.Context, tenancy.Scope, sdk.Account) (sdk.Runtime, error) {
 		return logisticsCancelRuntimeValue{}, nil
@@ -147,7 +147,7 @@ func returnLogisticsOperationForWorker() core.ReturnLogisticsOperation {
 		OrganizationID:     "018f1c8a-7b3c-7def-8000-000000000001",
 		WorkspaceID:        "018f1c8a-7b3c-7def-8000-000000000002",
 		ReturnID:           "018f1c8a-7b3c-7def-8000-000000000011",
-		ConnectorAccountID: "pochta-account",
+		ConnectorAccountID: "logistics-account",
 		OriginalRemoteID:   "RA644000001RU",
 		ExternalID:         "return-001",
 		MailType:           "POSTAL_PARCEL",

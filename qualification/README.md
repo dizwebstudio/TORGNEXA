@@ -115,6 +115,21 @@ export TORGNEXA_MARKETPLACE_SMOKE_ACCOUNT_REF=marketplace-sandbox-01
 export TORGNEXA_MARKETPLACE_SMOKE_RELEASE_COMMIT=$(git rev-parse HEAD)
 export TORGNEXA_MARKETPLACE_SMOKE_CATEGORY_CODE=123
 export TORGNEXA_MARKETPLACE_SMOKE_OUTPUT=/absolute/path/marketplace-live-smoke.json
+# The launcher maps the provider credential into this callback-scoped secret.
+# For the two-line credential use: client-id<newline>api-key.
+export TORGNEXA_MARKETPLACE_SMOKE_SECRET='credential-material'
+export TORGNEXA_MARKETPLACE_SMOKE_WAREHOUSE_ID=dedicated-warehouse-id
+export TORGNEXA_MARKETPLACE_SMOKE_VARIANT_ID=dedicated-variant-id
+# To bind this smoke to the complete golden path, set all nine opaque refs:
+export TORGNEXA_MARKETPLACE_SMOKE_FLOW_REF=golden-path/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_ORDER_REF=order/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_RESERVATION_REF=reservation/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_SHIPMENT_REF=shipment/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_RETURN_REF=return/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_REFUND_REF=refund/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_SETTLEMENT_REF=settlement/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_MARKING_REF=marking/flow-01
+export TORGNEXA_MARKETPLACE_SMOKE_EDO_REF=edo/flow-01
 make marketplace-live-smoke
 ```
 
@@ -139,14 +154,17 @@ non-production account; при отсутствии внешнего досту�
 Для release-runner добавлен объединяющий fail-closed gate:
 `make production-golden-path`. Он сначала запускает
 `make order-fulfillment-qualification`, а затем требует retained redacted
-evidence, привязанный к текущему `HEAD`:
+evidence, привязанный к текущему `HEAD` и одному общему `flow_ref`:
 
 - полный marketplace evidence (`TORGNEXA_MARKETPLACE_EVIDENCE_FILE`, только
-  `full` scope) и credentialed marketplace live smoke;
+  `full` scope), credentialed marketplace live smoke и отдельный live
+  return/refund/compensation artifact;
 - отдельные credentialed non-production evidence для carrier, payment и
-  fiscal (`TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE`,
+  fiscal, Chestny ZNAK и ЭДО (`TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE`,
   `TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE`,
-  `TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE`);
+  `TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE`,
+  `TORGNEXA_MARKING_GOLDEN_PATH_EVIDENCE_FILE`,
+  `TORGNEXA_EDO_GOLDEN_PATH_EVIDENCE_FILE`);
 - aggregate manifest в
   `TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE`.
 
@@ -156,22 +174,41 @@ evidence, привязанный к текущему `HEAD`:
 export TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE=/evidence/production-golden-path.json
 export TORGNEXA_MARKETPLACE_EVIDENCE_FILE=/evidence/marketplace-remote-full.json
 export TORGNEXA_MARKETPLACE_LIVE_SMOKE_EVIDENCE_FILE=/evidence/marketplace-live-smoke.json
+export TORGNEXA_MARKETPLACE_COMPENSATION_EVIDENCE_FILE=/evidence/marketplace-compensation.json
 export TORGNEXA_CARRIER_GOLDEN_PATH_EVIDENCE_FILE=/evidence/carrier-golden-path.json
 export TORGNEXA_PAYMENT_GOLDEN_PATH_EVIDENCE_FILE=/evidence/payment-golden-path.json
 export TORGNEXA_FISCAL_GOLDEN_PATH_EVIDENCE_FILE=/evidence/fiscal-golden-path.json
+export TORGNEXA_MARKING_GOLDEN_PATH_EVIDENCE_FILE=/evidence/chestny-znak-golden-path.json
+export TORGNEXA_EDO_GOLDEN_PATH_EVIDENCE_FILE=/evidence/edo-golden-path.json
 export TORGNEXA_P4_REPOSITORY=OWNER/NAME
 make production-golden-path
 ```
 
 Контракты aggregate и connector evidence находятся в
-`contracts/qualification/production-golden-path-v1.schema.json` и
-`contracts/qualification/connector-golden-path-evidence-v1.schema.json`.
-Gate проверяет SHA-256 всех пяти файлов, один release commit/repository,
-совпадение connector/account refs, полный путь order → reservation →
-pick/pack → label → shipment → return → refund → settlement → P&L →
-reconciliation, а также duplicate/out-of-order/timeout/approval/rate-limit и
-rollback checks. Он не принимает synthetic fixture вместо внешнего evidence,
-не вызывает провайдеры и не принимает credentials в аргументах или файлах.
+`contracts/qualification/production-golden-path-v2.schema.json`,
+`contracts/qualification/connector-golden-path-evidence-v2.schema.json`,
+`contracts/qualification/marketplace-remote-evidence-v2.schema.json`,
+`contracts/qualification/marketplace-live-smoke-v2.schema.json` и
+`contracts/qualification/marketplace-compensation-evidence-v2.schema.json`.
+Gate проверяет SHA-256 всех восьми файлов, один release commit/repository,
+совпадение connector/account refs и opaque order/reservation/shipment/return/
+refund/settlement/marking/EDO refs во всех артефактах. Manifest дополнительно
+требует полный путь order → reservation → pick/pack → label → shipment →
+return → refund → settlement → P&L → reconciliation, отдельную
+marketplace-компенсацию, live Chestny ZNAK, live ЭДО, фискализацию и
+duplicate/out-of-order/timeout/approval/rate-limit/rollback checks. Он не
+принимает synthetic fixture вместо внешнего evidence, не вызывает провайдеры
+сам и не принимает credentials в аргументах или файлах.
+
+`scripts/marketplace_compensation_evidence.py` — отдельная проверка redacted
+артефакта, который должен быть создан фактическим non-production запуском
+connector-а. В нём обязательны наблюдения `return=received`,
+`refund=accepted`, `compensation=accepted`, `settlement=matched`,
+read-after-write, idempotent replay и reconciliation. Артефакты Chestny ZNAK
+и ЭДО проходят v2 connector validator с обязательными `status_read`/
+`reconciliation` и `document_send`/`document_status`/`reconciliation`.
+Поэтому отсутствие официальных credentials или провал любого внешнего вызова
+оставляет release заблокированным.
 
 ## Внешняя квалификация финансового и складского контуров
 

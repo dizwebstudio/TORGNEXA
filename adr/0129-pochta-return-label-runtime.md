@@ -30,9 +30,27 @@ opaque `ArtifactRef` с префиксом `pochta-russia:form:return:`.
 не сохраняются в SDK или событиях. Ошибки маршрута, не-PDF и неверный RPO
 fail-closed.
 
-## Compatibility and operational impact
+## Alternatives considered
+
+Оставить возвратный ярлык только в provider-specific SDK было отклонено:
+существующий нейтральный label route уже предназначен для bounded PDF-форм.
+
+## Compatibility impact
 
 Изменение обратно совместимо: существующий `format=pdf` не меняется. Клиент
-должен явно передавать `format=return_pdf` для возвратной этикетки. Live
-qualification остаётся отдельным release gate для тестового кабинета Почты
-России и проверки доступности формы на реальном RPO.
+должен явно передавать `format=return_pdf` для возвратной этикетки.
+
+## Migration and data impact
+
+Миграция не требуется: используется существующий label request и временный
+artifact boundary без новой записи в доменной базе.
+
+## Security and privacy impact
+
+Токены и бинарное содержимое остаются в host transport; наружу выходит только
+проверенный opaque digest reference без адресов или иных PII.
+
+## Operational impact
+
+Live qualification остаётся отдельным release gate для тестового кабинета
+Почты России и проверки доступности формы на реальном RPO.

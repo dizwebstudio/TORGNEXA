@@ -19,10 +19,47 @@ func TestSmokeKeyChangesPerRun(t *testing.T) {
 	}
 }
 
-func TestHTTPTransportRejectsUnallowlistedHost(t *testing.T) {
-	transport := newHTTPTransport()
-	if _, _, _, _, err := transport.call(t.Context(), "GET", "example.invalid", "/ping", nil, nil, nil); err == nil {
-		t.Fatal("unallowlisted host was accepted")
+func TestGoldenPathFlowIsAllOrNothingAndRedacted(t *testing.T) {
+	variables := map[string]string{
+		"TORGNEXA_MARKETPLACE_SMOKE_FLOW_REF":        "golden-path/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_ORDER_REF":       "order/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_RESERVATION_REF": "reservation/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_SHIPMENT_REF":    "shipment/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_RETURN_REF":      "return/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_REFUND_REF":      "refund/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_SETTLEMENT_REF":  "settlement/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_MARKING_REF":     "marking/flow-01",
+		"TORGNEXA_MARKETPLACE_SMOKE_EDO_REF":         "edo/flow-01",
+	}
+	for name, value := range variables {
+		t.Setenv(name, value)
+	}
+	flow, err := loadGoldenPathFlow()
+	if err != nil || flow == nil || flow.OrderRef != "order/flow-01" || flow.EDORef != "edo/flow-01" {
+		t.Fatalf("golden path flow = %+v, err=%v", flow, err)
+	}
+	t.Setenv("TORGNEXA_MARKETPLACE_SMOKE_EDO_REF", "")
+	if _, err = loadGoldenPathFlow(); err == nil {
+		t.Fatal("incomplete golden path flow was accepted")
+	}
+	t.Setenv("TORGNEXA_MARKETPLACE_SMOKE_EDO_REF", "edo/flow-01")
+	t.Setenv("TORGNEXA_MARKETPLACE_SMOKE_ORDER_REF", "Bearer abc")
+	if _, err = loadGoldenPathFlow(); err == nil {
+		t.Fatal("unsafe golden path reference was accepted")
+	}
+}
+
+func TestSecretRuntimeRequiresTheBoundSecretReference(t *testing.T) {
+	runtime := secretRuntime{value: "synthetic-secret"}
+	var received string
+	if err := runtime.Secrets().UseSecret(t.Context(), smokeSecretReference, func(value []byte) error {
+		received = string(value)
+		return nil
+	}); err != nil {
+		t.Fatalf("bound secret reference rejected: %v", err)
+	}
+	if received != "synthetic-secret" {
+		t.Fatalf("received secret=%q", received)
 	}
 }
 
@@ -37,7 +74,7 @@ func TestEvidenceIsRedactedAndWrittenWithPrivatePermissions(t *testing.T) {
 		Target:         "dedicated-non-production",
 		Repository:     "owner/repository",
 		ReleaseCommit:  "0123456789abcdef0123456789abcdef01234567",
-		ConnectorID:    "ozon",
+		ConnectorID:    "marketplace-connector",
 		AccountRef:     "sandbox-account",
 		QualifiedAt:    "2026-09-03T10:00:00Z",
 		CredentialMode: "env_only_secret_accessor",

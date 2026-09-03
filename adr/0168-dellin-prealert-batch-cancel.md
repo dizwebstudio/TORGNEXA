@@ -17,6 +17,16 @@ SecretProvider-scoped login-сессии. Допускается только HT
 `data.state=success`; host возвращает точный batch ID, `CANCELLED`,
 `cancelled=true` и время наблюдения.
 
+## Alternatives considered
+
+Использовать отмену отдельного shipment или ручное удаление партии было
+отклонено: Pre-Alert имеет отдельную remote identity и state machine.
+
+## Consequences
+
+Оператор получает bounded approval-bound cancellation для уже созданной
+Pre-Alert заявки; остальные carrier operations не меняют свой lifecycle.
+
 ## Security and privacy impact
 
 Маршрут требует authenticated workspace scope, активный logistics account,

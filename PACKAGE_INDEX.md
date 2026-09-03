@@ -58,9 +58,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - adrs: 183
 - tasks: 234
 - milestones: 14
-- contracts: 254
+- contracts: 259
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3537
+- total source files (excluding local secrets/build/dependency/cache trees): 3565
 
 
 ## Connector category layout
@@ -959,6 +959,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `cmd/scheduler/main.go`
 - `cmd/torgnexa-connector-conformance/main.go`
 - `cmd/torgnexa-connector-emulator/main.go`
+- `cmd/torgnexa-marketplace-live-smoke/main.go`
+- `cmd/torgnexa-marketplace-live-smoke/main_test.go`
 - `cmd/torgnexa-runtime-qualifier/main.go`
 - `cmd/torgnexa-runtime-qualifier/main_test.go`
 - `cmd/torgnexa-slo-report/main.go`
@@ -1256,12 +1258,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/marketplaces/ozon/fixtures/warehouses.json`
 - `connectors/marketplaces/ozon/inventory.go`
 - `connectors/marketplaces/ozon/manifest.json`
+- `connectors/marketplaces/ozon/order_actions.go`
 - `connectors/marketplaces/ozon/orders.go`
 - `connectors/marketplaces/ozon/presentation.json`
 - `connectors/marketplaces/ozon/prices.go`
 - `connectors/marketplaces/ozon/products.go`
 - `connectors/marketplaces/ozon/publication.go`
+- `connectors/marketplaces/ozon/taxonomy.go`
 - `connectors/marketplaces/wildberries/advertising.go`
+- `connectors/marketplaces/wildberries/advertising_write.go`
 - `connectors/marketplaces/wildberries/conformance.go`
 - `connectors/marketplaces/wildberries/connector.go`
 - `connectors/marketplaces/wildberries/connector_test.go`
@@ -1272,11 +1277,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `connectors/marketplaces/wildberries/fixtures/warehouses.json`
 - `connectors/marketplaces/wildberries/inventory.go`
 - `connectors/marketplaces/wildberries/manifest.json`
+- `connectors/marketplaces/wildberries/order_actions.go`
 - `connectors/marketplaces/wildberries/orders.go`
 - `connectors/marketplaces/wildberries/presentation.json`
 - `connectors/marketplaces/wildberries/prices.go`
 - `connectors/marketplaces/wildberries/products.go`
 - `connectors/marketplaces/wildberries/publication.go`
+- `connectors/marketplaces/wildberries/taxonomy.go`
 - `connectors/marketplaces/yandex-market/config.go`
 - `connectors/marketplaces/yandex-market/conformance.go`
 - `connectors/marketplaces/yandex-market/connector.go`
@@ -1817,7 +1824,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/privacy/retention-policy.schema.json`
 - `contracts/protobuf/event_envelope.proto`
 - `contracts/publication-quality/profile.schema.json`
+- `contracts/qualification/connector-golden-path-evidence-v1.schema.json`
+- `contracts/qualification/external-qualification-evidence-v1.schema.json`
+- `contracts/qualification/financial-warehouse-qualification-v1.schema.json`
+- `contracts/qualification/marketplace-live-smoke-v1.schema.json`
 - `contracts/qualification/marketplace-remote-evidence-v1.schema.json`
+- `contracts/qualification/production-golden-path-v1.schema.json`
 - `contracts/reconciliation/README.md`
 - `contracts/reconciliation/action-v1.schema.json`
 - `contracts/reconciliation/drift-v1.schema.json`
@@ -3094,14 +3106,19 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/builtinruntime/catalog_probe_test.go`
 - `internal/platform/builtinruntime/certtransport.go`
 - `internal/platform/builtinruntime/certtransport_test.go`
+- `internal/platform/builtinruntime/commerce_webhook.go`
+- `internal/platform/builtinruntime/commerce_webhook_test.go`
 - `internal/platform/builtinruntime/dolyami_transport.go`
 - `internal/platform/builtinruntime/dolyami_transport_test.go`
 - `internal/platform/builtinruntime/http.go`
 - `internal/platform/builtinruntime/http_test.go`
+- `internal/platform/builtinruntime/listing_taxonomy.go`
+- `internal/platform/builtinruntime/listing_taxonomy_test.go`
 - `internal/platform/builtinruntime/local_ai_transport.go`
 - `internal/platform/builtinruntime/local_ai_transport_test.go`
 - `internal/platform/builtinruntime/logistics_transport.go`
 - `internal/platform/builtinruntime/logistics_transport_test.go`
+- `internal/platform/builtinruntime/marketplace_live_smoke.go`
 - `internal/platform/builtinruntime/ozon_transport.go`
 - `internal/platform/builtinruntime/paymentstransport.go`
 - `internal/platform/builtinruntime/paymentstransport_test.go`
@@ -3231,8 +3248,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/logging/logging_test.go`
 - `internal/platform/logistics/logistics.go`
 - `internal/platform/logistics/logistics_test.go`
-- `internal/platform/marketplacetaxonomy/profile.go`
-- `internal/platform/marketplacetaxonomy/profile_test.go`
 - `internal/platform/marking/ephemeral.go`
 - `internal/platform/marking/ephemeral_test.go`
 - `internal/platform/marking/marking.go`
@@ -3645,11 +3660,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-customer-service.sh`
 - `scripts/check-ecosystem-support.sh`
 - `scripts/check-financial-completeness.sh`
+- `scripts/check-financial-warehouse-qualification.sh`
 - `scripts/check-frontend-shell.sh`
 - `scripts/check-generated-sdks.sh`
 - `scripts/check-js-supply-chain.sh`
 - `scripts/check-marketplace-growth-qualification.sh`
 - `scripts/check-marketplace-listing-qualification.sh`
+- `scripts/check-marketplace-live-smoke.sh`
 - `scripts/check-marketplace-publication-qualification.sh`
 - `scripts/check-marketplace-remote-evidence.sh`
 - `scripts/check-marking-qualification.sh`
@@ -3663,6 +3680,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-postgres-backup-restore.sh`
 - `scripts/check-postgres-upgrade.sh`
 - `scripts/check-pre-v1-baseline.sh`
+- `scripts/check-production-golden-path.sh`
 - `scripts/check-production-health.sh`
 - `scripts/check-production-qualification.sh`
 - `scripts/check-secret-canary.sh`
@@ -3675,11 +3693,15 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/community-demo-member.sql`
 - `scripts/community-e2e.mjs`
 - `scripts/community-e2e.sh`
+- `scripts/connector_golden_path_evidence.py`
 - `scripts/cscart-smoke.sh`
 - `scripts/dzen-content-transformer-test.py`
 - `scripts/dzen-content-transformer.py`
 - `scripts/ensure-community-demo-user.sh`
 - `scripts/ensure-community-secrets-key.sh`
+- `scripts/external_qualification_evidence.py`
+- `scripts/financial_warehouse_qualification.py`
+- `scripts/financial_warehouse_qualification_test.py`
 - `scripts/generate-connector-readiness.py`
 - `scripts/generate-frontend-connector-catalog.py`
 - `scripts/generate-package-index.py`
@@ -3689,6 +3711,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/init-community-env.sh`
 - `scripts/install-security-tools.sh`
 - `scripts/magento-smoke.sh`
+- `scripts/marketplace_live_smoke_evidence.py`
+- `scripts/marketplace_live_smoke_evidence_test.py`
 - `scripts/marketplace_remote_evidence.py`
 - `scripts/marketplace_remote_evidence_test.py`
 - `scripts/medusa-docker/medusa-config.ts`
@@ -3706,6 +3730,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/package-release-evidence.sh`
 - `scripts/prestashop-smoke.sh`
 - `scripts/production-rollout.sh`
+- `scripts/production_golden_path.py`
+- `scripts/production_golden_path_test.py`
 - `scripts/promote-github-release.sh`
 - `scripts/runtime-load.py`
 - `scripts/saleor-smoke.sh`
@@ -3715,7 +3741,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/shopware-smoke.sh`
 - `scripts/stage-github-release.sh`
 - `scripts/verify-action-pins.sh`
+- `scripts/verify-p4-release-evidence.py`
 - `scripts/verify-release-evidence-external.sh`
+- `scripts/verify_p4_release_evidence_test.py`
 - `scripts/woocommerce-smoke.sh`
 - `sdk/examples/go/go.mod`
 - `sdk/examples/go/main.go`

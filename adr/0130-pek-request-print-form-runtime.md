@@ -29,9 +29,27 @@ Capability, Core-модель, база данных и секретная мо�
 попадают в SDK, события или журналы. Неподдержанный `type=multiple`, любой
 неоднозначный сетевой результат и malformed response остаются fail-closed.
 
-## Compatibility and operational impact
+## Alternatives considered
+
+Переиспользовать `type=multiple` было отклонено, потому что пакетная печать
+имеет другой риск, размер ответа и отдельный контракт qualification.
+
+## Compatibility impact
 
 Изменение обратно совместимо: запросы `format=pdf` не меняются. Клиент должен
-явно использовать `format=request_pdf` для формы заявки. Live qualification
-остаётся release gate для тестового кабинета ПЭК и проверки реального
-документа; это изменение не утверждает пакетную печать или операции записи.
+явно использовать `format=request_pdf` для формы заявки.
+
+## Migration and data impact
+
+Миграция не требуется: документ передаётся через существующий bounded label
+artifact boundary и не создаёт новую доменную запись.
+
+## Security and privacy impact
+
+Cargo code, credentials и PDF bytes остаются внутри host transport; наружу
+выходит только проверенный opaque artifact reference.
+
+## Operational impact
+
+Live qualification остаётся release gate для тестового кабинета ПЭК и проверки
+реального документа; пакетная печать и операции записи не объявляются.

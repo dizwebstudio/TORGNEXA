@@ -55,3 +55,13 @@ Refund requires an active production merchant account with Password3 enabled.
 The live qualification fixture must cover full/partial requests, failed
 provider responses, missing OpKey, non-successful payments and timeout
 recovery.
+
+## Alternatives considered
+
+Keeping refunds unsupported was rejected because the official merchant API now
+provides a bounded request path compatible with the existing payment lifecycle.
+
+## Migration and data impact
+
+No database migration is required; the existing refund status, remote request
+identifier and reconciliation records are reused unchanged.

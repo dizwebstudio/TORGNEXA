@@ -18,11 +18,11 @@
     "docs/connectors/yandex-market/conformance-plan.md",
     "docs/connectors/yandex-market/reconciliation.md",
     "docs/connectors/yandex-market/spec.md",
+    "frontend/src/generated/connector-catalog.ts",
     "internal/platform/builtinruntime/registry.go",
     "internal/platform/builtinruntime/support_generated.go",
     "internal/platform/builtinruntime/support_test.go",
     "internal/platform/connectors/catalog_generated.go",
-    "frontend/src/generated/connector-catalog.ts",
     "tasks/BACKLOG.md",
     "tasks/EXECUTION_PLAN.md",
     "tasks/issues/172-yandex-market-inventory-write.md"

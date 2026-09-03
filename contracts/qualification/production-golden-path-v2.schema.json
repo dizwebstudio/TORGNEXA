@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/qualification/production-golden-path-v2.json",
+  "title": "TORGNEXA complete production golden path qualification v2",
+  "description": "Redacted release evidence binding one marketplace order, carrier shipment, payment/fiscal lifecycle, return/refund/settlement, Chestny ZNAK and EDO live evidence to the provider-neutral synthetic path.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "scope", "environment", "target", "repository", "release_commit", "qualified_at", "flow", "connectors", "artifacts", "checks", "failure_matrix", "rollback"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "status": {"const": "PASS"},
+    "scope": {"const": "credentialed-full"},
+    "environment": {"const": "non-production"},
+    "target": {"const": "dedicated-non-production"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,139}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "qualified_at": {"type": "string", "format": "date-time"},
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_ref", "order_ref", "reservation_ref", "shipment_ref", "return_ref", "refund_ref", "settlement_ref", "marking_ref", "edo_ref", "links"],
+      "properties": {
+        "flow_ref": {"$ref": "#/$defs/ref"},
+        "order_ref": {"$ref": "#/$defs/ref"},
+        "reservation_ref": {"$ref": "#/$defs/ref"},
+        "shipment_ref": {"$ref": "#/$defs/ref"},
+        "return_ref": {"$ref": "#/$defs/ref"},
+        "refund_ref": {"$ref": "#/$defs/ref"},
+        "settlement_ref": {"$ref": "#/$defs/ref"},
+        "marking_ref": {"$ref": "#/$defs/ref"},
+        "edo_ref": {"$ref": "#/$defs/ref"},
+        "links": {"type": "array", "minItems": 9, "maxItems": 9, "uniqueItems": true, "items": {"$ref": "#/$defs/link"}}
+      }
+    },
+    "connectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marketplace", "carrier", "payment", "fiscal", "marking", "edo"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/connector"},
+        "carrier": {"$ref": "#/$defs/connector"},
+        "payment": {"$ref": "#/$defs/connector"},
+        "fiscal": {"$ref": "#/$defs/connector"},
+        "marking": {"$ref": "#/$defs/connector"},
+        "edo": {"$ref": "#/$defs/connector"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "evidence_ref", "sha256"],
+        "properties": {
+          "kind": {"enum": ["marketplace-remote", "marketplace-live-smoke", "marketplace-compensation", "carrier", "payment", "fiscal", "chestny-znak", "edo"]},
+          "evidence_ref": {"$ref": "#/$defs/ref"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "status", "evidence_ref"],
+        "properties": {
+          "id": {"enum": ["marketplace_live_smoke", "order_import", "reservation", "marketplace_compensation", "pick_pack", "label", "shipment_handoff", "return_inspection", "refund_settlement", "fiscalization", "chestny_znak_live", "edo_live", "settlement_reconciliation", "profitability", "reconciliation"]},
+          "owner": {"enum": ["marketplace", "platform", "carrier", "payment", "fiscal", "marking", "edo"]},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "failure_matrix": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {"enum": ["duplicate_commands", "duplicate_webhooks", "out_of_order_events", "worker_crash_resume", "lease_loss", "timeout_after_remote_commit", "insufficient_stock", "expired_label", "over_refund", "cross_tenant_access", "approval_denial", "rate_limit"]},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "evidence_ref"],
+      "properties": {
+        "verified": {"const": true},
+        "evidence_ref": {"$ref": "#/$defs/ref"}
+      }
+    }
+  },
+  "$defs": {
+    "ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "connector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector_id", "account_ref", "evidence_ref"],
+      "properties": {
+        "connector_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "account_ref": {"$ref": "#/$defs/ref"},
+        "evidence_ref": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "evidence_ref"],
+      "properties": {
+        "id": {"enum": ["order_to_reservation", "reservation_to_shipment", "shipment_to_return", "return_to_refund", "refund_to_settlement", "settlement_to_reconciliation", "order_to_marking", "refund_to_fiscal", "settlement_to_edo"]},
+        "from": {"$ref": "#/$defs/ref"},
+        "to": {"$ref": "#/$defs/ref"},
+        "evidence_ref": {"$ref": "#/$defs/ref"}
+      }
+    }
+  }
+}

@@ -52,10 +52,10 @@
   "existing_adrs": [
     "adr/0010-connector-capabilities.md",
     "adr/0039-connector-conformance-admission-gate.md",
-    "adr/0078-plugin-marketplace.md",
+    "adr/0078-final-cloud-billing-separated-from-commerce-payments.md",
     "adr/0090-built-in-provider-runtime-composition-boundary.md",
     "adr/0177-connector-depth-and-readiness.md",
-    "adr/0179-customer-service-operational-maturity.md",
+    "adr/0179-customer-service-inbox-operational-maturity.md",
     "adr/0180-mobile-warehouse-fulfillment.md"
   ],
   "gap_audit": {"performed": true, "prompt": "prompts/05-architecture-gap-audit.txt", "decision": "architecture_change"},

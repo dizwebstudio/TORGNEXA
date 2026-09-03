@@ -17,7 +17,22 @@ account/channel capability gates, leased worker mapping and existing MAX
 inline-keyboard encoder. No provider-specific fields, callback data or new
 remote lifecycle are introduced.
 
-## Security and compatibility impact
+## Alternatives considered
+
+Оставить capability закрытой было отклонено: adapter и общий Social boundary
+уже валидируют HTTPS buttons без нового provider-specific payload.
+
+## Consequences
+
+MAX получает ту же bounded button projection и lifecycle, что и Telegram;
+callback-data и незаявленные remote operations остаются недоступными.
+
+## Migration and data impact
+
+Миграция не требуется: меняется только runtime support projection, а
+существующие social content records остаются совместимыми.
+
+## Security and privacy impact
 
 Task 181's HTTPS-only, bounded button contract remains authoritative. The
 change is additive to runtime capability metadata and generated projections;
@@ -30,3 +45,9 @@ The UI advertises buttons only when the MAX connector account and channel have
 the admitted capability. Removing the runtime capability or account setting
 stops new button publications without affecting existing publication evidence.
 Credentialed live MAX qualification remains a release gate.
+
+## Compatibility impact
+
+The provider-neutral publication contract and existing social account identifiers
+remain unchanged. Connectors that do not advertise the button capability
+continue to be rejected by the capability gate.

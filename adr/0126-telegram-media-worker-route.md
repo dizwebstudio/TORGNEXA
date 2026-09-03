@@ -54,3 +54,13 @@ no API, event or database migration is required.
 The current rate limit and timeout apply to multipart requests, with a separate
 128 MiB body ceiling above the adapter's 10 MiB photo and 50 MiB video limits.
 Live qualification still requires a non-production bot and dedicated channel.
+
+## Alternatives considered
+
+Keeping media SDK-only was rejected because the released-upload worker bridge
+already provides the required quarantine and bounded egress controls.
+
+## Migration and data impact
+
+No database migration is required; existing upload-release, publication and
+receipt records continue to store only their provider-neutral projections.

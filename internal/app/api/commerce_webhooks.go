@@ -43,12 +43,15 @@ type commerceWebhookReceiverResolver interface {
 	CommerceWebhookReceiver(sdk.Account, sdk.Runtime, builtinruntime.ConfigLoader) (builtinruntime.CommerceWebhookReceiver, error)
 }
 
+type commerceWebhookHeaderResolver func(string, http.Header) (signature, topic string, ok bool)
+
 type commerceWebhookAPI struct {
 	accounts commerceWebhookAccounts
 	configs  commerceWebhookConfigs
 	secrets  secrets.SecretProvider
 	registry commerceWebhookReceiverResolver
 	dedup    func(tenancy.Scope) sdk.CommerceWebhookDeduplicator
+	headers  commerceWebhookHeaderResolver
 }
 
 func newCommerceWebhookRoutes(accounts commerceWebhookAccounts, configs commerceWebhookConfigs, secretSource secrets.SecretProvider, registry commerceWebhookReceiverResolver, processor *inboxrepo.Processor) []PublicWebhookRoute {
@@ -57,7 +60,7 @@ func newCommerceWebhookRoutes(accounts commerceWebhookAccounts, configs commerce
 	}
 	api := commerceWebhookAPI{accounts: accounts, configs: configs, secrets: secretSource, registry: registry, dedup: func(scope tenancy.Scope) sdk.CommerceWebhookDeduplicator {
 		return commerceWebhookDeduplicator{processor: processor, scope: scope}
-	}}
+	}, headers: builtinruntime.CommerceWebhookHeaders}
 	return []PublicWebhookRoute{{Method: http.MethodPost, Path: commerceWebhooksPathPrefix, PathPrefix: true, Handler: http.HandlerFunc(api.receive)}}
 }
 
@@ -90,7 +93,11 @@ func (api commerceWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		acknowledgeWebhook(w)
 		return
 	}
-	signature, topic, ok := commerceWebhookHeaders(r, connectorID)
+	headerResolver := api.headers
+	if headerResolver == nil {
+		headerResolver = builtinruntime.CommerceWebhookHeaders
+	}
+	signature, topic, ok := headerResolver(connectorID, r.Header)
 	if !ok {
 		logger.Warn("commerce webhook headers missing or unsupported")
 		acknowledgeWebhook(w)
@@ -135,22 +142,6 @@ func (api commerceWebhookAPI) configLoader(scope tenancy.Scope) builtinruntime.C
 
 func commerceWebhookFamily(family sdk.Family) bool {
 	return family == sdk.FamilyMarketplace || family == sdk.FamilyStorefront
-}
-
-func commerceWebhookHeaders(r *http.Request, connectorID string) (signature, topic string, ok bool) {
-	var rawTopic string
-	switch connectorID {
-	case "saleor":
-		signature = strings.TrimSpace(r.Header.Get("Saleor-Signature"))
-		rawTopic = r.Header.Get("Saleor-Event")
-	case "woocommerce":
-		signature = strings.TrimSpace(r.Header.Get("X-WC-Webhook-Signature"))
-		rawTopic = r.Header.Get("X-WC-Webhook-Topic")
-	default:
-		return "", "", false
-	}
-	topic = normalizeCommerceWebhookTopic(rawTopic)
-	return signature, topic, signature != "" && topic != ""
 }
 
 func normalizeCommerceWebhookTopic(value string) string {

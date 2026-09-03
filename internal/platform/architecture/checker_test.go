@@ -46,6 +46,20 @@ func TestRepositoryIgnoresFrontendPackageManagerDependencies(t *testing.T) {
 	}
 }
 
+func TestRepositoryAllowsProviderNeutralIdentityChecks(t *testing.T) {
+	t.Parallel()
+	root := writeArchitectureFixture(t)
+	writeTestFile(t, root, "internal/core/synthetic/model.go", `package synthetic
+
+func sameAccount(accountID, connectorID string) bool {
+	return accountID != "" && accountID == connectorID
+}
+`)
+	if _, err := CheckRepository(context.Background(), root); err != nil {
+		t.Fatalf("provider-neutral identity validation must remain allowed: %v", err)
+	}
+}
+
 func TestRepositoryAcceptsSupplementalStageReview(t *testing.T) {
 	t.Parallel()
 	root := writeArchitectureFixture(t)

@@ -56,3 +56,13 @@ Media uploads can be substantially larger than JSON calls, so the transport has
 a separate 256 MiB request ceiling and reuses the provider's existing timeout,
 rate-limit and retry policy. Live qualification still requires a non-production
 MAX bot and dedicated channel.
+
+## Alternatives considered
+
+Keeping MAX media closed was rejected because the released-upload bridge and
+bounded host transport now cover the documented media flow safely.
+
+## Migration and data impact
+
+No database migration is required; upload-release, social publication and
+receipt records retain their existing provider-neutral representation.

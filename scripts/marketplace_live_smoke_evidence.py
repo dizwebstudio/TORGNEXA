@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from golden_path_linkage import validate_flow
 
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
@@ -40,6 +41,15 @@ _CHECKS = {
     "read_after_write",
     "cleanup",
 }
+_V2_COMMON_CHECKS = {
+    "health",
+    "products_read",
+    "inventory_locations_read",
+    "inventory_read",
+    "orders_read",
+    "taxonomy_read",
+}
+_V2_WRITE_CHECKS = {"inventory_write", "read_after_write", "cleanup"}
 
 
 def _require(condition: bool, message: str) -> None:
@@ -77,7 +87,10 @@ def validate_document(document: Any) -> None:
         "write",
     }
     _require(required <= document.keys(), "evidence is missing required fields")
-    _require(document["schema_version"] == 1, "schema_version must be 1")
+    _require(document["schema_version"] in {1, 2}, "schema_version must be 1 or 2")
+    if document["schema_version"] == 2:
+        _require("flow" in document, "v2 evidence must contain flow linkage")
+        validate_flow(document["flow"])
     _require(document["status"] in {"PASS", "FAIL"}, "status must be PASS or FAIL")
     _require(document["scope"] in {"read", "qualification"}, "scope is invalid")
     _require(document["environment"] == "non-production", "environment is not non-production")
@@ -111,6 +124,11 @@ def validate_document(document: Any) -> None:
         seen.add(check_id)
         _require(check.get("status") == "PASS", f"check {check_id} is not PASS")
         _require(isinstance(check.get("evidence_ref"), str) and _EVIDENCE_REF.fullmatch(check["evidence_ref"]), f"check {check_id} evidence_ref is invalid")
+    if document["schema_version"] == 2:
+        required_checks = set(_V2_COMMON_CHECKS)
+        if document["connector_id"] == "ozon":
+            required_checks |= _V2_WRITE_CHECKS
+        _require(seen == required_checks, "v2 marketplace smoke check set is incomplete")
 
     write = document["write"]
     _require(isinstance(write, dict), "write must be an object")

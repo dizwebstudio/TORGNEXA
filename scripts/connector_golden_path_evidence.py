@@ -8,6 +8,7 @@ import datetime as dt
 import re
 from typing import Any
 
+from golden_path_linkage import validate_flow
 from p4_common import (
     QualificationError,
     read_json,
@@ -31,6 +32,7 @@ TOP_LEVEL = {
     "checks",
     "rollback",
 }
+V2_TOP_LEVEL = TOP_LEVEL | {"flow", "observations"}
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$")
 SAFE_ID = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 CHECK_ID = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
@@ -38,6 +40,12 @@ REQUIRED_CHECKS = {
     "carrier": {"health", "rate", "label", "shipment_handoff", "return_inspection"},
     "payment": {"health", "refund", "settlement", "reconciliation"},
     "fiscal": {"health", "marking_edo", "refund_fiscalization", "close"},
+    "marking": {"health", "product_read", "status_read", "reconciliation"},
+    "edo": {"health", "document_send", "document_status", "reconciliation"},
+}
+V2_REQUIRED_CHECKS = {
+    **REQUIRED_CHECKS,
+    "fiscal": {"health", "fiscalization", "refund_fiscalization", "close"},
 }
 
 
@@ -71,14 +79,38 @@ def validate(data: Any, kind: str) -> None:
     if not isinstance(data, dict):
         fail("evidence root must be an object")
     reject_secret_shaped_fields(data)
-    unknown = set(data) - TOP_LEVEL
+    schema_version = data.get("schema_version")
+    allowed_top_level = V2_TOP_LEVEL if schema_version == 2 else TOP_LEVEL
+    unknown = set(data) - allowed_top_level
     if unknown:
         fail(f"unsupported top-level fields: {', '.join(sorted(unknown))}")
     missing = TOP_LEVEL - set(data)
     if missing:
         fail(f"missing top-level fields: {', '.join(sorted(missing))}")
-    if data["schema_version"] != 1:
-        fail("schema_version must be 1")
+    if schema_version not in {1, 2}:
+        fail("schema_version must be 1 or 2")
+    if schema_version == 2:
+        if "flow" not in data:
+            fail("v2 connector evidence must contain flow linkage")
+        validate_flow(data["flow"])
+        if kind in {"marking", "edo"}:
+            observations = data.get("observations")
+            expected_observations = {
+                "marking": {"product_status", "marking_status", "reconciliation"},
+                "edo": {"send_status", "document_status", "reconciliation"},
+            }[kind]
+            if not isinstance(observations, dict) or set(observations) != expected_observations:
+                fail(f"v2 {kind} observations have an invalid shape")
+            expected_values = {
+                "product_status": "matched",
+                "marking_status": "observed",
+                "send_status": "accepted",
+                "document_status": "delivered",
+                "reconciliation": "matched",
+            }
+            for field in expected_observations:
+                if observations[field] != expected_values[field]:
+                    fail(f"v2 {kind} observation {field} is not confirmed")
     if data["status"] != "PASS":
         fail("status must be PASS")
     if data["scope"] != "connector":
@@ -107,7 +139,8 @@ def validate(data: Any, kind: str) -> None:
         if check.get("status") != "PASS":
             fail(f"check {check_id} is not PASS")
         string_field(check.get("evidence_ref"), f"checks[{index}].evidence_ref", SAFE_LABEL)
-    missing_checks = REQUIRED_CHECKS[kind] - seen
+    required_checks = V2_REQUIRED_CHECKS if schema_version == 2 else REQUIRED_CHECKS
+    missing_checks = required_checks[kind] - seen
     if missing_checks:
         fail(f"missing required {kind} checks: {', '.join(sorted(missing_checks))}")
 

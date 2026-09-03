@@ -59,7 +59,7 @@ tenant isolation, redaction, idempotency, frontend/API/SDK wiring and synthetic
 state transitions, but it cannot manufacture third-party credentials, hardware
 coverage or production topology evidence.
 
-## Compatibility and migration impact
+## Compatibility impact
 
 Migration `000058_ecosystem_support.sql` adds only the onboarding and partner
 evidence tables. It does not alter Product, connector, support, settlement,
@@ -67,13 +67,20 @@ subscription, WMS or customer ledgers. The OpenAPI and event changes are
 additive and generated SDK artifacts must be regenerated whenever the contract
 changes.
 
-## Security, privacy and operations
+## Migration and data impact
+
+Migration `000058_ecosystem_support.sql` is additive, forced-RLS and append-only;
+existing business ledgers and connector account data are not rewritten.
+
+## Security and privacy impact
 
 All reads and writes use the authenticated organization/workspace scope and
 FORCE RLS. Audit is required before privileged writes. Evidence is digest-only
 and has bounded references and expiry. App/partner permissions continue to be
 enforced by host policy and SecretProvider; this projection cannot grant raw
 tenant secrets, private keys, arbitrary network access or policy bypass.
+
+## Operational impact
 
 `make ecosystem-support-qualification` runs the repository synthetic gate.
 Credentialed connector qualification, partner sandbox-to-production UAT and

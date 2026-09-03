@@ -282,8 +282,12 @@ reconciliation с owner/SLA; runbook позволяет повторить бе�
 **Acceptance:** полный synthetic golden path проходит без дублей резерва,
 сборки, shipment, статуса, возврата или refund; важные сбои приводят к
 `failed`/`unknown`/`needs_attention`, а не к ложному успеху. Production
-готовность объявляется только при наличии evidence на целевых connectors и
-топологии.
+готовность объявляется только при наличии v2 linked evidence на целевых
+connectors и топологии. Aggregate release gate обязан связать один flow через
+marketplace → carrier → payment/fiscal → returns/refund/settlement и отдельно
+подтвердить marketplace compensation, Chestny ZNAK и ЭДО. Без официальных
+non-production credentials и redacted evidence это остаётся внешним blocker-ом,
+а не synthetic PASS.
 
 ## Не входит в этот task
 

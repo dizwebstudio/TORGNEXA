@@ -85,9 +85,9 @@ func TestCommerceWebhookRouteIsPublicAndUsesContractPrefix(t *testing.T) {
 	}
 }
 
-func TestCommerceWebhookRouteNormalizesSaleorTopicAndPassesRawBodyToReceiver(t *testing.T) {
+func TestCommerceWebhookRouteNormalizesTopicAndPassesRawBodyToReceiver(t *testing.T) {
 	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
-	account := sdk.Account{ID: "saleor-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "saleor", Family: sdk.FamilyStorefront, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, CreatedAt: at, UpdatedAt: at, Health: sdk.Health{Status: sdk.HealthUnknown}}
+	account := sdk.Account{ID: "storefront-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "storefront-a", Family: sdk.FamilyStorefront, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, CreatedAt: at, UpdatedAt: at, Health: sdk.Health{Status: sdk.HealthUnknown}}
 	receiver := &commerceWebhookReceiverStub{}
 	dedup := &commerceWebhookDedupStub{}
 	api := commerceWebhookAPI{
@@ -96,12 +96,15 @@ func TestCommerceWebhookRouteNormalizesSaleorTopicAndPassesRawBodyToReceiver(t *
 		secrets:  fakeWebhookSecrets{},
 		registry: commerceWebhookResolverStub{receiver: receiver},
 		dedup:    func(tenancy.Scope) sdk.CommerceWebhookDeduplicator { return dedup },
+		headers: func(_ string, headers http.Header) (string, string, bool) {
+			return strings.TrimSpace(headers.Get("X-Test-Signature")), normalizeCommerceWebhookTopic(headers.Get("X-Test-Topic")), true
+		},
 	}
-	path := commerceWebhooksPathPrefix + "saleor/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
 	body := `{"event":"PRODUCT_UPDATED","data":{"object":{"id":"UHJvZHVjdDox"}}}`
 	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(body))
-	req.Header.Set("Saleor-Signature", "protected..signature")
-	req.Header.Set("Saleor-Event", "PRODUCT_UPDATED")
+	req.Header.Set("X-Test-Signature", "protected..signature")
+	req.Header.Set("X-Test-Topic", "PRODUCT_UPDATED")
 	recorder := httptest.NewRecorder()
 	api.receive(recorder, req)
 	if recorder.Code != http.StatusOK || recorder.Body.String() != "{}" {
@@ -115,12 +118,12 @@ func TestCommerceWebhookRouteNormalizesSaleorTopicAndPassesRawBodyToReceiver(t *
 	}
 }
 
-func TestCommerceWebhookRouteRejectsUnsupportedProviderHeadersBeforeReceiver(t *testing.T) {
+func TestCommerceWebhookRouteRejectsUnsupportedHeadersBeforeReceiver(t *testing.T) {
 	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
-	account := sdk.Account{ID: "saleor-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "saleor", Family: sdk.FamilyStorefront, Status: sdk.AccountActive, Version: 1, CreatedAt: at, UpdatedAt: at, Health: sdk.Health{Status: sdk.HealthUnknown}}
+	account := sdk.Account{ID: "storefront-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "storefront-a", Family: sdk.FamilyStorefront, Status: sdk.AccountActive, Version: 1, CreatedAt: at, UpdatedAt: at, Health: sdk.Health{Status: sdk.HealthUnknown}}
 	receiver := &commerceWebhookReceiverStub{}
-	api := commerceWebhookAPI{accounts: commerceWebhookAccountStub{account: account}, configs: commerceWebhookConfigStub{}, secrets: fakeWebhookSecrets{}, registry: commerceWebhookResolverStub{receiver: receiver}, dedup: func(tenancy.Scope) sdk.CommerceWebhookDeduplicator { return &commerceWebhookDedupStub{} }}
-	path := commerceWebhooksPathPrefix + "saleor/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	api := commerceWebhookAPI{accounts: commerceWebhookAccountStub{account: account}, configs: commerceWebhookConfigStub{}, secrets: fakeWebhookSecrets{}, registry: commerceWebhookResolverStub{receiver: receiver}, dedup: func(tenancy.Scope) sdk.CommerceWebhookDeduplicator { return &commerceWebhookDedupStub{} }, headers: func(string, http.Header) (string, string, bool) { return "", "", false }}
+	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
 	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(`{"event":"PRODUCT_UPDATED"}`))
 	req.Header.Set("X-Webhook-Signature", "not-used")
 	req.Header.Set("X-Webhook-Topic", "product.updated")

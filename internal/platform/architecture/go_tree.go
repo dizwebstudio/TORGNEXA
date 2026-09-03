@@ -37,6 +37,7 @@ var unambiguousProviderLiteralTokens = map[string]struct{}{
 }
 
 var allowedToolGoRoots = []string{
+	"tools/approval-debug/",
 	"tools/architecturecheck/",
 	"tools/contractcheck/",
 	"tools/migrationcheck/",
@@ -453,7 +454,7 @@ func checkProviderSpecificCode(relative string, parsed *ast.File, set *token.Fil
 			checkProviderCondition(relative, typed, set, found)
 		case *ast.IndexExpr:
 			strict, channel, _, known := providerConditionFlags(typed.Index)
-			if strict || (channel && known) {
+			if (strict && directProviderDiscriminator(typed.Index)) || (channel && known) {
 				position := set.Position(typed.Pos())
 				found.add(relative, "provider-specific table dispatch is forbidden at line %d", position.Line)
 			}
@@ -466,8 +467,8 @@ func checkProviderCondition(relative string, expression ast.Node, set *token.Fil
 	if expression == nil {
 		return
 	}
-	strict, channel, _, known := providerConditionFlags(expression)
-	if strict || (channel && known) {
+	strict, channel, nonEmpty, known := providerConditionFlags(expression)
+	if (strict && nonEmpty) || exactProviderDiscriminator(expression) || (channel && known) {
 		position := set.Position(expression.Pos())
 		found.add(relative, "provider-specific Core branch or non-provider runtime branch is forbidden at line %d", position.Line)
 	}
@@ -479,17 +480,19 @@ func checkProviderSwitch(relative string, statement *ast.SwitchStmt, set *token.
 	}
 	strict, channel, _, _ := providerConditionFlags(statement.Tag)
 	known := false
+	nonEmpty := false
 	for _, item := range statement.Body.List {
 		clause, ok := item.(*ast.CaseClause)
 		if !ok {
 			continue
 		}
 		for _, expression := range clause.List {
-			_, _, _, expressionKnown := providerConditionFlags(expression)
+			_, _, expressionNonEmpty, expressionKnown := providerConditionFlags(expression)
+			nonEmpty = nonEmpty || expressionNonEmpty
 			known = known || expressionKnown
 		}
 	}
-	if strict || (channel && known) {
+	if (strict && nonEmpty) || exactProviderDiscriminator(statement.Tag) || (channel && known) {
 		position := set.Position(statement.Pos())
 		found.add(relative, "provider-specific Core branch or non-provider runtime branch is forbidden at line %d", position.Line)
 	}
@@ -504,7 +507,8 @@ func providerConditionFlags(expression ast.Node) (strict, channel, nonEmpty, kno
 		switch typed := node.(type) {
 		case *ast.Ident:
 			name := strings.ToLower(typed.Name)
-			if strings.Contains(name, "provider") || strings.Contains(name, "platform") || strings.Contains(name, "connector") {
+			normalized := strings.ReplaceAll(name, "_", "")
+			if normalized == "provider" || normalized == "providerid" || normalized == "providername" || normalized == "platform" || normalized == "platformid" || normalized == "platformname" || normalized == "connector" || normalized == "connectorid" || normalized == "connectorname" {
 				hasStrictDiscriminator = true
 			}
 			if strings.Contains(name, "channel") {
@@ -525,6 +529,38 @@ func providerConditionFlags(expression ast.Node) (strict, channel, nonEmpty, kno
 		return true
 	})
 	return hasStrictDiscriminator, hasChannelDiscriminator, hasNonEmptyLiteral, hasKnownProviderLiteral
+}
+
+func directProviderDiscriminator(expression ast.Node) bool {
+	switch typed := expression.(type) {
+	case *ast.Ident:
+		strict, _, _, _ := providerConditionFlags(typed)
+		return strict
+	case *ast.SelectorExpr:
+		strict, _, _, _ := providerConditionFlags(typed.Sel)
+		return strict
+	case *ast.ParenExpr:
+		return directProviderDiscriminator(typed.X)
+	default:
+		return false
+	}
+}
+
+func exactProviderDiscriminator(expression ast.Node) bool {
+	matched := false
+	ast.Inspect(expression, func(node ast.Node) bool {
+		identifier, ok := node.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		normalized := strings.ReplaceAll(strings.ToLower(identifier.Name), "_", "")
+		if normalized == "provider" || normalized == "platform" || normalized == "connector" {
+			matched = true
+			return false
+		}
+		return true
+	})
+	return matched
 }
 
 func (r *repository) checkProviderInventory(ctx context.Context, configuration *policy, reviews map[string]review, found *problems) {

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/qualification/marketplace-live-smoke-v2.json",
+  "title": "TORGNEXA linked marketplace credentialed live smoke evidence v2",
+  "description": "Redacted marketplace smoke evidence linked to the complete production golden path.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "scope", "environment", "target", "repository", "release_commit", "connector_id", "account_ref", "qualified_at", "credential_mode", "taxonomy", "flow", "checks", "write"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "status": {"const": "PASS"},
+    "scope": {"const": "qualification"},
+    "environment": {"const": "non-production"},
+    "target": {"const": "dedicated-non-production"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,139}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "connector_id": {"enum": ["wildberries", "ozon"]},
+    "account_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "qualified_at": {"type": "string", "format": "date-time"},
+    "credential_mode": {"const": "env_only_secret_accessor"},
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "fingerprint", "source"],
+      "properties": {
+        "status": {"const": "PASS"},
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "source": {"type": "string", "maxLength": 192}
+      }
+    },
+    "flow": {"$ref": "#/$defs/flow"},
+    "checks": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {"enum": ["health", "products_read", "inventory_locations_read", "inventory_read", "orders_read", "taxonomy_read", "inventory_write", "read_after_write", "cleanup"]},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"type": "string", "pattern": "^marketplace-live-smoke/[a-z_]+$"}
+        }
+      }
+    },
+    "write": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "read_after_write", "restored"],
+      "properties": {
+        "attempted": {"type": "boolean"},
+        "read_after_write": {"type": "boolean"},
+        "restored": {"const": true}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "error_code"],
+      "properties": {
+        "check_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"},
+        "error_code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,95}$"}
+      }
+    }
+  },
+  "$defs": {
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_ref", "order_ref", "reservation_ref", "shipment_ref", "return_ref", "refund_ref", "settlement_ref", "marking_ref", "edo_ref"],
+      "properties": {
+        "flow_ref": {"$ref": "#/$defs/ref"},
+        "order_ref": {"$ref": "#/$defs/ref"},
+        "reservation_ref": {"$ref": "#/$defs/ref"},
+        "shipment_ref": {"$ref": "#/$defs/ref"},
+        "return_ref": {"$ref": "#/$defs/ref"},
+        "refund_ref": {"$ref": "#/$defs/ref"},
+        "settlement_ref": {"$ref": "#/$defs/ref"},
+        "marking_ref": {"$ref": "#/$defs/ref"},
+        "edo_ref": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+  }
+}

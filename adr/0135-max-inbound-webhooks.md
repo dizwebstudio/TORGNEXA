@@ -26,7 +26,22 @@ provider JSON, secrets and unreviewed PII. Subscription lifecycle remains an
 SDK-only surface until it has a separate application authorization and
 configuration contract.
 
-## Security and compatibility impact
+## Alternatives considered
+
+Доверять входному событию без повторной проверки было отклонено из-за риска
+подделки, replay и cross-tenant routing.
+
+## Consequences
+
+MAX deliveries попадают в общий durable webhook boundary после проверки и
+deduplication; subscription lifecycle остаётся отдельным SDK-only scope.
+
+## Migration and data impact
+
+Миграция не требуется: используются существующие Task-009 inbox и
+transactional outbox records для verified delivery evidence.
+
+## Security and privacy impact
 
 The route is unauthenticated by design but always returns `{}` with HTTP 200,
 and the fixed URL shape plus capability check prevents cross-tenant routing.
@@ -44,3 +59,9 @@ authoritative database record. Operators must configure a separate webhook
 secret reference for MAX and keep the provider endpoint on HTTPS. Live MAX
 credentials, endpoint delivery and provider qualification remain deployment
 gates.
+
+## Compatibility impact
+
+The public webhook route keeps its existing tenant/account URL shape and
+acknowledgement behavior. MAX is admitted through the provider-neutral webhook
+contract without changing the event envelope compatibility.

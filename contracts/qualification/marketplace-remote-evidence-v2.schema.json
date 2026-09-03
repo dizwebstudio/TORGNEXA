@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/qualification/marketplace-remote-evidence-v2.json",
+  "title": "TORGNEXA linked marketplace remote qualification evidence v2",
+  "description": "Redacted full marketplace evidence linked to the same order flow as the production golden path aggregate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "environment", "repository", "release_commit", "connector_id", "account_ref", "qualified_at", "flow", "taxonomy", "capabilities", "checks", "rollback"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "status": {"const": "PASS"},
+    "environment": {"enum": ["sandbox", "staging", "non-production"]},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,139}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "connector_id": {"enum": ["wildberries", "ozon", "yandex-market"]},
+    "api_version": {"type": "string", "minLength": 1},
+    "account_ref": {"$ref": "#/$defs/ref"},
+    "qualified_at": {"type": "string", "format": "date-time"},
+    "flow": {"$ref": "#/$defs/flow"},
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "fingerprint", "mapping_ref", "source_ref"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "maxLength": 192},
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mapping_ref": {"$ref": "#/$defs/ref"},
+        "source_ref": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,63}$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "evidence_ref"],
+          "properties": {"status": {"const": "qualified"}, "evidence_ref": {"$ref": "#/$defs/ref"}}
+        }
+      },
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {"enum": ["taxonomy_read", "taxonomy_mapping", "batch_apply", "rate_limit", "idempotency", "partial_result", "read_after_write", "unknown_outcome", "reconciliation", "rollback", "order_import", "reservation", "pick_pack", "label", "shipment_handoff", "return_inspection", "refund_settlement", "marking_edo", "p_and_l"]},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "evidence_ref"],
+      "properties": {"verified": {"const": true}, "evidence_ref": {"$ref": "#/$defs/ref"}}
+    }
+  },
+  "$defs": {
+    "ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_ref", "order_ref", "reservation_ref", "shipment_ref", "return_ref", "refund_ref", "settlement_ref", "marking_ref", "edo_ref"],
+      "properties": {
+        "flow_ref": {"$ref": "#/$defs/ref"},
+        "order_ref": {"$ref": "#/$defs/ref"},
+        "reservation_ref": {"$ref": "#/$defs/ref"},
+        "shipment_ref": {"$ref": "#/$defs/ref"},
+        "return_ref": {"$ref": "#/$defs/ref"},
+        "refund_ref": {"$ref": "#/$defs/ref"},
+        "settlement_ref": {"$ref": "#/$defs/ref"},
+        "marking_ref": {"$ref": "#/$defs/ref"},
+        "edo_ref": {"$ref": "#/$defs/ref"}
+      }
+    }
+  }
+}

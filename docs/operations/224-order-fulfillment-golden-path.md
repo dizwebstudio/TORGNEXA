@@ -69,15 +69,20 @@ make production-golden-path
 
 Команда сначала выполняет provider-neutral synthetic qualification, затем
 fail-closed проверяет aggregate evidence из
-`TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE` и пять сохранённых redacted
+`TORGNEXA_PRODUCTION_GOLDEN_PATH_EVIDENCE_FILE` и восемь сохранённых redacted
 артефактов: full marketplace qualification, credentialed marketplace smoke,
-carrier, payment и fiscal. Каждый артефакт должен быть regular non-symlink JSON,
-иметь совпадающие repository/release SHA/account refs, а SHA-256 должен быть
-записан в aggregate manifest. Manifest обязан содержать PASS для всех стадий
-golden path, failure matrix, rollback и отдельный owner каждой проверки.
+marketplace return/refund/compensation, carrier, payment, fiscal, Chestny ZNAK
+и ЭДО. Каждый артефакт должен быть regular non-symlink JSON, иметь совпадающие
+repository/release SHA/account refs и один и тот же redacted flow linkage;
+SHA-256 должен быть записан в aggregate manifest. Manifest обязан содержать
+PASS для всех стадий golden path, фискализации, live Chestny ZNAK, live ЭДО,
+marketplace compensation, failure matrix, rollback и отдельный owner каждой
+проверки.
 
-Схемы evidence: `contracts/qualification/production-golden-path-v1.schema.json`
-и `contracts/qualification/connector-golden-path-evidence-v1.schema.json`.
+Схемы evidence: `contracts/qualification/production-golden-path-v2.schema.json`,
+`contracts/qualification/connector-golden-path-evidence-v2.schema.json`,
+`contracts/qualification/marketplace-compensation-evidence-v2.schema.json` и
+связанные v2 marketplace evidence schemas.
 Внешний runner сохраняет только redacted evidence; токены, raw payloads,
 remote IDs, штрихкоды и private signing material в него не попадают. Без
 credentialed non-production evidence gate завершается ошибкой и release

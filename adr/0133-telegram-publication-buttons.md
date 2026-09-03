@@ -25,7 +25,22 @@ Admit `social.post.buttons` for Telegram only. Keep callback-data buttons,
 inbound updates, edit/delete and MAX buttons outside this admission until
 their own authorization and lifecycle contracts are implemented.
 
-## Security and compatibility impact
+## Alternatives considered
+
+Хранить кнопки только в provider-specific payload было отклонено: это ломало
+immutable provider-neutral snapshot и API read-after-write semantics.
+
+## Consequences
+
+Telegram получает bounded HTTPS buttons через тот же approval, capability и
+receipt lifecycle; callback-data и неподтверждённые действия остаются закрыты.
+
+## Migration and data impact
+
+Миграция добавляет только default-empty JSONB snapshot; существующие строки и
+публикации сохраняют прежнее поведение.
+
+## Security and privacy impact
 
 URLs are restricted to HTTPS and the database check rejects extra JSON keys,
 control/unsafe URL characters and oversized values. The migration adds a
@@ -33,3 +48,13 @@ default-empty JSONB column and extends the existing capability validator; old
 readers can ignore the new field. Button data is not copied to events or
 secrets. Ambiguous Telegram writes continue to use the existing receipt
 recovery path and are never blind-retried.
+
+## Compatibility impact
+
+Старые API clients могут не передавать buttons и продолжают работать с теми же
+text/media variants и publication receipts.
+
+## Operational impact
+
+Capability и account setting можно отключить для остановки новых button
+publications без удаления уже сохранённых immutable snapshots.

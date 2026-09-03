@@ -95,15 +95,15 @@
       "kind": "core_domain"
     },
     {
+      "path": "internal/core/ecosystem",
+      "kind": "core_domain"
+    },
+    {
       "path": "internal/core/financialcompleteness",
       "kind": "core_domain"
     },
     {
       "path": "internal/core/integrationcenter",
-      "kind": "core_domain"
-    },
-    {
-      "path": "internal/core/ecosystem",
       "kind": "core_domain"
     },
     {
@@ -415,10 +415,6 @@
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/customerservicerepo",
-      "kind": "infrastructure_adapter"
-    },
-    {
       "path": "internal/platform/postgres/connectorconfigrepo",
       "kind": "infrastructure_adapter"
     },
@@ -431,15 +427,19 @@
       "kind": "infrastructure_adapter"
     },
     {
+      "path": "internal/platform/postgres/customerservicerepo",
+      "kind": "infrastructure_adapter"
+    },
+    {
       "path": "internal/platform/postgres/database",
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/entitlementrepo",
+      "path": "internal/platform/postgres/ecosystemrepo",
       "kind": "infrastructure_adapter"
     },
     {
-      "path": "internal/platform/postgres/ecosystemrepo",
+      "path": "internal/platform/postgres/entitlementrepo",
       "kind": "infrastructure_adapter"
     },
     {

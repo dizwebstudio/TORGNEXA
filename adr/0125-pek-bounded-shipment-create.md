@@ -50,3 +50,13 @@ Writes remain subject to existing tenant scope, capability, policy, approval,
 idempotency, retry/DLQ and reconciliation handling. A provider `OK`/accepted
 response must be followed by tracking or reconciliation before operational
 completion is asserted.
+
+## Alternatives considered
+
+Exposing formed-cargo, returns or address delivery was rejected because those
+operations need separate contracts and real carrier qualification.
+
+## Migration and data impact
+
+No migration is required; the existing shipment operation receipt and remote
+mapping persistence are reused without changing their schemas.

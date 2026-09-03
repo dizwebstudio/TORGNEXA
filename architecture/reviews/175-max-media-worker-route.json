@@ -16,11 +16,11 @@
     "docs/connectors/max-messenger/capability-audit.md",
     "docs/connectors/max-messenger/conformance-plan.md",
     "docs/connectors/max-messenger/spec.md",
+    "frontend/src/generated/connector-catalog.ts",
     "internal/platform/builtinruntime/http.go",
     "internal/platform/builtinruntime/http_test.go",
     "internal/platform/builtinruntime/support_generated.go",
     "internal/platform/builtinruntime/support_test.go",
-    "frontend/src/generated/connector-catalog.ts",
     "tasks/BACKLOG.md",
     "tasks/EXECUTION_PLAN.md",
     "tasks/issues/175-max-media-worker-route.md"

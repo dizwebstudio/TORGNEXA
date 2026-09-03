@@ -14,6 +14,7 @@
     "docs/connectors/telegram/capability-audit.md",
     "docs/connectors/telegram/conformance-plan.md",
     "docs/connectors/telegram/spec.md",
+    "frontend/src/generated/connector-catalog.ts",
     "internal/app/worker/social_media.go",
     "internal/app/worker/social_publication.go",
     "internal/app/worker/social_publication_test.go",
@@ -22,7 +23,6 @@
     "internal/platform/builtinruntime/http_test.go",
     "internal/platform/builtinruntime/support_generated.go",
     "internal/platform/builtinruntime/support_test.go",
-    "frontend/src/generated/connector-catalog.ts",
     "tasks/BACKLOG.md",
     "tasks/EXECUTION_PLAN.md",
     "tasks/issues/174-telegram-media-worker-route.md"

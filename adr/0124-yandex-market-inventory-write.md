@@ -61,3 +61,8 @@ capability can be disabled to stop writes.
   the campaign request shape and have different warehouse semantics.
 - Mark an accepted response as reconciled: rejected because the provider
   applies stock updates asynchronously.
+
+## Migration and data impact
+
+No database migration is required; existing mappings, receipts and inventory
+reconciliation records retain the same provider-neutral shape.

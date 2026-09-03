@@ -4739,6 +4739,40 @@
       }
     },
     {
+      "schema": "qualification/connector-golden-path-evidence-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "connector",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "chestny-znak",
+        "account_ref": "marking-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "flow": {
+          "flow_ref": "golden-path/flow-01",
+          "order_ref": "order/flow-01",
+          "reservation_ref": "reservation/flow-01",
+          "shipment_ref": "shipment/flow-01",
+          "return_ref": "return/flow-01",
+          "refund_ref": "refund/flow-01",
+          "settlement_ref": "settlement/flow-01",
+          "marking_ref": "marking/flow-01",
+          "edo_ref": "edo/flow-01"
+        },
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "marking/health"},
+          {"id": "product_read", "status": "PASS", "evidence_ref": "marking/product-read"},
+          {"id": "status_read", "status": "PASS", "evidence_ref": "marking/status-read"},
+          {"id": "reconciliation", "status": "PASS", "evidence_ref": "marking/reconciliation"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "marking/rollback"}
+      },
+      "invalid": {"schema_version": 1}
+    },
+    {
       "schema": "qualification/external-qualification-evidence-v1.schema.json",
       "valid": {
         "schema_version": 1,
@@ -4867,6 +4901,51 @@
       }
     },
     {
+      "schema": "qualification/marketplace-compensation-evidence-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "qualification",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "ozon",
+        "account_ref": "marketplace-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "flow": {
+          "flow_ref": "golden-path/flow-01",
+          "order_ref": "order/flow-01",
+          "reservation_ref": "reservation/flow-01",
+          "shipment_ref": "shipment/flow-01",
+          "return_ref": "return/flow-01",
+          "refund_ref": "refund/flow-01",
+          "settlement_ref": "settlement/flow-01",
+          "marking_ref": "marking/flow-01",
+          "edo_ref": "edo/flow-01"
+        },
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "marketplace-compensation/health"},
+          {"id": "return_authorize", "status": "PASS", "evidence_ref": "marketplace-compensation/return_authorize"},
+          {"id": "return_receive", "status": "PASS", "evidence_ref": "marketplace-compensation/return_receive"},
+          {"id": "compensation", "status": "PASS", "evidence_ref": "marketplace-compensation/compensation"},
+          {"id": "compensation_read_after_write", "status": "PASS", "evidence_ref": "marketplace-compensation/compensation_read_after_write"},
+          {"id": "reconciliation", "status": "PASS", "evidence_ref": "marketplace-compensation/reconciliation"}
+        ],
+        "observations": {
+          "return_status": "received",
+          "refund_status": "accepted",
+          "compensation_status": "accepted",
+          "settlement_status": "matched",
+          "read_after_write": true,
+          "idempotent_replay": true,
+          "reconciliation": true
+        },
+        "rollback": {"verified": true, "evidence_ref": "marketplace-compensation/rollback"}
+      },
+      "invalid": {"schema_version": 1}
+    },
+    {
       "schema": "qualification/marketplace-live-smoke-v1.schema.json",
       "valid": {
         "schema_version": 1,
@@ -4915,6 +4994,47 @@
         "write": {"attempted": true, "read_after_write": false, "restored": false},
         "api_key": "must-not-be-retained"
       }
+    },
+    {
+      "schema": "qualification/marketplace-live-smoke-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "qualification",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "ozon",
+        "account_ref": "marketplace-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "credential_mode": "env_only_secret_accessor",
+        "taxonomy": {"status": "PASS", "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source": "official-adapter-taxonomy"},
+        "flow": {
+          "flow_ref": "golden-path/flow-01",
+          "order_ref": "order/flow-01",
+          "reservation_ref": "reservation/flow-01",
+          "shipment_ref": "shipment/flow-01",
+          "return_ref": "return/flow-01",
+          "refund_ref": "refund/flow-01",
+          "settlement_ref": "settlement/flow-01",
+          "marking_ref": "marking/flow-01",
+          "edo_ref": "edo/flow-01"
+        },
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "marketplace-live-smoke/health"},
+          {"id": "products_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/products_read"},
+          {"id": "inventory_locations_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_locations_read"},
+          {"id": "inventory_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_read"},
+          {"id": "orders_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/orders_read"},
+          {"id": "taxonomy_read", "status": "PASS", "evidence_ref": "marketplace-live-smoke/taxonomy_read"},
+          {"id": "inventory_write", "status": "PASS", "evidence_ref": "marketplace-live-smoke/inventory_write"},
+          {"id": "read_after_write", "status": "PASS", "evidence_ref": "marketplace-live-smoke/read_after_write"},
+          {"id": "cleanup", "status": "PASS", "evidence_ref": "marketplace-live-smoke/cleanup"}
+        ],
+        "write": {"attempted": true, "read_after_write": true, "restored": true}
+      },
+      "invalid": {"schema_version": 1}
     },
     {
       "schema": "qualification/marketplace-remote-evidence-v1.schema.json",
@@ -4967,6 +5087,61 @@
         "rollback": {"verified": false, "evidence_ref": "rollback"},
         "token": "must-not-be-retained"
       }
+    },
+    {
+      "schema": "qualification/marketplace-remote-evidence-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "environment": "non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "connector_id": "ozon",
+        "account_ref": "marketplace-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "flow": {
+          "flow_ref": "golden-path/flow-01",
+          "order_ref": "order/flow-01",
+          "reservation_ref": "reservation/flow-01",
+          "shipment_ref": "shipment/flow-01",
+          "return_ref": "return/flow-01",
+          "refund_ref": "refund/flow-01",
+          "settlement_ref": "settlement/flow-01",
+          "marking_ref": "marking/flow-01",
+          "edo_ref": "edo/flow-01"
+        },
+        "taxonomy": {"version": "sandbox-2026-01", "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mapping_ref": "mapping-01", "source_ref": "official-sandbox-schema"},
+        "capabilities": {
+          "products.read": {"status": "qualified", "evidence_ref": "products-read"},
+          "products.write": {"status": "qualified", "evidence_ref": "products-write"},
+          "orders.read": {"status": "qualified", "evidence_ref": "orders-read"},
+          "inventory.write": {"status": "qualified", "evidence_ref": "inventory-write"},
+          "orders.status.write": {"status": "qualified", "evidence_ref": "orders-status-write"}
+        },
+        "checks": [
+          {"id": "taxonomy_read", "status": "PASS", "evidence_ref": "taxonomy-read"},
+          {"id": "taxonomy_mapping", "status": "PASS", "evidence_ref": "taxonomy-mapping"},
+          {"id": "batch_apply", "status": "PASS", "evidence_ref": "batch-apply"},
+          {"id": "rate_limit", "status": "PASS", "evidence_ref": "rate-limit"},
+          {"id": "idempotency", "status": "PASS", "evidence_ref": "idempotency"},
+          {"id": "partial_result", "status": "PASS", "evidence_ref": "partial-result"},
+          {"id": "read_after_write", "status": "PASS", "evidence_ref": "read-after-write"},
+          {"id": "unknown_outcome", "status": "PASS", "evidence_ref": "unknown-outcome"},
+          {"id": "reconciliation", "status": "PASS", "evidence_ref": "reconciliation"},
+          {"id": "rollback", "status": "PASS", "evidence_ref": "rollback"},
+          {"id": "order_import", "status": "PASS", "evidence_ref": "order-import"},
+          {"id": "reservation", "status": "PASS", "evidence_ref": "reservation"},
+          {"id": "pick_pack", "status": "PASS", "evidence_ref": "pick-pack"},
+          {"id": "label", "status": "PASS", "evidence_ref": "label"},
+          {"id": "shipment_handoff", "status": "PASS", "evidence_ref": "shipment-handoff"},
+          {"id": "return_inspection", "status": "PASS", "evidence_ref": "return-inspection"},
+          {"id": "refund_settlement", "status": "PASS", "evidence_ref": "refund-settlement"},
+          {"id": "marking_edo", "status": "PASS", "evidence_ref": "marking-edo"},
+          {"id": "p_and_l", "status": "PASS", "evidence_ref": "p-and-l"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "rollback"}
+      },
+      "invalid": {"schema_version": 1}
     },
     {
       "schema": "qualification/production-golden-path-v1.schema.json",
@@ -5037,6 +5212,92 @@
         "failure_matrix": [],
         "rollback": {"verified": false, "evidence_ref": "rollback"}
       }
+    },
+    {
+      "schema": "qualification/production-golden-path-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "credentialed-full",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "flow": {
+          "flow_ref": "golden-path/flow-01",
+          "order_ref": "order/flow-01",
+          "reservation_ref": "reservation/flow-01",
+          "shipment_ref": "shipment/flow-01",
+          "return_ref": "return/flow-01",
+          "refund_ref": "refund/flow-01",
+          "settlement_ref": "settlement/flow-01",
+          "marking_ref": "marking/flow-01",
+          "edo_ref": "edo/flow-01",
+          "links": [
+            {"id": "order_to_reservation", "from": "order", "to": "reservation", "evidence_ref": "link/order_to_reservation"},
+            {"id": "reservation_to_shipment", "from": "reservation", "to": "shipment", "evidence_ref": "link/reservation_to_shipment"},
+            {"id": "shipment_to_return", "from": "shipment", "to": "return", "evidence_ref": "link/shipment_to_return"},
+            {"id": "return_to_refund", "from": "return", "to": "refund", "evidence_ref": "link/return_to_refund"},
+            {"id": "refund_to_settlement", "from": "refund", "to": "settlement", "evidence_ref": "link/refund_to_settlement"},
+            {"id": "settlement_to_reconciliation", "from": "settlement", "to": "reconciliation", "evidence_ref": "link/settlement_to_reconciliation"},
+            {"id": "order_to_marking", "from": "order", "to": "marking", "evidence_ref": "link/order_to_marking"},
+            {"id": "refund_to_fiscal", "from": "refund", "to": "fiscal", "evidence_ref": "link/refund_to_fiscal"},
+            {"id": "settlement_to_edo", "from": "settlement", "to": "edo", "evidence_ref": "link/settlement_to_edo"}
+          ]
+        },
+        "connectors": {
+          "marketplace": {"connector_id": "ozon", "account_ref": "marketplace-account-01", "evidence_ref": "evidence/marketplace-remote"},
+          "carrier": {"connector_id": "cdek-sandbox", "account_ref": "carrier-account-01", "evidence_ref": "evidence/carrier"},
+          "payment": {"connector_id": "payment-sandbox", "account_ref": "payment-account-01", "evidence_ref": "evidence/payment"},
+          "fiscal": {"connector_id": "fiscal-sandbox", "account_ref": "fiscal-account-01", "evidence_ref": "evidence/fiscal"},
+          "marking": {"connector_id": "chestny-znak", "account_ref": "marking-account-01", "evidence_ref": "evidence/chestny-znak"},
+          "edo": {"connector_id": "diadoc", "account_ref": "edo-account-01", "evidence_ref": "evidence/edo"}
+        },
+        "artifacts": [
+          {"kind": "marketplace-remote", "evidence_ref": "evidence/marketplace-remote", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "marketplace-live-smoke", "evidence_ref": "evidence/marketplace-live-smoke", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "marketplace-compensation", "evidence_ref": "evidence/marketplace-compensation", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "carrier", "evidence_ref": "evidence/carrier", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "payment", "evidence_ref": "evidence/payment", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "fiscal", "evidence_ref": "evidence/fiscal", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "chestny-znak", "evidence_ref": "evidence/chestny-znak", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "edo", "evidence_ref": "evidence/edo", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+        ],
+        "checks": [
+          {"id": "marketplace_live_smoke", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/marketplace-live-smoke"},
+          {"id": "order_import", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/order-import"},
+          {"id": "reservation", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/reservation"},
+          {"id": "marketplace_compensation", "owner": "marketplace", "status": "PASS", "evidence_ref": "path/marketplace-compensation"},
+          {"id": "pick_pack", "owner": "platform", "status": "PASS", "evidence_ref": "path/pick-pack"},
+          {"id": "label", "owner": "carrier", "status": "PASS", "evidence_ref": "path/label"},
+          {"id": "shipment_handoff", "owner": "carrier", "status": "PASS", "evidence_ref": "path/shipment-handoff"},
+          {"id": "return_inspection", "owner": "carrier", "status": "PASS", "evidence_ref": "path/return-inspection"},
+          {"id": "refund_settlement", "owner": "payment", "status": "PASS", "evidence_ref": "path/refund-settlement"},
+          {"id": "fiscalization", "owner": "fiscal", "status": "PASS", "evidence_ref": "path/fiscalization"},
+          {"id": "chestny_znak_live", "owner": "marking", "status": "PASS", "evidence_ref": "path/chestny-znak-live"},
+          {"id": "edo_live", "owner": "edo", "status": "PASS", "evidence_ref": "path/edo-live"},
+          {"id": "settlement_reconciliation", "owner": "payment", "status": "PASS", "evidence_ref": "path/settlement-reconciliation"},
+          {"id": "profitability", "owner": "platform", "status": "PASS", "evidence_ref": "path/profitability"},
+          {"id": "reconciliation", "owner": "platform", "status": "PASS", "evidence_ref": "path/reconciliation"}
+        ],
+        "failure_matrix": [
+          {"id": "duplicate_commands", "status": "PASS", "evidence_ref": "failure/duplicate-commands"},
+          {"id": "duplicate_webhooks", "status": "PASS", "evidence_ref": "failure/duplicate-webhooks"},
+          {"id": "out_of_order_events", "status": "PASS", "evidence_ref": "failure/out-of-order-events"},
+          {"id": "worker_crash_resume", "status": "PASS", "evidence_ref": "failure/worker-crash-resume"},
+          {"id": "lease_loss", "status": "PASS", "evidence_ref": "failure/lease-loss"},
+          {"id": "timeout_after_remote_commit", "status": "PASS", "evidence_ref": "failure/timeout-after-remote-commit"},
+          {"id": "insufficient_stock", "status": "PASS", "evidence_ref": "failure/insufficient-stock"},
+          {"id": "expired_label", "status": "PASS", "evidence_ref": "failure/expired-label"},
+          {"id": "over_refund", "status": "PASS", "evidence_ref": "failure/over-refund"},
+          {"id": "cross_tenant_access", "status": "PASS", "evidence_ref": "failure/cross-tenant-access"},
+          {"id": "approval_denial", "status": "PASS", "evidence_ref": "failure/approval-denial"},
+          {"id": "rate_limit", "status": "PASS", "evidence_ref": "failure/rate-limit"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "evidence/rollback"}
+      },
+      "invalid": {"schema_version": 1}
     },
     {
       "schema": "reconciliation/action-v1.schema.json",

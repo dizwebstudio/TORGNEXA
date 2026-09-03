@@ -27,17 +27,17 @@
   ],
   "frozen_pillars": [
     "connector-plugin-runtime-capabilities",
-    "reporting-settlements-growth-supply-planning",
-    "privacy-secrets-security-governance"
+    "privacy-secrets-security-governance",
+    "reporting-settlements-growth-supply-planning"
   ],
   "adr": "adr/0128-robokassa-refund-runtime.md",
   "existing_adrs": [
     "adr/0009-transactional-outbox.md",
     "adr/0010-connector-capabilities.md",
     "adr/0039-connector-conformance-admission-gate.md",
-    "adr/0071-payment-rails.md",
+    "adr/0071-payment-sbp-provider-boundary.md",
     "adr/0090-built-in-provider-runtime-composition-boundary.md",
-    "adr/0105-unauthenticated-webhook-ingress.md"
+    "adr/0105-unauthenticated-verified-webhook-ingress.md"
   ],
   "gap_audit": {
     "performed": true,

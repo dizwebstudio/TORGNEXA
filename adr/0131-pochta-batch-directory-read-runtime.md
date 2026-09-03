@@ -31,9 +31,28 @@ fail-closed до отдельной qualification.
 валидация означает, что неполный, дублирующий или слишком большой ответ
 показывается как ошибка, а не превращается в недостоверные данные.
 
-## Compatibility and operational impact
+## Alternatives considered
+
+Оставить batch directory только в adapter logs было отклонено: оператору нужна
+bounded read-only проекция без доступа к сырому provider payload.
+
+## Compatibility impact
 
 Добавляется обратно совместимый capability, API route и сгенерированная SDK
 операция `listLogisticsBatches`; существующие routes и label formats не
-меняются. Live qualification нужна для проверки актуального тестового
-кабинета и не заменяет reconciliation для batch creation или hand-off.
+меняются.
+
+## Migration and data impact
+
+Миграция не требуется: справочник читается удалённо и не создаёт локальную
+копию состава партий или новую доменную таблицу.
+
+## Security and privacy impact
+
+Credentials, raw responses and order composition не пересекают host boundary;
+наружу выходят только bounded identifiers, status и UTC observation time.
+
+## Operational impact
+
+Live qualification нужна для проверки актуального тестового кабинета и не
+заменяет reconciliation для batch creation или hand-off.

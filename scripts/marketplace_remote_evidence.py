@@ -10,6 +10,7 @@ import argparse
 import re
 from typing import Any
 
+from golden_path_linkage import validate_flow
 from p4_common import (
     QualificationError,
     read_json,
@@ -22,7 +23,7 @@ from p4_common import (
 CONNECTORS = {"wildberries", "ozon", "yandex-market"}
 ENVIRONMENTS = {"sandbox", "staging", "non-production"}
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-SCHEMA_VERSION = 1
+SCHEMA_VERSIONS = {1, 2}
 
 LISTING_CHECKS = {
     "taxonomy_read",
@@ -62,6 +63,7 @@ TOP_LEVEL = {
     "checks",
     "rollback",
 }
+V2_TOP_LEVEL = TOP_LEVEL | {"flow"}
 
 
 def fail(message: str) -> None:
@@ -78,15 +80,21 @@ def validate(data: Any, scope: str) -> None:
     if not isinstance(data, dict):
         fail("evidence root must be an object")
     reject_secret_shaped_fields(data)
-    unknown = set(data) - TOP_LEVEL
+    schema_version = data.get("schema_version")
+    allowed_top_level = V2_TOP_LEVEL if schema_version == 2 else TOP_LEVEL
+    unknown = set(data) - allowed_top_level
     if unknown:
         fail(f"unsupported top-level fields: {', '.join(sorted(unknown))}")
     required = TOP_LEVEL - {"api_version"}
     missing = required - set(data)
     if missing:
         fail(f"missing top-level fields: {', '.join(sorted(missing))}")
-    if data["schema_version"] != SCHEMA_VERSION:
-        fail(f"schema_version must be {SCHEMA_VERSION}")
+    if schema_version not in SCHEMA_VERSIONS:
+        fail("schema_version must be 1 or 2")
+    if schema_version == 2:
+        if "flow" not in data:
+            fail("v2 marketplace evidence must contain flow linkage")
+        validate_flow(data["flow"])
     if data["status"] != "PASS":
         fail("status must be PASS")
     if data["environment"] not in ENVIRONMENTS:
