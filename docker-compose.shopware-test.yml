@@ -4,7 +4,7 @@ services:
     # recommended development path; this all-in-one community image keeps the
     # qualification stack small enough to run without a MariaDB/OpenSearch
     # project checkout. It must never be used for production data.
-    image: dockware/shopware:6.7.2.2
+    image: dockware/shopware:6.7.2.2@sha256:76a365700db105b35ba6b512f998eec115c82d4ca5d535069c3b4d35f9601eaf
     restart: "no"
     ports:
       - "127.0.0.1:18005:80"

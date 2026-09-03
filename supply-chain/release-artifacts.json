@@ -34,6 +34,7 @@
   "source_only_commands": [
     "torgnexa-connector-conformance",
     "torgnexa-connector-emulator",
+    "torgnexa-marketplace-live-smoke",
     "torgnexa-runtime-qualifier",
     "torgnexa-slo-report"
   ],
@@ -80,6 +81,14 @@
     },
     {
       "name": "kafka",
+      "image": "apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "kafka-init",
       "image": "apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837",
       "platforms": [
         "linux/amd64",

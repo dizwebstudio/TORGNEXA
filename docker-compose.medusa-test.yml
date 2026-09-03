@@ -2,7 +2,7 @@ name: torgnexa-medusa-test
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
     environment:
       POSTGRES_DB: medusa-dtc-test
       POSTGRES_USER: medusa
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     volumes:
       - medusa-test-redis:/data
     healthcheck:
@@ -26,7 +26,7 @@ services:
       retries: 20
 
   medusa:
-    image: node:20-alpine
+    image: node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
     working_dir: /server
     depends_on:
       postgres:

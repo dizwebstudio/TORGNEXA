@@ -143,7 +143,7 @@ jobs:
           test -f "$target/.env"
           test ! -L "$target/.env"
           test "$(stat -c '%a' "$target/.env")" = 600
-          for required in cat curl date docker find grep ln mktemp mv readlink rm sha256sum sleep sort stat tar; do
+          for required in cat date docker find grep ln mktemp mv readlink rm sha256sum sleep sort stat tar; do
             command -v "$required" >/dev/null
           done
           docker compose version >/dev/null
