@@ -19,7 +19,7 @@ COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
 
 def flow() -> dict:
-    return {
+    document = {
         "flow_ref": "golden-path/flow-01",
         "order_ref": "order/flow-01",
         "reservation_ref": "reservation/flow-01",
@@ -30,6 +30,7 @@ def flow() -> dict:
         "marking_ref": "marking/flow-01",
         "edo_ref": "edo/flow-01",
     }
+    return document
 
 
 def connector_document(kind: str) -> dict:
@@ -41,7 +42,7 @@ def connector_document(kind: str) -> dict:
         "edo": {"health", "document_send", "document_status", "reconciliation"},
     }[kind]
     connector_id = {"marking": "chestny-znak", "edo": "diadoc"}.get(kind, f"{kind}-sandbox")
-    return {
+    document = {
         "schema_version": 2,
         "status": "PASS",
         "scope": "connector",
@@ -53,21 +54,25 @@ def connector_document(kind: str) -> dict:
         "account_ref": f"{kind}-account-01",
         "qualified_at": "2026-09-03T00:00:00Z",
         "flow": flow(),
-        "observations": ({
-            "product_status": "matched",
-            "marking_status": "observed",
-            "reconciliation": "matched",
-        } if kind == "marking" else {
-            "send_status": "accepted",
-            "document_status": "delivered",
-            "reconciliation": "matched",
-        } if kind == "edo" else None),
         "checks": [
             {"id": check_id, "status": "PASS", "evidence_ref": f"{kind}/{check_id}"}
             for check_id in sorted(required)
         ],
         "rollback": {"verified": True, "evidence_ref": f"{kind}/rollback"},
     }
+    if kind == "marking":
+        document["observations"] = {
+            "product_status": "matched",
+            "marking_status": "observed",
+            "reconciliation": "matched",
+        }
+    elif kind == "edo":
+        document["observations"] = {
+            "send_status": "accepted",
+            "document_status": "delivered",
+            "reconciliation": "matched",
+        }
+    return document
 
 
 def marketplace_remote_document() -> dict:
@@ -321,6 +326,34 @@ class ProductionGoldenPathTest(unittest.TestCase):
                 "edo": connector_document("edo"),
             }
             documents["edo"]["flow"]["flow_ref"] = "golden-path/other-flow"
+            document = aggregate()
+            for kind, value in documents.items():
+                path = root / f"{kind}.json"
+                path.write_text(json.dumps(value), encoding="utf-8")
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                next(item for item in document["artifacts"] if item["kind"] == kind)["sha256"] = digest
+            with self.assertRaises(Exception):
+                validate_bundle(
+                    document,
+                    {kind: root / f"{kind}.json" for kind in ARTIFACT_KINDS},
+                    COMMIT,
+                    "dizwebstudio/TORGNEXA",
+                )
+
+    def test_bundle_rejects_sandbox_remote_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            documents = {
+                "marketplace-remote": marketplace_remote_document(),
+                "marketplace-live-smoke": marketplace_live_document(),
+                "marketplace-compensation": marketplace_compensation_document(),
+                "carrier": connector_document("carrier"),
+                "payment": connector_document("payment"),
+                "fiscal": connector_document("fiscal"),
+                "chestny-znak": connector_document("marking"),
+                "edo": connector_document("edo"),
+            }
+            documents["marketplace-remote"]["environment"] = "sandbox"
             document = aggregate()
             for kind, value in documents.items():
                 path = root / f"{kind}.json"

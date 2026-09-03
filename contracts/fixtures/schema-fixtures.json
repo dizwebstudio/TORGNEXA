@@ -4762,6 +4762,11 @@
           "marking_ref": "marking/flow-01",
           "edo_ref": "edo/flow-01"
         },
+        "observations": {
+          "product_status": "matched",
+          "marking_status": "observed",
+          "reconciliation": "matched"
+        },
         "checks": [
           {"id": "health", "status": "PASS", "evidence_ref": "marking/health"},
           {"id": "product_read", "status": "PASS", "evidence_ref": "marking/product-read"},

@@ -143,8 +143,10 @@ non-production offer на `+1`, подтверждает read-after-write и в�
 export TORGNEXA_MARKETPLACE_SMOKE_ALLOW_WRITES=I_UNDERSTAND_THIS_IS_NON_PRODUCTION
 ```
 
-Результат валидируется контрактом
-`contracts/qualification/marketplace-live-smoke-v1.schema.json`. Команда не
+Результат автономного smoke валидируется контрактом
+`contracts/qualification/marketplace-live-smoke-v1.schema.json`; при передаче
+всех девяти flow-ссылок выпускается и проверяется связанный v2-документ
+`contracts/qualification/marketplace-live-smoke-v2.schema.json`. Команда не
 создаёт live qualification без реальных credentials и подходящего
 non-production account; при отсутствии внешнего доступа она завершается с
 `FAIL`, сохраняя redacted failure evidence.

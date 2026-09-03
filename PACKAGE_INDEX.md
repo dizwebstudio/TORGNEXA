@@ -58,9 +58,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - adrs: 183
 - tasks: 234
 - milestones: 14
-- contracts: 259
+- contracts: 264
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3565
+- total source files (excluding local secrets/build/dependency/cache trees): 3573
 
 
 ## Connector category layout
@@ -1825,11 +1825,16 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/protobuf/event_envelope.proto`
 - `contracts/publication-quality/profile.schema.json`
 - `contracts/qualification/connector-golden-path-evidence-v1.schema.json`
+- `contracts/qualification/connector-golden-path-evidence-v2.schema.json`
 - `contracts/qualification/external-qualification-evidence-v1.schema.json`
 - `contracts/qualification/financial-warehouse-qualification-v1.schema.json`
+- `contracts/qualification/marketplace-compensation-evidence-v2.schema.json`
 - `contracts/qualification/marketplace-live-smoke-v1.schema.json`
+- `contracts/qualification/marketplace-live-smoke-v2.schema.json`
 - `contracts/qualification/marketplace-remote-evidence-v1.schema.json`
+- `contracts/qualification/marketplace-remote-evidence-v2.schema.json`
 - `contracts/qualification/production-golden-path-v1.schema.json`
+- `contracts/qualification/production-golden-path-v2.schema.json`
 - `contracts/reconciliation/README.md`
 - `contracts/reconciliation/action-v1.schema.json`
 - `contracts/reconciliation/drift-v1.schema.json`
@@ -3708,9 +3713,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/generate-pre-v1-baseline.py`
 - `scripts/generate-release-evidence.sh`
 - `scripts/generate-release-sboms.sh`
+- `scripts/golden_path_linkage.py`
 - `scripts/init-community-env.sh`
 - `scripts/install-security-tools.sh`
 - `scripts/magento-smoke.sh`
+- `scripts/marketplace_compensation_evidence.py`
+- `scripts/marketplace_compensation_evidence_test.py`
 - `scripts/marketplace_live_smoke_evidence.py`
 - `scripts/marketplace_live_smoke_evidence_test.py`
 - `scripts/marketplace_remote_evidence.py`

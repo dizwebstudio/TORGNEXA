@@ -310,7 +310,7 @@ def validate_bundle(
 
     remote = loaded["marketplace-remote"]
     marketplace_remote_evidence.validate(remote, "full")
-    if remote.get("schema_version") != 2:
+    if remote.get("schema_version") != 2 or remote.get("environment") != "non-production":
         fail("marketplace remote evidence must use linked schema v2")
     live = loaded["marketplace-live-smoke"]
     marketplace_live_smoke_evidence.validate_document(live)

@@ -5,8 +5,9 @@
 `repository-complete` (2026-09-03) — provider-neutral сквозной контур,
   контракты, API/UI, timeline, synthetic qualification, миграционный gate и
   fail-closed production evidence gate собраны. Production/live readiness
-  официальных marketplace, carrier и payment/fiscal accounts остаётся
-  external release-gate до запуска на целевых non-production accounts.
+  официальных marketplace, carrier, payment/fiscal, Chestny ZNAK и ЭДО
+  accounts остаётся external release-gate до запуска на целевых
+  non-production accounts и сохранения linked redacted evidence.
 
 ## Цель
 
@@ -36,7 +37,7 @@ connector capability и mapping-слоем.
 с единым flow/idempotency lineage, корректными unknown/blocked состояниями,
 детальной timeline и сверкой ссылок после частичного возврата.
 
-## Repository completion evidence — 2026-09-01
+## Repository completion evidence — 2026-09-03
 
 - `marketplaceoperations.NewAtStage` запускает golden path с уже
   материализованного canonical заказа; `label` — отдельная стадия между
@@ -50,6 +51,10 @@ connector capability и mapping-слоем.
 - Добавлены ADR-0174, эксплуатационная документация и
   `make order-fulfillment-qualification`; synthetic golden path проверяет
   canonical references, duplicate/idempotency и unknown outcome.
+- Production gate использует v2 linked evidence: один flow связывает
+  marketplace, carrier, payment/fiscal, returns/refund/settlement, Chestny
+  ZNAK и ЭДО; отдельный compensation artifact фиксирует remote return/refund/
+  compensation/settlement observations.
 - Миграция `000051_marketplace_order_fulfillment.sql` расширяет stage vocabulary
   для `label`, требует backup и не изменяет исторические бизнес-факты.
 
@@ -71,9 +76,9 @@ non-production credentials и retained evidence соответствующий c
 | 224.8 | Закрыта: refund allocation, fiscal/settlement lineage и over-refund guards остаются canonical. |
 | 224.9 | Закрыта: bounded `LifecycleRunner` и append-only command journal обеспечивают продолжение без дублей. |
 | 224.10 | Закрыта: flow detail/timeline API, SDK и операторский Marketplace UI. |
-| 224.11 | Repository gate закрыт; credentialed official connector gate остаётся открытым. |
+| 224.11 | Repository gate закрыт; linked credentialed official connector gate для marketplace/carrier/payment/fiscal/Chestny ZNAK/ЭДО остаётся открытым. |
 | 224.12 | Закрыта: findings, reconciliation actions, unknown/attention и operator visibility. |
-| 224.13 | Synthetic repository gate закрыт командой `make order-fulfillment-qualification`; полный release gate закрыт командой `make production-golden-path`, credentialed evidence остаётся внешним входом. |
+| 224.13 | Synthetic repository gate закрыт командой `make order-fulfillment-qualification`; `make production-golden-path` fail-closed проверяет v2 linked release evidence, а credentialed live evidence остаётся внешним входом. |
 
 ## Подзадачи
 

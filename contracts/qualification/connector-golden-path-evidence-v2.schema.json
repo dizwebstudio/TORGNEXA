@@ -18,6 +18,17 @@
     "account_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
     "qualified_at": {"type": "string", "format": "date-time"},
     "flow": {"$ref": "#/$defs/flow"},
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "product_status": {"const": "matched"},
+        "marking_status": {"const": "observed"},
+        "send_status": {"const": "accepted"},
+        "document_status": {"const": "delivered"},
+        "reconciliation": {"const": "matched"}
+      }
+    },
     "checks": {
       "type": "array",
       "minItems": 1,

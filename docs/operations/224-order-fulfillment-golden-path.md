@@ -23,7 +23,7 @@ Settlement агрегаты и хранит только tenant-scoped orchestra
 
 ```text
 order → reservation → pick_pack → label → shipment → return
-→ settlement → profitability → reconciliation → complete
+→ refund → fiscalization → settlement → profitability → reconciliation → complete
 ```
 
 Старт с заказа реализован через `marketplaceoperations.NewAtStage`. Команды
@@ -53,11 +53,11 @@ make order-fulfillment-qualification
 
 Gate покрывает synthetic полный путь, старт после materialization, требования
 canonical references, duplicate/idempotency и unknown outcome. Sandbox/live
-проверка официальных marketplace, carrier, payment/fiscal connectors не
-подменяется тестовыми fixture: для неё нужны целевые non-production accounts,
-scopes, topology и redacted retained evidence. До этого соответствующие
-capabilities остаются `read_only`, `partially_supported` или
-`qualification_required`.
+проверка официальных marketplace, carrier, payment/fiscal, Chestny ZNAK и ЭДО
+connectors не подменяется тестовыми fixture: для неё нужны целевые
+non-production accounts, scopes, topology и redacted retained evidence. До
+этого соответствующие capabilities остаются `read_only`, `partially_supported`
+или `qualification_required`.
 
 ## Production release gate
 
