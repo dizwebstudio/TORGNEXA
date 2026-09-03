@@ -54,6 +54,10 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 	if _, err := exec.LookPath("unshare"); err != nil {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
+	chroot, err := exec.LookPath("chroot")
+	if err != nil {
+		return SandboxProbeResult{}, ErrSandboxUnavailable
+	}
 	info, err := os.Stat(emulatorExecutable)
 	if err != nil || !info.Mode().IsRegular() {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
@@ -90,7 +94,10 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 
 	runctx, cancel := context.WithTimeout(ctx, time.Duration(sandbox.plan.Limits.WallTimeMS)*time.Millisecond)
 	defer cancel()
-	command := exec.CommandContext(runctx, "unshare", "--user", "--map-root-user", "--mount", "--net", "--ipc", "--uts", "--root", root, "--wd", "/", "/bin/emulator", "--isolation-probe")
+	// Use the portable short options and an absolute chroot helper. The
+	// qualification runs in both util-linux and BusyBox based build images;
+	// BusyBox does not implement util-linux's --root/--wd options.
+	command := exec.CommandContext(runctx, "unshare", "-U", "-r", "-m", "-n", "-i", "-u", chroot, root, "/bin/emulator", "--isolation-probe")
 	command.Env = []string{"LANG=C", "TZ=UTC", "PATH=/bin", "TORGNEXA_SANDBOX_MODE=test"}
 	stdout, err := command.StdoutPipe()
 	if err != nil {

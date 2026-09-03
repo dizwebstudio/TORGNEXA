@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-029B",
+  "task": "029",
+  "stage": "b",
+  "change_class": "implementation",
+  "summary": "Make the existing Task-029 Linux reference sandbox launch portable across util-linux and BusyBox unshare implementations without changing its isolation semantics.",
+  "scopes": [
+    "internal/platform/connectorsandbox/linux.go"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "The portability correction changes only the namespace and chroot command spelling; sandbox sessions retain the existing host-created connector scope and introduce no tenant authority."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "not_affected",
+      "evidence": "The probe still stages only the static emulator and returns the existing bounded isolation report; no persisted fields, provider payloads or credential material are added."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No public API, SDK surface or serialized operation result is changed by replacing util-linux-specific launcher options with portable equivalents."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "The Linux reference probe emits no EventBus event and the patch does not alter any event envelope or event catalog entry."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Connector SDK v1 and the Task-025 admission plan remain unchanged; only the Task-029 host launcher invocation is made compatible with both supported unshare implementations."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "The reference sandbox is transient and the portability fix adds no database schema, migration or stored runtime state."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "The same user, mount, network, IPC and UTS namespaces, minimal chroot and fixed environment remain mandatory; the compatibility fix restores execution of that existing isolation proof in BusyBox images."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "No operation authorization, approval policy, capability grant or production-credential rule is changed by the launcher portability correction."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "Probe results retain the existing bounded usage and isolation evidence shape, with no new audit or lineage payload."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "The change affects only deterministic test-process startup and cannot alter business retries, inbox, outbox or reconciliation behavior."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "The namespace probe continues to require a network namespace with no direct route, while the portable invocation makes that existing direct-network isolation evidence executable in BusyBox-based qualification images."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "Wall, CPU, RSS, output and concurrency ceilings and their measured result fields are unchanged."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Qualification operations gain compatibility with the pinned Alpine toolchain; rollback is a code-only revert and temporary chroot cleanup remains unchanged."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "The external isolation probe now passes in a privileged pinned Alpine runtime and the full Task-064 reference conformance gate remains 13/13."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "064"
+  ]
+}

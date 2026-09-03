@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3575
+- total source files (excluding local secrets/build/dependency/cache trees): 3576
 
 
 ## Connector category layout
@@ -759,6 +759,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/026-search-provider.json`
 - `architecture/reviews/028-entitlements.json`
 - `architecture/reviews/029-sandbox-dryrun.json`
+- `architecture/reviews/029b-sandbox-runtime-portability.json`
 - `architecture/reviews/030-data-lineage.json`
 - `architecture/reviews/031-import-export.json`
 - `architecture/reviews/032-frontend-shell.json`
