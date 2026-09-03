@@ -6,8 +6,10 @@
 account/statement boundary, completeness matrix/evaluation, API/SDK, RLS и
 frontend financial completeness center. Существующие Order, Payment, Settlement,
 FX, COGS/FIFO и advertising projections переиспользуются; второй ledger не
-создан. Credentialed live bank/acquirer, marketplace payout и advertising
-qualification остаются внешними release-gates и не подменяются health-check.
+создан. Общий fail-closed gate `make financial-warehouse-qualification`
+проверяет retained credentialed evidence финансового и складского контуров;
+сама credentialed qualification официальных accounts остаётся внешним входом
+и не подменяется health-check.
 
 ## Цель
 

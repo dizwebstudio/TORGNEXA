@@ -79,3 +79,14 @@ schemas, RLS/append-only boundary, FBO policy и frontend. Нагрузочны�
 FBO sandbox/live API, shipment/label/tracking, а также конкретных профилей
 scanner/camera, scale и printer. До их появления в Integration Center нельзя
 показывать `qualified` и нельзя выдавать remote FBO operation за локальную.
+
+Общий release-runner gate для финансового и складского контура —
+`make financial-warehouse-qualification`. Он выполняет локальные
+`financial-completeness-qualification` и `mobile-warehouse-qualification`,
+после чего fail-closed проверяет восемь внешних retained evidence artifacts.
+Для `fbs` и `fbo` обязательны exact scopes, fulfillment/label/tracking/handoff
+или inbound/acceptance/return checks, read-after-write и reconciliation. Для
+`hardware` обязательны profile version, discovery/pairing/health,
+timeout/retry, scan/camera/scale/print и safe fallback. Без актуального
+credentialed sandbox evidence UI/Integration Center сохраняет
+`read_only`/`qualification_required`.

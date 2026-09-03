@@ -87,6 +87,16 @@ marketplace payout, FX и advertising source требуют credentialed sandbox
 evidence на release topology. Без такого evidence коннектор остаётся
 `partial`/`qualification_required`, а не объявляется production-ready.
 
+Для одновременной проверки внешнего финансового и WMS-контура используется
+`make financial-warehouse-qualification`. Release-runner обязан передать
+aggregate manifest и redacted evidence для `bank`, `acquirer`,
+`marketplace_payout`, `fx`, `advertising`, `fbs`, `fbo` и `hardware`. Manifest
+связывает каждый артефакт с SHA-256, release commit, account/profile ref и
+owner check; валидатор требует PASS для payment/refund, payout-to-order,
+FX snapshot, advertising attribution, duplicate/unknown/reconciliation и
+rollback сценариев. Синтетические fixtures или один health-check не проходят
+этот gate.
+
 Для инцидента: остановить новые imports/recalculation kill switch’ом, не
 удалять подтверждённую историю, сверить source digest и создать новый run после
 исправления. В логах допустимы только tenant-safe IDs, статусы и timing.

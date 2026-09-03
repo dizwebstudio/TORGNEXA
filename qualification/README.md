@@ -172,3 +172,39 @@ pick/pack → label → shipment → return → refund → settlement → P&L �
 reconciliation, а также duplicate/out-of-order/timeout/approval/rate-limit и
 rollback checks. Он не принимает synthetic fixture вместо внешнего evidence,
 не вызывает провайдеры и не принимает credentials в аргументах или файлах.
+
+## Внешняя квалификация финансового и складского контуров
+
+Для Task 227/229 добавлен отдельный release-runner gate:
+`make financial-warehouse-qualification`. Он запускает
+`make financial-completeness-qualification` и
+`make mobile-warehouse-qualification`, затем требует aggregate manifest и
+восемь retained redacted evidence-файлов:
+
+- `bank`, `acquirer`, `marketplace_payout`, `fx`, `advertising`;
+- `fbs`, `fbo`, `hardware` — последний должен покрывать scanner, camera,
+  scale и printer profile.
+
+Минимальный запуск:
+
+```bash
+export TORGNEXA_FINANCIAL_WAREHOUSE_EVIDENCE_FILE=/evidence/financial-warehouse.json
+export TORGNEXA_BANK_QUALIFICATION_EVIDENCE_FILE=/evidence/bank.json
+export TORGNEXA_ACQUIRER_QUALIFICATION_EVIDENCE_FILE=/evidence/acquirer.json
+export TORGNEXA_MARKETPLACE_PAYOUT_QUALIFICATION_EVIDENCE_FILE=/evidence/marketplace-payout.json
+export TORGNEXA_FX_QUALIFICATION_EVIDENCE_FILE=/evidence/fx.json
+export TORGNEXA_ADVERTISING_QUALIFICATION_EVIDENCE_FILE=/evidence/advertising.json
+export TORGNEXA_FBS_QUALIFICATION_EVIDENCE_FILE=/evidence/fbs.json
+export TORGNEXA_FBO_QUALIFICATION_EVIDENCE_FILE=/evidence/fbo.json
+export TORGNEXA_HARDWARE_QUALIFICATION_EVIDENCE_FILE=/evidence/hardware.json
+export TORGNEXA_P4_REPOSITORY=OWNER/NAME
+make financial-warehouse-qualification
+```
+
+Контракты: `contracts/qualification/external-qualification-evidence-v1.schema.json`
+и `contracts/qualification/financial-warehouse-qualification-v1.schema.json`.
+Gate проверяет scopes, connector/profile version, release commit/repository,
+account/profile refs, SHA-256, rollback, source dedup/unknown/reconciliation,
+FBS/FBO read-after-write и hardware safe fallback. Он не вызывает внешние API и
+не принимает credentials; без фактического non-production evidence production
+claim остаётся заблокированным.

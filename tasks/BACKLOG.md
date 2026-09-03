@@ -1185,8 +1185,9 @@ financial gaps. It adds the redacted bank/source evidence boundary,
 completeness matrix/evaluation, statement preview/commit, findings queue,
 OpenAPI/SDK, frontend center, forced RLS and append-only controls without a
 second ledger. Credentialed live bank/acquirer, marketplace payout and
-advertising qualification remain external release-gates; missing facts are
-visible and never zero-filled.
+advertising qualification remain external release-gates; the combined
+`make financial-warehouse-qualification` gate now binds those artifacts to
+the release; missing facts are visible and never zero-filled.
 Tasks 167 and 219 provide channel unit economics, P&L, cash/report quality and
 FIFO foundations; Tasks 058–059 provide settlement/reconciliation; Tasks
 089/131 provide historical FX; Task 220 provides read-only advertising facts.
@@ -1216,9 +1217,10 @@ qualification. Mobile state is not authoritative and FBO remote execution is
 not presented as local warehouse work. See
 `tasks/issues/229-mobile-warehouse-fulfillment.md`.
 
-The repository gate is `make mobile-warehouse-qualification`; credentialed
-marketplace/carrier and scanner/scale/printer checks remain an external release
-gate until redacted target-topology evidence is retained.
+The repository gate is `make mobile-warehouse-qualification`; the combined
+`make financial-warehouse-qualification` gate validates retained credentialed
+FBS/FBO and scanner/scale/printer evidence. Production readiness remains
+blocked until target-topology evidence is retained.
 
 ## Epic 185 — Массовое управление каталогом
 
