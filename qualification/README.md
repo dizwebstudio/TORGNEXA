@@ -218,11 +218,13 @@ read-after-write, idempotent replay и reconciliation. Артефакты Chestn
 `make financial-warehouse-qualification`. Он запускает
 `make financial-completeness-qualification` и
 `make mobile-warehouse-qualification`, затем требует aggregate manifest и
-восемь retained redacted evidence-файлов:
+12 retained redacted evidence-файлов:
 
 - `bank`, `acquirer`, `marketplace_payout`, `fx`, `advertising`;
 - `fbs`, `fbo`, `hardware` — последний должен покрывать scanner, camera,
   scale и printer profile.
+- `partner_uat`, `rollback`, `slo_dr`, `production_support` — partner sign-off,
+  restore/replay, SLO/DR rehearsal и on-call/escalation readiness.
 
 Минимальный запуск:
 
@@ -236,14 +238,21 @@ export TORGNEXA_ADVERTISING_QUALIFICATION_EVIDENCE_FILE=/evidence/advertising.js
 export TORGNEXA_FBS_QUALIFICATION_EVIDENCE_FILE=/evidence/fbs.json
 export TORGNEXA_FBO_QUALIFICATION_EVIDENCE_FILE=/evidence/fbo.json
 export TORGNEXA_HARDWARE_QUALIFICATION_EVIDENCE_FILE=/evidence/hardware.json
+export TORGNEXA_PARTNER_UAT_QUALIFICATION_EVIDENCE_FILE=/evidence/partner-uat.json
+export TORGNEXA_ROLLBACK_QUALIFICATION_EVIDENCE_FILE=/evidence/rollback.json
+export TORGNEXA_SLO_DR_QUALIFICATION_EVIDENCE_FILE=/evidence/slo-dr.json
+export TORGNEXA_PRODUCTION_SUPPORT_QUALIFICATION_EVIDENCE_FILE=/evidence/production-support.json
 export TORGNEXA_P4_REPOSITORY=OWNER/NAME
 make financial-warehouse-qualification
 ```
 
-Контракты: `contracts/qualification/external-qualification-evidence-v1.schema.json`
-и `contracts/qualification/financial-warehouse-qualification-v1.schema.json`.
+Контракты: `contracts/qualification/external-qualification-evidence-v2.schema.json`
+и `contracts/qualification/financial-warehouse-qualification-v2.schema.json`;
+v1 остаётся для обратной совместимости локальных evidence. Для v2 все 12
+артефактов привязаны к одной target topology и release commit.
 Gate проверяет scopes, connector/profile version, release commit/repository,
-account/profile refs, SHA-256, rollback, source dedup/unknown/reconciliation,
-FBS/FBO read-after-write и hardware safe fallback. Он не вызывает внешние API и
-не принимает credentials; без фактического non-production evidence production
-claim остаётся заблокированным.
+account/profile refs, SHA-256, source dedup/unknown/reconciliation, FBS/FBO
+read-after-write, hardware safe fallback, partner UAT sign-off, rollback/restore,
+SLO/DR и production support. Он не вызывает внешние API и не принимает
+credentials; без фактического non-production evidence production claim остаётся
+заблокированным.

@@ -94,8 +94,17 @@ aggregate manifest и redacted evidence для `bank`, `acquirer`,
 связывает каждый артефакт с SHA-256, release commit, account/profile ref и
 owner check; валидатор требует PASS для payment/refund, payout-to-order,
 FX snapshot, advertising attribution, duplicate/unknown/reconciliation и
-rollback сценариев. Синтетические fixtures или один health-check не проходят
-этот gate.
+rollback сценариев. v2 дополнительно требует отдельные хэшируемые evidence
+для partner UAT, release rollback/database restore, SLO и DR rehearsal, а также
+production support/on-call/escalation; все артефакты должны ссылаться на одну
+`topology_ref`, `runtime_ref` и `region`. Синтетические fixtures или один
+health-check не проходят этот gate.
+
+На release-runner передаются 12 файлов: восемь финансовых/FBS/FBO/hardware
+артефактов и `partner_uat`, `rollback`, `slo_dr`, `production_support`.
+Операционные evidence содержат только redacted refs, статусы и агрегированные
+результаты: никаких имён сотрудников, токенов, полных банковских реквизитов,
+сырого лога или customer PII.
 
 Для инцидента: остановить новые imports/recalculation kill switch’ом, не
 удалять подтверждённую историю, сверить source digest и создать новый run после

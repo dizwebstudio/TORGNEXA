@@ -92,5 +92,7 @@ offline reservation, shipment или refund отклонено из-за рис�
 `make mobile-warehouse-qualification` проверяет repository-контур, contracts,
 SDK, migration, RLS, redaction и frontend wiring. Credentialed sandbox/live
 проверки FBS/FBO connector, scanner, scale, printer и carrier должны пройти на
-целевой topology с redacted evidence; до этого capability остаётся
+целевой topology с redacted evidence; v2 release gate дополнительно связывает
+этот topology с partner UAT, rollback/restore, SLO/DR rehearsal и production
+support evidence. До получения полного набора capability остаётся
 `read_only`, `partially_supported` или `qualification_required`.

@@ -4822,6 +4822,36 @@
       }
     },
     {
+      "schema": "qualification/external-qualification-evidence-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "financial",
+        "subject_kind": "connector",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "subject_id": "bank-sandbox",
+        "account_ref": "bank-account-01",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "version": "qualification-2026-09",
+        "scopes": ["accounts.read", "statements.read"],
+        "topology": {"topology_ref": "topology/finance-warehouse-01", "runtime_ref": "runtime/qualification-01", "region": "ru-msk-1"},
+        "observations": {"source_status": "observed", "read_after_write": true, "reconciliation": "matched"},
+        "checks": [
+          {"id": "health", "status": "PASS", "evidence_ref": "bank/health"},
+          {"id": "account_discovery", "status": "PASS", "evidence_ref": "bank/account-discovery"},
+          {"id": "statement_sync", "status": "PASS", "evidence_ref": "bank/statement-sync"},
+          {"id": "duplicate_sync", "status": "PASS", "evidence_ref": "bank/duplicate-sync"},
+          {"id": "unknown_transfer", "status": "PASS", "evidence_ref": "bank/unknown-transfer"},
+          {"id": "reconciliation", "status": "PASS", "evidence_ref": "bank/reconciliation"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "bank/rollback"}
+      },
+      "invalid": {"schema_version": 1}
+    },
+    {
       "schema": "qualification/financial-warehouse-qualification-v1.schema.json",
       "valid": {
         "schema_version": 1,
@@ -4904,6 +4934,96 @@
         "failure_matrix": [],
         "rollback": {"verified": false, "evidence_ref": "rollback"}
       }
+    },
+    {
+      "schema": "qualification/financial-warehouse-qualification-v2.schema.json",
+      "valid": {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "credentialed-financial-warehouse",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": "dizwebstudio/TORGNEXA",
+        "release_commit": "0123456789abcdef0123456789abcdef01234567",
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "topology": {"topology_ref": "topology/finance-warehouse-01", "runtime_ref": "runtime/qualification-01", "region": "ru-msk-1"},
+        "subjects": {
+          "bank": {"subject_id": "bank-sandbox", "account_ref": "bank-account-01", "evidence_ref": "evidence/bank"},
+          "acquirer": {"subject_id": "acquirer-sandbox", "account_ref": "acquirer-account-01", "evidence_ref": "evidence/acquirer"},
+          "marketplace_payout": {"subject_id": "marketplace-payout-sandbox", "account_ref": "marketplace-payout-account-01", "evidence_ref": "evidence/marketplace_payout"},
+          "fx": {"subject_id": "fx-sandbox", "account_ref": "fx-account-01", "evidence_ref": "evidence/fx"},
+          "advertising": {"subject_id": "advertising-sandbox", "account_ref": "advertising-account-01", "evidence_ref": "evidence/advertising"},
+          "fbs": {"subject_id": "fbs-sandbox", "account_ref": "fbs-account-01", "evidence_ref": "evidence/fbs"},
+          "fbo": {"subject_id": "fbo-sandbox", "account_ref": "fbo-account-01", "evidence_ref": "evidence/fbo"},
+          "hardware": {"subject_id": "hardware-sandbox", "account_ref": "hardware-account-01", "evidence_ref": "evidence/hardware"},
+          "partner_uat": {"subject_id": "partner-uat-sandbox", "account_ref": "partner-uat-account-01", "evidence_ref": "evidence/partner_uat"},
+          "rollback": {"subject_id": "rollback-sandbox", "account_ref": "rollback-account-01", "evidence_ref": "evidence/rollback"},
+          "slo_dr": {"subject_id": "slo-dr-sandbox", "account_ref": "slo-dr-account-01", "evidence_ref": "evidence/slo_dr"},
+          "production_support": {"subject_id": "production-support-sandbox", "account_ref": "production-support-account-01", "evidence_ref": "evidence/production_support"}
+        },
+        "artifacts": [
+          {"kind": "bank", "evidence_ref": "evidence/bank", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+          {"kind": "acquirer", "evidence_ref": "evidence/acquirer", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+          {"kind": "marketplace_payout", "evidence_ref": "evidence/marketplace_payout", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+          {"kind": "fx", "evidence_ref": "evidence/fx", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+          {"kind": "advertising", "evidence_ref": "evidence/advertising", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
+          {"kind": "fbs", "evidence_ref": "evidence/fbs", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"},
+          {"kind": "fbo", "evidence_ref": "evidence/fbo", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
+          {"kind": "hardware", "evidence_ref": "evidence/hardware", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"},
+          {"kind": "partner_uat", "evidence_ref": "evidence/partner_uat", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"kind": "rollback", "evidence_ref": "evidence/rollback", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"},
+          {"kind": "slo_dr", "evidence_ref": "evidence/slo_dr", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+          {"kind": "production_support", "evidence_ref": "evidence/production_support", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+        ],
+        "checks": [
+          {"id": "bank_statement_sync", "owner": "bank", "status": "PASS", "evidence_ref": "path/bank-statement-sync"},
+          {"id": "acquirer_payment_refund", "owner": "acquirer", "status": "PASS", "evidence_ref": "path/acquirer-payment-refund"},
+          {"id": "payout_import", "owner": "marketplace_payout", "status": "PASS", "evidence_ref": "path/payout-import"},
+          {"id": "payout_order_match", "owner": "marketplace_payout", "status": "PASS", "evidence_ref": "path/payout-order-match"},
+          {"id": "fx_conversion_snapshot", "owner": "fx", "status": "PASS", "evidence_ref": "path/fx-conversion-snapshot"},
+          {"id": "advertising_attribution", "owner": "advertising", "status": "PASS", "evidence_ref": "path/advertising-attribution"},
+          {"id": "financial_reconciliation", "owner": "platform", "status": "PASS", "evidence_ref": "path/financial-reconciliation"},
+          {"id": "financial_duplicate_idempotency", "owner": "platform", "status": "PASS", "evidence_ref": "path/financial-duplicate-idempotency"},
+          {"id": "financial_unknown_recovery", "owner": "platform", "status": "PASS", "evidence_ref": "path/financial-unknown-recovery"},
+          {"id": "fbs_order_to_handoff", "owner": "fbs", "status": "PASS", "evidence_ref": "path/fbs-order-to-handoff"},
+          {"id": "fbo_inbound_acceptance", "owner": "fbo", "status": "PASS", "evidence_ref": "path/fbo-inbound-acceptance"},
+          {"id": "warehouse_read_after_write", "owner": "platform", "status": "PASS", "evidence_ref": "path/warehouse-read-after-write"},
+          {"id": "warehouse_reconciliation", "owner": "platform", "status": "PASS", "evidence_ref": "path/warehouse-reconciliation"},
+          {"id": "warehouse_idempotency", "owner": "platform", "status": "PASS", "evidence_ref": "path/warehouse-idempotency"},
+          {"id": "warehouse_unknown_recovery", "owner": "platform", "status": "PASS", "evidence_ref": "path/warehouse-unknown-recovery"},
+          {"id": "hardware_safe_fallback", "owner": "hardware", "status": "PASS", "evidence_ref": "path/hardware-safe-fallback"},
+          {"id": "device_matrix", "owner": "hardware", "status": "PASS", "evidence_ref": "path/device-matrix"},
+          {"id": "partner_uat", "owner": "partner", "status": "PASS", "evidence_ref": "path/partner-uat"},
+          {"id": "rollback", "owner": "platform", "status": "PASS", "evidence_ref": "path/rollback"},
+          {"id": "slo", "owner": "platform", "status": "PASS", "evidence_ref": "path/slo"},
+          {"id": "dr", "owner": "platform", "status": "PASS", "evidence_ref": "path/dr"},
+          {"id": "production_support", "owner": "platform", "status": "PASS", "evidence_ref": "path/production-support"},
+          {"id": "support_escalation", "owner": "platform", "status": "PASS", "evidence_ref": "path/support-escalation"}
+        ],
+        "failure_matrix": [
+          {"id": "duplicate_statement_or_payout", "status": "PASS", "evidence_ref": "failure/duplicate-statement-or-payout"},
+          {"id": "duplicate_scan_or_print", "status": "PASS", "evidence_ref": "failure/duplicate-scan-or-print"},
+          {"id": "unknown_remote_commit", "status": "PASS", "evidence_ref": "failure/unknown-remote-commit"},
+          {"id": "stale_fx_or_currency_mismatch", "status": "PASS", "evidence_ref": "failure/stale-fx-or-currency-mismatch"},
+          {"id": "unattributed_advertising", "status": "PASS", "evidence_ref": "failure/unattributed-advertising"},
+          {"id": "cross_tenant", "status": "PASS", "evidence_ref": "failure/cross-tenant"},
+          {"id": "revoked_device", "status": "PASS", "evidence_ref": "failure/revoked-device"},
+          {"id": "printer_outage", "status": "PASS", "evidence_ref": "failure/printer-outage"},
+          {"id": "offline_reconnect_conflict", "status": "PASS", "evidence_ref": "failure/offline-reconnect-conflict"},
+          {"id": "fbo_local_pick_denied", "status": "PASS", "evidence_ref": "failure/fbo-local-pick-denied"},
+          {"id": "fbs_handoff_timeout", "status": "PASS", "evidence_ref": "failure/fbs-handoff-timeout"},
+          {"id": "approval_denial", "status": "PASS", "evidence_ref": "failure/approval-denial"},
+          {"id": "rate_limit", "status": "PASS", "evidence_ref": "failure/rate-limit"},
+          {"id": "worker_crash_resume", "status": "PASS", "evidence_ref": "failure/worker-crash-resume"},
+          {"id": "uat_rejection", "status": "PASS", "evidence_ref": "failure/uat-rejection"},
+          {"id": "rollback_restore_failure", "status": "PASS", "evidence_ref": "failure/rollback-restore-failure"},
+          {"id": "slo_breach", "status": "PASS", "evidence_ref": "failure/slo-breach"},
+          {"id": "dr_restore_failure", "status": "PASS", "evidence_ref": "failure/dr-restore-failure"},
+          {"id": "support_escalation_failure", "status": "PASS", "evidence_ref": "failure/support-escalation-failure"}
+        ],
+        "rollback": {"verified": true, "evidence_ref": "evidence/rollback"}
+      },
+      "invalid": {"schema_version": 1}
     },
     {
       "schema": "qualification/marketplace-compensation-evidence-v2.schema.json",

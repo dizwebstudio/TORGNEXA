@@ -8,14 +8,23 @@ from pathlib import Path
 
 from financial_warehouse_qualification import (
     ARTIFACT_KINDS,
+    V2_ARTIFACT_KINDS,
+    V2_REQUIRED_CHECKS,
+    V2_REQUIRED_FAILURES,
     REQUIRED_CHECKS,
     REQUIRED_FAILURES,
     SUBJECT_KINDS,
     validate_bundle,
     validate_document,
 )
+import external_qualification_evidence
 from external_qualification_evidence import REQUIRED_CHECKS as EXTERNAL_CHECKS
 from external_qualification_evidence import REQUIRED_SCOPES
+from external_qualification_evidence import V2_OBSERVATION_VALUES
+from external_qualification_evidence import V2_REQUIRED_CHECKS as EXTERNAL_V2_CHECKS
+from external_qualification_evidence import V2_REQUIRED_SCOPES
+from external_qualification_evidence import V2_SCOPE_BY_KIND
+from external_qualification_evidence import V2_SUBJECT_KIND_BY_KIND
 from p4_common import QualificationError
 
 
@@ -54,6 +63,52 @@ def external_document(kind: str) -> dict:
     }
 
 
+def v2_topology() -> dict:
+    return {
+        "topology_ref": "topology/finance-warehouse-01",
+        "runtime_ref": "runtime/qualification-01",
+        "region": "ru-msk-1",
+    }
+
+
+def external_document_v2(kind: str) -> dict:
+    if kind in SUBJECT_KINDS:
+        document = external_document(kind)
+        document["schema_version"] = 2
+    else:
+        document = {
+            "schema_version": 2,
+            "status": "PASS",
+            "scope": V2_SCOPE_BY_KIND[kind],
+            "subject_kind": V2_SUBJECT_KIND_BY_KIND[kind],
+            "environment": "non-production",
+            "target": "dedicated-non-production",
+            "repository": REPOSITORY,
+            "release_commit": COMMIT,
+            "subject_id": f"{kind.replace('_', '-')}-sandbox",
+            "account_ref": f"{kind.replace('_', '-')}-account-01",
+            "qualified_at": "2026-09-03T00:00:00Z",
+            "version": "qualification-2026-09",
+            "scopes": sorted(V2_REQUIRED_SCOPES[kind]),
+            "checks": [
+                {"id": check_id, "status": "PASS", "evidence_ref": f"{kind}/{check_id}"}
+                for check_id in sorted(EXTERNAL_V2_CHECKS[kind])
+            ],
+            "rollback": {"verified": True, "evidence_ref": f"{kind}/rollback"},
+        }
+    document["topology"] = v2_topology()
+    document["observations"] = copy.deepcopy(V2_OBSERVATION_VALUES[kind])
+    if kind == "partner_uat":
+        document["observations"] = {
+            "partner_ref": "partner/acme-uat-01",
+            "decision": "accepted",
+            "scenario_count": 12,
+            "critical_findings": 0,
+            "signed_off": True,
+        }
+    return document
+
+
 def aggregate() -> dict:
     return {
         "schema_version": 1,
@@ -83,6 +138,41 @@ def aggregate() -> dict:
         "failure_matrix": [
             {"id": scenario_id, "status": "PASS", "evidence_ref": f"failure/{scenario_id}"}
             for scenario_id in sorted(REQUIRED_FAILURES)
+        ],
+        "rollback": {"verified": True, "evidence_ref": "evidence/rollback"},
+    }
+
+
+def aggregate_v2() -> dict:
+    return {
+        "schema_version": 2,
+        "status": "PASS",
+        "scope": "credentialed-financial-warehouse",
+        "environment": "non-production",
+        "target": "dedicated-non-production",
+        "repository": REPOSITORY,
+        "release_commit": COMMIT,
+        "qualified_at": "2026-09-03T00:00:00Z",
+        "topology": v2_topology(),
+        "subjects": {
+            kind: {
+                "subject_id": f"{kind.replace('_', '-')}-sandbox",
+                "account_ref": f"{kind.replace('_', '-')}-account-01",
+                "evidence_ref": f"evidence/{kind}",
+            }
+            for kind in V2_ARTIFACT_KINDS
+        },
+        "artifacts": [
+            {"kind": kind, "evidence_ref": f"evidence/{kind}", "sha256": "0" * 64}
+            for kind in V2_ARTIFACT_KINDS
+        ],
+        "checks": [
+            {"id": check_id, "owner": owner, "status": "PASS", "evidence_ref": f"path/{check_id}"}
+            for check_id, owner in sorted(V2_REQUIRED_CHECKS.items())
+        ],
+        "failure_matrix": [
+            {"id": scenario_id, "status": "PASS", "evidence_ref": f"failure/{scenario_id}"}
+            for scenario_id in sorted(V2_REQUIRED_FAILURES)
         ],
         "rollback": {"verified": True, "evidence_ref": "evidence/rollback"},
     }
@@ -132,6 +222,40 @@ class FinancialWarehouseQualificationTest(unittest.TestCase):
             paths["fx"].write_text(json.dumps(tampered, sort_keys=True), encoding="utf-8")
             with self.assertRaises(QualificationError):
                 validate_bundle(document, paths, COMMIT, REPOSITORY)
+
+    def test_v2_bundle_binds_operational_evidence_and_topology(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = aggregate_v2()
+            paths = {}
+            for kind in V2_ARTIFACT_KINDS:
+                path = root / f"{kind}.json"
+                path.write_text(json.dumps(external_document_v2(kind), sort_keys=True), encoding="utf-8")
+                next(item for item in document["artifacts"] if item["kind"] == kind)["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+                paths[kind] = path
+            validate_bundle(document, paths, COMMIT, REPOSITORY)
+
+    def test_v2_bundle_rejects_topology_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = aggregate_v2()
+            paths = {}
+            for kind in V2_ARTIFACT_KINDS:
+                artifact = external_document_v2(kind)
+                if kind == "hardware":
+                    artifact["topology"]["topology_ref"] = "topology/other-01"
+                path = root / f"{kind}.json"
+                path.write_text(json.dumps(artifact, sort_keys=True), encoding="utf-8")
+                next(item for item in document["artifacts"] if item["kind"] == kind)["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+                paths[kind] = path
+            with self.assertRaises(QualificationError):
+                validate_bundle(document, paths, COMMIT, REPOSITORY)
+
+    def test_v2_partner_uat_requires_signoff(self):
+        artifact = external_document_v2("partner_uat")
+        artifact["observations"]["signed_off"] = False
+        with self.assertRaises(QualificationError):
+            external_qualification_evidence.validate(artifact, "partner_uat")
 
 
 if __name__ == "__main__":

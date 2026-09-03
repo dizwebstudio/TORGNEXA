@@ -15,6 +15,10 @@ advertising="${TORGNEXA_ADVERTISING_QUALIFICATION_EVIDENCE_FILE:-}"
 fbs="${TORGNEXA_FBS_QUALIFICATION_EVIDENCE_FILE:-}"
 fbo="${TORGNEXA_FBO_QUALIFICATION_EVIDENCE_FILE:-}"
 hardware="${TORGNEXA_HARDWARE_QUALIFICATION_EVIDENCE_FILE:-}"
+partner_uat="${TORGNEXA_PARTNER_UAT_QUALIFICATION_EVIDENCE_FILE:-}"
+rollback="${TORGNEXA_ROLLBACK_QUALIFICATION_EVIDENCE_FILE:-}"
+slo_dr="${TORGNEXA_SLO_DR_QUALIFICATION_EVIDENCE_FILE:-}"
+production_support="${TORGNEXA_PRODUCTION_SUPPORT_QUALIFICATION_EVIDENCE_FILE:-}"
 
 require_absolute_file() {
   local name="$1"
@@ -38,6 +42,10 @@ require_absolute_file TORGNEXA_ADVERTISING_QUALIFICATION_EVIDENCE_FILE "$adverti
 require_absolute_file TORGNEXA_FBS_QUALIFICATION_EVIDENCE_FILE "$fbs"
 require_absolute_file TORGNEXA_FBO_QUALIFICATION_EVIDENCE_FILE "$fbo"
 require_absolute_file TORGNEXA_HARDWARE_QUALIFICATION_EVIDENCE_FILE "$hardware"
+require_absolute_file TORGNEXA_PARTNER_UAT_QUALIFICATION_EVIDENCE_FILE "$partner_uat"
+require_absolute_file TORGNEXA_ROLLBACK_QUALIFICATION_EVIDENCE_FILE "$rollback"
+require_absolute_file TORGNEXA_SLO_DR_QUALIFICATION_EVIDENCE_FILE "$slo_dr"
+require_absolute_file TORGNEXA_PRODUCTION_SUPPORT_QUALIFICATION_EVIDENCE_FILE "$production_support"
 
 echo "Running provider-neutral financial completeness qualification..."
 make financial-completeness-qualification
@@ -55,6 +63,10 @@ validator_args=(
   --fbs-evidence "$fbs"
   --fbo-evidence "$fbo"
   --hardware-evidence "$hardware"
+  --partner-uat-evidence "$partner_uat"
+  --rollback-evidence "$rollback"
+  --slo-dr-evidence "$slo_dr"
+  --production-support-evidence "$production_support"
   --expected-release-commit "$release_commit"
 )
 if [[ -n "${TORGNEXA_P4_REPOSITORY:-}" ]]; then

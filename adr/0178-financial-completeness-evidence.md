@@ -73,7 +73,12 @@ kill-switch и reconciliation.
 
 Локальный gate: `make financial-completeness-qualification`. Credentialed
 sandbox/live bank, marketplace payout, FX и advertising checks проходят
-отдельно на release topology.
+отдельно на release topology. Общий gate
+`make financial-warehouse-qualification` использует v2 manifest: к восьми
+финансовым/FBS/FBO/hardware evidence добавляются partner UAT, rollback/restore,
+SLO/DR и production support artifacts. Каждый redacted artifact имеет digest,
+release identity и общий `topology_ref`; отсутствие любого фактического
+evidence блокирует production claim.
 
 ## Alternatives considered
 

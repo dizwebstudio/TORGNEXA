@@ -7,7 +7,8 @@ account/statement boundary, completeness matrix/evaluation, API/SDK, RLS и
 frontend financial completeness center. Существующие Order, Payment, Settlement,
 FX, COGS/FIFO и advertising projections переиспользуются; второй ledger не
 создан. Общий fail-closed gate `make financial-warehouse-qualification`
-проверяет retained credentialed evidence финансового и складского контуров;
+проверяет v2 retained credentialed evidence финансового и складского контуров,
+partner UAT, rollback/restore, SLO/DR и production support;
 сама credentialed qualification официальных accounts остаётся внешним входом
 и не подменяется health-check.
 
@@ -57,7 +58,9 @@ evidence/quality projection вокруг канонических ledgers.
 `repository-complete` не означает, что у репозитория появились реальные
 банковские или marketplace credentials. Для production claim дополнительно
 нужны retained credentialed sandbox/live evidence с connector version, scopes,
-датой и redacted result.
+датой, target topology и redacted result. В v2 это 12 хэшируемых артефактов:
+bank, acquirer, marketplace payouts, FX, advertising, FBS, FBO, hardware,
+partner UAT, rollback, SLO/DR и production support.
 
 ## Что уже есть и что закрывает этот task
 

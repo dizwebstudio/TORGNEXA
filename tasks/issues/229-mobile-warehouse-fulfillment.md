@@ -7,7 +7,8 @@ tasks и логистические label ports уже существуют в T
 Единый mobile-first процесс оператора, печать складских документов,
 устойчивый scan flow и модель FBO/FBS реализованы в repository-контуре.
 Общий fail-closed gate `make financial-warehouse-qualification` подготовлен
-для retained credentialed FBS/FBO и hardware evidence.
+для v2 retained credentialed FBS/FBO и hardware evidence на target topology,
+а также partner UAT, rollback/restore, SLO/DR и production support evidence.
 
 ## Цель
 
@@ -381,8 +382,9 @@ OpenAPI/Go/Python/TypeScript SDK, versioned events, RLS/audit, frontend
 `/warehouse/mobile`, static qualification gate и эксплуатационный runbook.
 
 Остался только внешний вход release-gate 229.12/229.14: нужны credentialed
-sandbox/live проверки выбранных FBS/FBO marketplace/carrier connector-ов и
-конкретных scanner/camera, scale и printer profiles на целевой topology для
-`make financial-warehouse-qualification`. До появления redacted evidence эти capabilities честно остаются
+sandbox/live проверки выбранных FBS/FBO marketplace/carrier connector-ов,
+конкретных scanner/camera, scale и printer profiles, partner UAT, rollback/
+restore, SLO/DR и production support на целевой topology для
+`make financial-warehouse-qualification`. До появления полного redacted evidence эти capabilities честно остаются
 `read_only`/`partially_supported`/`qualification_required`; repository-complete
 не означает production-qualified.

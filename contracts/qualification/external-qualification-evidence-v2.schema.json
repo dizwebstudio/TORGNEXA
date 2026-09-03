@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://torgnexa.local/schemas/qualification/external-qualification-evidence-v2.json",
+  "title": "TORGNEXA external finance, warehouse and operational qualification v2",
+  "description": "Redacted credentialed non-production evidence for finance, FBS/FBO, hardware, partner UAT, rollback, SLO/DR and production support.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "scope", "subject_kind", "environment", "target", "repository", "release_commit", "subject_id", "account_ref", "qualified_at", "version", "scopes", "topology", "observations", "checks", "rollback"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "status": {"const": "PASS"},
+    "scope": {"enum": ["financial", "warehouse", "hardware", "partner-uat", "rollback", "slo-dr", "production-support"]},
+    "subject_kind": {"enum": ["connector", "hardware", "partner", "platform"]},
+    "environment": {"const": "non-production"},
+    "target": {"const": "dedicated-non-production"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,139}$"},
+    "release_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "subject_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "account_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "qualified_at": {"type": "string", "format": "date-time"},
+    "version": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"}},
+    "topology": {"$ref": "#/$defs/topology"},
+    "observations": {"$ref": "#/$defs/observations"},
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence_ref"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"},
+          "status": {"const": "PASS"},
+          "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "evidence_ref"],
+      "properties": {
+        "verified": {"const": true},
+        "evidence_ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"}
+      }
+    }
+  },
+  "$defs": {
+    "ref": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"},
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topology_ref", "runtime_ref", "region"],
+      "properties": {
+        "topology_ref": {"$ref": "#/$defs/ref"},
+        "runtime_ref": {"$ref": "#/$defs/ref"},
+        "region": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_status": {"const": "observed"},
+        "read_after_write": {"const": true},
+        "reconciliation": {"const": "matched"},
+        "fulfillment_mode": {"enum": ["fbs", "fbo"]},
+        "handoff_status": {"const": "accepted"},
+        "acceptance_status": {"const": "accepted"},
+        "profile_status": {"const": "matched"},
+        "topology_match": {"const": true},
+        "scan_status": {"const": "observed"},
+        "camera_status": {"const": "observed"},
+        "scale_status": {"const": "observed"},
+        "print_status": {"const": "accepted"},
+        "safe_fallback": {"const": true},
+        "partner_ref": {"$ref": "#/$defs/ref"},
+        "decision": {"const": "accepted"},
+        "scenario_count": {"type": "integer", "minimum": 1},
+        "critical_findings": {"const": 0},
+        "signed_off": {"const": true},
+        "rollback_status": {"const": "verified"},
+        "restore_status": {"const": "verified"},
+        "data_integrity": {"const": "preserved"},
+        "replay_safe": {"const": true},
+        "slo_status": {"const": "met"},
+        "error_budget": {"const": "within"},
+        "rto_status": {"const": "met"},
+        "rpo_status": {"const": "met"},
+        "backup_restore": {"const": "verified"},
+        "dr_rehearsal": {"const": "passed"},
+        "alerting": {"const": "verified"},
+        "support_status": {"const": "ready"},
+        "on_call": {"const": "confirmed"},
+        "runbook": {"const": "verified"},
+        "escalation": {"const": "tested"},
+        "handoff": {"const": "accepted"}
+      }
+    }
+  }
+}

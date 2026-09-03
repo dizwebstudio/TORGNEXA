@@ -109,6 +109,7 @@ V2_OBSERVATION_VALUES = {
     "fbs": {"fulfillment_mode": "fbs", "handoff_status": "accepted", "read_after_write": True, "reconciliation": "matched"},
     "fbo": {"fulfillment_mode": "fbo", "acceptance_status": "accepted", "read_after_write": True, "reconciliation": "matched"},
     "hardware": {"profile_status": "matched", "topology_match": True, "scan_status": "observed", "camera_status": "observed", "scale_status": "observed", "print_status": "accepted", "safe_fallback": True, "reconciliation": "matched"},
+    "partner_uat": {"decision": "accepted", "signed_off": True},
     "rollback": {"rollback_status": "verified", "restore_status": "verified", "data_integrity": "preserved", "replay_safe": True},
     "slo_dr": {"slo_status": "met", "error_budget": "within", "rto_status": "met", "rpo_status": "met", "backup_restore": "verified", "dr_rehearsal": "passed", "alerting": "verified"},
     "production_support": {"support_status": "ready", "on_call": "confirmed", "runbook": "verified", "escalation": "tested", "handoff": "accepted"},

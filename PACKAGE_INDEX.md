@@ -58,9 +58,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - adrs: 183
 - tasks: 234
 - milestones: 14
-- contracts: 264
+- contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3573
+- total source files (excluding local secrets/build/dependency/cache trees): 3575
 
 
 ## Connector category layout
@@ -1827,7 +1827,9 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `contracts/qualification/connector-golden-path-evidence-v1.schema.json`
 - `contracts/qualification/connector-golden-path-evidence-v2.schema.json`
 - `contracts/qualification/external-qualification-evidence-v1.schema.json`
+- `contracts/qualification/external-qualification-evidence-v2.schema.json`
 - `contracts/qualification/financial-warehouse-qualification-v1.schema.json`
+- `contracts/qualification/financial-warehouse-qualification-v2.schema.json`
 - `contracts/qualification/marketplace-compensation-evidence-v2.schema.json`
 - `contracts/qualification/marketplace-live-smoke-v1.schema.json`
 - `contracts/qualification/marketplace-live-smoke-v2.schema.json`
