@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "id": "ARCH-233",
+  "task": "233",
+  "change_class": "implementation",
+  "summary": "Classify unavailable Linux namespace runtimes before the existing Task-029 sandbox probe while preserving hard failure for an actual launcher or emulator failure.",
+  "scopes": [
+    "internal/platform/connectorsandbox/linux.go"
+  ],
+  "frozen_pillars": [],
+  "adr": null,
+  "existing_adrs": [
+    "adr/0010-connector-capabilities.md",
+    "adr/0020-plugin-governance.md",
+    "adr/0035-architecture-change-governance.md",
+    "adr/0036-connector-sdk-v1-runtime-boundary.md",
+    "adr/0037-isolated-plugin-security-boundary.md",
+    "adr/0038-connector-sandbox-dry-run-runtime.md",
+    "adr/0039-connector-conformance-admission-gate.md"
+  ],
+  "gap_audit": {
+    "performed": true,
+    "prompt": "prompts/05-architecture-gap-audit.txt",
+    "decision": "within_frozen_architecture"
+  },
+  "impacts": [
+    {
+      "area": "tenancy",
+      "status": "not_affected",
+      "evidence": "The preflight runs before the existing host-created sandbox session and adds no tenant, organization or workspace authority."
+    },
+    {
+      "area": "privacy_data_governance",
+      "status": "not_affected",
+      "evidence": "The preflight executes only an absolute system true command and does not inspect, persist or expose provider data or credentials."
+    },
+    {
+      "area": "api_compatibility",
+      "status": "not_affected",
+      "evidence": "No public API, SDK method or serialized result field changes; only the internal error classification before the existing probe changes."
+    },
+    {
+      "area": "event_compatibility",
+      "status": "not_affected",
+      "evidence": "The preflight publishes no event and does not alter any event envelope, catalog entry or outbox behavior."
+    },
+    {
+      "area": "plugin_sdk_compatibility",
+      "status": "not_affected",
+      "evidence": "Task-025 admission plans and Connector SDK v1 remain unchanged; ErrSandboxUnavailable is an existing host runtime error."
+    },
+    {
+      "area": "database_migration",
+      "status": "not_affected",
+      "evidence": "Namespace availability is evaluated transiently and introduces no database table, migration or stored state."
+    },
+    {
+      "area": "security",
+      "status": "affected",
+      "evidence": "The preflight prevents a restricted kernel from being reported as a generic probe defect, while the real isolation probe still requires all existing namespaces, chroot, environment and network boundaries."
+    },
+    {
+      "area": "approvals_risk",
+      "status": "not_affected",
+      "evidence": "No operation policy, approval requirement, capability grant or production credential rule is changed."
+    },
+    {
+      "area": "audit_lineage",
+      "status": "not_affected",
+      "evidence": "The availability classification is transient test control flow and adds no audit, lineage or evidence payload."
+    },
+    {
+      "area": "reconciliation_idempotency",
+      "status": "not_affected",
+      "evidence": "The preflight cannot reach business state and does not alter retries, inbox, outbox, deduplication or reconciliation semantics."
+    },
+    {
+      "area": "webhooks_egress",
+      "status": "affected",
+      "evidence": "The preflight verifies that the same network namespace required by the external isolation proof is available before the child is started; it grants no egress route."
+    },
+    {
+      "area": "slo_observability",
+      "status": "not_affected",
+      "evidence": "Signed wall, CPU, RSS, output and concurrency limits remain enforced by the existing process monitor after preflight."
+    },
+    {
+      "area": "operations_rollback",
+      "status": "affected",
+      "evidence": "Restricted developer containers now receive an explicit runtime-unavailable qualification result, and reverting the code restores the prior generic failure without data migration."
+    },
+    {
+      "area": "testing_conformance",
+      "status": "affected",
+      "evidence": "The same test skips only when the kernel cannot create the required namespaces; namespace-enabled runtimes still execute and pass the real chroot isolation probe."
+    }
+  ],
+  "provider": null,
+  "follow_up_tasks": [
+    "064"
+  ]
+}

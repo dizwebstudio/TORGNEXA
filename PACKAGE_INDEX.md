@@ -56,11 +56,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 - docs: 557
 - adrs: 183
-- tasks: 234
+- tasks: 235
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3576
+- total source files (excluding local secrets/build/dependency/cache trees): 3578
 
 
 ## Connector category layout
@@ -953,6 +953,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `architecture/reviews/229-mobile-warehouse-fulfillment.json`
 - `architecture/reviews/230-mass-catalog-management.json`
 - `architecture/reviews/231-ecosystem-support.json`
+- `architecture/reviews/233-connector-sandbox-namespace-preflight.json`
 - `cmd/api/main.go`
 - `cmd/api/main_test.go`
 - `cmd/mcp/main.go`
@@ -4019,6 +4020,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/230-mass-catalog-management.md`
 - `tasks/issues/231-ecosystem-support.md`
 - `tasks/issues/232-marketplace-listing-remote-runtime.md`
+- `tasks/issues/233-connector-sandbox-namespace-preflight.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

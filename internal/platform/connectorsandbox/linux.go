@@ -51,11 +51,16 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 	if runtime.GOOS != "linux" || emulatorExecutable == "" {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
-	if _, err := exec.LookPath("unshare"); err != nil {
+	unshare, err := exec.LookPath("unshare")
+	if err != nil {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
 	chroot, err := exec.LookPath("chroot")
 	if err != nil {
+		return SandboxProbeResult{}, ErrSandboxUnavailable
+	}
+	trueCommand, err := exec.LookPath("true")
+	if err != nil || !linuxNamespacesAvailable(unshare, trueCommand) {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
 	info, err := os.Stat(emulatorExecutable)
@@ -97,7 +102,7 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 	// Use the portable short options and an absolute chroot helper. The
 	// qualification runs in both util-linux and BusyBox based build images;
 	// BusyBox does not implement util-linux's --root/--wd options.
-	command := exec.CommandContext(runctx, "unshare", "-U", "-r", "-m", "-n", "-i", "-u", chroot, root, "/bin/emulator", "--isolation-probe")
+	command := exec.CommandContext(runctx, unshare, "-U", "-r", "-m", "-n", "-i", "-u", chroot, root, "/bin/emulator", "--isolation-probe")
 	command.Env = []string{"LANG=C", "TZ=UTC", "PATH=/bin", "TORGNEXA_SANDBOX_MODE=test"}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -156,6 +161,12 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 		Usage:     Usage{WallTimeMS: time.Since(started).Milliseconds(), CPUTimeMS: cpuMS.Load(), PeakRSSBytes: peakRSS.Load(), OutputBytes: int64(len(outData))},
 		Isolation: IsolationEvidence{ProductionCredentialsBlocked: true, EnvironmentIsolated: true, FilesystemIsolated: true, DirectNetworkBlocked: true, EgressMediated: true, ResourceLimitsEnforced: true},
 	}, nil
+}
+
+func linuxNamespacesAvailable(unshare, trueCommand string) bool {
+	command := exec.Command(unshare, "-U", "-r", "-m", "-n", "-i", "-u", trueCommand)
+	command.Env = []string{"LANG=C", "TZ=UTC", "PATH=/bin"}
+	return command.Run() == nil
 }
 
 func copyExecutable(source, destination string) error {
