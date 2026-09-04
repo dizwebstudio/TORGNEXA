@@ -56,11 +56,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 - docs: 557
 - adrs: 183
-- tasks: 235
+- tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3459
+- total source files (excluding local secrets/build/dependency/cache trees): 3461
 
 
 ## Connector category layout
@@ -3446,6 +3446,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `migrations/000059_marketplace_publication_async_identity.sql`
 - `migrations/000060_sync_outbound_version_fence.sql`
 - `migrations/000061_marketplace_operation_action_runtime.sql`
+- `migrations/000062_workspace_member_idempotency_digest.sql`
 - `migrations/baseline-manifest.json`
 - `migrations/catalog.json`
 - `migrations_legacy_pre_v1/000001_platform.sql`
@@ -3902,6 +3903,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tasks/issues/231-ecosystem-support.md`
 - `tasks/issues/232-marketplace-listing-remote-runtime.md`
 - `tasks/issues/233-connector-sandbox-namespace-preflight.md`
+- `tasks/issues/234-security-correctness-performance-hardening.md`
 - `tasks/milestones/M0-foundation.md`
 - `tasks/milestones/M1-core-commerce.md`
 - `tasks/milestones/M10-russia-regulated.md`

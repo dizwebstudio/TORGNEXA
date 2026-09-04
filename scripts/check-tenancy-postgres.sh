@@ -172,6 +172,7 @@ psql_exec "$database_name" --command "
   GRANT SELECT, INSERT, UPDATE ON connector_accounts, secret_references TO torgnexa_app;
   GRANT SELECT, INSERT ON secret_versions TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON privacy_purposes, privacy_retention_policies, user_profiles TO torgnexa_app;
+  GRANT SELECT, INSERT, UPDATE ON workspace_members TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON products, offers, connector_entity_mappings, prices, warehouses, inventory_positions, orders TO torgnexa_app;
   GRANT SELECT, INSERT ON order_items, lineage_records, lineage_inputs TO torgnexa_app;
   GRANT SELECT, INSERT, UPDATE ON pim_brands, pim_categories, pim_attributes, pim_product_brands, pim_product_categories, pim_product_attribute_values, pim_field_authorities, pim_duplicate_candidates TO torgnexa_app;
@@ -186,6 +187,9 @@ psql_exec "$database_name" --command "
   INSERT INTO workspaces (id, organization_id, name) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', 'Synthetic Workspace A'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', 'Synthetic Workspace B');
+  INSERT INTO workspace_members (id, organization_id, workspace_id, email, display_name, role_code, status, invitation_key) VALUES
+    ('member-a', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'admin-a@example.test', 'Admin A', 'admin', 'active', 'invite-a'),
+    ('member-b', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'admin-b@example.test', 'Admin B', 'admin', 'active', 'invite-b');
   INSERT INTO stores (id, organization_id, workspace_id, code, name) VALUES
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1a0003', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 'synthetic-a', 'Synthetic Store A'),
     ('018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', 'synthetic-b', 'Synthetic Store B');
@@ -352,6 +356,91 @@ scope_b="
   SELECT set_config('app.organization_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0001', true);
   SELECT set_config('app.workspace_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002', true);
 "
+
+# Task 234.1: two concurrent disable mutations must serialize on the complete
+# workspace administration invariant, not only on their target member rows.
+member_mutation_probe() {
+  local member_id=$1
+  local mutation_key=$2
+  local role=$3
+  local status=$4
+  local expected_version=$5
+  psql_exec "$database_name" --command "
+    BEGIN;
+    SET LOCAL ROLE torgnexa_app;
+    SELECT set_config('app.organization_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001', true);
+    SELECT set_config('app.workspace_id', '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', true);
+    WITH locked AS (
+      SELECT pg_advisory_xact_lock(hashtextextended('workspace-members:' || '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001' || ':' || '018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002', 0))
+    ) SELECT 1 FROM locked;
+    SELECT role_code,status,last_mutation_key,COALESCE(last_mutation_hash,'')
+      FROM workspace_members
+      WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001'
+        AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002'
+        AND id='$member_id'
+      FOR UPDATE;
+    SELECT CASE WHEN count(*) <= 1 THEN 1 / (count(*) - count(*)) ELSE 1 END
+      FROM workspace_members
+      WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001'
+        AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002'
+        AND role_code='admin' AND status='active';
+    SELECT pg_sleep(1);
+    UPDATE workspace_members
+      SET role_code='$role', status='$status', last_mutation_key='$mutation_key', last_mutation_hash=repeat('a',64), version=version+1, updated_at=clock_timestamp()
+      WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001'
+        AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002'
+        AND id='$member_id' AND version=$expected_version;
+    COMMIT;
+  " </dev/null
+}
+
+set +e
+member_mutation_probe member-a member-update-a viewer disabled 1 >/dev/null 2>&1 &
+member_a_pid=$!
+member_mutation_probe member-b member-update-b viewer disabled 1 >/dev/null 2>&1 &
+member_b_pid=$!
+wait "$member_a_pid"
+member_a_status=$?
+wait "$member_b_pid"
+member_b_status=$?
+set -e
+member_successes=0
+[[ "$member_a_status" -eq 0 ]] && member_successes=$((member_successes + 1))
+[[ "$member_b_status" -eq 0 ]] && member_successes=$((member_successes + 1))
+[[ "$member_successes" -eq 1 ]] || die "concurrent member disable probe committed $member_successes mutations"
+active_workspace_admins="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM workspace_members WHERE role_code='admin' AND status='active'; ROLLBACK;")"
+[[ "$active_workspace_admins" == 1 ]] || die "concurrent member disable probe left $active_workspace_admins active administrators"
+
+psql_exec "$database_name" --command "
+  UPDATE workspace_members
+  SET role_code='admin', status='active', last_mutation_key=NULL, last_mutation_hash=NULL, version=version+1, updated_at=clock_timestamp()
+  WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001'
+    AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002';
+" >/dev/null
+member_a_version="$(query_scalar "$database_name" "SELECT version FROM workspace_members WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001' AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002' AND id='member-a';")"
+member_b_version="$(query_scalar "$database_name" "SELECT version FROM workspace_members WHERE organization_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001' AND workspace_id='018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002' AND id='member-b';")"
+[[ "$member_a_version" =~ ^[0-9]+$ && "$member_b_version" =~ ^[0-9]+$ ]] || die "member demotion probe read invalid versions"
+set +e
+member_mutation_probe member-a member-demote-a manager active "$member_a_version" >/dev/null 2>&1 &
+member_a_pid=$!
+member_mutation_probe member-b member-demote-b manager active "$member_b_version" >/dev/null 2>&1 &
+member_b_pid=$!
+wait "$member_a_pid"
+member_a_status=$?
+wait "$member_b_pid"
+member_b_status=$?
+set -e
+member_successes=0
+[[ "$member_a_status" -eq 0 ]] && member_successes=$((member_successes + 1))
+[[ "$member_b_status" -eq 0 ]] && member_successes=$((member_successes + 1))
+[[ "$member_successes" -eq 1 ]] || die "concurrent member demotion probe committed $member_successes mutations"
+active_workspace_admins="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM workspace_members WHERE role_code='admin' AND status='active'; ROLLBACK;")"
+[[ "$active_workspace_admins" == 1 ]] || die "concurrent member demotion probe left $active_workspace_admins active administrators"
+demoted_members="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM workspace_members WHERE role_code='manager' AND status='active'; ROLLBACK;")"
+[[ "$demoted_members" == 1 ]] || die "concurrent member demotion probe left $demoted_members managers"
+member_digest_columns="$(query_scalar "$database_name" "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_members' AND column_name='last_mutation_hash';")"
+[[ "$member_digest_columns" == 1 ]] || die "workspace member idempotency digest column is missing"
+
 same_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM stores; ROLLBACK;")"
 [[ "$same_tenant" == 1 ]] || die "same-tenant lookup returned $same_tenant rows"
 cross_tenant="$(query_scalar "$database_name" "$scope_a SELECT count(*) FROM stores WHERE id = '018f0e8b-8a58-7f42-8c2d-5c2f9b1b0003'; ROLLBACK;")"

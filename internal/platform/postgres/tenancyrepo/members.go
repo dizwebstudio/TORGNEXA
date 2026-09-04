@@ -2,9 +2,13 @@ package tenancyrepo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +18,62 @@ import (
 var ErrMemberConflict = errors.New("workspace member conflict")
 var ErrLastAdministrator = errors.New("last active workspace administrator")
 var ErrMemberNotFound = errors.New("active workspace member not found")
+
+const workspaceMemberMutationLockStatement = `WITH locked AS (
+  SELECT pg_advisory_xact_lock(hashtextextended('workspace-members:' || $1 || ':' || $2, 0))
+)
+SELECT $1 || ':' || $2 FROM locked`
+
+const workspaceMemberMutationDigestColumnQuery = `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='workspace_members' AND column_name='last_mutation_hash'
+)`
+
+const workspaceMemberStateQuery = `SELECT role_code,status,COALESCE(last_mutation_key,''),COALESCE(last_mutation_hash,'')
+FROM workspace_members
+WHERE organization_id=$1 AND workspace_id=$2 AND id=$3
+FOR UPDATE`
+
+const workspaceMemberLegacyStateQuery = `SELECT role_code,status,COALESCE(last_mutation_key,'')
+FROM workspace_members
+WHERE organization_id=$1 AND workspace_id=$2 AND id=$3
+FOR UPDATE`
+
+const workspaceMemberAdminCountQuery = `SELECT count(*)
+FROM workspace_members
+WHERE organization_id=$1 AND workspace_id=$2 AND role_code='admin' AND status='active'`
+
+const workspaceMemberUpdateQuery = `WITH existing AS (
+  SELECT id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at
+  FROM workspace_members
+  WHERE organization_id=$1 AND workspace_id=$2 AND id=$3
+    AND last_mutation_key=$6 AND last_mutation_hash=$7
+), updated AS (
+  UPDATE workspace_members
+  SET role_code=$4,status=$5,last_mutation_key=$6,last_mutation_hash=$7,version=version+1,updated_at=clock_timestamp()
+  WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$8
+    AND NOT EXISTS(SELECT 1 FROM existing)
+  RETURNING id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at
+)
+SELECT * FROM existing
+UNION ALL
+SELECT * FROM updated`
+
+const workspaceMemberLegacyUpdateQuery = `WITH existing AS (
+  SELECT id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at
+  FROM workspace_members
+  WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND last_mutation_key=$6
+), updated AS (
+  UPDATE workspace_members
+  SET role_code=$4,status=$5,last_mutation_key=$6,version=version+1,updated_at=clock_timestamp()
+  WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$7
+    AND NOT EXISTS(SELECT 1 FROM existing)
+  RETURNING id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at
+)
+SELECT * FROM existing
+UNION ALL
+SELECT * FROM updated`
 
 type Member struct {
 	ID, Email, DisplayName, OIDCSubject, Role, Status, InvitationKey string
@@ -140,27 +200,84 @@ func (r *Repository) UpdateMember(ctx context.Context, scope tenancy.Scope, id, 
 	if id == "" || mutationKey == "" || expected < 1 || !validMemberRole(role) || (status != "invited" && status != "active" && status != "disabled") {
 		return Member{}, ErrMemberConflict
 	}
+	digest := memberMutationDigest(id, role, status, expected)
 	var member Member
 	err := r.withWriteScope(ctx, scope, func(q queryer) error {
+		lockScope := scope.OrganizationID().String() + ":" + scope.WorkspaceID().String()
+		var lockedScope string
+		if err := q.QueryRowContext(ctx, workspaceMemberMutationLockStatement, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&lockedScope); err != nil {
+			return fmt.Errorf("lock workspace member administration: %w", err)
+		}
+		if lockedScope != lockScope {
+			return errors.New("lock workspace member administration: advisory lock acknowledgement mismatch")
+		}
+		var digestColumnPresent bool
+		if err := q.QueryRowContext(ctx, workspaceMemberMutationDigestColumnQuery).Scan(&digestColumnPresent); err != nil {
+			return fmt.Errorf("check workspace member idempotency schema: %w", err)
+		}
+		if !digestColumnPresent {
+			// The nullable digest column is an expand migration. Keep the new
+			// binary runnable during the brief rolling window before migration
+			// 000062, while the advisory lock still closes the admin race.
+			return updateMemberWithoutDigest(ctx, q, scope, id, role, status, mutationKey, expected, &member)
+		}
+
 		var oldRole, oldStatus string
-		if err := q.QueryRowContext(ctx, `SELECT role_code,status FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id).Scan(&oldRole, &oldStatus); err != nil {
+		var oldMutationKey, oldMutationHash string
+		if err := q.QueryRowContext(ctx, workspaceMemberStateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id).Scan(&oldRole, &oldStatus, &oldMutationKey, &oldMutationHash); err != nil {
 			return err
+		}
+		if oldMutationKey != "" && (oldMutationHash == "" || oldMutationHash != digest) {
+			return ErrMemberConflict
 		}
 		if oldRole == "admin" && oldStatus == "active" && (role != "admin" || status != "active") {
 			var count int
-			if err := q.QueryRowContext(ctx, `SELECT count(*) FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND role_code='admin' AND status='active'`, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&count); err != nil {
+			if err := q.QueryRowContext(ctx, workspaceMemberAdminCountQuery, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&count); err != nil {
 				return err
 			}
 			if count <= 1 {
 				return ErrLastAdministrator
 			}
 		}
-		return scanMember(q.QueryRowContext(ctx, `WITH existing AS (SELECT id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND last_mutation_key=$6), updated AS (UPDATE workspace_members SET role_code=$4,status=$5,last_mutation_key=$6,version=version+1,updated_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$7 AND NOT EXISTS(SELECT 1 FROM existing) RETURNING id,email,display_name,COALESCE(oidc_subject,'') oidc_subject,role_code,status,invitation_key,version,invited_at,updated_at) SELECT * FROM existing UNION ALL SELECT * FROM updated`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, role, status, mutationKey, expected), &member)
+		return scanMember(q.QueryRowContext(ctx, workspaceMemberUpdateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, role, status, mutationKey, digest, expected), &member)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Member{}, ErrMemberConflict
 	}
 	return member, err
+}
+
+func updateMemberWithoutDigest(ctx context.Context, q queryer, scope tenancy.Scope, id, role, status, mutationKey string, expected int64, member *Member) error {
+	var oldRole, oldStatus, oldMutationKey string
+	if err := q.QueryRowContext(ctx, workspaceMemberLegacyStateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id).Scan(&oldRole, &oldStatus, &oldMutationKey); err != nil {
+		return err
+	}
+	if oldRole == "admin" && oldStatus == "active" && (role != "admin" || status != "active") {
+		var count int
+		if err := q.QueryRowContext(ctx, workspaceMemberAdminCountQuery, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&count); err != nil {
+			return err
+		}
+		if count <= 1 {
+			return ErrLastAdministrator
+		}
+	}
+	return scanMember(q.QueryRowContext(ctx, workspaceMemberLegacyUpdateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, role, status, mutationKey, expected), member)
+}
+
+// memberMutationDigest returns the stable digest of the normalized member
+// update payload. Length-prefixing keeps the tuple unambiguous and prevents a
+// key from being replayed with a different member, role, status, or version.
+func memberMutationDigest(id, role, status string, expected int64) string {
+	values := []string{id, role, status, strconv.FormatInt(expected, 10)}
+	payload := make([]byte, 0, len(id)+len(role)+len(status)+32)
+	for _, value := range values {
+		var length [4]byte
+		binary.BigEndian.PutUint32(length[:], uint32(len(value)))
+		payload = append(payload, length[:]...)
+		payload = append(payload, value...)
+	}
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
 }
 
 func scanMember(row rowScanner, m *Member) error {

@@ -138,6 +138,88 @@ func TestQueriesContainMandatoryTenantPredicates(t *testing.T) {
 			t.Errorf("profile update does not contain %q", predicate)
 		}
 	}
+	compactMemberLock := strings.Join(strings.Fields(workspaceMemberMutationLockStatement), " ")
+	for _, predicate := range []string{"pg_advisory_xact_lock", "hashtextextended", "workspace-members:"} {
+		if !strings.Contains(compactMemberLock, predicate) {
+			t.Errorf("workspace member mutation lock does not contain %q", predicate)
+		}
+	}
+	for _, predicate := range []string{"organization_id=$1", "workspace_id=$2", "role_code='admin'", "status='active'"} {
+		if !strings.Contains(strings.Join(strings.Fields(workspaceMemberAdminCountQuery), " "), predicate) {
+			t.Errorf("workspace member administrator count does not contain %q", predicate)
+		}
+	}
+}
+
+func TestUpdateMemberSerializesWorkspaceAdministration(t *testing.T) {
+	t.Parallel()
+	queries := newMemberMutationQueries()
+	repository := newRepository(&memberMutationTransactor{queries: queries})
+
+	member, err := repository.UpdateMember(context.Background(), mustScope(t, organizationA, workspaceA), "member-a", "viewer", "disabled", "member-update-1", 1)
+	if err != nil {
+		t.Fatalf("UpdateMember() error = %v", err)
+	}
+	if member.ID != "member-a" || member.Status != "disabled" {
+		t.Fatalf("UpdateMember() = %#v, want disabled member-a", member)
+	}
+	want := []string{applyScopeStatement, workspaceMemberMutationLockStatement, workspaceMemberMutationDigestColumnQuery, workspaceMemberStateQuery, workspaceMemberAdminCountQuery, workspaceMemberUpdateQuery}
+	if !equalStrings(queries.statements, want) {
+		t.Fatalf("workspace member statements = %#v, want %#v", queries.statements, want)
+	}
+}
+
+func TestUpdateMemberRejectsIdempotencyPayloadMismatch(t *testing.T) {
+	t.Parallel()
+	queries := newMemberMutationQueries()
+	queries.mutationKey = "member-update-1"
+	queries.mutationHash = strings.Repeat("a", 64)
+	repository := newRepository(&memberMutationTransactor{queries: queries})
+
+	_, err := repository.UpdateMember(context.Background(), mustScope(t, organizationA, workspaceA), "member-a", "viewer", "disabled", queries.mutationKey, 1)
+	if !errors.Is(err, ErrMemberConflict) {
+		t.Fatalf("UpdateMember() error = %v, want ErrMemberConflict", err)
+	}
+	if len(queries.statements) != 4 || queries.statements[1] != workspaceMemberMutationLockStatement || queries.statements[2] != workspaceMemberMutationDigestColumnQuery || queries.statements[3] != workspaceMemberStateQuery {
+		t.Fatalf("mismatched replay executed unexpected statements: %#v", queries.statements)
+	}
+}
+
+func TestUpdateMemberReplaysSameIdempotencyPayload(t *testing.T) {
+	t.Parallel()
+	queries := newMemberMutationQueries()
+	queries.memberRole = "viewer"
+	queries.memberStatus = "active"
+	queries.mutationKey = "member-update-1"
+	queries.mutationHash = memberMutationDigest("member-a", "viewer", "active", 1)
+	queries.memberValues[5] = "active"
+	repository := newRepository(&memberMutationTransactor{queries: queries})
+
+	member, err := repository.UpdateMember(context.Background(), mustScope(t, organizationA, workspaceA), "member-a", "viewer", "active", queries.mutationKey, 1)
+	if err != nil {
+		t.Fatalf("UpdateMember() replay error = %v", err)
+	}
+	if member.Status != "active" {
+		t.Fatalf("replayed member status = %q, want active", member.Status)
+	}
+	if len(queries.statements) != 5 || queries.statements[3] != workspaceMemberStateQuery || queries.statements[4] != workspaceMemberUpdateQuery {
+		t.Fatalf("replay executed unexpected statements: %#v", queries.statements)
+	}
+}
+
+func TestUpdateMemberSupportsExpandWindowBeforeDigestMigration(t *testing.T) {
+	t.Parallel()
+	queries := newMemberMutationQueries()
+	queries.digestColumn = false
+	repository := newRepository(&memberMutationTransactor{queries: queries})
+
+	if _, err := repository.UpdateMember(context.Background(), mustScope(t, organizationA, workspaceA), "member-a", "viewer", "disabled", "member-update-1", 1); err != nil {
+		t.Fatalf("UpdateMember() during expand window error = %v", err)
+	}
+	want := []string{applyScopeStatement, workspaceMemberMutationLockStatement, workspaceMemberMutationDigestColumnQuery, workspaceMemberLegacyStateQuery, workspaceMemberAdminCountQuery, workspaceMemberLegacyUpdateQuery}
+	if !equalStrings(queries.statements, want) {
+		t.Fatalf("expand-window statements = %#v, want %#v", queries.statements, want)
+	}
 }
 
 func TestNewRejectsNilDatabase(t *testing.T) {
@@ -170,6 +252,83 @@ type fakeQueries struct {
 	organizationVals  []any
 	workspaceValues   []any
 	storeValues       []any
+}
+
+type memberMutationTransactor struct {
+	queries *memberMutationQueries
+}
+
+func (transactions *memberMutationTransactor) run(ctx context.Context, _ bool, operation func(queryer) error) error {
+	return operation(transactions.queries)
+}
+
+type memberMutationQueries struct {
+	organization string
+	workspace    string
+	statements   []string
+	memberRole   string
+	memberStatus string
+	mutationKey  string
+	mutationHash string
+	digestColumn bool
+	memberValues []any
+}
+
+func newMemberMutationQueries() *memberMutationQueries {
+	now := time.Date(2026, 8, 9, 10, 0, 0, 0, time.UTC)
+	return &memberMutationQueries{
+		memberRole:   "admin",
+		memberStatus: "active",
+		digestColumn: true,
+		memberValues: []any{"member-a", "admin@example.test", "Admin A", "", "viewer", "disabled", "invite-a", int64(2), now, now},
+	}
+}
+
+func (queries *memberMutationQueries) QueryRowContext(_ context.Context, statement string, arguments ...any) rowScanner {
+	queries.statements = append(queries.statements, statement)
+	if statement == applyScopeStatement {
+		queries.organization, _ = arguments[0].(string)
+		queries.workspace, _ = arguments[1].(string)
+		return fakeRow{values: []any{queries.organization, queries.workspace}}
+	}
+	if statement == workspaceMemberMutationDigestColumnQuery {
+		return fakeRow{values: []any{queries.digestColumn}}
+	}
+	if len(arguments) < 2 || arguments[0] != queries.organization || arguments[1] != queries.workspace {
+		return fakeRow{err: sql.ErrNoRows}
+	}
+	switch statement {
+	case workspaceMemberMutationLockStatement:
+		return fakeRow{values: []any{queries.organization + ":" + queries.workspace}}
+	case workspaceMemberStateQuery:
+		return fakeRow{values: []any{queries.memberRole, queries.memberStatus, queries.mutationKey, queries.mutationHash}}
+	case workspaceMemberLegacyStateQuery:
+		return fakeRow{values: []any{queries.memberRole, queries.memberStatus, queries.mutationKey}}
+	case workspaceMemberAdminCountQuery:
+		return fakeRow{values: []any{int64(2)}}
+	case workspaceMemberUpdateQuery:
+		return fakeRow{values: queries.memberValues}
+	case workspaceMemberLegacyUpdateQuery:
+		return fakeRow{values: queries.memberValues}
+	default:
+		return fakeRow{err: errors.New("unexpected member query")}
+	}
+}
+
+func (queries *memberMutationQueries) QueryContext(context.Context, string, ...any) (rowsScanner, error) {
+	return emptyRows{}, nil
+}
+
+func equalStrings(actual, expected []string) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for index := range actual {
+		if actual[index] != expected[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func newFakeQueries() *fakeQueries {
@@ -253,6 +412,18 @@ func (row fakeRow) Scan(destinations ...any) error {
 				return fmt.Errorf("value %d is not int64", index)
 			}
 			*destination = number
+		case *int:
+			number, ok := value.(int64)
+			if !ok {
+				return fmt.Errorf("value %d is not int64", index)
+			}
+			*destination = int(number)
+		case *bool:
+			value, ok := value.(bool)
+			if !ok {
+				return fmt.Errorf("value %d is not bool", index)
+			}
+			*destination = value
 		case *time.Time:
 			timestamp, ok := value.(time.Time)
 			if !ok {

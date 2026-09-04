@@ -39,17 +39,17 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.1 — Сериализовать invariant последнего администратора
 
-- [ ] Перед count/update сериализовать изменения admin-состава на уровне
+- [x] Перед count/update сериализовать изменения admin-состава на уровне
   `(organization_id, workspace_id)`: tenant-scoped advisory transaction lock,
   блокировка полного набора активных admin в детерминированном порядке либо
   `SERIALIZABLE` с ограниченным retry.
-- [ ] Не считать блокировку только изменяемой строки достаточной защитой.
-- [ ] Сохранить optimistic `expected_version` и default-deny authorization.
-- [ ] Привязать `Idempotency-Key` к digest нормализованного payload; повтор с
+- [x] Не считать блокировку только изменяемой строки достаточной защитой.
+- [x] Сохранить optimistic `expected_version` и default-deny authorization.
+- [x] Привязать `Idempotency-Key` к digest нормализованного payload; повтор с
   тем же ключом и другим role/status должен завершаться конфликтом.
-- [ ] Добавить PostgreSQL-тест: два параллельных запроса отключают двух разных
+- [x] Добавить PostgreSQL-тест: два параллельных запроса отключают двух разных
   admin; ровно один коммитится, после завершения остаётся один active admin.
-- [ ] Добавить тесты concurrent demotion, disable и корректного replay одного
+- [x] Добавить тесты concurrent demotion, disable и корректного replay одного
   и того же payload.
 
 ### 234.2 — Сделать verified payment webhook атомарным и повторяемым
