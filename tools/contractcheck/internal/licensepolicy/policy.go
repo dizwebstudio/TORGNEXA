@@ -222,7 +222,7 @@ func (policy compiledPolicy) evaluate(expression string) error {
 // unknown expressions remain fail-closed in parseExpression/evaluateAtom.
 func normalizeLicenseExpression(expression string) string {
 	switch expression {
-	case "Public", "Public Domain", "public-domain":
+	case "Domain", "Public", "Public Domain", "public-domain":
 		return "Public-Domain"
 	case "bzip-2-1.0.6":
 		return "bzip2-1.0.6"

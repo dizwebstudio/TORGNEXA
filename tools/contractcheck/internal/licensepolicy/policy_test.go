@@ -16,16 +16,21 @@ func TestLicenseExpressions(t *testing.T) {
 	}{
 		{name: "allowed atom", expression: "MIT"},
 		{name: "allowed AND", expression: "MIT AND Apache-2.0"},
-		{name: "denied AND", expression: "MIT AND GPL-3.0-only", want: "is denied"},
-		{name: "OR requires selection", expression: "MIT OR GPL-3.0-only", want: "explicit selected"},
-		{name: "OR selected allowed", expression: "MIT OR GPL-3.0-only", selection: "MIT"},
+		{name: "denied AND", expression: "MIT AND AGPL-3.0-only", want: "is denied"},
+		{name: "OR requires selection", expression: "MIT OR AGPL-3.0-only", want: "explicit selected"},
+		{name: "OR selected allowed", expression: "MIT OR AGPL-3.0-only", selection: "MIT"},
 		{name: "review required", expression: "MPL-2.0", want: "requires legal review"},
+		{name: "SPDX GPL-3-only", expression: "GPL-3.0-only"},
+		{name: "SPDX LGPL-2-or-later", expression: "LGPL-2.0-or-later"},
+		{name: "SPDX curl", expression: "curl"},
 		{name: "Trivy public domain alias", expression: "Public Domain"},
 		{name: "Trivy lowercase public domain alias", expression: "public-domain"},
 		{name: "Trivy short public domain alias", expression: "Public"},
+		{name: "Trivy split public domain alias", expression: "Domain"},
 		{name: "Trivy bzip alias", expression: "bzip-2-1.0.6"},
 		{name: "SPDX ICU", expression: "ICU"},
 		{name: "Trivy GPLv3 alias", expression: "GPLv3+"},
+		{name: "SPDX Zlib", expression: "Zlib"},
 		{name: "unknown", expression: "LicenseRef-Custom", want: "unknown and denied"},
 		{name: "WITH rejected", expression: "Apache-2.0 WITH LLVM-exception", want: "WITH exceptions"},
 		{name: "malformed", expression: "MIT OR", want: "invalid"},
@@ -37,7 +42,7 @@ func TestLicenseExpressions(t *testing.T) {
 			if test.selection != "" {
 				selection = fmt.Sprintf(`[{"expression":%q,"selected":%q}]`, test.expression, test.selection)
 			}
-			policy := fmt.Sprintf(`{"version":1,"allowed_spdx":["Apache-2.0","GPL-3.0-or-later","ICU","MIT","Public-Domain","bzip2-1.0.6"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["GPL-3.0-only"],"selected_or_choices":%s,"unknown_license_policy":"deny"}`, selection)
+			policy := fmt.Sprintf(`{"version":1,"allowed_spdx":["Apache-2.0","GPL-3.0-only","GPL-3.0-or-later","ICU","LGPL-2.0-or-later","MIT","Public-Domain","Zlib","bzip2-1.0.6","curl"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["AGPL-3.0-only"],"selected_or_choices":%s,"unknown_license_policy":"deny"}`, selection)
 			report := fmt.Sprintf(`{"SchemaVersion":2,"Results":[{"Licenses":[{"Name":%q}]}]}`, test.expression)
 			_, err := Check([]byte(policy), []byte(report))
 			if test.want == "" {

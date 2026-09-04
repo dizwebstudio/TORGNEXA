@@ -10,11 +10,12 @@ On 2026-09-04, the release owner also approved distribution of the current pinne
 images containing `GPL-2.0-only` and `LGPL-2.1-or-later` components. This
 approval applies to the exact image digests in
 `supply-chain/release-artifacts.json`, including the reported `ICU` and
-`bzip2-1.0.6` components. Trivy's `Public`, `Public Domain`, `public-domain`,
-`bzip-2-1.0.6` and `GPLv3+` labels are accepted only through exact
-normalization to the approved policy identifiers; any image digest or license
-expression outside that set remains subject to the default-deny policy and a
-new review.
+`bzip2-1.0.6`, `LGPL-2.0-or-later`, `curl`, `GPL-3.0-only` and `Zlib`
+components.
+Trivy's `Domain`, `Public`, `Public Domain`, `public-domain`, `bzip-2-1.0.6` and
+`GPLv3+` labels are accepted only through exact normalization to the approved
+policy identifiers; any image digest or license expression outside that set
+remains subject to the default-deny policy and a new review.
 
 Connector implementations must continue to comply with provider API terms and trademark requirements. This repository license decision does not waive dependency-license, vulnerability, provenance, signing, protected-branch, or release-topology qualification gates.
 

@@ -7,14 +7,18 @@
     "CC0-1.0",
     "GPL-2.0-only",
     "GPL-2.0-or-later",
+    "GPL-3.0-only",
     "GPL-3.0-or-later",
     "ICU",
     "ISC",
+    "LGPL-2.0-or-later",
     "LGPL-2.1-or-later",
     "MIT",
     "MPL-2.0",
     "Public-Domain",
-    "bzip2-1.0.6"
+    "Zlib",
+    "bzip2-1.0.6",
+    "curl"
   ],
   "review_required_spdx": [
     "LGPL-2.1-only",
@@ -26,7 +30,6 @@
     "AGPL-3.0-or-later",
     "BUSL-1.1",
     "CC-BY-NC-4.0",
-    "GPL-3.0-only",
     "SSPL-1.0"
   ],
   "selected_or_choices": [],
