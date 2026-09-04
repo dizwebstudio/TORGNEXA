@@ -1563,9 +1563,7 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 		if err := validateImmutableImage(runtime.Image); err != nil {
 			problems.add(releaseInventoryPath, "runtime %q image: %v", runtime.Name, err)
 		}
-		if strings.Join(runtime.Platforms, "\x00") != "linux/amd64\x00linux/arm64" {
-			problems.add(releaseInventoryPath, "runtime %q platforms must be exactly [linux/amd64 linux/arm64]", runtime.Name)
-		}
+		checkPlatforms(releaseInventoryPath, "runtime "+runtime.Name, runtime.Platforms, problems)
 		if _, duplicate := actualRuntime[runtime.Name]; duplicate {
 			problems.add(releaseInventoryPath, "duplicate runtime %q", runtime.Name)
 		}

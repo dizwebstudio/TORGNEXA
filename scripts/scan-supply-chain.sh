@@ -169,6 +169,7 @@ sanitize_json() {
   local raw=$1
   local destination=$2
 
+  [[ -f "$raw" && ! -L "$raw" ]] || return 1
   jq -s 'map(walk(if type == "object" then del(
     .Match, .match, .Secret, .secret, .Code, .code,
     .Snippet, .snippet, .Content, .content
@@ -495,7 +496,9 @@ if [[ "$scope" == images || "$scope" == all ]]; then
     validate_trivy_report "$output_dir/${report_stem}.secret.json" \
       "trivy-image-secret-${report_stem}" secret
   done <"$work_dir/images.tsv"
-  [[ "$image_count" == 8 ]] || die "expected eight pinned image/platform scans, got $image_count"
+  expected_image_count="$(wc -l <"$work_dir/images.tsv")"
+  [[ "$image_count" == "$expected_image_count" ]] || \
+    die "expected $expected_image_count pinned image/platform scans, got $image_count"
 
   image_status=passed
   image_failed="$(tail -n "+$((image_status_start + 1))" "$status_file" | awk -F '\t' '$2 != "passed" {count++} END {print count+0}')"

@@ -387,11 +387,11 @@ func TestSupplyChainPolicyRejectsUnsafeConfigurations(t *testing.T) {
 			wantErr: "binary inventory must exactly match",
 		},
 		{
-			name: "runtime platform missing",
+			name: "runtime platform unsupported",
 			mutate: func(t *testing.T, root string) {
-				replaceFixture(t, root, releaseInventoryPath, `["linux/amd64","linux/arm64"]`, `["linux/amd64"]`)
+				replaceFixture(t, root, releaseInventoryPath, `["linux/amd64","linux/arm64"]`, `["linux/wasm64"]`)
 			},
-			wantErr: "platforms must be exactly",
+			wantErr: "platform \"linux/wasm64\" is not allowed",
 		},
 		{
 			name: "public release without license",
