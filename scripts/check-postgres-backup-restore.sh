@@ -471,7 +471,8 @@ for _ in {1..30}; do
   sleep 1
 done
 if [[ "$wal_archived" != true ]]; then
-  archive_status="$(query_scalar 5432 postgres "
+  archive_status=unavailable
+  if archive_status="$(query_scalar 5432 postgres "
     SELECT format(
       'archived=%s failed=%s last_archived=%s last_failed=%s',
       archived_count,
@@ -480,15 +481,23 @@ if [[ "$wal_archived" != true ]]; then
       coalesce(last_failed_wal, '-')
     )
     FROM pg_stat_archiver;
-  " || true)"
+  ")"; then
+    :
+  else
+    echo "check-postgres-backup-restore: WAL archive status is unavailable" >&2
+  fi
   echo "check-postgres-backup-restore: WAL archive status: $archive_status" >&2
-  docker_exec sh -eu -c '
+  if ! docker_exec sh -eu -c '
     for path in /tmp/wal_archive/*; do
       [ -f "$path" ] || continue
       stat -c "%n %s" "$path"
     done
-  ' >&2 || true
-  docker_exec tail -n 80 /tmp/primary.log >&2 || true
+  ' >&2; then
+    echo "check-postgres-backup-restore: WAL archive listing is unavailable" >&2
+  fi
+  if ! docker_exec tail -n 80 /tmp/primary.log >&2; then
+    echo "check-postgres-backup-restore: primary log is unavailable" >&2
+  fi
   die "required WAL segment was not archived: $last_required_segment"
 fi
 
