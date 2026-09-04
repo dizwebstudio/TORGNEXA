@@ -4,6 +4,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "paths": {
+      "@torgnexa/sdk": ["../sdk/typescript/src/client.gen.d.mts"]
+    },
     "outDir": ".repository-test",
     "rootDir": "src",
     "skipLibCheck": true
