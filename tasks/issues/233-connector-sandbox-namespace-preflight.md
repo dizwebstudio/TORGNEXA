@@ -23,8 +23,8 @@ container fallback to obtain the same real probe.
   probe; non-zero launcher/emulator exits remain hard probe failures.
 - [x] Local restricted runtimes can execute the complete qualification through
   the pinned, read-only, network-disabled container fallback; CI uses that
-  fallback only through an explicit job-level opt-in and otherwise remains
-  fail-closed.
+  fallback only through the trusted `scripts/check.sh` entrypoint opt-in and
+  otherwise remains fail-closed.
 - [x] No API, event, SDK, credential, egress or persistence contract changes.
 - [x] Qualification passes in a namespace-enabled pinned runtime and remains
   truthful in a restricted runtime.

@@ -52,9 +52,10 @@ user namespace, the qualification scripts do not downgrade the probe. Outside
 CI they re-run the same scripts in the pinned Go qualification image with a
 read-only repository mount, no network, bounded container resources and only
 the `SYS_ADMIN`/AppArmor allowances required by the kernel probe. CI must
-explicitly opt into the same fallback through
-`TORGNEXA_SANDBOX_ALLOW_CONTAINER_FALLBACK=1`; without that job-level opt-in a
-CI runner must provide Linux namespaces and the scripts fail closed.
+explicitly opt into the same fallback through the repository's `scripts/check.sh`
+entrypoint, which sets `TORGNEXA_SANDBOX_ALLOW_CONTAINER_FALLBACK=1` for the
+trusted CI check. Without that entrypoint opt-in a CI runner must provide Linux
+namespaces and the scripts fail closed.
 
 Production may use a stronger container/microVM backend, but it must preserve or exceed these semantics.
 

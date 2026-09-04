@@ -5,13 +5,13 @@
   "change_class": "implementation",
   "summary": "Classify unavailable Linux namespace runtimes before the existing Task-029 sandbox probe while preserving hard failure for an actual launcher or emulator failure.",
   "scopes": [
-    ".github/workflows/ci.yml",
     "PACKAGE_INDEX.md",
     "architecture/reviews/233-connector-sandbox-namespace-preflight.json",
     "docs/28-sandbox-test-mode.md",
     "internal/platform/connectorsandbox/linux.go",
     "scripts/check-connector-conformance.sh",
     "scripts/check-connector-sandbox-linux.sh",
+    "scripts/check.sh",
     "scripts/connector-sandbox-runtime.sh",
     "tasks/issues/233-connector-sandbox-namespace-preflight.md"
   ],
@@ -95,7 +95,7 @@
     {
       "area": "operations_rollback",
       "status": "affected",
-      "evidence": "Restricted developer/CI containers now receive an explicit runtime-unavailable result unless the qualification fallback is explicitly enabled; reverting the code restores the prior generic failure without data migration."
+      "evidence": "Restricted developer/CI containers now receive an explicit runtime-unavailable result unless the trusted check entrypoint explicitly enables the qualification fallback; reverting the code restores the prior generic failure without data migration."
     },
     {
       "area": "testing_conformance",
