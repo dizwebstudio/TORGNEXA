@@ -1,4 +1,5 @@
 name: torgnexa
+
 x-app-env: &app-env
   TORGNEXA_ENV: development
   TORGNEXA_LOG_LEVEL: ${TORGNEXA_LOG_LEVEL:-info}
