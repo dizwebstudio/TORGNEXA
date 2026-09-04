@@ -5,6 +5,7 @@
   "change_class": "implementation",
   "summary": "Classify unavailable Linux namespace runtimes before the existing Task-029 sandbox probe while preserving hard failure for an actual launcher or emulator failure.",
   "scopes": [
+    ".github/workflows/ci.yml",
     "PACKAGE_INDEX.md",
     "architecture/reviews/233-connector-sandbox-namespace-preflight.json",
     "docs/28-sandbox-test-mode.md",
@@ -39,7 +40,7 @@
     {
       "area": "privacy_data_governance",
       "status": "not_affected",
-      "evidence": "The preflight executes only an absolute system true command; the local fallback mounts the repository read-only, uses no network and does not expose provider data or credentials."
+      "evidence": "The preflight executes only an absolute system true command; the explicitly enabled local/CI fallback mounts the repository read-only, uses no network and does not expose provider data or credentials."
     },
     {
       "area": "api_compatibility",
@@ -64,7 +65,7 @@
     {
       "area": "security",
       "status": "affected",
-      "evidence": "The preflight prevents a restricted kernel from being reported as a generic probe defect; local fallback uses a pinned, read-only, network-disabled container with only the SYS_ADMIN/AppArmor allowances required by the namespace probe, while the real isolation probe still requires all existing namespaces, chroot, environment and network boundaries."
+      "evidence": "The preflight prevents a restricted kernel from being reported as a generic probe defect; the explicitly enabled fallback uses a pinned, read-only, network-disabled container with only the SYS_ADMIN/AppArmor allowances required by the namespace probe, while the real isolation probe still requires all existing namespaces, chroot, environment and network boundaries."
     },
     {
       "area": "approvals_risk",
@@ -94,12 +95,12 @@
     {
       "area": "operations_rollback",
       "status": "affected",
-      "evidence": "Restricted developer containers now receive an explicit runtime-unavailable qualification result, and reverting the code restores the prior generic failure without data migration."
+      "evidence": "Restricted developer/CI containers now receive an explicit runtime-unavailable result unless the qualification fallback is explicitly enabled; reverting the code restores the prior generic failure without data migration."
     },
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "The same test skips only when the kernel cannot create the required namespaces and no local fallback is available; namespace-enabled runtimes still execute and pass the real chroot isolation probe."
+      "evidence": "The same test skips only when the kernel cannot create the required namespaces and no explicitly enabled fallback is available; namespace-enabled runtimes still execute and pass the real chroot isolation probe."
     }
   ],
   "provider": null,

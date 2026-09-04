@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-# Shared runtime qualification helpers. The container fallback is deliberately
-# local-only: pull requests must use a namespace-enabled runner instead of
-# executing untrusted repository code with expanded container capabilities.
+# Shared runtime qualification helpers. The container fallback is explicit in
+# CI and constrained to the pinned, read-only, network-disabled qualification
+# container; callers must opt in before executing repository code with the
+# namespace capability required by the probe.
 
 readonly TORGNEXA_SANDBOX_QUALIFICATION_IMAGE='golang:1.26.7-bookworm@sha256:e8c859f5632dcfde7b32d2012b4351728f6437930887c2f6a91ea242459e5514'
 

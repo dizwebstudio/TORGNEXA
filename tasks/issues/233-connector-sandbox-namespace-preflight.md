@@ -22,8 +22,9 @@ container fallback to obtain the same real probe.
 - [x] A namespace preflight success still executes the real chroot isolation
   probe; non-zero launcher/emulator exits remain hard probe failures.
 - [x] Local restricted runtimes can execute the complete qualification through
-  the pinned, read-only, network-disabled container fallback; CI remains
-  fail-closed and requires a namespace-enabled runner.
+  the pinned, read-only, network-disabled container fallback; CI uses that
+  fallback only through an explicit job-level opt-in and otherwise remains
+  fail-closed.
 - [x] No API, event, SDK, credential, egress or persistence contract changes.
 - [x] Qualification passes in a namespace-enabled pinned runtime and remains
   truthful in a restricted runtime.

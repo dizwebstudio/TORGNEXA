@@ -21,6 +21,7 @@ jobs:
       GOTELEMETRY: "off"
       GOTOOLCHAIN: local
       GOWORK: "off"
+      TORGNEXA_SANDBOX_ALLOW_CONTAINER_FALLBACK: "1"
     steps:
       - name: Check out the exact revision without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
