@@ -39,6 +39,7 @@ SKIP_DIR_NAMES = {
     ".mypy_cache",
     ".nox",
     ".pytest_cache",
+    ".prerender",
     ".repository-test",
     ".ruff_cache",
     ".security-tools",
