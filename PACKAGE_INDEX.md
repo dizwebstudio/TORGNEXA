@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3579
+- total source files (excluding local secrets/build/dependency/cache trees): 3580
 
 
 ## Connector category layout
@@ -2712,6 +2712,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/src/api/ApiProvider.tsx`
 - `frontend/src/api/client.ts`
 - `frontend/src/api/decoders.ts`
+- `frontend/src/api/session-fetch.ts`
 - `frontend/src/app/App.tsx`
 - `frontend/src/app/UiProvider.tsx`
 - `frontend/src/app/realtime-events.ts`

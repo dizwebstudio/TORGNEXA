@@ -24,6 +24,7 @@
     "frontend/src/api/ApiProvider.tsx",
     "frontend/src/api/client.ts",
     "frontend/src/api/decoders.ts",
+    "frontend/src/api/session-fetch.ts",
     "frontend/src/app/App.tsx",
     "frontend/src/auth/AuthBoundary.tsx",
     "frontend/src/auth/AuthProvider.tsx",

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {fetchWithSessionRefresh} from "../.repository-test/api/client.js";
+import {fetchWithSessionRefresh} from "../.repository-test/api/session-fetch.js";
 
 const refreshedSession = {
   subject: "user-1",
