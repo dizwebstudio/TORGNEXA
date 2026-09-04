@@ -26,9 +26,6 @@ jobs:
       GOTOOLCHAIN: local
       GOWORK: "off"
       SOURCE_REVISION: ${{ github.sha }}
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
-      REPORT_DIR: ${{ runner.temp }}/torgnexa-source-reports
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
     steps:
       - name: Check out the exact revision without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -49,12 +46,19 @@ jobs:
           npm --prefix integrations/n8n-nodes-torgnexa ci --ignore-scripts --no-fund
           npm --prefix integrations/n8n-nodes-torgnexa audit --audit-level=high
       - name: Install checksum-verified security tools
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-source-reports
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR" "$REPORT_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Verify deterministic JavaScript dependency policy
         run: ./scripts/check-js-supply-chain.sh repository
       - name: Scan source and dependencies
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-source-reports
+          TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
         run: |
           ./scripts/scan-supply-chain.sh \
             --mode dry-run \
@@ -82,9 +86,6 @@ jobs:
       GOTOOLCHAIN: local
       GOWORK: "off"
       SOURCE_REVISION: ${{ github.sha }}
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
-      REPORT_DIR: ${{ runner.temp }}/torgnexa-image-reports
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
     steps:
       - name: Check out the exact revision without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -96,10 +97,17 @@ jobs:
           go-version: "1.26.7"
           cache: false
       - name: Install checksum-verified security tools
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-image-reports
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR" "$REPORT_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Scan every pinned runtime image and platform
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-image-reports
+          TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
         run: |
           ./scripts/scan-supply-chain.sh \
             --mode dry-run \

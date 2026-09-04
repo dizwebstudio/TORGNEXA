@@ -1263,3 +1263,16 @@ qualification; официальные taxonomy/write/read-after-write evidence �
 канала остаются отдельными внешними gates. Структура такого redacted evidence
 проверяется через `make marketplace-remote-evidence`. См.
 `tasks/issues/232-marketplace-listing-remote-runtime.md`.
+
+## Follow-up — Security correctness и performance hardening
+
+Task 234 запланирован по результатам security/performance-аудита. P0 закрывает
+гонку последнего администратора, разрыв между payment webhook receipt и
+применением статуса, а также неатомарные privileged settings mutations и audit.
+Следующая волна привязывает commerce webhook topic к серверной подписке,
+устраняет nested-transaction deadlock OAuth refresh и сокращает OIDC/DB hot
+path. Затем исправляются lifecycle/fan-out SSE, multi-replica rate limiting и
+раскрытие внутреннего OIDC subject reference. Regression gate включает
+PostgreSQL concurrency/failure injection, authenticated/SSE load profiles,
+gosec triage, `govulncheck` и Trivy. См.
+`tasks/issues/234-security-correctness-performance-hardening.md`.
