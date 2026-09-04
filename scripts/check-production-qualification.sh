@@ -5,6 +5,7 @@ cd "$root"
 command -v docker >/dev/null 2>&1 || { echo "Docker is required for P3 production qualification" >&2; exit 1; }
 docker compose version >/dev/null
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required for bounded load qualification" >&2; exit 1; }
+command -v base64 >/dev/null 2>&1 || { echo "base64 is required for disposable qualification credentials" >&2; exit 1; }
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 evidence="${TORGNEXA_QUALIFICATION_EVIDENCE_DIR:-$root/qualification/evidence/$stamp}"
@@ -20,6 +21,19 @@ if [[ ! -f .env ]]; then
   ./scripts/init-community-env.sh >/dev/null
   generated_env=1
 fi
+
+# The qualification project owns disposable, project-scoped volumes. Always
+# override a stale or ambient master key with a fresh padded Base64 encoding so
+# a local .env or CI environment cannot make the ephemeral stack unreadable.
+# This key is never persisted or printed; production/community credentials
+# remain governed by their existing .env/secret-manager lifecycle.
+qualification_master_key="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+if [[ ! "$qualification_master_key" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+  echo "unable to generate a padded 32-byte qualification master key" >&2
+  exit 1
+fi
+export TORGNEXA_SECRETS_MASTER_KEY="$qualification_master_key"
+unset qualification_master_key
 
 # The qualification stack is disposable and must be runnable alongside a
 # developer or staging stack. Resolve free host ports instead of inheriting
