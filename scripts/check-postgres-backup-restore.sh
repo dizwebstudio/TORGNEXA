@@ -122,7 +122,7 @@ docker_exec sh -eu -c 'printf "%s\n" "$@" >>/tmp/primary/postgresql.conf' sh \
   "max_wal_senders = 2" \
   "archive_mode = on" \
   "archive_timeout = '1s'" \
-  "archive_command = 'test ! -f /tmp/wal_archive/%f && cp %p /tmp/wal_archive/%f'" \
+  "archive_command = 'test -f /tmp/wal_archive/%f || cp %p /tmp/wal_archive/%f'" \
   "fsync = on" \
   "synchronous_commit = on" \
   "full_page_writes = on"
@@ -458,7 +458,7 @@ psql_exec 5432 torgnexa --command "INSERT INTO backup_restore_markers (marker) V
 target_lsn="$(query_scalar 5432 postgres "SELECT pg_current_wal_flush_lsn();")"
 [[ "$target_lsn" =~ ^[0-9A-F]+/[0-9A-F]+$ ]] || die "unexpected recovery target LSN: $target_lsn"
 psql_exec 5432 torgnexa --command "INSERT INTO backup_restore_markers (marker) VALUES ('after-recovery-target');" >/dev/null
-last_required_segment="$(query_scalar 5432 postgres "SELECT pg_walfile_name(pg_current_wal_lsn());")"
+last_required_segment="$(query_scalar 5432 postgres "SELECT pg_walfile_name('$target_lsn'::pg_lsn);")"
 [[ "$last_required_segment" =~ ^[0-9A-F]{24}$ ]] || die "unexpected WAL segment name: $last_required_segment"
 psql_exec 5432 postgres --command "SELECT pg_switch_wal();" >/dev/null
 
@@ -470,7 +470,27 @@ for _ in {1..30}; do
   fi
   sleep 1
 done
-[[ "$wal_archived" == true ]] || die "required WAL segment was not archived"
+if [[ "$wal_archived" != true ]]; then
+  archive_status="$(query_scalar 5432 postgres "
+    SELECT format(
+      'archived=%s failed=%s last_archived=%s last_failed=%s',
+      archived_count,
+      failed_count,
+      coalesce(last_archived_wal, '-'),
+      coalesce(last_failed_wal, '-')
+    )
+    FROM pg_stat_archiver;
+  " || true)"
+  echo "check-postgres-backup-restore: WAL archive status: $archive_status" >&2
+  docker_exec sh -eu -c '
+    for path in /tmp/wal_archive/*; do
+      [ -f "$path" ] || continue
+      stat -c "%n %s" "$path"
+    done
+  ' >&2 || true
+  docker_exec tail -n 80 /tmp/primary.log >&2 || true
+  die "required WAL segment was not archived: $last_required_segment"
+fi
 
 docker_exec pg_ctl --pgdata=/tmp/primary --wait --timeout=30 --mode fast stop >/dev/null
 docker_exec cp -a /tmp/base /tmp/recovery
