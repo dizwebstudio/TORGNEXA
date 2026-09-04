@@ -5,12 +5,13 @@
     "BSD-2-Clause",
     "BSD-3-Clause",
     "CC0-1.0",
+    "GPL-2.0-only",
     "ISC",
+    "LGPL-2.1-or-later",
     "MIT"
   ],
   "review_required_spdx": [
     "LGPL-2.1-only",
-    "LGPL-2.1-or-later",
     "LGPL-3.0-only",
     "LGPL-3.0-or-later",
     "MPL-2.0"
@@ -20,7 +21,6 @@
     "AGPL-3.0-or-later",
     "BUSL-1.1",
     "CC-BY-NC-4.0",
-    "GPL-2.0-only",
     "GPL-2.0-or-later",
     "GPL-3.0-only",
     "GPL-3.0-or-later",
