@@ -20,6 +20,7 @@ func TestLicenseExpressions(t *testing.T) {
 		{name: "OR requires selection", expression: "MIT OR GPL-3.0-only", want: "explicit selected"},
 		{name: "OR selected allowed", expression: "MIT OR GPL-3.0-only", selection: "MIT"},
 		{name: "review required", expression: "MPL-2.0", want: "requires legal review"},
+		{name: "Trivy public domain alias", expression: "Public Domain"},
 		{name: "unknown", expression: "LicenseRef-Custom", want: "unknown and denied"},
 		{name: "WITH rejected", expression: "Apache-2.0 WITH LLVM-exception", want: "WITH exceptions"},
 		{name: "malformed", expression: "MIT OR", want: "invalid"},
@@ -31,7 +32,7 @@ func TestLicenseExpressions(t *testing.T) {
 			if test.selection != "" {
 				selection = fmt.Sprintf(`[{"expression":%q,"selected":%q}]`, test.expression, test.selection)
 			}
-			policy := fmt.Sprintf(`{"version":1,"allowed_spdx":["Apache-2.0","MIT"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["GPL-3.0-only"],"selected_or_choices":%s,"unknown_license_policy":"deny"}`, selection)
+			policy := fmt.Sprintf(`{"version":1,"allowed_spdx":["Apache-2.0","MIT","Public-Domain"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["GPL-3.0-only"],"selected_or_choices":%s,"unknown_license_policy":"deny"}`, selection)
 			report := fmt.Sprintf(`{"SchemaVersion":2,"Results":[{"Licenses":[{"Name":%q}]}]}`, test.expression)
 			_, err := Check([]byte(policy), []byte(report))
 			if test.want == "" {

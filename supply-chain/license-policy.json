@@ -6,24 +6,25 @@
     "BSD-3-Clause",
     "CC0-1.0",
     "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-or-later",
     "ISC",
     "LGPL-2.1-or-later",
-    "MIT"
+    "MIT",
+    "MPL-2.0",
+    "Public-Domain"
   ],
   "review_required_spdx": [
     "LGPL-2.1-only",
     "LGPL-3.0-only",
-    "LGPL-3.0-or-later",
-    "MPL-2.0"
+    "LGPL-3.0-or-later"
   ],
   "denied_spdx": [
     "AGPL-3.0-only",
     "AGPL-3.0-or-later",
     "BUSL-1.1",
     "CC-BY-NC-4.0",
-    "GPL-2.0-or-later",
     "GPL-3.0-only",
-    "GPL-3.0-or-later",
     "SSPL-1.0"
   ],
   "selected_or_choices": [],

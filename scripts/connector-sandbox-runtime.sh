@@ -6,6 +6,8 @@
 # namespace capability required by the probe.
 
 readonly TORGNEXA_SANDBOX_QUALIFICATION_IMAGE='golang:1.26.7-bookworm@sha256:e8c859f5632dcfde7b32d2012b4351728f6437930887c2f6a91ea242459e5514'
+readonly TORGNEXA_SANDBOX_IMAGE_PULL_ATTEMPTS=3
+readonly TORGNEXA_SANDBOX_IMAGE_PULL_BACKOFF_SECONDS=2
 
 connector_sandbox_namespace_available() {
   local unshare_command true_command
@@ -32,8 +34,29 @@ connector_sandbox_run_in_container() {
     return 1
   fi
 
+  # A qualification image is immutable, but a registry outage must not turn a
+  # transient pull failure into a misleading sandbox failure. Pull the exact
+  # digest with a small bounded retry budget, then prevent docker run from
+  # consulting the registry again. A successful inspect also verifies that the
+  # requested digest is locally available before repository code is executed.
+  local attempt
+  if ! docker image inspect "$TORGNEXA_SANDBOX_QUALIFICATION_IMAGE" >/dev/null 2>&1; then
+    for ((attempt = 1; attempt <= TORGNEXA_SANDBOX_IMAGE_PULL_ATTEMPTS; attempt++)); do
+      echo "connector sandbox runtime qualification: pulling pinned image (attempt $attempt/$TORGNEXA_SANDBOX_IMAGE_PULL_ATTEMPTS)" >&2
+      if docker pull "$TORGNEXA_SANDBOX_QUALIFICATION_IMAGE" >/dev/null &&
+        docker image inspect "$TORGNEXA_SANDBOX_QUALIFICATION_IMAGE" >/dev/null 2>&1; then
+        break
+      fi
+      if (( attempt == TORGNEXA_SANDBOX_IMAGE_PULL_ATTEMPTS )); then
+        echo "connector sandbox runtime qualification: FAIL (Docker could not make the pinned qualification image available after $TORGNEXA_SANDBOX_IMAGE_PULL_ATTEMPTS attempts; check Docker daemon access and registry connectivity)" >&2
+        return 125
+      fi
+      sleep "$TORGNEXA_SANDBOX_IMAGE_PULL_BACKOFF_SECONDS"
+    done
+  fi
+
   echo "connector sandbox runtime qualification: host namespaces unavailable; using pinned qualification container"
-  docker run --rm --pull=missing --network none --read-only \
+  docker run --rm --pull=never --network none --read-only \
     --cap-add=SYS_ADMIN --security-opt=apparmor=unconfined \
     --pids-limit 128 --memory 512m --cpus 2 \
     --tmpfs /tmp:rw,nosuid,nodev,exec \

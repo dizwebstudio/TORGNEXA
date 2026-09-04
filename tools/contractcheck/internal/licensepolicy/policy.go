@@ -197,6 +197,7 @@ func compilePolicy(policy Policy) (compiledPolicy, error) {
 }
 
 func (policy compiledPolicy) evaluate(expression string) error {
+	expression = normalizeLicenseExpression(expression)
 	node, err := parseExpression(expression)
 	if err != nil {
 		return err
@@ -214,6 +215,16 @@ func (policy compiledPolicy) evaluate(expression string) error {
 		}
 	}
 	return nil
+}
+
+// normalizeLicenseExpression maps the exact human-readable alias emitted by
+// Trivy to the repository's SPDX-style policy token. Other malformed or
+// unknown expressions remain fail-closed in parseExpression/evaluateAtom.
+func normalizeLicenseExpression(expression string) string {
+	if strings.TrimSpace(expression) == "Public Domain" {
+		return "Public-Domain"
+	}
+	return expression
 }
 
 func (policy compiledPolicy) evaluateSelected(node *expressionNode, selected string) error {

@@ -54,7 +54,10 @@ read-only repository mount, no network, bounded container resources and only
 the `SYS_ADMIN`/AppArmor allowances required by the kernel probe. CI must
 explicitly opt into the same fallback through the repository's `scripts/check.sh`
 entrypoint, which sets `TORGNEXA_SANDBOX_ALLOW_CONTAINER_FALLBACK=1` for the
-trusted CI check. Without that entrypoint opt-in a CI runner must provide Linux
+trusted CI check. If the pinned image is not cached, the fallback retries its
+exact digest three times and then runs with `--pull=never`; a registry outage
+therefore remains an explicit qualification failure and never changes the
+runtime image. Without that entrypoint opt-in a CI runner must provide Linux
 namespaces and the scripts fail closed.
 
 Production may use a stronger container/microVM backend, but it must preserve or exceed these semantics.
