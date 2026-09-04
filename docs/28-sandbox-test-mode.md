@@ -47,6 +47,14 @@ The reference sandbox uses:
 
 The isolation probe fails if the child can observe a host production-secret environment variable, `/run/secrets/torgnexa-production`, `/etc/passwd`, or direct Internet TCP connectivity.
 
+If a local Linux host or ordinary development container denies the required
+user namespace, the qualification scripts do not downgrade the probe. Outside
+CI they re-run the same scripts in the pinned Go qualification image with a
+read-only repository mount, no network, bounded container resources and only
+the `SYS_ADMIN`/AppArmor allowances required by the kernel probe. CI must
+instead use a namespace-enabled Linux runner; it never receives this automatic
+container fallback for untrusted pull-request code.
+
 Production may use a stronger container/microVM backend, but it must preserve or exceed these semantics.
 
 ## Deterministic emulator

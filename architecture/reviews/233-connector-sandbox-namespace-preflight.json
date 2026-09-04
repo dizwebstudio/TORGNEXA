@@ -5,7 +5,14 @@
   "change_class": "implementation",
   "summary": "Classify unavailable Linux namespace runtimes before the existing Task-029 sandbox probe while preserving hard failure for an actual launcher or emulator failure.",
   "scopes": [
-    "internal/platform/connectorsandbox/linux.go"
+    "PACKAGE_INDEX.md",
+    "architecture/reviews/233-connector-sandbox-namespace-preflight.json",
+    "docs/28-sandbox-test-mode.md",
+    "internal/platform/connectorsandbox/linux.go",
+    "scripts/check-connector-conformance.sh",
+    "scripts/check-connector-sandbox-linux.sh",
+    "scripts/connector-sandbox-runtime.sh",
+    "tasks/issues/233-connector-sandbox-namespace-preflight.md"
   ],
   "frozen_pillars": [],
   "adr": null,
@@ -32,7 +39,7 @@
     {
       "area": "privacy_data_governance",
       "status": "not_affected",
-      "evidence": "The preflight executes only an absolute system true command and does not inspect, persist or expose provider data or credentials."
+      "evidence": "The preflight executes only an absolute system true command; the local fallback mounts the repository read-only, uses no network and does not expose provider data or credentials."
     },
     {
       "area": "api_compatibility",
@@ -57,7 +64,7 @@
     {
       "area": "security",
       "status": "affected",
-      "evidence": "The preflight prevents a restricted kernel from being reported as a generic probe defect, while the real isolation probe still requires all existing namespaces, chroot, environment and network boundaries."
+      "evidence": "The preflight prevents a restricted kernel from being reported as a generic probe defect; local fallback uses a pinned, read-only, network-disabled container with only the SYS_ADMIN/AppArmor allowances required by the namespace probe, while the real isolation probe still requires all existing namespaces, chroot, environment and network boundaries."
     },
     {
       "area": "approvals_risk",
@@ -77,7 +84,7 @@
     {
       "area": "webhooks_egress",
       "status": "affected",
-      "evidence": "The preflight verifies that the same network namespace required by the external isolation proof is available before the child is started; it grants no egress route."
+      "evidence": "The preflight verifies that the same network namespace required by the external isolation proof is available before the child is started; the fallback uses `--network none` and grants no egress route."
     },
     {
       "area": "slo_observability",
@@ -92,7 +99,7 @@
     {
       "area": "testing_conformance",
       "status": "affected",
-      "evidence": "The same test skips only when the kernel cannot create the required namespaces; namespace-enabled runtimes still execute and pass the real chroot isolation probe."
+      "evidence": "The same test skips only when the kernel cannot create the required namespaces and no local fallback is available; namespace-enabled runtimes still execute and pass the real chroot isolation probe."
     }
   ],
   "provider": null,

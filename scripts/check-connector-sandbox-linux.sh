@@ -11,6 +11,12 @@ if ! command -v unshare >/dev/null 2>&1; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/scripts/connector-sandbox-runtime.sh"
+if ! connector_sandbox_namespace_available; then
+  connector_sandbox_run_in_container "$ROOT" "scripts/check-connector-sandbox-linux.sh"
+  exit $?
+fi
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

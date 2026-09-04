@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3578
+- total source files (excluding local secrets/build/dependency/cache trees): 3579
 
 
 ## Connector category layout
@@ -3702,6 +3702,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/community-demo-member.sql`
 - `scripts/community-e2e.mjs`
 - `scripts/community-e2e.sh`
+- `scripts/connector-sandbox-runtime.sh`
 - `scripts/connector_golden_path_evidence.py`
 - `scripts/cscart-smoke.sh`
 - `scripts/dzen-content-transformer-test.py`
