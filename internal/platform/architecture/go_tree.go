@@ -44,6 +44,11 @@ var allowedToolGoRoots = []string{
 	"tools/sdkgen/",
 }
 
+var packageManagerDependencyRoots = []string{
+	"frontend/node_modules",
+	"integrations/n8n-nodes-torgnexa/node_modules",
+}
+
 func (r *repository) checkGoTree(ctx context.Context, configuration *policy, found *problems) int {
 	discovered := make(map[string]struct{})
 	files := make([]string, 0)
@@ -91,11 +96,11 @@ func (r *repository) walkGoFiles(ctx context.Context, files *[]string, packages 
 			return nil
 		}
 		relative := filepath.ToSlash(relativeOS)
-		// frontend/node_modules is package-manager material, not first-party Go
-		// source. Ignore the entire configured dependency root before inspecting
-		// its expected symlinks and nested vendor directories. Source-side
-		// node_modules/vendor trees remain fail-closed everywhere else.
-		if relative == "frontend/node_modules" {
+		// Registered package-manager dependency roots are not first-party Go
+		// source. Ignore them before inspecting their expected symlinks and
+		// nested vendor directories. Source-side dependency trees remain
+		// fail-closed everywhere else.
+		if containsPath(packageManagerDependencyRoots, relative) {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}
@@ -153,6 +158,15 @@ func (r *repository) walkGoFiles(ctx context.Context, files *[]string, packages 
 	if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		found.add(".", "walk Go inventory failed: %v", err)
 	}
+}
+
+func containsPath(paths []string, target string) bool {
+	for _, path := range paths {
+		if path == target {
+			return true
+		}
+	}
+	return false
 }
 
 func allowedGoSourcePath(relative string) bool {

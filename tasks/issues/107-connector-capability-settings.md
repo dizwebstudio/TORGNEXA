@@ -23,4 +23,4 @@ Configure enabled connector capabilities and synchronization directions within m
 - Direction, risk and approval requirements are host-owned metadata. Connector manifests and API callers cannot downgrade a remote write from `write_sensitive` or remove its approval requirement.
 - Account activation and sync-policy creation, re-enabling and manual execution fail closed unless the required per-account capabilities are enabled.
 - Settings → Integrations renders every manifest capability with explicit read/write classification and saves the cabinet-specific selection.
-- Architecture validation registers the existing catalog-image/report adapters, recognizes the Connector SDK `storefront` family and excludes only the ignored `frontend/node_modules` dependency root from first-party Go inventory; hidden source-side vendor and symlink paths remain rejected.
+- Architecture validation registers the existing catalog-image/report adapters, recognizes the Connector SDK `storefront` family and excludes the registered frontend and n8n package-manager dependency roots from first-party Go inventory; hidden source-side vendor and symlink paths remain rejected.

@@ -30,16 +30,21 @@ func TestRepositoryPolicyFixturePasses(t *testing.T) {
 	}
 }
 
-func TestRepositoryIgnoresFrontendPackageManagerDependencies(t *testing.T) {
+func TestRepositoryIgnoresPackageManagerDependencies(t *testing.T) {
 	t.Parallel()
 	root := writeArchitectureFixture(t)
-	writeTestFile(t, root, "frontend/node_modules/typescript/vendor/example.invalid/tool.go", "package tool\n")
-	target := filepath.Join(root, "frontend", "node_modules", ".bin", "tsc")
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink("../typescript/bin/tsc", target); err != nil {
-		t.Fatal(err)
+	for _, dependencyRoot := range []string{
+		"frontend/node_modules",
+		"integrations/n8n-nodes-torgnexa/node_modules",
+	} {
+		writeTestFile(t, root, dependencyRoot+"/typescript/vendor/example.invalid/tool.go", "package tool\n")
+		target := filepath.Join(root, dependencyRoot, ".bin", "tsc")
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("../typescript/bin/tsc", target); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if _, err := CheckRepository(context.Background(), root); err != nil {
 		t.Fatalf("package-manager dependency tree must not enter first-party inventory: %v", err)

@@ -73,6 +73,8 @@ wait_healthy() {
   done
   echo "service $service did not become healthy/running" >&2
   ${dc[@]} ps >&2 || true
+  echo "--- $service startup logs (last 120 lines) ---" >&2
+  ${dc[@]} logs --no-color --tail 120 "$service" >&2 || true
   return 1
 }
 wait_healthy_after_restart() {
@@ -90,6 +92,8 @@ wait_healthy_after_restart() {
   done
   echo "service $service did not become healthy/running after restart" >&2
   ${dc[@]} ps >&2 || true
+  echo "--- $service recovery logs (last 120 lines) ---" >&2
+  ${dc[@]} logs --no-color --tail 120 "$service" >&2 || true
   return 1
 }
 wait_running() {
@@ -103,6 +107,8 @@ wait_running() {
     sleep 2
   done
   echo "service $service did not become running" >&2
+  echo "--- $service startup logs (last 120 lines) ---" >&2
+  ${dc[@]} logs --no-color --tail 120 "$service" >&2 || true
   return 1
 }
 wait_worker_ready() {

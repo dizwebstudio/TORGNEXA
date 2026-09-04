@@ -4,7 +4,7 @@
   "task": "107",
   "stage": "a",
   "change_class": "implementation",
-  "summary": "Close Task 107 repository architecture validation drift by registering existing PostgreSQL adapters, aligning storefront provider families with validated Connector SDK manifests, and keeping local frontend package-manager dependencies outside the first-party Go inventory.",
+  "summary": "Close Task 107 repository architecture validation drift by registering existing PostgreSQL adapters, aligning storefront provider families with validated Connector SDK manifests, and keeping registered frontend and n8n package-manager dependencies outside the first-party Go inventory.",
   "scopes": [
     ".gitignore",
     "HANDOFF.md",
@@ -36,14 +36,14 @@
     {"area":"event_compatibility","status":"not_affected","evidence":"No event name, envelope, producer or consumer behavior changes."},
     {"area":"plugin_sdk_compatibility","status":"affected","evidence":"Provider policy now recognizes the existing Connector SDK storefront family already declared by the three validated manifests."},
     {"area":"database_migration","status":"not_affected","evidence":"Catalog image and report repositories are existing adapters; registration adds no SQL or migration."},
-    {"area":"security","status":"affected","evidence":"Only the explicit frontend/node_modules dependency root is skipped; vendor and symlink checks remain fail-closed everywhere else and are regression-tested."},
+    {"area":"security","status":"affected","evidence":"Only the explicit frontend and n8n package-manager dependency roots are skipped; vendor and symlink checks remain fail-closed everywhere else and are regression-tested."},
     {"area":"approvals_risk","status":"not_affected","evidence":"Capability risk classification and approval-required remote writes are unchanged."},
     {"area":"audit_lineage","status":"not_affected","evidence":"No audit record, lineage record or SIEM export behavior changes."},
     {"area":"reconciliation_idempotency","status":"not_affected","evidence":"Sync execution, reconciliation state and idempotency behavior are unchanged."},
     {"area":"webhooks_egress","status":"not_affected","evidence":"No webhook destination, signature, replay or egress behavior changes."},
     {"area":"slo_observability","status":"affected","evidence":"The canonical architecture gate can now report a clean result instead of known inventory false positives."},
     {"area":"operations_rollback","status":"affected","evidence":"Rollback restores validation metadata only; no runtime or persisted business state requires conversion."},
-    {"area":"testing_conformance","status":"affected","evidence":"Architecture tests cover the bounded dependency-root exclusion while existing hidden vendor and symlink rejection tests remain active."}
+    {"area":"testing_conformance","status":"affected","evidence":"Architecture tests cover both bounded package-manager dependency-root exclusions while existing hidden vendor and symlink rejection tests remain active."}
   ],
   "provider": null,
   "follow_up_tasks": ["108", "109"]
