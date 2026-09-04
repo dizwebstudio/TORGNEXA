@@ -42,6 +42,9 @@ declare module "react/jsx-runtime" {
 declare module "react-dom/client" {
   export function createRoot(container: Element | DocumentFragment): {render(node: unknown): void};
 }
+declare module "react-dom/server" {
+  export function renderToStaticMarkup(node: unknown, options?: unknown): string;
+}
 declare module "@tanstack/react-query" {
   export class QueryClient { constructor(config?: unknown); invalidateQueries(input?: unknown): Promise<void>; setQueryData(queryKey: readonly unknown[], data: unknown): void; }
   export function QueryClientProvider(props: {client: QueryClient; children?: unknown}): unknown;
