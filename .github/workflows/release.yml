@@ -113,7 +113,6 @@ jobs:
       GOTELEMETRY: "off"
       GOTOOLCHAIN: local
       GOWORK: "off"
-      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-runtime-qualification
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -123,6 +122,8 @@ jobs:
           go-version: "1.26.7"
           cache: false
       - name: Qualify deployed worker, Kafka, PostgreSQL, and warehouse execution
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-runtime-qualification
         run: |
           mkdir -m 0700 -- "$EVIDENCE_DIR"
           TORGNEXA_QUALIFICATION_EVIDENCE_DIR="$EVIDENCE_DIR" ./scripts/check-production-qualification.sh
@@ -154,8 +155,6 @@ jobs:
       FULL_REF: ${{ github.ref }}
       SOURCE_REVISION: ${{ github.sha }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
       GOTELEMETRY: "off"
       GOTOOLCHAIN: local
       GOWORK: "off"
@@ -192,10 +191,12 @@ jobs:
             "$mode" "$version" "$SOURCE_REVISION" "$source_epoch" "$release_ref" "$EVENT_NAME" >>"$GITHUB_OUTPUT"
       - name: Build reproducible release bytes once
         env:
+          ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
           BUILD_MODE: ${{ steps.context.outputs.mode }}
           BUILD_VERSION: ${{ steps.context.outputs.version }}
           BUILD_REVISION: ${{ steps.context.outputs.revision }}
           BUILD_SOURCE_EPOCH: ${{ steps.context.outputs.source_epoch }}
+          TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
         run: |
           mkdir -m 0700 -- "$ARTIFACT_DIR"
           ./scripts/build-release.sh \
@@ -221,9 +222,6 @@ jobs:
       contents: read
     env:
       VERSION: ${{ needs.build.outputs.version }}
-      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -233,10 +231,15 @@ jobs:
           name: release-build-${{ github.run_id }}
           path: ${{ runner.temp }}/torgnexa-release-artifacts
       - name: Install checksum-verified SBOM tooling
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Generate SPDX 2.3 SBOMs for the exact binaries
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: ./scripts/generate-release-sboms.sh --artifact-dir "$ARTIFACT_DIR" --version "$VERSION" --syft "$TOOLS_DIR/syft"
       - name: Retain binaries and their SBOMs without rebuilding
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -255,9 +258,6 @@ jobs:
     env:
       MODE: ${{ needs.build.outputs.mode }}
       SOURCE_REVISION: ${{ needs.build.outputs.revision }}
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
-      REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
       GOTELEMETRY: "off"
       GOTOOLCHAIN: local
       GOWORK: "off"
@@ -270,10 +270,17 @@ jobs:
           go-version: "1.26.7"
           cache: false
       - name: Install checksum-verified security tools
+        env:
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR" "$REPORT_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Run all source and runtime-image gates
+        env:
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
         run: |
           ./scripts/scan-supply-chain.sh \
             --mode "$MODE" \
@@ -301,10 +308,6 @@ jobs:
       contents: read
       id-token: write
     env:
-      ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
-      REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
-      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
       VERSION: ${{ needs.build.outputs.version }}
       MODE: ${{ needs.build.outputs.mode }}
       SOURCE_REVISION: ${{ needs.build.outputs.revision }}
@@ -313,7 +316,6 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       WORKFLOW_RUN_ID: ${{ github.run_id }}
       WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
       COSIGN_YES: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -332,10 +334,16 @@ jobs:
           name: release-security-${{ github.run_id }}
           path: ${{ runner.temp }}/torgnexa-release-reports
       - name: Install checksum-verified signing tools
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR" "$EVIDENCE_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Keylessly sign every first-party binary digest
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           for binary in api mcp scheduler worker; do
             subject="$ARTIFACT_DIR/${binary}_${VERSION}_linux_amd64"
@@ -348,7 +356,9 @@ jobs:
           subject-path: ${{ runner.temp }}/torgnexa-release-artifacts/*_linux_amd64
       - name: Verify both keyless signature paths before evidence assembly
         env:
+          ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
           GITHUB_ATTESTATION: ${{ steps.github_attest.outputs.bundle-path }}
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           issuer=https://token.actions.githubusercontent.com
           identity="https://github.com/$REPOSITORY/.github/workflows/release.yml@$RELEASE_REF"
@@ -395,8 +405,13 @@ jobs:
           rm -f -- "$verified_subjects"
       - name: Assemble and structurally validate the self-contained evidence
         env:
+          ARTIFACT_DIR: ${{ runner.temp }}/torgnexa-release-artifacts
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
           GITHUB_ATTESTATION: ${{ steps.github_attest.outputs.bundle-path }}
           EXTERNAL_VERIFICATION: ${{ runner.temp }}/torgnexa-release-artifacts/external-verification.json
+          REPORT_DIR: ${{ runner.temp }}/torgnexa-release-reports
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
+          TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
         run: |
           ./scripts/generate-release-evidence.sh \
             --mode "$MODE" \
@@ -429,8 +444,6 @@ jobs:
     outputs:
       public_ready: ${{ steps.ready.outputs.public_ready }}
     env:
-      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
-      TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
       MODE: ${{ needs.build.outputs.mode }}
       VERSION: ${{ needs.build.outputs.version }}
       EXPECTED_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}
@@ -439,7 +452,6 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       RELEASE_REF: ${{ needs.build.outputs.release_ref }}
       SOURCE_REVISION: ${{ needs.build.outputs.revision }}
-      TORGNEXA_SAFE_OUTPUT_ROOT: ${{ runner.temp }}
       GOTOOLCHAIN: local
       GOWORK: "off"
     steps:
@@ -455,10 +467,15 @@ jobs:
           name: release-evidence-${{ github.run_id }}
           path: ${{ runner.temp }}/torgnexa-release-evidence
       - name: Install checksum-verified verification tools
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           mkdir -m 0700 -- "$TOOLS_DIR"
           ./scripts/install-security-tools.sh --bin-dir "$TOOLS_DIR"
       - name: Verify evidence structure and exact OIDC identity
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
+          TOOLS_DIR: ${{ runner.temp }}/torgnexa-security-tools
         run: |
           go -C tools/contractcheck run ./cmd/releasecheck -root "$EVIDENCE_DIR" -manifest evidence.json -mode "$MODE"
           for binary in api mcp scheduler worker; do
@@ -485,6 +502,8 @@ jobs:
           done
       - name: Expose fail-closed publication state
         id: ready
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
         run: |
           public_ready=$(jq -r '.release.public_ready' "$EVIDENCE_DIR/evidence.json")
           [[ "$public_ready" == true || "$public_ready" == false ]]
@@ -498,8 +517,6 @@ jobs:
     environment: release-publication
     permissions:
       contents: write
-    env:
-      EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -510,5 +527,6 @@ jobs:
           path: ${{ runner.temp }}/torgnexa-release-evidence
       - name: Stage verified bytes as a non-public GitHub Release draft
         env:
+          EVIDENCE_DIR: ${{ runner.temp }}/torgnexa-release-evidence
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/stage-github-release.sh
