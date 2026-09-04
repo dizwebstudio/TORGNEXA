@@ -217,12 +217,17 @@ func (policy compiledPolicy) evaluate(expression string) error {
 	return nil
 }
 
-// normalizeLicenseExpression maps the exact human-readable alias emitted by
+// normalizeLicenseExpression maps exact non-canonical aliases emitted by
 // Trivy to the repository's SPDX-style policy token. Other malformed or
 // unknown expressions remain fail-closed in parseExpression/evaluateAtom.
 func normalizeLicenseExpression(expression string) string {
-	if strings.TrimSpace(expression) == "Public Domain" {
+	switch expression {
+	case "Public", "Public Domain", "public-domain":
 		return "Public-Domain"
+	case "bzip-2-1.0.6":
+		return "bzip2-1.0.6"
+	case "GPLv3+":
+		return "GPL-3.0-or-later"
 	}
 	return expression
 }

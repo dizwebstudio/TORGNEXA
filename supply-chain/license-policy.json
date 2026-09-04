@@ -8,11 +8,13 @@
     "GPL-2.0-only",
     "GPL-2.0-or-later",
     "GPL-3.0-or-later",
+    "ICU",
     "ISC",
     "LGPL-2.1-or-later",
     "MIT",
     "MPL-2.0",
-    "Public-Domain"
+    "Public-Domain",
+    "bzip2-1.0.6"
   ],
   "review_required_spdx": [
     "LGPL-2.1-only",

@@ -9,8 +9,12 @@ Third-party dependencies, generated artifacts, provider SDKs, examples, and inte
 On 2026-09-04, the release owner also approved distribution of the current pinned runtime
 images containing `GPL-2.0-only` and `LGPL-2.1-or-later` components. This
 approval applies to the exact image digests in
-`supply-chain/release-artifacts.json`; any image digest or license expression
-outside that set remains subject to the default-deny policy and a new review.
+`supply-chain/release-artifacts.json`, including the reported `ICU` and
+`bzip2-1.0.6` components. Trivy's `Public`, `Public Domain`, `public-domain`,
+`bzip-2-1.0.6` and `GPLv3+` labels are accepted only through exact
+normalization to the approved policy identifiers; any image digest or license
+expression outside that set remains subject to the default-deny policy and a
+new review.
 
 Connector implementations must continue to comply with provider API terms and trademark requirements. This repository license decision does not waive dependency-license, vulnerability, provenance, signing, protected-branch, or release-topology qualification gates.
 
