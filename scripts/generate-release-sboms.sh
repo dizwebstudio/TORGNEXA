@@ -64,7 +64,7 @@ safe_root="$(realpath -e -- "$safe_root")"
 artifact_dir="$(realpath -e -- "$artifact_dir")"
 [[ "$artifact_dir" == "$safe_root/"* ]] || die "--artifact-dir must be a child of $safe_root"
 
-for command_name in jq mktemp realpath sha256sum sort; do
+for command_name in chmod jq mktemp realpath sha256sum sort; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
@@ -105,8 +105,13 @@ while IFS=$'\t' read -r name platform; do
   binary_path="$artifact_dir/$binary_name"
   sbom_name="${binary_name}.spdx.json"
   raw_sbom="$work_dir/$sbom_name"
-  [[ -f "$binary_path" && -x "$binary_path" && ! -L "$binary_path" ]] || \
+  [[ -f "$binary_path" && ! -L "$binary_path" ]] || \
     die "release binary is missing or unsafe: $binary_name"
+  # actions/upload-artifact does not preserve executable file modes. The
+  # content was already verified against the build-produced SHA256SUMS above,
+  # so restore the mode only after the regular-file and digest checks pass.
+  chmod 0755 -- "$binary_path"
+  [[ -x "$binary_path" ]] || die "release binary could not be made executable: $binary_name"
 
   "$syft_path" scan "file:$binary_path" \
     --source-name "$name" --source-version "$release_version" \
