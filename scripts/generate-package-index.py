@@ -38,6 +38,7 @@ SKIP_DIR_NAMES = {
     ".idea",
     ".mypy_cache",
     ".nox",
+    ".offline-dist",
     ".pytest_cache",
     ".prerender",
     ".repository-test",

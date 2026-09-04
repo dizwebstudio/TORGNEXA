@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3465
+- total source files (excluding local secrets/build/dependency/cache trees): 3459
 
 
 ## Connector category layout
@@ -2707,12 +2707,6 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `frontend/vite.config.ts`
 - `go.mod`
 - `go.sum`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/credentials/TorgnexaApi.credentials.js`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/nodes/Torgnexa/GenericFunctions.js`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/nodes/Torgnexa/Torgnexa.node.js`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/nodes/TorgnexaTrigger/Events.js`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/nodes/TorgnexaTrigger/Signature.js`
-- `integrations/n8n-nodes-torgnexa/.offline-dist/nodes/TorgnexaTrigger/TorgnexaTrigger.node.js`
 - `integrations/n8n-nodes-torgnexa/COMPATIBILITY.md`
 - `integrations/n8n-nodes-torgnexa/LICENSE.md`
 - `integrations/n8n-nodes-torgnexa/README.md`
