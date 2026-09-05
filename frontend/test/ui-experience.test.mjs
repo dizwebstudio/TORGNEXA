@@ -465,7 +465,7 @@ test("community browser checks have a synthetic Keycloak user and upload scanner
   const helper = readRoot("scripts/ensure-community-demo-user.sh");
   assert.match(realm, /"username": "demo"/);
   assert.match(realm, /"realmRoles": \["admin"\]/);
-  assert.match(compose, /clamav\/clamav:1\.4\.3@sha256:/);
+  assert.match(compose, /clamav\/clamav:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}/);
   assert.match(compose, /TORGNEXA_WORKER_UPLOADS_ENABLED: \$\{TORGNEXA_WORKER_UPLOADS_ENABLED:-true\}/);
   assert.match(helper, /set-password/);
   assert.match(helper, /add-roles/);
