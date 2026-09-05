@@ -218,7 +218,12 @@ func applyScope(ctx context.Context, queries queryer, scope tenancy.Scope) error
 
 func idempotencyLockKey(scope tenancy.Scope, consumer, eventID string) int64 {
 	fingerprint, _ := inboxKeyDigest(scope, consumer, eventID)
-	return int64(binary.BigEndian.Uint64(fingerprint[:8]))
+	key := binary.BigEndian.Uint64(fingerprint[:8])
+	if key > 1<<63-1 {
+		key &= 1<<63 - 1
+	}
+	// #nosec G115 -- the branch above bounds key to MaxInt64 before conversion.
+	return int64(key)
 }
 
 func inboxKeyDigest(scope tenancy.Scope, consumer, eventID string) ([32]byte, error) {
@@ -228,7 +233,10 @@ func inboxKeyDigest(scope tenancy.Scope, consumer, eventID string) ([32]byte, er
 		if len(value) > 65535 {
 			return [32]byte{}, inbox.ErrInvalidRecord
 		}
-		payload = append(payload, byte(len(value)>>8), byte(len(value)))
+		var length [2]byte
+		// The guard above proves the length fits the two-byte prefix.
+		binary.BigEndian.PutUint16(length[:], uint16(len(value))) // #nosec G115 -- len(value) is explicitly bounded to 65535 above.
+		payload = append(payload, length[:]...)
 		payload = append(payload, value...)
 	}
 	return sha256Sum(payload), nil

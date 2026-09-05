@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -166,7 +167,7 @@ func (f *fakeSecrets) Create(_ context.Context, scope tenancy.Scope, class secre
 		return secrets.Metadata{}, secrets.ErrInvalidMaterial
 	}
 	f.n++
-	ref := secrets.Reference("sec:v1:" + strings.Repeat("0", 30) + string([]byte{'0' + byte(f.n/10), '0' + byte(f.n%10)}))
+	ref := secrets.Reference("sec:v1:" + strings.Repeat("0", 30) + fmt.Sprintf("%02x", f.n))
 	if !ref.Valid() {
 		return secrets.Metadata{}, secrets.ErrInvalidReference
 	}

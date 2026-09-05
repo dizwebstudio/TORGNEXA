@@ -3,6 +3,7 @@ package reconciliation
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func (s *seqIDs) NewID(prefix string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.n++
-	return prefix + "test_" + string(rune('a'+s.n)), nil
+	return prefix + "test_" + strconv.Itoa(s.n), nil
 }
 func scope014(t *testing.T) tenancy.Scope {
 	t.Helper()

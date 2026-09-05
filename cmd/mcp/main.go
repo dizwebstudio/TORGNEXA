@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/app/mcp"
@@ -27,9 +30,32 @@ func main() {
 }
 
 func healthcheck(address string) error {
-	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
+	validated, err := validateHealthcheckAddress(address)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// #nosec G704 -- validateHealthcheckAddress permits only loopback IP literals and a bounded TCP port.
+	conn, err := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", validated)
 	if err != nil {
 		return err
 	}
 	return conn.Close()
+}
+
+func validateHealthcheckAddress(raw string) (string, error) {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip == nil || !ip.IsLoopback() {
+		return "", net.InvalidAddrError("healthcheck address must target a loopback IP")
+	}
+	value, err := strconv.Atoi(port)
+	if err != nil || value < 1 || value > 65535 {
+		return "", net.InvalidAddrError("healthcheck address has an invalid port")
+	}
+	return net.JoinHostPort(ip.String(), strconv.Itoa(value)), nil
 }

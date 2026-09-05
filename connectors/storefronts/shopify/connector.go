@@ -71,7 +71,7 @@ func Manifest() sdk.Manifest {
 	return sdk.Manifest{
 		ID: "shopify", Name: "Shopify", Family: sdk.FamilyStorefront, Version: "1.0.0", SDKVersion: sdk.SDKMajor,
 		Capabilities: []sdk.Capability{"inventory.read", "inventory.write", "notifications.receive", "orders.read", "orders.status.write", "prices.read", "prices.write", "products.read", "products.write", "returns.read"},
-		Auth: []sdk.AuthRequirement{{Kind: sdk.AuthOAuth2, SecretClass: "marketplace.oauth-token", Required: true, OAuth2: &sdk.OAuth2Configuration{
+		Auth: []sdk.AuthRequirement{{Kind: sdk.AuthOAuth2, SecretClass: "marketplace.oauth-token", Required: true, OAuth2: &sdk.OAuth2Configuration{ // #nosec G101 -- OAuth metadata names and endpoint templates contain no secret value.
 			GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token",
 			Scopes: []string{"read_products", "write_products", "read_inventory", "write_inventory", "read_orders", "write_orders"}, ClientAuthMethod: "client_secret_post",
 			ScopeSeparator: ",", HostParameter: "shop_domain", HostSuffix: ".myshopify.com", ExtraTokenParams: map[string]string{"expiring": "1"},

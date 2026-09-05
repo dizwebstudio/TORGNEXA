@@ -104,7 +104,9 @@ func (candidateSecrets) UseSecret(_ context.Context, _ sdk.SecretReference, call
 	if callback == nil {
 		return errors.New("callback missing")
 	}
-	value := []byte("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.c2lnbmF0dXJl")
+	// Keep the fixture structurally valid for the connector without embedding a
+	// JWT-shaped secret that scanners could mistake for a credential.
+	value := []byte("dGVzdC1oZWFkZXI.dGVzdC1wYXlsb2Fk.dGVzdC1zaWduYXR1cmU")
 	defer clear(value)
 	return callback(value)
 }

@@ -3,6 +3,7 @@ package secrets
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -223,7 +224,12 @@ func TestRedactionHelpers(t *testing.T) {
 	if SensitiveKey("token_count") {
 		t.Fatal("token_count metric must remain visible")
 	}
-	for _, value := range []string{"Bearer abc", "Basic Zm9vOmJhcg==", "-----BEGIN ENCRYPTED PRIVATE KEY-----\nabc", "https://example.invalid/callback?access_token=abc", "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.signature"} {
+	jwtFixture := strings.Join([]string{
+		base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`)),
+		base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1"}`)),
+		"signature",
+	}, ".")
+	for _, value := range []string{"Bearer abc", "Basic Zm9vOmJhcg==", "-----BEGIN ENCRYPTED PRIVATE KEY-----\nabc", "https://example.invalid/callback?access_token=abc", jwtFixture} {
 		if !SensitiveString(value) || RedactText(value) != RedactedValue {
 			t.Errorf("value not redacted: %q", value)
 		}

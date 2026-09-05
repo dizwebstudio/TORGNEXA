@@ -1,13 +1,14 @@
-# Version Baseline — 2026-08-08
+# Version Baseline — 2026-09-05
 
 | Component | Baseline | Notes |
 |---|---:|---|
 | Go | 1.26.7 | minimum language version 1.26.0; exact patched toolchain pinned in `go.mod` |
 | PostgreSQL | 18.4 | readable tag plus immutable OCI index digest in the release inventory |
 | Apache Kafka | 4.3.1 | supported bugfix release, KRaft |
-| Valkey | 9.1.1 | current 9.1 bugfix |
+| Valkey | 9.1.2 | current 9.1 bugfix |
 | ClickHouse | 26.6 | immutable OCI index digest in the release inventory |
-| Keycloak | 26.7.x | current 26.7 line |
+| Keycloak | 26.7.3 | current 26.7 bugfix |
+| ClamAV | 1.4.6 | current 1.4 maintenance line; linux/amd64 |
 | n8n | external | do not package as runtime without license review |
 | Syft | 1.50.0 | pinned SPDX SBOM generator; archive and binary SHA-256 verified |
 | Trivy | 0.70.0 | pinned vulnerability, secret, license, misconfiguration and image scanner |

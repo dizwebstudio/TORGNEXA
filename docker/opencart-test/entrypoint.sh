@@ -48,7 +48,6 @@ if [ ! -f /var/www/html/.torgnexa-demo-installed ]; then
   rm -rf /var/www/html/install
   php /usr/local/bin/torgnexa-opencart-seed.php
   touch /var/www/html/.torgnexa-demo-installed
-  chown www-data:www-data /var/www/html/.torgnexa-demo-installed
   echo "[torgnexa] synthetic demo data loaded"
 fi
 

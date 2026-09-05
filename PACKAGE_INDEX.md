@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3461
+- total source files (excluding local secrets/build/dependency/cache trees): 3464
 
 
 ## Connector category layout
@@ -2802,6 +2802,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/oidc_membership_test.go`
 - `internal/app/api/oidc_profile_test.go`
 - `internal/app/api/oidc_security.go`
+- `internal/app/api/oidc_security_test.go`
 - `internal/app/api/openapi_runtime_parity_test.go`
 - `internal/app/api/operator_assistant.go`
 - `internal/app/api/order_status.go`
@@ -3629,6 +3630,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/promote-github-release.sh`
 - `scripts/runtime-load.py`
 - `scripts/saleor-smoke.sh`
+- `scripts/scan-supply-chain-lib-test.sh`
+- `scripts/scan-supply-chain-lib.sh`
 - `scripts/scan-supply-chain.sh`
 - `scripts/shopify-mock-server.py`
 - `scripts/shopify-smoke.sh`

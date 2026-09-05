@@ -44,7 +44,7 @@ const (
 	ClassOAuthClient             Class = "oauth_client"
 	ClassOAuthState              Class = "oauth_state"
 	ClassOAuthRefresh            Class = "oauth_refresh"
-	ClassERPCredential           Class = "erp_credential"
+	ClassERPCredential           Class = "erp_credential" // #nosec G101 -- this is a non-secret purpose enum used for policy classification.
 	ClassWebhookSigning          Class = "webhook_signing"
 	ClassCertificate             Class = "certificate"
 	ClassStorageCredential       Class = "storage_credential"

@@ -18,7 +18,7 @@ type Transport interface {
 }
 
 func manifest() sdk.Manifest {
-	return sdk.Manifest{ID: "saby-edo", Name: "Saby EDO", Family: sdk.FamilyEDO, Version: "1.0.0", SDKVersion: 1, Capabilities: []sdk.Capability{"edo.documents.read", "edo.documents.send", "edo.documents.sign_request"}, Auth: []sdk.AuthRequirement{{Kind: sdk.AuthBearer, SecretClass: "edo.credential", Required: true}}, RateLimit: sdk.RateLimitPolicy{MaxConcurrency: 2, MinIntervalMS: 200, RequestTimeoutMS: 30000, Retry: sdk.RetryPolicy{MaxAttempts: 4, BaseBackoffMS: 500, MaxBackoffMS: 30000}}}
+	return sdk.Manifest{ID: "saby-edo", Name: "Saby EDO", Family: sdk.FamilyEDO, Version: "1.0.0", SDKVersion: 1, Capabilities: []sdk.Capability{"edo.documents.read", "edo.documents.send", "edo.documents.sign_request"}, Auth: []sdk.AuthRequirement{{Kind: sdk.AuthBearer, SecretClass: "edo.credential", Required: true}}, RateLimit: sdk.RateLimitPolicy{MaxConcurrency: 2, MinIntervalMS: 200, RequestTimeoutMS: 30000, Retry: sdk.RetryPolicy{MaxAttempts: 4, BaseBackoffMS: 500, MaxBackoffMS: 30000}}} // #nosec G101 -- credential is a manifest classification label, not secret material.
 }
 func (c *Connector) ReadEDODocument(ctx context.Context, a sdk.Account, r sdk.Runtime, q sdk.EDODocumentRequest) (sdk.EDODocument, error) {
 	if c == nil || c.transport == nil || sdk.ValidateAccountAgainstManifest(a, Manifest()) != nil || q.Validate() != nil || sdk.RequireCapability(Manifest(), "edo.documents.read") != nil {

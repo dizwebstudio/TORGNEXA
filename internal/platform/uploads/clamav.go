@@ -81,7 +81,11 @@ func (s *ClamAVScanner) Scan(ctx context.Context, request ScanRequest, source io
 			if total > s.config.MaxBytes || total > request.SizeBytes {
 				return ScanResult{}, ErrSecurityRejected
 			}
+			if n > clamAVChunkBytes {
+				return ScanResult{}, ErrSecurityRejected
+			}
 			var header [4]byte
+			// #nosec G115 -- n is bounded by the fixed 32 KiB read buffer above.
 			binary.BigEndian.PutUint32(header[:], uint32(n))
 			if _, err := conn.Write(header[:]); err != nil {
 				return ScanResult{ScannerName: "clamav", EngineVersion: s.config.EngineVersion, SignatureVersion: s.config.SignatureVersion, Status: ScannerError}, ErrScannerUnavailable

@@ -60,7 +60,7 @@ func Manifest() sdk.Manifest {
 	return sdk.Manifest{
 		ID: "onec", Name: "1C", Family: sdk.FamilyERP, Version: "1.0.0", SDKVersion: sdk.SDKMajor,
 		Capabilities: []sdk.Capability{"erp.catalog.read", "erp.inventory.read"},
-		Auth:         []sdk.AuthRequirement{{Kind: sdk.AuthBasic, SecretClass: "erp.basic-credentials", Required: true}},
+		Auth:         []sdk.AuthRequirement{{Kind: sdk.AuthBasic, SecretClass: "erp.basic-credentials", Required: true}}, // #nosec G101 -- credentials is a manifest classification label, not secret material.
 		RateLimit: sdk.RateLimitPolicy{MaxConcurrency: 2, MinIntervalMS: 100, RequestTimeoutMS: 20000,
 			Retry: sdk.RetryPolicy{MaxAttempts: 5, BaseBackoffMS: 500, MaxBackoffMS: 30000}},
 	}

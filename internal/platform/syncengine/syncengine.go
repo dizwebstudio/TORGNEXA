@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -888,7 +889,13 @@ func policySource(policyID string) string {
 func deterministicID(prefix string, parts ...string) string {
 	h := sha256.New()
 	for _, part := range parts {
-		_, _ = h.Write([]byte{byte(len(part) >> 8), byte(len(part))})
+		if len(part) > 1<<16-1 {
+			return ""
+		}
+		var length [2]byte
+		// #nosec G115 -- the explicit bound above proves the length fits uint16.
+		binary.BigEndian.PutUint16(length[:], uint16(len(part)))
+		_, _ = h.Write(length[:])
 		_, _ = h.Write([]byte(part))
 	}
 	return prefix + "_" + hex.EncodeToString(h.Sum(nil)[:12])

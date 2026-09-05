@@ -56,7 +56,7 @@ func account() sdk.Account {
 	created := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
 	return sdk.Account{ID: "ali-account", OrganizationID: "01890f4d-1e10-7cc0-9c4a-111111111111", WorkspaceID: "01890f4d-1e10-7cc0-9c4a-222222222222", ConnectorID: "aliexpress-ru", Family: sdk.FamilyMarketplace, Status: sdk.AccountActive, SecretReference: "sec:v1:0123456789abcdef0123456789abcdef", Version: 1, Health: sdk.Health{Status: sdk.HealthUnknown}, CreatedAt: created, UpdatedAt: created}
 }
-func jwt() []byte         { return []byte("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.c2lnbmF0dXJl") }
+func jwt() []byte         { return []byte("dGVzdC1oZWFkZXI.dGVzdC1wYXlsb2Fk.dGVzdC1zaWduYXR1cmU") }
 func fixedNow() time.Time { return time.Date(2026, 8, 10, 20, 0, 0, 0, time.UTC) }
 
 func TestManifestMatchesAndCapabilityAuditBoundary(t *testing.T) {
@@ -78,7 +78,7 @@ func TestManifestMatchesAndCapabilityAuditBoundary(t *testing.T) {
 }
 
 func TestJWTStrict(t *testing.T) {
-	for _, value := range [][]byte{nil, []byte("short"), []byte("a.b.c"), []byte(" eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2ln "), []byte("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.*")} {
+	for _, value := range [][]byte{nil, []byte("short"), []byte("a.b.c"), []byte(" test-header.test-payload.test-signature "), []byte("dGVzdC1oZWFkZXI.dGVzdC1wYXlsb2Fk.*")} {
 		if validJWT(value) {
 			t.Fatalf("bad token accepted: %q", value)
 		}

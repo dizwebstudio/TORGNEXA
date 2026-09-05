@@ -51,12 +51,12 @@ services:
       TORGNEXA_PRESTASHOP_API_KEY: 0123456789abcdef0123456789abcdef
       TORGNEXA_PRESTASHOP_CURRENCY: EUR
     ports:
-      - "${PRESTASHOP_HTTP_PORT:-8097}:80"
+      - "${PRESTASHOP_HTTP_PORT:-8097}:8080"
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl --globoff -fsS -u \"$${TORGNEXA_PRESTASHOP_API_KEY}:\" -H 'Host: 127.0.0.1:${PRESTASHOP_HTTP_PORT:-8097}' 'http://127.0.0.1/api/products?output_format=JSON&display=[id]&limit=1' | grep -q 'products'"]
+      test: ["CMD-SHELL", "curl --globoff -fsS -u \"$${TORGNEXA_PRESTASHOP_API_KEY}:\" -H 'Host: 127.0.0.1:${PRESTASHOP_HTTP_PORT:-8097}' 'http://127.0.0.1:8080/api/products?output_format=JSON&display=[id]&limit=1' | grep -q 'products'"]
       interval: 5s
       timeout: 5s
       retries: 30

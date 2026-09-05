@@ -181,9 +181,9 @@ func (d Decimal) String() string {
 	neg := d.coefficient < 0
 	var mag uint64
 	if neg {
-		mag = uint64(-(d.coefficient + 1)) + 1
+		mag = domain.UnsignedMagnitude(d.coefficient)
 	} else {
-		mag = uint64(d.coefficient)
+		mag = domain.UnsignedMagnitude(d.coefficient)
 	}
 	s := strconv.FormatUint(mag, 10)
 	if d.scale > 0 {

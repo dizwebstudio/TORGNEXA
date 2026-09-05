@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -60,7 +61,7 @@ func TestPromptInjectionRegressionCorpus(t *testing.T) {
 			if tc.ExternalText == "" {
 				t.Fatal("fixture must contain hostile external text")
 			}
-			request := Request{Agent: testAgent(), Tool: tc.RequestedTool, Permission: tc.Permission, Risk: tc.Risk, Trust: TrustUntrustedExternal, ApprovalBoundary: tc.ApprovalBoundary, CorrelationID: "fixture:" + tc.ID, InvocationID: "fixture-" + string(rune('a'+index)), At: at}
+			request := Request{Agent: testAgent(), Tool: tc.RequestedTool, Permission: tc.Permission, Risk: tc.Risk, Trust: TrustUntrustedExternal, ApprovalBoundary: tc.ApprovalBoundary, CorrelationID: "fixture:" + tc.ID, InvocationID: fmt.Sprintf("fixture-%d", index), At: at}
 			request.Metrics.Money = tc.Money
 			decision, err := service.AuthorizeCall(context.Background(), testScope(t), request)
 			switch tc.Expected {

@@ -13,6 +13,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/core/social"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/approval"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 const ApprovalsPath = "/api/v1/approvals"
@@ -298,8 +299,9 @@ func newApprovalID() string {
 	if _, err := rand.Read(value[:]); err != nil {
 		return ""
 	}
-	millis := uint64(time.Now().UnixMilli())
-	value[0], value[1], value[2], value[3], value[4], value[5] = byte(millis>>40), byte(millis>>32), byte(millis>>24), byte(millis>>16), byte(millis>>8), byte(millis)
+	if err := domain.PutUUIDv7Timestamp(value[:6], time.Now()); err != nil {
+		return ""
+	}
 	value[6], value[8] = (value[6]&0x0f)|0x70, (value[8]&0x3f)|0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", value[0:4], value[4:6], value[6:8], value[8:10], value[10:16])
 }

@@ -271,7 +271,11 @@ func memberMutationDigest(id, role, status string, expected int64) string {
 	values := []string{id, role, status, strconv.FormatInt(expected, 10)}
 	payload := make([]byte, 0, len(id)+len(role)+len(status)+32)
 	for _, value := range values {
+		if len(value) > 1<<32-1 {
+			return ""
+		}
 		var length [4]byte
+		// #nosec G115 -- the explicit bound above proves the length fits uint32.
 		binary.BigEndian.PutUint32(length[:], uint32(len(value)))
 		payload = append(payload, length[:]...)
 		payload = append(payload, value...)

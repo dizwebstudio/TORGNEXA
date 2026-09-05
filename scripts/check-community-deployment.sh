@@ -76,11 +76,17 @@ catalog_topics=sorted({'.'.join(event['event_type'].split('.')[:2])+'.events.'+e
 if topic_lines != catalog_topics:
     raise SystemExit('deploy/kafka/topics.txt drifted from contracts/events/event-catalog.json')
 
-compose=compose_text
-for match in re.finditer(r'(?m)^\s+image:\s+([^#\s]+)', compose):
-    ref=match.group(1)
-    if not re.search(r'@sha256:[0-9a-f]{64}$', ref):
-        raise SystemExit(f'external Compose image is not digest pinned: {ref}')
+compose_files=sorted(root.glob('docker-compose*.yml'))
+if not compose_files:
+    raise SystemExit('no Compose files found')
+for compose_path in compose_files:
+    compose=compose_path.read_text()
+    image_matches=list(re.finditer(r'(?m)^\s+image:\s+([^#\s]+)', compose))
+    for match in image_matches:
+        ref=match.group(1)
+        digest_tokens=re.findall(r'@sha256:', ref)
+        if len(digest_tokens) != 1 or not re.fullmatch(r'.+@sha256:[0-9a-f]{64}', ref):
+            raise SystemExit(f'{compose_path}: image must contain exactly one sha256 digest: {ref}')
 dockerfile=(root/'Dockerfile').read_text().splitlines()
 for line in dockerfile:
     line=line.strip()

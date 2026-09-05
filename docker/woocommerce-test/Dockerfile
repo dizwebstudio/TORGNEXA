@@ -11,6 +11,8 @@ RUN apt-get update \
     && rm -f /tmp/woocommerce.zip \
     && a2enmod rewrite headers ssl \
     && a2ensite default-ssl \
+    && sed -ri 's!^[[:space:]]*Listen 80$!Listen 8080!; s!^[[:space:]]*Listen 443$!Listen 8443!' /etc/apache2/ports.conf \
+    && sed -ri 's!<VirtualHost \*:80>!<VirtualHost *:8080>!; s!<VirtualHost \*:443>!<VirtualHost *:8443>!' /etc/apache2/sites-enabled/000-default.conf /etc/apache2/sites-enabled/default-ssl.conf \
     && openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
       -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
@@ -18,13 +20,21 @@ RUN apt-get update \
       -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
     && printf '%s\n' 'SetEnvIf Authorization "^(.*)$" HTTP_AUTHORIZATION=$1' > /etc/apache2/conf-available/torgnexa-auth.conf \
     && a2enconf torgnexa-auth \
+    && chmod 0640 /etc/ssl/private/ssl-cert-snakeoil.key \
+    && chown root:www-data /etc/ssl/private/ssl-cert-snakeoil.key \
+    && chmod 0750 /etc/ssl/private \
+    && chown root:www-data /etc/ssl/private \
+    && mkdir -p /var/run/apache2 /var/lock/apache2 /var/log/apache2 \
+    && chown -R www-data:www-data /var/run/apache2 /var/lock/apache2 /var/log/apache2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/woocommerce-test/entrypoint.sh /usr/local/bin/torgnexa-woocommerce-entrypoint
 COPY docker/woocommerce-test/seed-demo.php /usr/local/bin/torgnexa-woocommerce-seed.php
 COPY docker/woocommerce-test/local-rest-canonical.php /usr/src/wordpress/wp-content/mu-plugins/torgnexa-local-rest-canonical.php
 
-RUN chmod +x /usr/local/bin/torgnexa-woocommerce-entrypoint
+RUN chmod +x /usr/local/bin/torgnexa-woocommerce-entrypoint \
+    && chown -R www-data:www-data /usr/src/wordpress/wp-content
 
 ENTRYPOINT ["/usr/local/bin/torgnexa-woocommerce-entrypoint"]
 CMD ["apache2-foreground"]
+USER www-data

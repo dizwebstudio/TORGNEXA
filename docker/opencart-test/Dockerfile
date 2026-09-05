@@ -13,6 +13,10 @@ RUN apt-get update \
     && a2enmod rewrite headers \
     && printf '%s\n' 'SetEnvIf Authorization "^(.*)$" HTTP_AUTHORIZATION=$1' > /etc/apache2/conf-available/torgnexa.conf \
     && a2enconf torgnexa \
+    && sed -ri 's!^Listen 80$!Listen 8080!' /etc/apache2/ports.conf \
+    && sed -ri 's!<VirtualHost \*:80>!<VirtualHost *:8080>!' /etc/apache2/sites-enabled/000-default.conf \
+    && mkdir -p /var/run/apache2 /var/lock/apache2 /var/log/apache2 \
+    && chown -R www-data:www-data /var/run/apache2 /var/lock/apache2 /var/log/apache2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
@@ -42,3 +46,4 @@ RUN chmod +x /usr/local/bin/torgnexa-opencart-entrypoint \
 
 ENTRYPOINT ["/usr/local/bin/torgnexa-opencart-entrypoint"]
 CMD ["apache2-foreground"]
+USER www-data

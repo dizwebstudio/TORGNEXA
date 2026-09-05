@@ -50,7 +50,7 @@ func TestGoldenPathFlowIsAllOrNothingAndRedacted(t *testing.T) {
 }
 
 func TestSecretRuntimeRequiresTheBoundSecretReference(t *testing.T) {
-	runtime := secretRuntime{value: "synthetic-secret"}
+	runtime := secretRuntime{value: "synthetic-marker"}
 	var received string
 	if err := runtime.Secrets().UseSecret(t.Context(), smokeSecretReference, func(value []byte) error {
 		received = string(value)
@@ -58,7 +58,7 @@ func TestSecretRuntimeRequiresTheBoundSecretReference(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("bound secret reference rejected: %v", err)
 	}
-	if received != "synthetic-secret" {
+	if received != "synthetic-marker" {
 		t.Fatalf("received secret=%q", received)
 	}
 }
@@ -67,20 +67,20 @@ func TestEvidenceIsRedactedAndWrittenWithPrivatePermissions(t *testing.T) {
 	temporary := t.TempDir()
 	path := filepath.Join(temporary, "nested", "marketplace-live-smoke.json")
 	evidence := smokeEvidence{
-		SchemaVersion:  1,
-		Status:         "FAIL",
-		Scope:          "qualification",
-		Environment:    "non-production",
-		Target:         "dedicated-non-production",
-		Repository:     "owner/repository",
-		ReleaseCommit:  "0123456789abcdef0123456789abcdef01234567",
-		ConnectorID:    "marketplace-connector",
-		AccountRef:     "sandbox-account",
-		QualifiedAt:    "2026-09-03T10:00:00Z",
-		CredentialMode: "env_only_secret_accessor",
-		Taxonomy:       taxonomyEvidence{Status: "NOT_RUN"},
-		Write:          writeEvidenceState{Restored: true},
-		Failure:        &failureEvidence{CheckID: "configuration", ErrorCode: "credential_missing"},
+		SchemaVersion:    1,
+		Status:           "FAIL",
+		Scope:            "qualification",
+		Environment:      "non-production",
+		Target:           "dedicated-non-production",
+		Repository:       "owner/repository",
+		ReleaseCommit:    "0123456789abcdef0123456789abcdef01234567",
+		ConnectorID:      "marketplace-connector",
+		AccountRef:       "sandbox-account",
+		QualifiedAt:      "2026-09-03T10:00:00Z",
+		SecretAccessMode: smokeCredentialMode,
+		Taxonomy:         taxonomyEvidence{Status: "NOT_RUN"},
+		Write:            writeEvidenceState{Restored: true},
+		Failure:          &failureEvidence{CheckID: "configuration", ErrorCode: "secret_missing"},
 	}
 	if err := writeEvidence(path, evidence); err != nil {
 		t.Fatalf("write evidence: %v", err)

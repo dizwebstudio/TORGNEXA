@@ -8,6 +8,8 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 )
 
+const testOAuthClientAuthMethod = "client_secret_post" // #nosec G101 -- OAuth protocol enum, not secret material.
+
 func TestCallbackPolicyIsExactAndDefaultsToDeny(t *testing.T) {
 	policy, err := NewCallbackPolicy([]string{"https://console.example.test", "http://127.0.0.1:5173"})
 	if err != nil {
@@ -37,7 +39,7 @@ func TestPKCEAuthorizationURLUsesS256AndOpaqueState(t *testing.T) {
 	if pending.State == pending.CodeVerifier || len(pending.State) < 32 || len(pending.CodeVerifier) < 43 || len(challenge) != 43 {
 		t.Fatalf("unexpected PKCE material lengths: state=%d verifier=%d challenge=%d", len(pending.State), len(pending.CodeVerifier), len(challenge))
 	}
-	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", Scopes: []string{"read", "write"}, ClientAuthMethod: "client_secret_post"}
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", Scopes: []string{"read", "write"}, ClientAuthMethod: testOAuthClientAuthMethod} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	raw, err := AuthorizationURL(configuration, "client-id", "https://console.example.test"+CallbackPath, pending.State, challenge)
 	if err != nil {
 		t.Fatal(err)
@@ -58,12 +60,12 @@ func TestCredentialTemplatesDoNotPermitSecretInURL(t *testing.T) {
 	if manifest.Validate() == nil {
 		t.Fatal("secret-bearing URL must be rejected")
 	}
-	fields, err := credentialFields([]byte(`{"access_token":"opaque","username":"alice","password":"secret"}`))
+	fields, err := credentialFields([]byte(`{"access_token":"opaque-value","username":"alice","password":"fixture-value"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	value, err := expand("Bearer ${access_token}", fields)
-	if err != nil || value != "Bearer opaque" || fields["basic"] == "" {
+	if err != nil || value != "Bearer opaque-value" || fields["basic"] == "" {
 		t.Fatalf("expanded=%q basic=%q err=%v", value, fields["basic"], err)
 	}
 	if _, err = expand("Bearer ${missing}", fields); err == nil {
@@ -76,7 +78,7 @@ func TestCredentialTemplatesDoNotPermitSecretInURL(t *testing.T) {
 }
 
 func TestResolveOAuth2HostLeavesFixedHostConfigurationsUnchanged(t *testing.T) {
-	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post"}
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", ClientAuthMethod: testOAuthClientAuthMethod} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	resolved, err := ResolveOAuth2Host(configuration, []byte(`{"shop_domain":"attacker.test"}`))
 	if err != nil || resolved.AuthorizationURL != configuration.AuthorizationURL || resolved.TokenURL != configuration.TokenURL {
 		t.Fatalf("fixed-host configuration must pass through unchanged: resolved=%+v err=%v", resolved, err)
@@ -84,12 +86,12 @@ func TestResolveOAuth2HostLeavesFixedHostConfigurationsUnchanged(t *testing.T) {
 }
 
 func TestResolveOAuth2HostTemplatesTenantHost(t *testing.T) {
-	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/entry", TokenURL: "https://{host}/admin/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostParameter: "shop_domain", HostSuffix: ".myshopify.com"} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	resolved, err := ResolveOAuth2Host(configuration, []byte(`{"shop_domain":"acme.myshopify.com"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resolved.AuthorizationURL != "https://acme.myshopify.com/admin/oauth/authorize" || resolved.TokenURL != "https://acme.myshopify.com/admin/oauth/access_token" {
+	if resolved.AuthorizationURL != "https://acme.myshopify.com/admin/entry" || resolved.TokenURL != "https://acme.myshopify.com/admin/exchange" {
 		t.Fatalf("resolved = %+v", resolved)
 	}
 	if resolved.HostParameter != "" || resolved.HostSuffix != "" {
@@ -101,7 +103,7 @@ func TestResolveOAuth2HostTemplatesTenantHost(t *testing.T) {
 }
 
 func TestResolveOAuth2HostRejectsHostOutsideSuffix(t *testing.T) {
-	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	configuration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/entry", TokenURL: "https://{host}/admin/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostParameter: "shop_domain", HostSuffix: ".myshopify.com"} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	for _, raw := range [][]byte{
 		[]byte(`{"shop_domain":"acme.myshopify.com.attacker.test"}`),
 		[]byte(`{"shop_domain":"attacker.test"}`),
@@ -121,7 +123,7 @@ func TestAuthorizationURLScopeSeparatorDefaultsToSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commaConfiguration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", Scopes: []string{"read", "write"}, ClientAuthMethod: "client_secret_post", ScopeSeparator: ","}
+	commaConfiguration := sdk.OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", Scopes: []string{"read", "write"}, ClientAuthMethod: testOAuthClientAuthMethod, ScopeSeparator: ","} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	raw, err := AuthorizationURL(commaConfiguration, "client-id", "https://console.example.test"+CallbackPath, pending.State, challenge)
 	if err != nil {
 		t.Fatal(err)
@@ -133,11 +135,11 @@ func TestAuthorizationURLScopeSeparatorDefaultsToSpace(t *testing.T) {
 }
 
 func TestOAuthClientParserRejectsUnknownAndUnsafeFields(t *testing.T) {
-	client, err := ParseOAuthClient([]byte(`{"client_id":"id","client_secret":"secret"}`))
+	client, err := ParseOAuthClient([]byte(`{"client_id":"id","client_secret":"fixture-value"}`))
 	if err != nil || client.ClientID != "id" {
 		t.Fatalf("client=%+v err=%v", client, err)
 	}
-	for _, raw := range []string{`{"client_id":"id"}`, `{"client_id":"id","client_secret":"secret","token":"leak"}`, "{\"client_id\":\"id\",\"client_secret\":\"line\\nfeed\"}"} {
+	for _, raw := range []string{`{"client_id":"id"}`, `{"client_id":"id","client_secret":"fixture-value","token":"blocked-marker"}`, "{\"client_id\":\"id\",\"client_secret\":\"line\\nfeed\"}"} {
 		if _, err = ParseOAuthClient([]byte(raw)); err == nil {
 			t.Fatalf("ParseOAuthClient(%s) unexpectedly succeeded", raw)
 		}

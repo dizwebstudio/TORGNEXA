@@ -93,8 +93,15 @@ func TestDigestScopedTrivyExpressionApproval(t *testing.T) {
 
 	wrongArtifact := strings.Replace(artifact, strings.Repeat("a", 64), strings.Repeat("b", 64), 1)
 	report := fmt.Sprintf(`{"SchemaVersion":2,"ArtifactName":%q,"ArtifactType":"container_image","Results":[{"Licenses":[{"Name":%q}]}]}`, wrongArtifact, legacyExpression)
-	if _, err := Check([]byte(policy), []byte(report)); err == nil || !strings.Contains(err.Error(), "unexpected SPDX token") {
-		t.Fatalf("digest-mismatched image Check() error = %v, want fail-closed parse error", err)
+	if _, err := Check([]byte(policy), []byte(report)); err == nil || !strings.Contains(err.Error(), "artifact") {
+		t.Fatalf("digest-mismatched image Check() error = %v, want fail-closed artifact approval error", err)
+	}
+
+	for _, expression := range []string{"MIT", "UNKNOWN", "NOASSERTION"} {
+		report := fmt.Sprintf(`{"SchemaVersion":2,"ArtifactName":%q,"ArtifactType":"container_image","Results":[{"Licenses":[{"Name":%q}]}]}`, artifact, expression)
+		if _, err := Check([]byte(policy), []byte(report)); err == nil || !strings.Contains(err.Error(), "not approved") {
+			t.Fatalf("unapproved image expression %q Check() error = %v, want fail-closed expression approval error", expression, err)
+		}
 	}
 }
 

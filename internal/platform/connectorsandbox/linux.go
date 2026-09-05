@@ -63,10 +63,6 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 	if err != nil || !linuxNamespacesAvailable(unshare, trueCommand) {
 		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
-	info, err := os.Stat(emulatorExecutable)
-	if err != nil || !info.Mode().IsRegular() {
-		return SandboxProbeResult{}, ErrSandboxUnavailable
-	}
 	select {
 	case sandbox.slots <- struct{}{}:
 		defer func() { <-sandbox.slots }()
@@ -86,7 +82,7 @@ func (sandbox *LinuxSandbox) Probe(ctx context.Context, emulatorExecutable strin
 		return SandboxProbeResult{}, err
 	}
 	if err := copyExecutable(emulatorExecutable, filepath.Join(bin, "emulator")); err != nil {
-		return SandboxProbeResult{}, err
+		return SandboxProbeResult{}, ErrSandboxUnavailable
 	}
 	// No /etc, /run, /home, /proc or production secret mount is created. Seal
 	// both directories after staging so the child cannot write its root.
@@ -170,7 +166,20 @@ func linuxNamespacesAvailable(unshare, trueCommand string) bool {
 }
 
 func copyExecutable(source, destination string) error {
-	input, err := os.Open(source)
+	if source == "" || !filepath.IsAbs(source) || filepath.Clean(source) != source || destination == "" || filepath.Clean(destination) != destination {
+		return fmt.Errorf("sandbox executable path must be absolute and canonical")
+	}
+	parent, err := os.OpenRoot(filepath.Dir(source))
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	base := filepath.Base(source)
+	info, err := parent.Lstat(base)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&0111 == 0 {
+		return fmt.Errorf("sandbox executable must be a regular executable")
+	}
+	input, err := parent.Open(base)
 	if err != nil {
 		return err
 	}

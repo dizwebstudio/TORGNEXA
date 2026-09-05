@@ -1209,7 +1209,11 @@ func loadMobileScan(ctx context.Context, tx *sql.Tx, s inventory.Scope, id strin
 		}
 		return MobileScanEvidence{}, err
 	}
-	decimal, err := inventory.NewDecimal(coefficient, uint8(scale))
+	safeScale, err := persistedDecimalScale(scale)
+	if err != nil {
+		return MobileScanEvidence{}, inventory.ErrInvalidRecord
+	}
+	decimal, err := inventory.NewDecimal(coefficient, safeScale)
 	if err != nil {
 		return MobileScanEvidence{}, inventory.ErrInvalidRecord
 	}

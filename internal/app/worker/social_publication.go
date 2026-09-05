@@ -14,6 +14,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
@@ -261,8 +262,9 @@ func socialWorkerUUID(now time.Time) string {
 	if _, err := rand.Read(value[:]); err != nil {
 		return ""
 	}
-	millis := uint64(now.UnixMilli())
-	value[0], value[1], value[2], value[3], value[4], value[5] = byte(millis>>40), byte(millis>>32), byte(millis>>24), byte(millis>>16), byte(millis>>8), byte(millis)
+	if err := domain.PutUUIDv7Timestamp(value[:6], now); err != nil {
+		return ""
+	}
 	value[6], value[8] = (value[6]&0x0f)|0x70, (value[8]&0x3f)|0x80
 	raw := hex.EncodeToString(value[:])
 	return raw[0:8] + "-" + raw[8:12] + "-" + raw[12:16] + "-" + raw[16:20] + "-" + raw[20:32]

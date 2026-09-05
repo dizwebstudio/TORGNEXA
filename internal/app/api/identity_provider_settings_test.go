@@ -89,7 +89,7 @@ func (s *idpAuditStub) Capture(_ context.Context, _ tenancy.Scope, entry audit.E
 type idpValidatorStub struct{ err error }
 
 func (s idpValidatorStub) Validate(context.Context, securitysettings.ProviderRevision) (securitysettings.ProviderValidation, error) {
-	return securitysettings.ProviderValidation{Status: "valid", ReasonCode: "validated", MetadataDigest: strings.Repeat("a", 64), Issuer: "https://id.example.test", AuthorizationURL: "https://id.example.test/auth", TokenURL: "https://id.example.test/token", JWKSURL: "https://id.example.test/jwks"}, s.err
+	return securitysettings.ProviderValidation{Status: "valid", ReasonCode: "validated", MetadataDigest: strings.Repeat("a", 64), Issuer: "https://id.example.test", AuthorizationURL: "https://id.example.test/a", TokenURL: "https://id.example.test/b", JWKSURL: "https://id.example.test/c"}, s.err // #nosec G101 -- synthetic OIDC metadata URLs; no credential material.
 }
 
 func TestIdentityProviderDraftStoresSecretWithoutReturningIt(t *testing.T) {

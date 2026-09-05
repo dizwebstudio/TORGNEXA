@@ -1,6 +1,7 @@
 package legalparty
 
 import (
+	"strconv"
 	"testing"
 	"time"
 )
@@ -79,13 +80,13 @@ func TestContractAndAuthorityUTC(t *testing.T) {
 }
 
 func makeINN10(base string) string {
-	return base + string(byte('0'+checksumDigit(base, []int{2, 4, 10, 3, 5, 9, 4, 6, 8})))
+	return base + strconv.Itoa(checksumDigit(base, []int{2, 4, 10, 3, 5, 9, 4, 6, 8}))
 }
 func makeINN12(base10 string) string {
 	d11 := checksumDigit(base10, []int{7, 2, 4, 10, 3, 5, 9, 4, 6, 8})
-	s := base10 + string(byte('0'+d11))
+	s := base10 + strconv.Itoa(d11)
 	d12 := checksumDigit(s, []int{3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8})
-	return s + string(byte('0'+d12))
+	return s + strconv.Itoa(d12)
 }
-func makeOGRN(base12 string) string   { return base12 + string(byte('0'+modDecimal(base12, 11)%10)) }
-func makeOGRNIP(base14 string) string { return base14 + string(byte('0'+modDecimal(base14, 13)%10)) }
+func makeOGRN(base12 string) string   { return base12 + strconv.Itoa(modDecimal(base12, 11)%10) }
+func makeOGRNIP(base14 string) string { return base14 + strconv.Itoa(modDecimal(base14, 13)%10) }

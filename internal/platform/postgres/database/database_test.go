@@ -12,7 +12,7 @@ import (
 
 func validConfig() config.Database {
 	return config.Database{
-		URL:             "postgres://user:secret@example.invalid:5432/db?sslmode=require",
+		URL:             "postgres://user@example.invalid:5432/db?sslmode=require",
 		MaxOpenConns:    4,
 		MaxIdleConns:    2,
 		ConnMaxLifetime: 30 * time.Minute,

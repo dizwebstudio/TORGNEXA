@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,6 +31,11 @@ type oidcAuthenticator struct {
 	userinfoHost string
 	environment  config.Environment
 	sessions     securitysettings.Store
+}
+
+type oidcEgressBoundary struct {
+	issuerHost   string
+	userinfoHost string
 }
 
 type oidcClaims struct {
@@ -79,14 +85,22 @@ type workspaceMembershipStore interface {
 }
 
 func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store, memberships workspaceMembershipStore) (Authenticator, TenantResolver, Authorizer, error) {
-	if err := validateOIDCConfig(cfg); err != nil {
+	boundary, err := validateOIDCConfig(cfg)
+	if err != nil {
 		return nil, nil, nil, err
 	}
-	issuer, err := url.Parse(cfg.OIDC.Issuer)
-	if err != nil || issuer.Host == "" {
-		return nil, nil, nil, ErrSecurityCompositionInvalid
+	transport := &http.Transport{
+		Proxy: nil,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			host, port, splitErr := net.SplitHostPort(address)
+			if splitErr != nil || !strings.EqualFold(strings.Trim(host, "[]"), boundary.userinfoHost) {
+				return nil, fmt.Errorf("oidc userinfo egress denied")
+			}
+			return (&net.Dialer{Timeout: cfg.OIDC.RequestTimeout}).DialContext(ctx, network, net.JoinHostPort(host, port))
+		},
 	}
-	authenticator := &oidcAuthenticator{cfg: cfg.OIDC, userinfoHost: issuer.Host, environment: cfg.Environment, sessions: sessions, client: &http.Client{
+	authenticator := &oidcAuthenticator{cfg: cfg.OIDC, userinfoHost: boundary.issuerHost, environment: cfg.Environment, sessions: sessions, client: &http.Client{
+		Transport:     transport,
 		Timeout:       cfg.OIDC.RequestTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}
@@ -97,20 +111,35 @@ func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store, members
 	return authenticator, resolver, roleAuthorizer{memberships: memberships}, nil
 }
 
-func validateOIDCConfig(cfg config.Config) error {
+func validateOIDCConfig(cfg config.Config) (oidcEgressBoundary, error) {
 	if cfg.OIDC.Issuer == "" || cfg.OIDC.UserInfoURL == "" || cfg.OIDC.ClientID == "" || cfg.OIDC.RequestTimeout <= 0 {
-		return ErrSecurityCompositionInvalid
+		return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 	}
+	parsedURLs := make([]*url.URL, 0, 2)
 	for _, raw := range []string{cfg.OIDC.Issuer, cfg.OIDC.UserInfoURL} {
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-			return ErrSecurityCompositionInvalid
+			return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 		}
 		if parsed.Scheme != "https" && cfg.Environment != config.EnvironmentDevelopment {
-			return ErrSecurityCompositionInvalid
+			return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 		}
+		parsedURLs = append(parsedURLs, parsed)
 	}
-	return nil
+	issuerHost := strings.ToLower(parsedURLs[0].Hostname())
+	userinfoHost := strings.ToLower(parsedURLs[1].Hostname())
+	if userinfoHost != issuerHost && !(cfg.Environment == config.EnvironmentDevelopment && allowedDevelopmentOIDCHost(userinfoHost)) {
+		return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
+	}
+	return oidcEgressBoundary{issuerHost: parsedURLs[0].Host, userinfoHost: userinfoHost}, nil
+}
+
+func allowedDevelopmentOIDCHost(host string) bool {
+	if host == "keycloak" || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, request *http.Request) (Principal, error) {
@@ -125,6 +154,7 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if len(token) < 32 || len(token) > 16_384 || strings.ContainsAny(token, "\r\n\t ") {
 		return Principal{}, ErrUnauthenticated
 	}
+	// #nosec G704 -- UserInfoURL is accepted only by validateOIDCConfig and the transport enforces the exact allowlisted host.
 	userinfoRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, authenticator.cfg.UserInfoURL, nil)
 	if err != nil {
 		return Principal{}, ErrUnauthenticated
@@ -133,6 +163,7 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	// Community deployments use an internal backchannel address while Keycloak
 	// validates requests against its public issuer hostname.
 	userinfoRequest.Host = authenticator.userinfoHost
+	// #nosec G704 -- redirects are disabled and the client transport has an exact-host egress boundary.
 	response, err := authenticator.client.Do(userinfoRequest)
 	if err != nil {
 		return Principal{}, ErrUnauthenticated

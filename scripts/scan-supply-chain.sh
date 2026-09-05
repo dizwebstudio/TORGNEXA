@@ -10,6 +10,7 @@ export LC_ALL=C
 export TZ=UTC
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "$repo_root/scripts/scan-supply-chain-lib.sh"
 inventory="$repo_root/supply-chain/release-artifacts.json"
 tool_manifest="$repo_root/supply-chain/tool-versions.json"
 license_policy="$repo_root/supply-chain/license-policy.json"
@@ -165,17 +166,6 @@ record_status() {
   fi
 }
 
-sanitize_json() {
-  local raw=$1
-  local destination=$2
-
-  [[ -f "$raw" && ! -L "$raw" ]] || return 1
-  jq -s 'map(walk(if type == "object" then del(
-    .Match, .match, .Secret, .secret, .Code, .code,
-    .Snippet, .snippet, .Content, .content
-  ) else . end)) | if length == 1 then .[0] else . end' "$raw" >"$destination"
-}
-
 validate_govuln_report() {
   local report=$1
   local check_name=$2
@@ -325,6 +315,9 @@ run_trivy_json_check() {
   set -e
   sanitize_status=0
   sanitize_json "$raw" "$destination" || sanitize_status=$?
+  if ((sanitize_status == 0 && command_status == 0)); then
+    normalize_trivy_report "$destination" || sanitize_status=$?
+  fi
   if ((sanitize_status == 0)) && ! jq -e '
     type == "object" and length > 0
   ' "$destination" >/dev/null; then

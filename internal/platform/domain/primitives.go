@@ -3,6 +3,7 @@ package domain
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,31 @@ const (
 	// cover inventory/measurement use cases without introducing binary floats.
 	MaxDecimalScale = 9
 )
+
+// UnsignedMagnitude returns the mathematical magnitude of a signed integer.
+// It is defined for MinInt64 as well as ordinary negative values.
+func UnsignedMagnitude(value int64) uint64 {
+	if value < 0 {
+		// #nosec G115 -- value+1 is non-positive, so its negation is at most MaxInt64; adding one yields the exact magnitude of MinInt64 too.
+		return uint64(-(value + 1)) + 1
+	}
+	// #nosec G115 -- non-negative int64 values are representable by uint64.
+	return uint64(value)
+}
+
+// PutUUIDv7Timestamp writes the checked 48-bit Unix-millisecond UUIDv7
+// timestamp into the first six bytes of dst.
+func PutUUIDv7Timestamp(dst []byte, now time.Time) error {
+	milliseconds := now.UTC().UnixMilli()
+	if len(dst) < 6 || milliseconds < 0 || milliseconds >= 1<<48 {
+		return errors.New("domain: UUIDv7 timestamp is outside the 48-bit range")
+	}
+	var encoded [8]byte
+	// #nosec G115 -- milliseconds is explicitly constrained to [0, 2^48), so the conversion is lossless.
+	binary.BigEndian.PutUint64(encoded[:], uint64(milliseconds))
+	copy(dst[:6], encoded[2:])
+	return nil
+}
 
 var (
 	currencyPattern        = regexp.MustCompile(`^[A-Z]{3}$`)
@@ -338,12 +364,7 @@ func (d Decimal) String() string {
 		return "0"
 	}
 	negative := d.coefficient < 0
-	var magnitude uint64
-	if negative {
-		magnitude = uint64(-(d.coefficient + 1)) + 1
-	} else {
-		magnitude = uint64(d.coefficient)
-	}
+	magnitude := UnsignedMagnitude(d.coefficient)
 	digits := strconv.FormatUint(magnitude, 10)
 	if d.scale > 0 {
 		for len(digits) <= int(d.scale) {

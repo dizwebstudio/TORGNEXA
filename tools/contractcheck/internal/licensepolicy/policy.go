@@ -259,11 +259,17 @@ func compilePolicy(policy Policy) (compiledPolicy, error) {
 
 func (policy compiledPolicy) evaluate(artifactName, artifactType, expression string) error {
 	if artifactType == "container_image" {
-		_, approvedArtifact := policy.approvedImageArtifacts[artifactName]
-		_, approvedExpression := policy.approvedTrivyExpressions[expression]
-		if approvedArtifact && approvedExpression {
-			return nil
+		if _, approvedArtifact := policy.approvedImageArtifacts[artifactName]; !approvedArtifact {
+			return fmt.Errorf("container image artifact %q is not approved for this license report", artifactName)
 		}
+		if _, approvedExpression := policy.approvedTrivyExpressions[expression]; !approvedExpression {
+			return fmt.Errorf("license expression %q is not approved for container image %q", expression, artifactName)
+		}
+		// Container approvals are intentionally exact on both the immutable
+		// digest and Trivy's raw expression. Do not fall back to the generic
+		// SPDX policy: a new digest or newly reported expression requires a
+		// fresh qualification entry.
+		return nil
 	}
 	expression = normalizeLicenseExpression(expression)
 	node, err := parseExpression(expression)

@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/app/api"
@@ -29,13 +32,20 @@ func main() {
 }
 
 func healthcheck(url string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	validated, err := validateHealthcheckURL(url)
 	if err != nil {
 		return err
 	}
-	resp, err := (&http.Client{Timeout: 2 * time.Second}).Do(req)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// #nosec G704 -- validated is produced by validateHealthcheckURL, which accepts only loopback IP literals.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, validated, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	// #nosec G704 -- validateHealthcheckURL permits only loopback IP literals and redirects are disabled.
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -44,4 +54,22 @@ func healthcheck(url string) error {
 		return fmt.Errorf("health status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func validateHealthcheckURL(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("healthcheck URL must be a loopback HTTP URL")
+	}
+	ip := net.ParseIP(parsed.Hostname())
+	if ip == nil || !ip.IsLoopback() {
+		return "", fmt.Errorf("healthcheck URL must target a loopback IP")
+	}
+	if port := parsed.Port(); port != "" {
+		value, parseErr := strconv.Atoi(port)
+		if parseErr != nil || value < 1 || value > 65535 {
+			return "", fmt.Errorf("healthcheck URL has an invalid port")
+		}
+	}
+	return parsed.String(), nil
 }

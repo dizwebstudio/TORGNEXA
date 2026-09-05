@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ type fixedIDs struct{ n int }
 
 func (g *fixedIDs) NewID(prefix string) (string, error) {
 	g.n++
-	return prefix + "test_" + string(rune('0'+g.n)), nil
+	return prefix + "test_" + strconv.Itoa(g.n), nil
 }
 
 type memoryRepo struct {

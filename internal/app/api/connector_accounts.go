@@ -27,7 +27,7 @@ import (
 const (
 	ConnectorAccountsPath        = "/api/v1/connector-accounts"
 	ConnectorAccountsDisablePath = "/api/v1/connector-accounts:disable"
-	ConnectorCredentialsPath     = "/api/v1/connector-accounts:credentials"
+	ConnectorCredentialsPath     = "/api/v1/connector-accounts:credentials" // #nosec G101 -- this is a public route name, not credential material.
 	ConnectorCapabilitiesPath    = "/api/v1/connector-accounts:capabilities"
 	ConnectorEnablePath          = "/api/v1/connector-accounts:enable"
 	ConnectorHealthPath          = "/api/v1/connector-accounts:check"

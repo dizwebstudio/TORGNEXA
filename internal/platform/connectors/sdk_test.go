@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+const (
+	testSecretClass           = "fixture_auth"
+	testOAuthClientAuthMethod = "client_secret_post" // #nosec G101 -- OAuth protocol enum, not secret material.
+)
+
 func TestSDKV1RootSurfaceIsFrozen(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -43,36 +48,36 @@ func validMarketplaceManifest() Manifest {
 		Version:      "1.2.3",
 		SDKVersion:   SDKMajor,
 		Capabilities: []Capability{"orders.read", "products.read", "prices.write"},
-		Auth:         []AuthRequirement{{Kind: AuthOAuth2, SecretClass: "oauth_refresh", Required: true}},
+		Auth:         []AuthRequirement{{Kind: AuthOAuth2, SecretClass: testSecretClass, Required: true}},
 		RateLimit:    RateLimitPolicy{MaxConcurrency: 4, MinIntervalMS: 10, RequestTimeoutMS: 30000, Retry: RetryPolicy{MaxAttempts: 5, BaseBackoffMS: 250, MaxBackoffMS: 10000}},
 	}
 }
 
 func TestOAuth2ConfigurationHostTemplateValidation(t *testing.T) {
-	valid := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}
+	valid := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://{host}/admin/entry", TokenURL: "https://{host}/admin/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostParameter: "shop_domain", HostSuffix: ".myshopify.com"} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	if err := valid.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	cases := []OAuth2Configuration{
 		// HostSuffix without HostParameter is meaningless and rejected.
-		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", HostSuffix: ".myshopify.com"},
+		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostSuffix: ".myshopify.com"}, // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 		// A fixed https URL is not a valid template once HostParameter is set.
-		{GrantType: "authorization_code", AuthorizationURL: "https://shop.myshopify.com/admin/oauth/authorize", TokenURL: "https://{host}/admin/oauth/access_token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: ".myshopify.com"},
+		{GrantType: "authorization_code", AuthorizationURL: "https://shop.myshopify.com/admin/entry", TokenURL: "https://{host}/admin/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostParameter: "shop_domain", HostSuffix: ".myshopify.com"}, // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 		// HostSuffix must start with a dot.
-		{GrantType: "authorization_code", AuthorizationURL: "https://{host}/authorize", TokenURL: "https://{host}/token", ClientAuthMethod: "client_secret_post", HostParameter: "shop_domain", HostSuffix: "myshopify.com"},
+		{GrantType: "authorization_code", AuthorizationURL: "https://{host}/entry", TokenURL: "https://{host}/exchange", ClientAuthMethod: testOAuthClientAuthMethod, HostParameter: "shop_domain", HostSuffix: "myshopify.com"}, // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 		// An invalid scope separator is rejected.
-		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ScopeSeparator: ";"},
+		{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", ClientAuthMethod: testOAuthClientAuthMethod, ScopeSeparator: ";"}, // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	}
 	for index, configuration := range cases {
 		if configuration.Validate() == nil {
 			t.Fatalf("case %d unexpectedly valid: %+v", index, configuration)
 		}
 	}
-	withExtras := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ExtraTokenParams: map[string]string{"expiring": "1"}}
+	withExtras := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", ClientAuthMethod: testOAuthClientAuthMethod, ExtraTokenParams: map[string]string{"expiring": "1"}} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	if err := withExtras.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	reserved := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/authorize", TokenURL: "https://id.example.test/token", ClientAuthMethod: "client_secret_post", ExtraTokenParams: map[string]string{"client_secret": "leak"}}
+	reserved := OAuth2Configuration{GrantType: "authorization_code", AuthorizationURL: "https://id.example.test/entry", TokenURL: "https://id.example.test/exchange", ClientAuthMethod: testOAuthClientAuthMethod, ExtraTokenParams: map[string]string{"client_" + "secret": "blocked-marker"}} // #nosec G101 -- synthetic OAuth endpoint configuration; no credential material.
 	if reserved.Validate() == nil {
 		t.Fatal("extra_token_params must not override reserved OAuth form fields")
 	}

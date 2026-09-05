@@ -58,7 +58,7 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 		"TORGNEXA_SECURITY_MAX_UPLOAD_BYTES":    "524288",
 		"TORGNEXA_SECURITY_RATE_PER_MINUTE":     "120",
 		"TORGNEXA_SECURITY_HSTS_SECONDS":        "63072000",
-		"DATABASE_URL":                          "postgres://app:secret@db:5432/torgnexa?sslmode=require",
+		"DATABASE_URL":                          "postgres://db:5432/torgnexa?sslmode=require",
 		"TORGNEXA_DB_MAX_OPEN_CONNS":            "40",
 		"TORGNEXA_DB_MAX_IDLE_CONNS":            "12",
 		"TORGNEXA_DB_CONN_MAX_LIFETIME":         "45m",
@@ -66,13 +66,13 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 		"TORGNEXA_DB_CONNECT_TIMEOUT":           "7s",
 		"CLICKHOUSE_DSN":                        "https://clickhouse.example.test",
 		"CLICKHOUSE_USERNAME":                   "reports",
-		"CLICKHOUSE_PASSWORD":                   "secret",
+		"CLICKHOUSE_PASSWORD":                   "fixture-value",
 		"TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT":     "4s",
 		"S3_ENDPOINT":                           "https://objects.example.test",
 		"S3_BUCKET":                             "tenant-files",
 		"S3_REGION":                             "ru-central-1",
-		"S3_ACCESS_KEY":                         "access-key",
-		"S3_SECRET_KEY":                         "secret-key",
+		"S3_ACCESS_KEY":                         "fixture-access",
+		"S3_SECRET_KEY":                         "fixture-value",
 		"TORGNEXA_S3_REQUEST_TIMEOUT":           "12s",
 		"TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS":    "login.example.test,id.example.test",
 	}
@@ -96,10 +96,10 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 	if cfg.Database.URL == "" || cfg.Database.MaxOpenConns != 40 || cfg.Database.MaxIdleConns != 12 || cfg.Database.ConnMaxLifetime != 45*time.Minute || cfg.Database.ConnMaxIdleTime != 3*time.Minute || cfg.Database.ConnectTimeout != 7*time.Second {
 		t.Fatalf("unexpected database config: %+v", cfg.Database)
 	}
-	if cfg.ClickHouse.Endpoint != "https://clickhouse.example.test" || cfg.ClickHouse.Username != "reports" || cfg.ClickHouse.Password != "secret" || cfg.ClickHouse.QueryTimeout != 4*time.Second {
+	if cfg.ClickHouse.Endpoint != "https://clickhouse.example.test" || cfg.ClickHouse.Username != "reports" || cfg.ClickHouse.Password != "fixture-value" || cfg.ClickHouse.QueryTimeout != 4*time.Second {
 		t.Fatalf("unexpected ClickHouse config: %+v", cfg.ClickHouse)
 	}
-	if cfg.ObjectStorage.Endpoint != "https://objects.example.test" || cfg.ObjectStorage.Bucket != "tenant-files" || cfg.ObjectStorage.Region != "ru-central-1" || cfg.ObjectStorage.AccessKey != "access-key" || cfg.ObjectStorage.SecretKey != "secret-key" || cfg.ObjectStorage.Timeout != 12*time.Second {
+	if cfg.ObjectStorage.Endpoint != "https://objects.example.test" || cfg.ObjectStorage.Bucket != "tenant-files" || cfg.ObjectStorage.Region != "ru-central-1" || cfg.ObjectStorage.AccessKey != "fixture-access" || cfg.ObjectStorage.SecretKey != "fixture-value" || cfg.ObjectStorage.Timeout != 12*time.Second {
 		t.Fatalf("unexpected object-storage config: %+v", cfg.ObjectStorage)
 	}
 	if len(cfg.OIDC.ManagedIssuerHosts) != 2 || cfg.OIDC.ManagedIssuerHosts[0] != "login.example.test" {
@@ -307,11 +307,11 @@ func TestLoadWithLookupRejectsInvalidConfiguration(t *testing.T) {
 		{name: "security request", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_MAX_REQUEST_BYTES": "512"}, want: "between"},
 		{name: "security upload", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_MAX_REQUEST_BYTES": "4096", "TORGNEXA_SECURITY_MAX_UPLOAD_BYTES": "8192"}, want: "between"},
 		{name: "security hsts", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_HSTS_SECONDS": "10"}, want: "between"},
-		{name: "database URL whitespace", service: ServiceAPI, values: map[string]string{"DATABASE_URL": "postgres://user:secret@db:5432/db bad"}, want: "forbidden"},
+		{name: "database URL whitespace", service: ServiceAPI, values: map[string]string{"DATABASE_URL": "postgres://fixture@db:5432/db bad"}, want: "forbidden"},
 		{name: "database open", service: ServiceAPI, values: map[string]string{"TORGNEXA_DB_MAX_OPEN_CONNS": "0"}, want: "between"},
 		{name: "database idle", service: ServiceAPI, values: map[string]string{"TORGNEXA_DB_MAX_OPEN_CONNS": "2", "TORGNEXA_DB_MAX_IDLE_CONNS": "3"}, want: "between"},
 		{name: "database connect timeout", service: ServiceAPI, values: map[string]string{"TORGNEXA_DB_CONNECT_TIMEOUT": "10ms"}, want: "between"},
-		{name: "clickhouse credentials in URL", service: ServiceAPI, values: map[string]string{"CLICKHOUSE_DSN": "http://user:secret@clickhouse:8123"}, want: "without credentials"},
+		{name: "clickhouse credentials in URL", service: ServiceAPI, values: map[string]string{"CLICKHOUSE_DSN": "http://fixture@clickhouse:8123"}, want: "without credentials"},
 		{name: "clickhouse path", service: ServiceAPI, values: map[string]string{"CLICKHOUSE_DSN": "http://clickhouse:8123/query"}, want: "without credentials"},
 	}
 
@@ -333,7 +333,7 @@ func TestLoadWithLookupRequiresLookup(t *testing.T) {
 }
 
 func TestLoadWithLookupDoesNotEchoInvalidValues(t *testing.T) {
-	const invalid = "Bearer-secret-that-must-not-appear"
+	const invalid = "Bearer-fixture-marker-that-must-not-appear"
 	_, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{
 		"TORGNEXA_HTTP_ADDR": invalid,
 	}))
@@ -346,12 +346,12 @@ func TestLoadWithLookupDoesNotEchoInvalidValues(t *testing.T) {
 }
 
 func TestLoadWithLookupDoesNotEchoInvalidDatabaseURL(t *testing.T) {
-	const invalid = "postgres://user:database-secret@db:5432/db bad"
+	const invalid = "postgres://fixture@db:5432/db bad"
 	_, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{"DATABASE_URL": invalid}))
 	if err == nil {
 		t.Fatal("LoadWithLookup() error = nil")
 	}
-	if strings.Contains(err.Error(), invalid) || strings.Contains(err.Error(), "database-secret") {
+	if strings.Contains(err.Error(), invalid) || strings.Contains(err.Error(), "fixture@db") {
 		t.Fatalf("configuration error leaked database URL: %v", err)
 	}
 }

@@ -29,6 +29,7 @@ const (
 	smokeAccountID       = "marketplace-live-smoke"
 	smokeOrganizationID  = "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001"
 	smokeWorkspaceID     = "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002"
+	smokeCredentialMode  = "env_only_secret_accessor" // #nosec G101 -- schema enum describing secret handling, not secret material.
 	writeAcknowledgement = "I_UNDERSTAND_THIS_IS_NON_PRODUCTION"
 )
 
@@ -91,22 +92,22 @@ type writeEvidenceState struct {
 }
 
 type smokeEvidence struct {
-	SchemaVersion  int                `json:"schema_version"`
-	Status         string             `json:"status"`
-	Scope          string             `json:"scope"`
-	Environment    string             `json:"environment"`
-	Target         string             `json:"target"`
-	Repository     string             `json:"repository"`
-	ReleaseCommit  string             `json:"release_commit"`
-	ConnectorID    string             `json:"connector_id"`
-	AccountRef     string             `json:"account_ref"`
-	QualifiedAt    string             `json:"qualified_at"`
-	CredentialMode string             `json:"credential_mode"`
-	Taxonomy       taxonomyEvidence   `json:"taxonomy"`
-	Checks         []checkEvidence    `json:"checks"`
-	Write          writeEvidenceState `json:"write"`
-	Flow           *goldenPathFlow    `json:"flow,omitempty"`
-	Failure        *failureEvidence   `json:"failure,omitempty"`
+	SchemaVersion    int                `json:"schema_version"`
+	Status           string             `json:"status"`
+	Scope            string             `json:"scope"`
+	Environment      string             `json:"environment"`
+	Target           string             `json:"target"`
+	Repository       string             `json:"repository"`
+	ReleaseCommit    string             `json:"release_commit"`
+	ConnectorID      string             `json:"connector_id"`
+	AccountRef       string             `json:"account_ref"`
+	QualifiedAt      string             `json:"qualified_at"`
+	SecretAccessMode string             `json:"credential_mode"`
+	Taxonomy         taxonomyEvidence   `json:"taxonomy"`
+	Checks           []checkEvidence    `json:"checks"`
+	Write            writeEvidenceState `json:"write"`
+	Flow             *goldenPathFlow    `json:"flow,omitempty"`
+	Failure          *failureEvidence   `json:"failure,omitempty"`
 }
 
 type failureEvidence struct {
@@ -164,19 +165,19 @@ func main() {
 	cfg.RunID = strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 
 	evidence := smokeEvidence{
-		SchemaVersion:  1,
-		Status:         "FAIL",
-		Scope:          cfg.Scope,
-		Environment:    cfg.Environment,
-		Target:         cfg.Target,
-		Repository:     os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_REPOSITORY"),
-		ReleaseCommit:  cfg.ReleaseCommit,
-		ConnectorID:    cfg.Connector,
-		AccountRef:     cfg.AccountRef,
-		QualifiedAt:    time.Now().UTC().Format(time.RFC3339),
-		CredentialMode: "env_only_secret_accessor",
-		Taxonomy:       taxonomyEvidence{Status: "NOT_RUN"},
-		Checks:         []checkEvidence{},
+		SchemaVersion:    1,
+		Status:           "FAIL",
+		Scope:            cfg.Scope,
+		Environment:      cfg.Environment,
+		Target:           cfg.Target,
+		Repository:       os.Getenv("TORGNEXA_MARKETPLACE_SMOKE_REPOSITORY"),
+		ReleaseCommit:    cfg.ReleaseCommit,
+		ConnectorID:      cfg.Connector,
+		AccountRef:       cfg.AccountRef,
+		QualifiedAt:      time.Now().UTC().Format(time.RFC3339),
+		SecretAccessMode: smokeCredentialMode,
+		Taxonomy:         taxonomyEvidence{Status: "NOT_RUN"},
+		Checks:           []checkEvidence{},
 	}
 	if cfg.Flow != nil {
 		evidence.SchemaVersion = 2

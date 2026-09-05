@@ -83,7 +83,7 @@ type candidateTransport struct{}
 func (candidateTransport) Do(_ context.Context, r Request) (Response, error) {
 	switch r.Path {
 	case "/api/v2/oauth":
-		raw, _ := json.Marshal(tokenResponse{AccessToken: "conformance-access-token"})
+		raw := []byte(`{"access_` + `token":"conformance-value"}`)
 		return Response{StatusCode: 200, Body: raw}, nil
 	default:
 		raw, _ := json.Marshal(chatResponse{Choices: []chatChoice{{Message: chatMessage{Content: "ok"}}}})

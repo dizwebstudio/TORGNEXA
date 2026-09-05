@@ -122,9 +122,9 @@ func (d Decimal) String() string {
 	negative := d.coefficient < 0
 	var magnitude uint64
 	if negative {
-		magnitude = uint64(-(d.coefficient + 1)) + 1
+		magnitude = domain.UnsignedMagnitude(d.coefficient)
 	} else {
-		magnitude = uint64(d.coefficient)
+		magnitude = domain.UnsignedMagnitude(d.coefficient)
 	}
 	digits := strconv.FormatUint(magnitude, 10)
 	if d.scale > 0 {

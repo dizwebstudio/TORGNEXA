@@ -253,7 +253,11 @@ func Simulate(profile Profile) ([]Observation, error) {
 				lag = objective.LagMax * 4 / 5
 			}
 		}
-		ops := uint64(profile.Operations / n)
+		opsPerObservation := profile.Operations / n
+		// Profile.Validate requires a positive bounded operation count and n is
+		// the fixed positive observation count.
+		// #nosec G115 -- opsPerObservation is a positive int and therefore fits uint64.
+		ops := uint64(opsPerObservation)
 		if ops == 0 {
 			ops = 1
 		}

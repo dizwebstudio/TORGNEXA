@@ -35,6 +35,14 @@ func New(db *sql.DB) (*Repository, error) {
 	return &Repository{db: db}, nil
 }
 
+func persistedDecimalScale(raw int) (uint8, error) {
+	if raw < 0 || raw > domain.MaxDecimalScale {
+		return 0, core.ErrInvalidRecord
+	}
+	// #nosec G115 -- raw is bounded to the shared decimal scale range above.
+	return uint8(raw), nil
+}
+
 func (r *Repository) Cancellation(ctx context.Context, scope core.Scope, id core.CancellationID) (core.CancellationRequest, error) {
 	if err := r.validate(ctx, scope); err != nil || !id.Valid() {
 		return core.CancellationRequest{}, core.ErrInvalidRecord
@@ -309,7 +317,11 @@ func (r *Repository) RecordInspection(ctx context.Context, scope core.Scope, ins
 				return err
 			}
 			existing.Outcome, existing.ConditionCode, existing.DiscrepancyCode = core.ReturnStatus(outcome), condition, discrepancy
-			existing.Quantity, err = core.NewQuantity(coefficient, uint8(scale), unit)
+			safeScale, scaleErr := persistedDecimalScale(scale)
+			if scaleErr != nil {
+				return scaleErr
+			}
+			existing.Quantity, err = core.NewQuantity(coefficient, safeScale, unit)
 			if err != nil {
 				return err
 			}
@@ -691,13 +703,25 @@ func scanReturnItem(row scanner) (core.ReturnItem, error) {
 	if err != nil {
 		return core.ReturnItem{}, err
 	}
-	if result.Requested, err = core.NewQuantity(requestedCoefficient, uint8(requestedScale), unit); err != nil {
+	safeRequestedScale, scaleErr := persistedDecimalScale(requestedScale)
+	if scaleErr != nil {
+		return core.ReturnItem{}, scaleErr
+	}
+	if result.Requested, err = core.NewQuantity(requestedCoefficient, safeRequestedScale, unit); err != nil {
 		return core.ReturnItem{}, err
 	}
-	if result.Received, err = core.NewQuantity(receivedCoefficient, uint8(receivedScale), unit); err != nil {
+	safeReceivedScale, scaleErr := persistedDecimalScale(receivedScale)
+	if scaleErr != nil {
+		return core.ReturnItem{}, scaleErr
+	}
+	if result.Received, err = core.NewQuantity(receivedCoefficient, safeReceivedScale, unit); err != nil {
 		return core.ReturnItem{}, err
 	}
-	if result.Accepted, err = core.NewQuantity(acceptedCoefficient, uint8(acceptedScale), unit); err != nil {
+	safeAcceptedScale, scaleErr := persistedDecimalScale(acceptedScale)
+	if scaleErr != nil {
+		return core.ReturnItem{}, scaleErr
+	}
+	if result.Accepted, err = core.NewQuantity(acceptedCoefficient, safeAcceptedScale, unit); err != nil {
 		return core.ReturnItem{}, err
 	}
 	result.Disposition, result.CreatedAt, result.UpdatedAt = core.Disposition(disposition), result.CreatedAt.UTC(), result.UpdatedAt.UTC()

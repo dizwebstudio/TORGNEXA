@@ -607,6 +607,16 @@ Priority may move, but dependency gates in milestones and contracts must be resp
   runtime images. The policy binds that decision to the exact seven image
   digests and all 129 observed raw expressions; digest/expression drift,
   `UNKNOWN`, and `NOASSERTION` remain default-deny.
+- Rechecked on 2026-09-05 after the runtime image refresh with pinned Trivy
+  0.70.0 and the current vulnerability database. ClamAV 1.4.6 is clean on its
+  declared linux/amd64 platform (0 Critical / 0 High). Keycloak 26.7.3 is
+  0 Critical / 2 High on both linux/amd64 and linux/arm64. Valkey 9.1.2-alpine
+  is 0 Critical / 7 High on both declared platforms, down from 10 High. Kafka
+  remains pinned to 4.3.1 because no newer official stable tag/digest was
+  published during this check; it reproduces 0 Critical / 14 High on both
+  declared platforms. The Kafka findings remain upstream-owned until a
+  patched stable Apache image is published; do not substitute an unreviewed
+  image family or release candidate.
 - Run a protected semantic-version prerelease on the hosting platform and
   independently verify downloaded signatures, provenance, subjects, OIDC
   identity, and archived evidence. Keep publication disabled until protected prerelease, image/security, backup/upgrade and runtime qualification evidence all pass for the exact release topology. The repository license is now Apache-2.0.

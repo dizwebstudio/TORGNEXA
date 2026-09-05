@@ -458,7 +458,11 @@ func (r *Repository) WMSCreateOrderPickTasks(ctx context.Context, s inventory.Sc
 				return err
 			}
 			count++
-			decimal, err := inventory.NewDecimal(coefficient, uint8(scale))
+			safeScale, err := persistedDecimalScale(scale)
+			if err != nil {
+				return inventory.ErrInvalidRecord
+			}
+			decimal, err := inventory.NewDecimal(coefficient, safeScale)
 			if err != nil {
 				return inventory.ErrInvalidRecord
 			}
@@ -910,6 +914,14 @@ type wmsTaskScanner struct {
 
 func newWMSTaskScanner(out *WMSTask) *wmsTaskScanner { return &wmsTaskScanner{out: out} }
 
+func persistedDecimalScale(raw int16) (uint8, error) {
+	if raw < 0 || raw > inventory.MaxDecimalScale {
+		return 0, inventory.ErrInvalidRecord
+	}
+	// #nosec G115 -- raw is bounded to the inventory decimal scale range above.
+	return uint8(raw), nil
+}
+
 func (t *wmsTaskScanner) targets() []any {
 	return []any{&t.out.ID, &t.out.IdempotencyKey, &t.out.TaskType, &t.out.State, &t.out.WarehouseID, &t.out.SKU, &t.unit, &t.orderID, &t.orderItemID, &t.allocationID, &t.out.SourceLocationCode, &t.out.TargetLocationCode, &t.expectedCoefficient, &t.expectedScale, &t.processedCoefficient, &t.processedScale, &t.out.AssignedTo, &t.out.ExceptionCode, &t.out.CancelReason, &t.out.Version, &t.claimedAt, &t.startedAt, &t.completedAt, &t.out.CreatedAt, &t.out.UpdatedAt}
 }
@@ -924,11 +936,19 @@ func (t *wmsTaskScanner) finish() error {
 	if t.allocationID.Valid {
 		t.out.FulfillmentAllocationID = t.allocationID.String
 	}
-	expected, err := inventory.NewDecimal(t.expectedCoefficient, uint8(t.expectedScale))
+	expectedScale, err := persistedDecimalScale(t.expectedScale)
 	if err != nil {
 		return err
 	}
-	processed, err := inventory.NewDecimal(t.processedCoefficient, uint8(t.processedScale))
+	expected, err := inventory.NewDecimal(t.expectedCoefficient, expectedScale)
+	if err != nil {
+		return err
+	}
+	processedScale, err := persistedDecimalScale(t.processedScale)
+	if err != nil {
+		return err
+	}
+	processed, err := inventory.NewDecimal(t.processedCoefficient, processedScale)
 	if err != nil {
 		return err
 	}
@@ -1016,7 +1036,11 @@ func scanWMSTaskEvent(row scanner) (WMSTaskEvent, error) {
 	if err := row.Scan(&out.ID, &out.TaskID, &out.IdempotencyKey, &out.Kind, &out.BarcodeDigest, &out.LocationCode, &coefficient, &scale, &out.Quantity.Unit, &out.ReasonCode, &out.ActorID, &out.OccurredAt); err != nil {
 		return WMSTaskEvent{}, err
 	}
-	decimal, err := inventory.NewDecimal(coefficient, uint8(scale))
+	safeScale, err := persistedDecimalScale(scale)
+	if err != nil {
+		return WMSTaskEvent{}, inventory.ErrInvalidRecord
+	}
+	decimal, err := inventory.NewDecimal(coefficient, safeScale)
 	if err != nil {
 		return WMSTaskEvent{}, inventory.ErrInvalidRecord
 	}
@@ -1151,7 +1175,11 @@ func reserveOrderItemTx(ctx context.Context, tx *sql.Tx, s inventory.Scope, comm
 	if orderStatus == "fulfilled" || orderStatus == "cancelled" {
 		return inventory.FulfillmentAllocation{}, inventory.ErrInvalidRecord
 	}
-	decimal, err := inventory.NewDecimal(coefficient, uint8(scale))
+	safeScale, err := persistedDecimalScale(scale)
+	if err != nil {
+		return inventory.FulfillmentAllocation{}, inventory.ErrInvalidRecord
+	}
+	decimal, err := inventory.NewDecimal(coefficient, safeScale)
 	if err != nil {
 		return inventory.FulfillmentAllocation{}, err
 	}

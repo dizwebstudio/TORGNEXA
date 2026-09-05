@@ -37,7 +37,7 @@ done
 
 echo "[torgnexa] waiting for WordPress files"
 i=0
-until [ -f /var/www/html/wp-config.php ]
+until [ -s /var/www/html/wp-config.php ] && grep -q 'wp-settings.php' /var/www/html/wp-config.php
 do
   i=$((i + 1))
   if [ "$i" -gt 60 ]; then
@@ -47,7 +47,7 @@ do
   sleep 1
 done
 
-if ! wp core is-installed --allow-root >/dev/null 2>&1; then
+if ! wp core is-installed >/dev/null 2>&1; then
   echo "[torgnexa] installing WordPress"
   wp core install \
     --url="$WORDPRESS_SITEURL" \
@@ -55,18 +55,17 @@ if ! wp core is-installed --allow-root >/dev/null 2>&1; then
     --admin_user="$WORDPRESS_ADMIN_USER" \
     --admin_password="$WORDPRESS_ADMIN_PASSWORD" \
     --admin_email="$WORDPRESS_ADMIN_EMAIL" \
-    --skip-email \
-    --allow-root
+    --skip-email
 fi
 
-wp option update blogdescription "Synthetic WooCommerce connector test store" --allow-root >/dev/null
-wp option update permalink_structure '/%postname%/' --allow-root >/dev/null
-wp rewrite flush --hard --allow-root >/dev/null 2>&1 || wp rewrite flush --allow-root >/dev/null
-wp option update woocommerce_currency "${WOO_STORE_CURRENCY:-USD}" --allow-root >/dev/null
-wp plugin activate woocommerce --allow-root >/dev/null
+wp option update blogdescription "Synthetic WooCommerce connector test store" >/dev/null
+wp option update permalink_structure '/%postname%/' >/dev/null
+wp rewrite flush --hard >/dev/null 2>&1 || wp rewrite flush >/dev/null
+wp option update woocommerce_currency "${WOO_STORE_CURRENCY:-USD}" >/dev/null
+wp plugin activate woocommerce >/dev/null
 
 i=0
-until wp eval 'exit(function_exists("wc_get_product") ? 0 : 1);' --allow-root >/dev/null 2>&1
+until wp eval 'exit(function_exists("wc_get_product") ? 0 : 1);' >/dev/null 2>&1
 do
   i=$((i + 1))
   if [ "$i" -gt 30 ]; then
@@ -78,9 +77,8 @@ done
 
 if [ ! -f /var/www/html/.torgnexa-woocommerce-demo-installed ]; then
   echo "[torgnexa] loading synthetic WooCommerce catalog and order"
-  wp eval-file /usr/local/bin/torgnexa-woocommerce-seed.php --allow-root
+  wp eval-file /usr/local/bin/torgnexa-woocommerce-seed.php
   touch /var/www/html/.torgnexa-woocommerce-demo-installed
-  chown www-data:www-data /var/www/html/.torgnexa-woocommerce-demo-installed
 fi
 
 echo "[torgnexa] WooCommerce demo is available at ${WORDPRESS_SITEURL}"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/inventory"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 )
 
 const allocationSelect = `SELECT allocation_id,idempotency_key,order_id,order_item_id,offer_id,warehouse_id,quantity_coefficient,quantity_scale,unit,state,COALESCE(reason_code,''),COALESCE(incident_id,''),COALESCE(replaces_allocation_id,''),version,created_at,updated_at FROM fulfillment_allocations WHERE organization_id=$1 AND workspace_id=$2`
@@ -258,8 +259,9 @@ func randomUUIDv7At(now time.Time) (string, error) {
 	if _, err := rand.Read(value[:]); err != nil {
 		return "", err
 	}
-	millis := uint64(now.UTC().UnixMilli())
-	value[0], value[1], value[2], value[3], value[4], value[5] = byte(millis>>40), byte(millis>>32), byte(millis>>24), byte(millis>>16), byte(millis>>8), byte(millis)
+	if err := domain.PutUUIDv7Timestamp(value[:6], now); err != nil {
+		return "", err
+	}
 	value[6], value[8] = (value[6]&0x0f)|0x70, (value[8]&0x3f)|0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", value[0:4], value[4:6], value[6:8], value[8:10], value[10:16]), nil
 }

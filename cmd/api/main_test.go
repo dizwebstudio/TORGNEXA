@@ -18,3 +18,11 @@ func TestHealthcheck(t *testing.T) {
 		t.Fatal("expected non-2xx failure")
 	}
 }
+
+func TestValidateHealthcheckURLRejectsNonLoopbackTargets(t *testing.T) {
+	for _, raw := range []string{"https://127.0.0.1:8080/health", "http://127.0.0.1@169.254.169.254/", "http://example.test/"} {
+		if _, err := validateHealthcheckURL(raw); err == nil {
+			t.Fatalf("validateHealthcheckURL(%q) unexpectedly succeeded", raw)
+		}
+	}
+}

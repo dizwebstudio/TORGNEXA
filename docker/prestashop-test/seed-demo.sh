@@ -12,7 +12,8 @@ php /usr/local/bin/torgnexa-prestashop-seed.php
 # race while both try to create the same cache file.
 php -r 'require "/var/www/html/config/config.inc.php"; require "/var/www/html/init.php"; $class = "PrestaShop" . chr(92) . "PrestaShop" . chr(92) . "Adapter" . chr(92) . "ContainerBuilder"; $class::getContainer("webservice", false);'
 
-# Init scripts run as root, while Apache serves requests as www-data. The
-# warm-up creates cache files, so hand ownership back before the storefront is
-# reachable.
-chown -R www-data:www-data /var/www/html/var/cache
+# The image runs both initialization and Apache as www-data. Keep this guard so
+# the script remains safe if an operator deliberately runs it as root.
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R www-data:www-data /var/www/html/var/cache
+fi
