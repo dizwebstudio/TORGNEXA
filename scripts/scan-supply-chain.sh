@@ -470,21 +470,21 @@ if [[ "$scope" == images || "$scope" == all ]]; then
 
     run_trivy_json_check "trivy-image-vulnerability-${report_stem}" \
       "$output_dir/${report_stem}.vulnerability.json" \
-      image --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
+      image --image-src remote --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
       --platform "$platform" --scanners vuln \
       --detection-priority precise --exit-on-eol 1 --exit-code 0 "$image"
     validate_trivy_report "$output_dir/${report_stem}.vulnerability.json" \
       "trivy-image-vulnerability-${report_stem}" vulnerability
     run_trivy_json_check "trivy-image-license-${report_stem}" \
       "$output_dir/${report_stem}.license.json" \
-      image --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
+      image --image-src remote --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
       --platform "$platform" --scanners license --license-full --exit-code 0 "$image"
     validate_trivy_report "$output_dir/${report_stem}.license.json" \
       "trivy-image-license-${report_stem}" license
     enforce_license_policy "$output_dir/${report_stem}.license.json" "trivy-image-license-${report_stem}"
     run_trivy_json_check "trivy-image-secret-${report_stem}" \
       "$output_dir/${report_stem}.secret.json" \
-      image --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
+      image --image-src remote --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
       --platform "$platform" --scanners secret --exit-code 0 "$image"
     validate_trivy_report "$output_dir/${report_stem}.secret.json" \
       "trivy-image-secret-${report_stem}" secret
