@@ -32,6 +32,15 @@ identity recorded rather than frozen indefinitely for reproducibility.
 Third-party runtime images are pinned and scanned. TORGNEXA does not re-sign an
 upstream image as if it were a first-party artifact.
 
+First-party derived runtime images are published as private GHCR candidates by
+a manual, `production`-protected, default-branch-only workflow. The checked-in
+inventory is the publication matrix, GitHub's ephemeral workflow token is the
+only push credential, and every candidate receives a unique build tag plus an
+immutable digest record. Candidate publication is deliberately separate from production
+promotion: Compose adoption, digest-scoped license review, scans, signing,
+provenance verification, and runtime qualification must still pass for the
+exact published digest.
+
 ## Operational qualification
 
 Repository tests and mocked signature verification prove implementation only.

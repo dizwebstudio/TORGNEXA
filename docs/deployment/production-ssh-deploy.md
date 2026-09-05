@@ -35,6 +35,13 @@ Recommended environment variables (not secrets):
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:8080/api/v1/health` | HTTP(S) endpoint reachable from the deployment host. |
 | `DEPLOY_BACKUP_RETENTION` | `7` | Number of pre-deployment PostgreSQL dumps to keep on the host. Must be from `1` to `99`. |
 
+Registry publication does not require an additional GitHub secret. The
+protected runtime-image workflow publishes to GHCR with its ephemeral
+`GITHUB_TOKEN` and `packages: write`. If a production Compose overlay references
+private GHCR images, authenticate the dedicated deployment account on the host
+once with a classic PAT limited to `read:packages`; do not put a registry write
+token in `.env` or the deployment workflow.
+
 ## Production application values
 
 The application `.env` on the VPS reuses the credentials documented in the

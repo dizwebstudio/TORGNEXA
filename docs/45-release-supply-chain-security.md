@@ -22,10 +22,13 @@ builds or ships. Discovery and the inventory must agree in both directions:
 - an unregistered discovered artifact fails the gate, and a stale inventory
   entry also fails it.
 
-TORGNEXA currently has releaseable Go commands but no first-party container or
-plugin package. That is an explicit not-applicable case, not permission to skip
-future image or plugin gates. Third-party images are never re-signed as
-TORGNEXA artifacts.
+TORGNEXA has releaseable Go commands and four registered first-party runtime
+image definitions for PostgreSQL, Kafka, Keycloak, and Valkey. The image
+definitions and their GHCR publication targets are declared in
+`supply-chain/release-artifacts.json`. A workflow-produced candidate is not a
+shipped release image until its exact digest has passed the image, license,
+SBOM, signing, provenance, and deployment qualification gates. TORGNEXA does
+not re-sign unchanged third-party images as TORGNEXA artifacts.
 
 All Go modules and future supported package-manager manifests are discovered
 recursively. A newly discovered ecosystem without an implemented lockfile and
@@ -253,6 +256,38 @@ Emergency patches use the same technical gates. Review and rollout may be
 expedited, but signing, provenance, secret checks, Critical vulnerability
 policy, and evidence archival are never bypassed. Any permitted time-limited
 risk exception records the owner and mandatory follow-up deadline.
+
+## First-party runtime image publication
+
+`.github/workflows/runtime-images.yml` bootstraps immutable multi-platform
+runtime-image candidates in GHCR. It is manual-only, accepts a validated target
+SemVer, and builds only from the repository default branch. The publication
+matrix comes from the checked-in artifact inventory rather than user input.
+
+The matrix publisher is the only non-release job permitted `packages: write`.
+It runs behind the existing protected `production` environment and authenticates
+with the run-scoped `GITHUB_TOKEN`; no persistent registry credential is stored
+in repository secrets. Every action is commit-pinned, checkout credentials are
+not persisted, and BuildKit attaches an SBOM and maximal provenance to each
+`linux/amd64` and `linux/arm64` image index.
+
+Candidates use a unique `v<version>-build.<run-id>.<attempt>` tag and the
+workflow retains `runtime-images-<run-id>` containing every exact OCI digest.
+The package must remain private while it is a candidate. Publication of the
+candidate does not update Compose or qualify it for production. The release
+owner must next:
+
+1. copy the exact digest references into all applicable Compose services and
+   `development_runtime` entries;
+2. add digest-scoped license decisions without permitting `UNKNOWN` or
+   `NOASSERTION`;
+3. run the complete image gate for both declared platforms and bind its SBOM,
+   scan, signature, provenance, and runtime evidence to those exact digests;
+4. expose or deploy only the qualified digest references.
+
+For private GHCR packages, the production deployment account is authenticated
+once with a read-only `read:packages` PAT. That pull credential belongs on the
+deployment host, not in the repository and not in the image-publication job.
 
 ## Task 078 plugin publication linkage
 

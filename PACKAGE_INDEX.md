@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3464
+- total source files (excluding local secrets/build/dependency/cache trees): 3470
 
 
 ## Connector category layout
@@ -538,6 +538,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `.github/workflows/ci.yml`
 - `.github/workflows/production-deploy.yml`
 - `.github/workflows/release.yml`
+- `.github/workflows/runtime-images.yml`
 - `.github/workflows/security.yml`
 - `.gitignore`
 - `.npmrc`
@@ -1901,14 +1902,19 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docker-compose.shopware-test.yml`
 - `docker-compose.woocommerce-test.yml`
 - `docker-compose.yml`
+- `docker/kafka/Dockerfile`
+- `docker/keycloak/Dockerfile`
+- `docker/keycloak/entrypoint.sh`
 - `docker/opencart-test/Dockerfile`
 - `docker/opencart-test/configure.php`
 - `docker/opencart-test/entrypoint.sh`
 - `docker/opencart-test/seed-demo.php`
 - `docker/opencart-test/seed.sql`
+- `docker/postgres/Dockerfile`
 - `docker/prestashop-test/Dockerfile`
 - `docker/prestashop-test/seed-demo.php`
 - `docker/prestashop-test/seed-demo.sh`
+- `docker/valkey/Dockerfile`
 - `docker/woocommerce-test/Dockerfile`
 - `docker/woocommerce-test/entrypoint.sh`
 - `docker/woocommerce-test/local-rest-canonical.php`

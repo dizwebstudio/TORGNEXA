@@ -33,10 +33,11 @@ var (
 )
 
 const (
-	releaseInventoryPath = "supply-chain/release-artifacts.json"
-	toolVersionsPath     = "supply-chain/tool-versions.json"
-	actionPinsPath       = "supply-chain/action-pins.json"
-	ciWorkflowPath       = ".github/workflows/ci.yml"
+	releaseInventoryPath      = "supply-chain/release-artifacts.json"
+	toolVersionsPath          = "supply-chain/tool-versions.json"
+	actionPinsPath            = "supply-chain/action-pins.json"
+	ciWorkflowPath            = ".github/workflows/ci.yml"
+	runtimeImagesWorkflowPath = ".github/workflows/runtime-images.yml"
 )
 
 const trustedArchitectureRun = `set -euo pipefail
@@ -96,6 +97,7 @@ func CheckSupplyChain(ctx context.Context, root string) error {
 	workflows := loadWorkflows(ctx, absRoot, &problems)
 	checkWorkflows(absRoot, workflows, pins, &problems)
 	checkReleaseWorkflow(workflows, &problems)
+	checkRuntimeImagesWorkflow(workflows, &problems)
 	checkRepositoryImages(ctx, absRoot, &problems)
 	tools := checkToolVersions(ctx, absRoot, &problems)
 	checkGoModulePolicy(ctx, absRoot, tools, &problems)
@@ -166,6 +168,10 @@ func loadActionPins(ctx context.Context, root string, problems *diagnostics) map
 		"actions/setup-go",
 		"actions/setup-node",
 		"actions/upload-artifact",
+		"docker/build-push-action",
+		"docker/login-action",
+		"docker/setup-buildx-action",
+		"docker/setup-qemu-action",
 	}, problems)
 	return pins
 }
@@ -550,7 +556,9 @@ func checkJobPermissions(relative, jobName string, job *yaml.Node, problems *dia
 		}
 		if value.Value == "write" {
 			allowed := allowedWritesByJob[jobName]
-			if _, ok := allowed[key.Value]; !ok {
+			_, allowedByJob := allowed[key.Value]
+			allowedRuntimePublication := relative == runtimeImagesWorkflowPath && jobName == "publish-runtime-images" && key.Value == "packages"
+			if !allowedByJob && !allowedRuntimePublication {
 				problems.add(relative, "job %q may not request %s: write", jobName, key.Value)
 			}
 		}
@@ -829,6 +837,91 @@ func checkReleaseWorkflow(workflows []workflowPolicy, problems *diagnostics) {
 	requireAncestors(workflow.Rel, graph, "publish", []string{"verify"}, problems)
 }
 
+func checkRuntimeImagesWorkflow(workflows []workflowPolicy, problems *diagnostics) {
+	var workflow *workflowPolicy
+	for index := range workflows {
+		if workflows[index].Rel == runtimeImagesWorkflowPath {
+			workflow = &workflows[index]
+			break
+		}
+	}
+	if workflow == nil {
+		problems.add(runtimeImagesWorkflowPath, "protected runtime-image publication workflow is required")
+		return
+	}
+	if !yamlExactKeys(yamlMapValue(workflow.Root, "on"), "workflow_dispatch") {
+		problems.add(workflow.Rel, "runtime-image publication trigger must be exactly workflow_dispatch")
+	}
+	jobNames := make([]string, 0, len(workflow.Jobs))
+	for name := range workflow.Jobs {
+		jobNames = append(jobNames, name)
+	}
+	sort.Strings(jobNames)
+	if strings.Join(jobNames, "\x00") != "plan\x00publish-runtime-images\x00summarize" {
+		problems.add(workflow.Rel, "runtime-image publication requires exactly plan, publish-runtime-images, and summarize jobs")
+	}
+	publisher := workflow.Jobs["publish-runtime-images"]
+	if publisher == nil {
+		return
+	}
+	checkReleaseEnvironment(workflow.Rel, publisher, "publish-runtime-images", "production", problems)
+	checkExactJobPermissions(workflow.Rel, publisher, "publish-runtime-images", map[string]string{
+		"contents": "read",
+		"packages": "write",
+	}, problems)
+	graph := make(map[string][]string, len(workflow.Jobs))
+	for name, job := range workflow.Jobs {
+		graph[name] = yamlStringList(yamlMapValue(job, "needs"), workflow.Rel, "job "+name+" needs", problems)
+	}
+	requireAncestors(workflow.Rel, graph, "publish-runtime-images", []string{"plan"}, problems)
+	requireAncestors(workflow.Rel, graph, "summarize", []string{"plan", "publish-runtime-images"}, problems)
+	qemu := findActionStep(publisher, "docker/setup-qemu-action")
+	if qemu == nil || !yamlExactScalarMap(yamlMapValue(qemu, "with"), map[string]string{
+		"cache-image": "false",
+		"image":       "tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
+		"platforms":   "arm64",
+	}) {
+		problems.add(workflow.Rel, "runtime-image publisher must use the exact pinned QEMU helper image")
+	}
+	buildx := findActionStep(publisher, "docker/setup-buildx-action")
+	if buildx == nil || !yamlExactScalarMap(yamlMapValue(buildx, "with"), map[string]string{
+		"cache-binary": "false",
+		"cleanup":      "true",
+		"driver-opts":  "image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3",
+		"version":      "v0.37.0",
+	}) {
+		problems.add(workflow.Rel, "runtime-image publisher must use the exact pinned Buildx and BuildKit versions")
+	}
+	login := findActionStep(publisher, "docker/login-action")
+	if login == nil || !yamlExactScalarMap(yamlMapValue(login, "with"), map[string]string{
+		"password": "${{ github.token }}",
+		"registry": "ghcr.io",
+		"username": "${{ github.actor }}",
+	}) {
+		problems.add(workflow.Rel, "runtime-image publisher must authenticate to GHCR only with the ephemeral GitHub token")
+	}
+	build := findActionStep(publisher, "docker/build-push-action")
+	if build == nil || yamlScalarValue(yamlMapValue(build, "with"), "platforms") != "linux/amd64,linux/arm64" ||
+		yamlScalarValue(yamlMapValue(build, "with"), "push") != "true" ||
+		yamlScalarValue(yamlMapValue(build, "with"), "provenance") != "mode=max" ||
+		yamlScalarValue(yamlMapValue(build, "with"), "sbom") != "true" {
+		problems.add(workflow.Rel, "runtime-image publisher must push both platforms with SBOM and maximal provenance")
+	}
+}
+
+func findActionStep(job *yaml.Node, action string) *yaml.Node {
+	steps := yamlMapValue(job, "steps")
+	if steps == nil || steps.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, step := range steps.Content {
+		if step.Kind == yaml.MappingNode && actionReferenceName(yamlScalarValue(step, "uses")) == action {
+			return step
+		}
+	}
+	return nil
+}
+
 func checkExactJobPermissions(relative string, job *yaml.Node, jobName string, expected map[string]string, problems *diagnostics) {
 	if job == nil {
 		return
@@ -974,8 +1067,10 @@ func validateImmutableImage(reference string) error {
 		"clickhouse/clickhouse-server": {},
 		"dockware/shopware":            {},
 		"dxflrs/garage":                {},
+		"eclipse-temurin":              {},
 		"golang":                       {},
 		"mariadb":                      {},
+		"moby/buildkit":                {},
 		"node":                         {},
 		"php":                          {},
 		"postgres":                     {},
@@ -984,6 +1079,7 @@ func validateImmutableImage(reference string) error {
 		"redis":                        {},
 		"ghcr.io/saleor/saleor":        {},
 		"quay.io/keycloak/keycloak":    {},
+		"tonistiigi/binfmt":            {},
 		"valkey/valkey":                {},
 		"wordpress":                    {},
 	}
@@ -1486,11 +1582,12 @@ func checkExactSortedNames(relative, field string, actual, expected []string, pr
 }
 
 type releaseArtifactInventory struct {
-	Version            int            `json:"version"`
-	PublicReleaseReady bool           `json:"public_release_ready"`
-	Binaries           []binaryEntry  `json:"binaries"`
-	SourceOnlyCommands []string       `json:"source_only_commands"`
-	DevelopmentRuntime []runtimeEntry `json:"development_runtime"`
+	Version            int                   `json:"version"`
+	PublicReleaseReady bool                  `json:"public_release_ready"`
+	Binaries           []binaryEntry         `json:"binaries"`
+	SourceOnlyCommands []string              `json:"source_only_commands"`
+	ContainerImages    []containerImageEntry `json:"container_images"`
+	DevelopmentRuntime []runtimeEntry        `json:"development_runtime"`
 }
 
 type binaryEntry struct {
@@ -1503,6 +1600,13 @@ type runtimeEntry struct {
 	Name      string   `json:"name"`
 	Image     string   `json:"image"`
 	Platforms []string `json:"platforms"`
+}
+
+type containerImageEntry struct {
+	Name       string   `json:"name"`
+	Repository string   `json:"repository"`
+	Dockerfile string   `json:"dockerfile"`
+	Platforms  []string `json:"platforms"`
 }
 
 func checkReleaseInventory(ctx context.Context, root string, problems *diagnostics) (bool, []string) {
@@ -1548,6 +1652,7 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 	if strings.Join(accountedCommands, "\x00") != strings.Join(commands, "\x00") {
 		problems.add(releaseInventoryPath, "binary inventory must exactly match cmd packages %v", commands)
 	}
+	checkFirstPartyContainerImages(root, inventory.ContainerImages, problems)
 
 	composeImages := loadComposeServiceImages(ctx, root, "docker-compose.yml", problems)
 	actualRuntime := make(map[string]string, len(inventory.DevelopmentRuntime))
@@ -1585,6 +1690,42 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 	}
 	sort.Strings(runtimeImages)
 	return inventory.PublicReleaseReady, runtimeImages
+}
+
+func checkFirstPartyContainerImages(root string, images []containerImageEntry, problems *diagnostics) {
+	expected := map[string]struct {
+		repository string
+		dockerfile string
+	}{
+		"kafka":    {repository: "ghcr.io/dizwebstudio/torgnexa-kafka", dockerfile: "docker/kafka/Dockerfile"},
+		"keycloak": {repository: "ghcr.io/dizwebstudio/torgnexa-keycloak", dockerfile: "docker/keycloak/Dockerfile"},
+		"postgres": {repository: "ghcr.io/dizwebstudio/torgnexa-postgres", dockerfile: "docker/postgres/Dockerfile"},
+		"valkey":   {repository: "ghcr.io/dizwebstudio/torgnexa-valkey", dockerfile: "docker/valkey/Dockerfile"},
+	}
+	actualNames := make([]string, 0, len(images))
+	previous := ""
+	for _, image := range images {
+		actualNames = append(actualNames, image.Name)
+		if previous != "" && image.Name <= previous {
+			problems.add(releaseInventoryPath, "container_images must be strictly sorted and unique")
+		}
+		previous = image.Name
+		want, known := expected[image.Name]
+		if !known || image.Repository != want.repository || image.Dockerfile != want.dockerfile {
+			problems.add(releaseInventoryPath, "container image %q does not match its reviewed GHCR repository and Dockerfile", image.Name)
+		}
+		if _, err := resolveRealRepositoryPath(root, image.Dockerfile, false); err != nil {
+			problems.add(releaseInventoryPath, "container image %q Dockerfile: %v", image.Name, err)
+		}
+		checkPlatforms(releaseInventoryPath, "container image "+image.Name, image.Platforms, problems)
+		if strings.Join(image.Platforms, "\x00") != "linux/amd64\x00linux/arm64" {
+			problems.add(releaseInventoryPath, "container image %q must publish exactly linux/amd64 and linux/arm64", image.Name)
+		}
+	}
+	sort.Strings(actualNames)
+	if strings.Join(actualNames, "\x00") != "kafka\x00keycloak\x00postgres\x00valkey" {
+		problems.add(releaseInventoryPath, "container_images must contain exactly the reviewed runtime image set")
+	}
 }
 
 func checkPlatforms(relative, field string, platforms []string, problems *diagnostics) {

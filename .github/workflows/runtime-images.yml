@@ -1,0 +1,206 @@
+name: runtime-image-candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Target TORGNEXA SemVer without the v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.context.outputs.matrix }}
+      publication_tag: ${{ steps.context.outputs.publication_tag }}
+      version: ${{ steps.context.outputs.version }}
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      INPUT_VERSION: ${{ inputs.version }}
+      REF_NAME: ${{ github.ref_name }}
+      REF_TYPE: ${{ github.ref_type }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+      RUN_ID: ${{ github.run_id }}
+      SOURCE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Validate the protected source and derive the publication matrix
+        id: context
+        run: |
+          set -euo pipefail
+          [[ "$REF_TYPE" == branch && "$REF_NAME" == "$DEFAULT_BRANCH" ]]
+          [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RUN_ID" =~ ^[1-9][0-9]*$ && "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          ./scripts/check-semver.sh "$INPUT_VERSION"
+          matrix=$(jq -cer '
+            .container_images as $images |
+            ($images | length == 4) and
+            ([$images[].name] == ([ $images[].name ] | sort)) and
+            (all($images[];
+              (.name | test("^[a-z][a-z0-9-]*$")) and
+              (.repository | test("^ghcr\\.io/dizwebstudio/torgnexa-[a-z0-9-]+$")) and
+              (.dockerfile | test("^docker/[a-z0-9-]+/Dockerfile$")) and
+              (.platforms == ["linux/amd64", "linux/arm64"])
+            )) |
+            if . then
+              {include: [$images[] | {name, repository, dockerfile}]}
+            else
+              error("invalid first-party container inventory")
+            end
+          ' supply-chain/release-artifacts.json)
+          publication_tag="v${INPUT_VERSION}-build.${RUN_ID}.${RUN_ATTEMPT}"
+          printf 'matrix=%s\npublication_tag=%s\nversion=%s\n' \
+            "$matrix" "$publication_tag" "$INPUT_VERSION" >>"$GITHUB_OUTPUT"
+
+  publish-runtime-images:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install the registered emulation runtime
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a
+        with:
+          image: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+          cache-image: false
+      - name: Install the registered Buildx runtime
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+        with:
+          version: v0.37.0
+          driver-opts: image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+          cache-binary: false
+          cleanup: true
+      - name: Authenticate to GHCR with the ephemeral workflow token
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build once and publish the multi-platform candidate
+        id: publish
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ matrix.repository }}:${{ needs.plan.outputs.publication_tag }}
+          labels: |
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=v${{ needs.plan.outputs.version }}
+      - name: Verify the published index and record its immutable digest
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_REPOSITORY: ${{ matrix.repository }}
+          PUBLICATION_TAG: ${{ needs.plan.outputs.publication_tag }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+          REPORT_DIR: ${{ runner.temp }}/runtime-image-digest
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$IMAGE_NAME" =~ ^[a-z][a-z0-9-]*$ ]]
+          mkdir -m 0700 -- "$REPORT_DIR"
+          docker buildx imagetools inspect --raw "$IMAGE_REPOSITORY@$DIGEST" >"$REPORT_DIR/index.json"
+          jq -e '
+            [.manifests[] |
+              select(.platform.os == "linux") |
+              .platform.architecture
+            ] |
+            (map(select(. == "amd64")) | length) == 1 and
+            (map(select(. == "arm64")) | length) == 1
+          ' "$REPORT_DIR/index.json" >/dev/null
+          jq -n \
+            --arg name "$IMAGE_NAME" \
+            --arg repository "$IMAGE_REPOSITORY" \
+            --arg tag "$PUBLICATION_TAG" \
+            --arg digest "$DIGEST" \
+            --arg dockerfile "$DOCKERFILE" \
+            --arg version "$RELEASE_VERSION" \
+            --arg revision "$SOURCE_REVISION" \
+            '{
+              schema_version: 1,
+              status: "candidate",
+              name: $name,
+              repository: $repository,
+              tag: $tag,
+              digest: $digest,
+              reference: ($repository + ":" + $tag + "@" + $digest),
+              dockerfile: $dockerfile,
+              release_version: ("v" + $version),
+              source_revision: $revision,
+              platforms: ["linux/amd64", "linux/arm64"]
+            }' >"$REPORT_DIR/$IMAGE_NAME.json"
+      - name: Retain the exact candidate digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runtime-image-digest-${{ matrix.name }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/runtime-image-digest/${{ matrix.name }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+  summarize:
+    needs: [plan, publish-runtime-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: runtime-image-digest-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/runtime-image-digests
+          merge-multiple: true
+      - name: Validate and combine the publication records
+        env:
+          DIGEST_DIR: ${{ runner.temp }}/runtime-image-digests
+          OUTPUT_FILE: ${{ runner.temp }}/runtime-images.json
+        run: |
+          set -euo pipefail
+          mapfile -t records < <(find "$DIGEST_DIR" -maxdepth 1 -type f -name '*.json' -print | LC_ALL=C sort)
+          [[ "${#records[@]}" == 4 ]]
+          jq -s '{schema_version: 1, status: "candidate", images: sort_by(.name)}' "${records[@]}" >"$OUTPUT_FILE"
+          jq -e --slurpfile published "$OUTPUT_FILE" '
+            [.container_images[] | {name, repository, dockerfile, platforms}] ==
+            [$published[0].images[] | {name, repository, dockerfile, platforms}]
+          ' supply-chain/release-artifacts.json >/dev/null
+          jq -r '.images[] | "- `\(.reference)`"' "$OUTPUT_FILE" >>"$GITHUB_STEP_SUMMARY"
+      - name: Retain the complete immutable image inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runtime-images-${{ github.run_id }}
+          path: ${{ runner.temp }}/runtime-images.json
+          if-no-files-found: error
+          retention-days: 90

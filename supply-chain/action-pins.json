@@ -30,6 +30,26 @@
       "name": "actions/upload-artifact",
       "version": "v7.0.1",
       "commit": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    },
+    {
+      "name": "docker/build-push-action",
+      "version": "v7.3.0",
+      "commit": "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"
+    },
+    {
+      "name": "docker/login-action",
+      "version": "v4.6.0",
+      "commit": "dbcb813823bdd20940b903addbd779551569679f"
+    },
+    {
+      "name": "docker/setup-buildx-action",
+      "version": "v4.3.0",
+      "commit": "37fe631027851001ddb9b187196cc803df7f5f0e"
+    },
+    {
+      "name": "docker/setup-qemu-action",
+      "version": "v4.3.0",
+      "commit": "1f40c72289eff860ee54a304f1438e3cff362e0a"
     }
   ]
 }

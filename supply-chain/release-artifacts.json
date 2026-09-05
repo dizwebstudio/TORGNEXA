@@ -38,6 +38,44 @@
     "torgnexa-runtime-qualifier",
     "torgnexa-slo-report"
   ],
+  "container_images": [
+    {
+      "name": "kafka",
+      "repository": "ghcr.io/dizwebstudio/torgnexa-kafka",
+      "dockerfile": "docker/kafka/Dockerfile",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "keycloak",
+      "repository": "ghcr.io/dizwebstudio/torgnexa-keycloak",
+      "dockerfile": "docker/keycloak/Dockerfile",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "postgres",
+      "repository": "ghcr.io/dizwebstudio/torgnexa-postgres",
+      "dockerfile": "docker/postgres/Dockerfile",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    {
+      "name": "valkey",
+      "repository": "ghcr.io/dizwebstudio/torgnexa-valkey",
+      "dockerfile": "docker/valkey/Dockerfile",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    }
+  ],
   "development_runtime": [
     {
       "name": "app-db-role",

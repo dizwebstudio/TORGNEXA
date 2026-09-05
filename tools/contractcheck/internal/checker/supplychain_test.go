@@ -17,6 +17,10 @@ const (
 	testSetupNodeCommit = "6666666666666666666666666666666666666666"
 	testUploadCommit    = "4444444444444444444444444444444444444444"
 	testAttestCommit    = "5555555555555555555555555555555555555555"
+	testBuildPushCommit = "7777777777777777777777777777777777777777"
+	testLoginCommit     = "8888888888888888888888888888888888888888"
+	testBuildxCommit    = "9999999999999999999999999999999999999999"
+	testQEMUCommit      = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	testDigestA         = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	testDigestB         = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	testDigestC         = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -337,6 +341,20 @@ func TestSupplyChainPolicyRejectsUnsafeConfigurations(t *testing.T) {
 			wantErr: "job \"publish\" may not request packages: write",
 		},
 		{
+			name: "runtime image publication is not protected",
+			mutate: func(t *testing.T, root string) {
+				replaceFixture(t, root, runtimeImagesWorkflowPath, "    environment: production\n", "")
+			},
+			wantErr: "environment must be exactly \"production\"",
+		},
+		{
+			name: "runtime image publication uses mutable BuildKit",
+			mutate: func(t *testing.T, root string) {
+				replaceFixture(t, root, runtimeImagesWorkflowPath, "image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3", "image=moby/buildkit:latest")
+			},
+			wantErr: "exact pinned Buildx and BuildKit versions",
+		},
+		{
 			name: "continue on error",
 			mutate: func(t *testing.T, root string) {
 				replaceFixture(t, root, ".github/workflows/release.yml", "security:\n    needs: build", "security:\n    continue-on-error: true\n    needs: build")
@@ -554,6 +572,14 @@ golang.org/x/vuln v1.6.0/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
 		mustWriteFixture(t, root, relative, "{}\n")
 	}
 	mustWriteFixture(t, root, "docker-compose.yml", validComposeFixture())
+	for _, relative := range []string{
+		"docker/kafka/Dockerfile",
+		"docker/keycloak/Dockerfile",
+		"docker/postgres/Dockerfile",
+		"docker/valkey/Dockerfile",
+	} {
+		mustWriteFixture(t, root, relative, "FROM scratch\n")
+	}
 	mustWriteFixture(t, root, actionPinsPath, validActionPinsFixture())
 	mustWriteFixture(t, root, toolVersionsPath, validToolVersionsFixture())
 	mustWriteFixture(t, root, releaseInventoryPath, validReleaseInventoryFixture())
@@ -561,6 +587,7 @@ golang.org/x/vuln v1.6.0/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
 	mustWriteFixture(t, root, "supply-chain/risk-exceptions.json", `{"version":1,"approval_enforced":false,"exceptions":[]}`)
 	mustWriteFixture(t, root, ".github/workflows/ci.yml", validCIWorkflowFixture())
 	mustWriteFixture(t, root, ".github/workflows/release.yml", validReleaseWorkflowFixture())
+	mustWriteFixture(t, root, runtimeImagesWorkflowPath, validRuntimeImagesWorkflowFixture())
 	mustWriteFixture(t, root, ".github/workflows/security.yml", validSecurityWorkflowFixture())
 	return root
 }
@@ -588,7 +615,11 @@ func validActionPinsFixture() string {
 		`{"name":"actions/download-artifact","version":"v8.0.1","commit":"` + testDownloadCommit + `"},` +
 		`{"name":"actions/setup-go","version":"v7.0.0","commit":"` + testSetupGoCommit + `"},` +
 		`{"name":"actions/setup-node","version":"v7.0.0","commit":"` + testSetupNodeCommit + `"},` +
-		`{"name":"actions/upload-artifact","version":"v7.0.1","commit":"` + testUploadCommit + `"}]}`
+		`{"name":"actions/upload-artifact","version":"v7.0.1","commit":"` + testUploadCommit + `"},` +
+		`{"name":"docker/build-push-action","version":"v7.3.0","commit":"` + testBuildPushCommit + `"},` +
+		`{"name":"docker/login-action","version":"v4.6.0","commit":"` + testLoginCommit + `"},` +
+		`{"name":"docker/setup-buildx-action","version":"v4.3.0","commit":"` + testBuildxCommit + `"},` +
+		`{"name":"docker/setup-qemu-action","version":"v4.3.0","commit":"` + testQEMUCommit + `"}]}`
 }
 
 func validToolVersionsFixture() string {
@@ -607,6 +638,11 @@ func validReleaseInventoryFixture() string {
 		`{"name":"mcp","package":"./cmd/mcp","platforms":["linux/amd64"]},` +
 		`{"name":"scheduler","package":"./cmd/scheduler","platforms":["linux/amd64"]},` +
 		`{"name":"worker","package":"./cmd/worker","platforms":["linux/amd64"]}],` +
+		`"container_images":[` +
+		`{"name":"kafka","repository":"ghcr.io/dizwebstudio/torgnexa-kafka","dockerfile":"docker/kafka/Dockerfile","platforms":["linux/amd64","linux/arm64"]},` +
+		`{"name":"keycloak","repository":"ghcr.io/dizwebstudio/torgnexa-keycloak","dockerfile":"docker/keycloak/Dockerfile","platforms":["linux/amd64","linux/arm64"]},` +
+		`{"name":"postgres","repository":"ghcr.io/dizwebstudio/torgnexa-postgres","dockerfile":"docker/postgres/Dockerfile","platforms":["linux/amd64","linux/arm64"]},` +
+		`{"name":"valkey","repository":"ghcr.io/dizwebstudio/torgnexa-valkey","dockerfile":"docker/valkey/Dockerfile","platforms":["linux/amd64","linux/arm64"]}],` +
 		`"development_runtime":[` +
 		`{"name":"clickhouse","image":"clickhouse/clickhouse-server:26.6@sha256:` + testDigestA + `","platforms":["linux/amd64","linux/arm64"]},` +
 		`{"name":"kafka","image":"apache/kafka:4.3.1@sha256:` + testDigestB + `","platforms":["linux/amd64","linux/arm64"]},` +
@@ -785,6 +821,65 @@ jobs:
         with:
           node-version: 22.16.0
       - run: make security
+`
+}
+
+func validRuntimeImagesWorkflowFixture() string {
+	return `name: runtime-images
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@` + testCheckoutCommit + `
+        with:
+          persist-credentials: false
+  publish-runtime-images:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-qemu-action@` + testQEMUCommit + `
+        with:
+          image: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+          cache-image: false
+      - uses: docker/setup-buildx-action@` + testBuildxCommit + `
+        with:
+          version: v0.37.0
+          driver-opts: image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+          cache-binary: false
+          cleanup: true
+      - uses: docker/login-action@` + testLoginCommit + `
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@` + testBuildPushCommit + `
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+      - uses: actions/upload-artifact@` + testUploadCommit + `
+  summarize:
+    needs: [plan, publish-runtime-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@` + testDownloadCommit + `
 `
 }
 
