@@ -89,12 +89,12 @@ repository, workflow, commit, or ref.
 
 1. Task 118 now provides the exact protected-release machinery for `SC-OPS-01`: the workflow stages a non-public draft, P4 independently re-verifies Sigstore/SLSA identity and binds GitHub asset SHA-256 digests before promotion. The actual protected run remains pending until those commands pass on the real hosting account/release tag; repository code alone cannot mark this item accepted.
 2. Resolved in Task 117: TORGNEXA-owned Community core is licensed Apache-2.0, the top-level `LICENSE` is present, package metadata is aligned, and `public_release_ready:true` removes only the repository-license blocker.
-3. The 2026-08-09 live two-platform runtime scan correctly failed closed.
-   Kafka 4.3.1 has 10 High findings per platform; PostgreSQL 18 Alpine has 15
-   High and 1 Critical per platform. The dependency-license policy also rejects
-   or requires review for findings in every current development-runtime image.
-   No active secret was found. Image upgrades, exact finding triage, and legal
-   classification must be reviewed rather than waived implicitly.
+3. The 2026-09-05 complete local scan still fails closed on independent
+   vulnerability, secret, SAST and misconfiguration findings. The current
+   digest-pinned image license inventory is explicitly approved and bound to
+   the exact seven image digests plus all 129 observed raw Trivy expressions;
+   any digest or expression drift requires a new decision. License approval
+   does not waive the remaining scanner findings.
 
 Risk-exception parsing, exact scoping, expiry, and CODEOWNERS enforcement are
 implemented and tested. Applying waivers to scanner output remains deliberately

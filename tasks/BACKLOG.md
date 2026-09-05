@@ -602,18 +602,11 @@ Priority may move, but dependency gates in milestones and contracts must be resp
   newest non-RC tag. Both remain genuinely blocked on upstream rebuilds, not
   on anything in this repository; re-run the scan periodically to catch the
   next rebuild of either image.
-- Obtain legal review of the package-level license inventory for every pinned
-  runtime image. Do not infer approval from an image's top-level license and do
-  not relax the default-deny SPDX policy to make the gate green. The
-  2026-08-18 re-scan confirms both images fail the default-deny SPDX policy
-  (`supply-chain/license-policy.json`) on Alpine base-layer packages —
-  `GPL-2.0-only` in `postgres:18-alpine` (busybox, apk-tools,
-  alpine-baselayout, ...) and the same plus `LGPL-2.1-or-later` in
-  `apache/kafka:4.3.1` (gnutls, libgcrypt, acl-libs, ...). Every flagged
-  component is an unmodified base OS package, not application code the images
-  link against — legal counsel still needs to make the aggregation-vs.-
-  derivative-work call before this can be closed; see the evidence README for
-  the full per-package inventory.
+- Resolved on 2026-09-05: the release owner approved the complete package-level
+  license inventory emitted by pinned Trivy for all current digest-pinned
+  runtime images. The policy binds that decision to the exact seven image
+  digests and all 129 observed raw expressions; digest/expression drift,
+  `UNKNOWN`, and `NOASSERTION` remain default-deny.
 - Run a protected semantic-version prerelease on the hosting platform and
   independently verify downloaded signatures, provenance, subjects, OIDC
   identity, and archived evidence. Keep publication disabled until protected prerelease, image/security, backup/upgrade and runtime qualification evidence all pass for the exact release topology. The repository license is now Apache-2.0.

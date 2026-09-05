@@ -443,6 +443,13 @@ func TestSupplyChainPolicyRejectsUnsafeConfigurations(t *testing.T) {
 			wantErr: "unknown_license_policy must be deny",
 		},
 		{
+			name: "stale digest scoped license approval",
+			mutate: func(t *testing.T, root string) {
+				replaceFixture(t, root, "supply-chain/license-policy.json", `"approved_image_artifacts":[],"approved_trivy_license_expressions":[]`, `"approved_image_artifacts":["example.invalid/runtime:v1@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"approved_trivy_license_expressions":["legacy"]`)
+			},
+			wantErr: "not present in the current runtime inventory",
+		},
+		{
 			name: "local action path escape",
 			mutate: func(t *testing.T, root string) {
 				replaceFixture(t, root, ".github/workflows/ci.yml", "      - name: Run repository checks\n        run: ./scripts/check.sh", "      - uses: ./../outside\n      - name: Run repository checks\n        run: ./scripts/check.sh")
@@ -550,7 +557,7 @@ golang.org/x/vuln v1.6.0/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
 	mustWriteFixture(t, root, actionPinsPath, validActionPinsFixture())
 	mustWriteFixture(t, root, toolVersionsPath, validToolVersionsFixture())
 	mustWriteFixture(t, root, releaseInventoryPath, validReleaseInventoryFixture())
-	mustWriteFixture(t, root, "supply-chain/license-policy.json", `{"version":1,"allowed_spdx":["Apache-2.0","MIT"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["AGPL-3.0-only"],"selected_or_choices":[],"unknown_license_policy":"deny"}`)
+	mustWriteFixture(t, root, "supply-chain/license-policy.json", `{"version":1,"allowed_spdx":["Apache-2.0","MIT"],"review_required_spdx":["MPL-2.0"],"denied_spdx":["AGPL-3.0-only"],"approved_image_artifacts":[],"approved_trivy_license_expressions":[],"selected_or_choices":[],"unknown_license_policy":"deny"}`)
 	mustWriteFixture(t, root, "supply-chain/risk-exceptions.json", `{"version":1,"approval_enforced":false,"exceptions":[]}`)
 	mustWriteFixture(t, root, ".github/workflows/ci.yml", validCIWorkflowFixture())
 	mustWriteFixture(t, root, ".github/workflows/release.yml", validReleaseWorkflowFixture())

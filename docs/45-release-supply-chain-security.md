@@ -156,6 +156,15 @@ For `AND`, every term must be permitted. For `OR`, the selected permitted
 license must be recorded; substring matching is forbidden. A legal exception
 is package/version-scoped, reviewed, justified, and expiring.
 
+Some OS package databases expose legacy distribution labels or compound
+license metadata that is not parseable as SPDX. The checked-in policy may
+approve those raw Trivy values only for exact digest-pinned container images.
+Acceptance requires both an exact `approved_image_artifacts` match and an exact
+`approved_trivy_license_expressions` match. The arrays are sorted, bounded and
+validated; mutable image references, `UNKNOWN`, and `NOASSERTION` are forbidden.
+Digest or scanner-expression drift therefore returns to the parsed default-deny
+path instead of inheriting an approval from an older image.
+
 Task 117 records the approved TORGNEXA-owned Community-core repository license as Apache-2.0. The top-level `LICENSE`, `LICENSE-DECISION.md`, and owned package metadata carry that decision and `supply-chain/release-artifacts.json` may set `public_release_ready:true`. This field removes only the repository-license blocker: dependency-license, vulnerability, provenance/signing, protected-hosting and deployment qualification gates remain independently fail-closed.
 
 ## Signing and provenance (`SC-PROV-01`)
@@ -223,14 +232,12 @@ service behavior, registry permissions, and hosted artifact retention cannot
 be proven from a filesystem-only sandbox. Their evidence belongs to the
 protected prerelease record.
 
-The latest local live scan (2026-08-09) passed all first-party source gates and
-found no runtime-image secrets. It blocked the candidate because Kafka 4.3.1
-reported 10 High findings on each supported architecture, PostgreSQL 18 Alpine
-reported 15 High and 1 Critical on each architecture, and the default-deny
-license policy rejected or routed findings from all four development-runtime
-images to legal review. ClickHouse and Valkey had no High/Critical
-vulnerabilities in that database snapshot. These are release-input blockers,
-not reasons to weaken scanner thresholds or silently reclassify licenses.
+The latest complete local scan (2026-09-05) covered every configured runtime
+image/platform entry and captured the full license inventory for the seven
+unique pinned image digests. The release owner's exact-digest decision is now
+represented by the bounded raw-expression policy described above. Vulnerability,
+secret, SAST and misconfiguration findings remain independent fail-closed gates;
+license approval does not waive them or change their thresholds.
 
 ## Release and emergency-patch procedure
 

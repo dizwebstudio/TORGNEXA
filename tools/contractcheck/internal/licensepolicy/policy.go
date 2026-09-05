@@ -14,14 +14,17 @@ import (
 )
 
 const (
-	maxPolicyBytes     = 1 << 20
-	maxReportBytes     = 32 << 20
-	maxExpressionBytes = 512
-	maxTokens          = 128
-	maxDepth           = 32
+	maxPolicyBytes                  = 1 << 20
+	maxReportBytes                  = 32 << 20
+	maxExpressionBytes              = 512
+	maxApprovedTrivyExpressionBytes = 4096
+	maxApprovedImageArtifactBytes   = 512
+	maxTokens                       = 128
+	maxDepth                        = 32
 )
 
 var identifierRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+-]*$`)
+var imageDigestRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // Selection records the approved branch of one exact SPDX OR expression.
 type Selection struct {
@@ -31,12 +34,14 @@ type Selection struct {
 
 // Policy is the strict on-disk license policy.
 type Policy struct {
-	Version              int         `json:"version"`
-	AllowedSPDX          []string    `json:"allowed_spdx"`
-	ReviewRequiredSPDX   []string    `json:"review_required_spdx"`
-	DeniedSPDX           []string    `json:"denied_spdx"`
-	SelectedORChoices    []Selection `json:"selected_or_choices"`
-	UnknownLicensePolicy string      `json:"unknown_license_policy"`
+	Version                         int         `json:"version"`
+	AllowedSPDX                     []string    `json:"allowed_spdx"`
+	ReviewRequiredSPDX              []string    `json:"review_required_spdx"`
+	DeniedSPDX                      []string    `json:"denied_spdx"`
+	ApprovedImageArtifacts          []string    `json:"approved_image_artifacts"`
+	ApprovedTrivyLicenseExpressions []string    `json:"approved_trivy_license_expressions"`
+	SelectedORChoices               []Selection `json:"selected_or_choices"`
+	UnknownLicensePolicy            string      `json:"unknown_license_policy"`
 }
 
 // Result is safe machine-readable evaluation output.
@@ -46,6 +51,8 @@ type Result struct {
 
 type trivyReport struct {
 	SchemaVersion int           `json:"SchemaVersion"`
+	ArtifactName  string        `json:"ArtifactName"`
+	ArtifactType  string        `json:"ArtifactType"`
 	Results       []trivyResult `json:"Results"`
 }
 
@@ -65,6 +72,29 @@ func ValidatePolicy(data []byte) error {
 	}
 	_, err := compilePolicy(policy)
 	return err
+}
+
+// ValidatePolicyForImageArtifacts also rejects digest-scoped approvals that
+// are not present in the current runtime inventory.
+func ValidatePolicyForImageArtifacts(data []byte, imageArtifacts []string) error {
+	var policy Policy
+	if err := decodeStrict(data, &policy); err != nil {
+		return fmt.Errorf("decode policy: %w", err)
+	}
+	compiled, err := compilePolicy(policy)
+	if err != nil {
+		return err
+	}
+	current := make(map[string]struct{}, len(imageArtifacts))
+	for _, artifact := range imageArtifacts {
+		current[artifact] = struct{}{}
+	}
+	for artifact := range compiled.approvedImageArtifacts {
+		if _, exists := current[artifact]; !exists {
+			return fmt.Errorf("approved image artifact %q is not present in the current runtime inventory", artifact)
+		}
+	}
+	return nil
 }
 
 // CheckFiles loads and validates a policy and one sanitized Trivy report.
@@ -101,7 +131,7 @@ func Check(policyData, reportData []byte) (Result, error) {
 	for _, result := range report.Results {
 		for _, license := range result.Licenses {
 			count++
-			if err := compiled.evaluate(license.Name); err != nil {
+			if err := compiled.evaluate(report.ArtifactName, report.ArtifactType, license.Name); err != nil {
 				return Result{}, fmt.Errorf("license expression %q: %w", license.Name, err)
 			}
 		}
@@ -127,10 +157,12 @@ func decodeScannerJSON(data []byte, target any) error {
 }
 
 type compiledPolicy struct {
-	allowed    map[string]struct{}
-	review     map[string]struct{}
-	denied     map[string]struct{}
-	selections map[string]string
+	allowed                  map[string]struct{}
+	review                   map[string]struct{}
+	denied                   map[string]struct{}
+	approvedImageArtifacts   map[string]struct{}
+	approvedTrivyExpressions map[string]struct{}
+	selections               map[string]string
 }
 
 func compilePolicy(policy Policy) (compiledPolicy, error) {
@@ -140,12 +172,14 @@ func compilePolicy(policy Policy) (compiledPolicy, error) {
 	if policy.UnknownLicensePolicy != "deny" {
 		return compiledPolicy{}, fmt.Errorf("unknown_license_policy must be deny")
 	}
-	if policy.AllowedSPDX == nil || policy.ReviewRequiredSPDX == nil || policy.DeniedSPDX == nil || policy.SelectedORChoices == nil {
+	if policy.AllowedSPDX == nil || policy.ReviewRequiredSPDX == nil || policy.DeniedSPDX == nil ||
+		policy.ApprovedImageArtifacts == nil || policy.ApprovedTrivyLicenseExpressions == nil || policy.SelectedORChoices == nil {
 		return compiledPolicy{}, fmt.Errorf("license policy arrays must be present and non-null")
 	}
 	compiled := compiledPolicy{
-		allowed: make(map[string]struct{}), review: make(map[string]struct{}),
-		denied: make(map[string]struct{}), selections: make(map[string]string),
+		allowed: make(map[string]struct{}), review: make(map[string]struct{}), denied: make(map[string]struct{}),
+		approvedImageArtifacts: make(map[string]struct{}), approvedTrivyExpressions: make(map[string]struct{}),
+		selections: make(map[string]string),
 	}
 	all := make(map[string]string)
 	for field, values := range map[string][]string{
@@ -175,6 +209,33 @@ func compilePolicy(policy Policy) (compiledPolicy, error) {
 			}
 		}
 	}
+	if !sort.StringsAreSorted(policy.ApprovedImageArtifacts) {
+		return compiledPolicy{}, fmt.Errorf("approved_image_artifacts must be sorted")
+	}
+	for index, artifact := range policy.ApprovedImageArtifacts {
+		if !validApprovedImageArtifact(artifact) {
+			return compiledPolicy{}, fmt.Errorf("approved_image_artifacts contains invalid digest-pinned image %q", artifact)
+		}
+		if index > 0 && policy.ApprovedImageArtifacts[index-1] == artifact {
+			return compiledPolicy{}, fmt.Errorf("approved_image_artifacts contains duplicate %q", artifact)
+		}
+		compiled.approvedImageArtifacts[artifact] = struct{}{}
+	}
+	if !sort.StringsAreSorted(policy.ApprovedTrivyLicenseExpressions) {
+		return compiledPolicy{}, fmt.Errorf("approved_trivy_license_expressions must be sorted")
+	}
+	for index, expression := range policy.ApprovedTrivyLicenseExpressions {
+		if expression != strings.TrimSpace(expression) || len(expression) == 0 || len(expression) > maxApprovedTrivyExpressionBytes || expression == "UNKNOWN" || expression == "NOASSERTION" {
+			return compiledPolicy{}, fmt.Errorf("approved_trivy_license_expressions contains invalid expression %q", expression)
+		}
+		if index > 0 && policy.ApprovedTrivyLicenseExpressions[index-1] == expression {
+			return compiledPolicy{}, fmt.Errorf("approved_trivy_license_expressions contains duplicate %q", expression)
+		}
+		compiled.approvedTrivyExpressions[expression] = struct{}{}
+	}
+	if (len(compiled.approvedImageArtifacts) == 0) != (len(compiled.approvedTrivyExpressions) == 0) {
+		return compiledPolicy{}, fmt.Errorf("approved image artifacts and Trivy expressions must either both be empty or both be non-empty")
+	}
 	previous := ""
 	for _, selection := range policy.SelectedORChoices {
 		if selection.Expression <= previous && previous != "" {
@@ -196,7 +257,14 @@ func compilePolicy(policy Policy) (compiledPolicy, error) {
 	return compiled, nil
 }
 
-func (policy compiledPolicy) evaluate(expression string) error {
+func (policy compiledPolicy) evaluate(artifactName, artifactType, expression string) error {
+	if artifactType == "container_image" {
+		_, approvedArtifact := policy.approvedImageArtifacts[artifactName]
+		_, approvedExpression := policy.approvedTrivyExpressions[expression]
+		if approvedArtifact && approvedExpression {
+			return nil
+		}
+	}
 	expression = normalizeLicenseExpression(expression)
 	node, err := parseExpression(expression)
 	if err != nil {
@@ -215,6 +283,23 @@ func (policy compiledPolicy) evaluate(expression string) error {
 		}
 	}
 	return nil
+}
+
+func validApprovedImageArtifact(value string) bool {
+	if value != strings.TrimSpace(value) || len(value) == 0 || len(value) > maxApprovedImageArtifactBytes || strings.Count(value, "@sha256:") != 1 {
+		return false
+	}
+	reference, digest, found := strings.Cut(value, "@sha256:")
+	if !found || reference == "" || !imageDigestRE.MatchString(digest) {
+		return false
+	}
+	for _, character := range reference {
+		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') && !strings.ContainsRune("./:_-", character) {
+			return false
+		}
+	}
+	return true
 }
 
 // normalizeLicenseExpression maps exact non-canonical aliases emitted by

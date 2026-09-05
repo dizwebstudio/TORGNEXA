@@ -363,7 +363,7 @@ func newTestBundle(t *testing.T, mode Mode) *testBundle {
 		Exceptions:      []riskException{},
 		Blockers:        []blocker{},
 	}
-	policy := []byte(`{"version":1,"allowed_spdx":["Apache-2.0","MIT"],"review_required_spdx":[],"denied_spdx":["AGPL-3.0-only"],"selected_or_choices":[],"unknown_license_policy":"deny"}`)
+	policy := []byte(`{"version":1,"allowed_spdx":["Apache-2.0","MIT"],"review_required_spdx":[],"denied_spdx":["AGPL-3.0-only"],"approved_image_artifacts":[],"approved_trivy_license_expressions":[],"selected_or_choices":[],"unknown_license_policy":"deny"}`)
 	policyPath := "policy/license-policy.json"
 	bundle.write(policyPath, policy)
 	bundle.manifest.DependencyLicensePolicy = &fileEvidence{

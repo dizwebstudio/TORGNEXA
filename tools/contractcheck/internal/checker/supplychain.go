@@ -99,8 +99,8 @@ func CheckSupplyChain(ctx context.Context, root string) error {
 	checkRepositoryImages(ctx, absRoot, &problems)
 	tools := checkToolVersions(ctx, absRoot, &problems)
 	checkGoModulePolicy(ctx, absRoot, tools, &problems)
-	publicReleaseReady := checkReleaseInventory(ctx, absRoot, &problems)
-	checkAuxiliaryPolicyFiles(ctx, absRoot, publicReleaseReady, &problems)
+	publicReleaseReady, runtimeImages := checkReleaseInventory(ctx, absRoot, &problems)
+	checkAuxiliaryPolicyFiles(ctx, absRoot, publicReleaseReady, runtimeImages, &problems)
 	return problems.err()
 }
 
@@ -1505,10 +1505,10 @@ type runtimeEntry struct {
 	Platforms []string `json:"platforms"`
 }
 
-func checkReleaseInventory(ctx context.Context, root string, problems *diagnostics) bool {
+func checkReleaseInventory(ctx context.Context, root string, problems *diagnostics) (bool, []string) {
 	var inventory releaseArtifactInventory
 	if !readPolicyJSON(ctx, root, releaseInventoryPath, &inventory, problems) {
-		return false
+		return false, nil
 	}
 	if inventory.Version != policyVersion {
 		problems.add(releaseInventoryPath, "version must be %d", policyVersion)
@@ -1551,6 +1551,7 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 
 	composeImages := loadComposeServiceImages(ctx, root, "docker-compose.yml", problems)
 	actualRuntime := make(map[string]string, len(inventory.DevelopmentRuntime))
+	uniqueRuntimeImages := make(map[string]struct{}, len(inventory.DevelopmentRuntime))
 	previous = ""
 	for _, runtime := range inventory.DevelopmentRuntime {
 		if runtime.Name <= previous && previous != "" {
@@ -1568,6 +1569,7 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 			problems.add(releaseInventoryPath, "duplicate runtime %q", runtime.Name)
 		}
 		actualRuntime[runtime.Name] = runtime.Image
+		uniqueRuntimeImages[runtime.Image] = struct{}{}
 	}
 	if !equalStringMaps(actualRuntime, composeImages) {
 		problems.add(releaseInventoryPath, "development_runtime must exactly match docker-compose.yml service images")
@@ -1577,7 +1579,12 @@ func checkReleaseInventory(ctx context.Context, root string, problems *diagnosti
 			problems.add(releaseInventoryPath, "public_release_ready requires a real top-level LICENSE file")
 		}
 	}
-	return inventory.PublicReleaseReady
+	runtimeImages := make([]string, 0, len(uniqueRuntimeImages))
+	for image := range uniqueRuntimeImages {
+		runtimeImages = append(runtimeImages, image)
+	}
+	sort.Strings(runtimeImages)
+	return inventory.PublicReleaseReady, runtimeImages
 }
 
 func checkPlatforms(relative, field string, platforms []string, problems *diagnostics) {
@@ -1685,12 +1692,12 @@ type riskException struct {
 	ExpiresAt            string   `json:"expires_at"`
 }
 
-func checkAuxiliaryPolicyFiles(ctx context.Context, root string, publicReleaseReady bool, problems *diagnostics) {
-	checkLicensePolicy(ctx, root, problems)
+func checkAuxiliaryPolicyFiles(ctx context.Context, root string, publicReleaseReady bool, runtimeImages []string, problems *diagnostics) {
+	checkLicensePolicy(ctx, root, runtimeImages, problems)
 	checkRiskExceptions(ctx, root, publicReleaseReady, problems)
 }
 
-func checkLicensePolicy(ctx context.Context, root string, problems *diagnostics) {
+func checkLicensePolicy(ctx context.Context, root string, runtimeImages []string, problems *diagnostics) {
 	const relative = "supply-chain/license-policy.json"
 	if !checkSupplyContext(ctx, problems) {
 		return
@@ -1699,7 +1706,7 @@ func checkLicensePolicy(ctx context.Context, root string, problems *diagnostics)
 	if !ok {
 		return
 	}
-	if err := licensepolicy.ValidatePolicy(data); err != nil {
+	if err := licensepolicy.ValidatePolicyForImageArtifacts(data, runtimeImages); err != nil {
 		problems.add(relative, "%v", err)
 	}
 }
