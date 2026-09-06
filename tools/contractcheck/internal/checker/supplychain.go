@@ -893,7 +893,7 @@ func checkRuntimeImagesWorkflow(workflows []workflowPolicy, problems *diagnostic
 		problems.add(workflow.Rel, "runtime-image publisher must use the exact pinned Buildx and BuildKit versions")
 	}
 	login := findActionStep(publisher, "docker/login-action")
-	if login == nil || !yamlExactScalarMap(yamlMapValue(login, "with"), map[string]string{
+	if login == nil || !yamlExactScalarMap(yamlMapValue(login, "with"), map[string]string{ // #nosec G101 -- "password" is a workflow input name and the expected value is GitHub's ephemeral token expression, not credential material.
 		"password": "${{ github.token }}",
 		"registry": "ghcr.io",
 		"username": "${{ github.actor }}",

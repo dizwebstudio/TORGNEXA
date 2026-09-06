@@ -38,3 +38,7 @@ ARG BUILDARCH
 ARG TARGETARCH
 RUN chmod 0755 /usr/local/bin/gosu; \
     if [ "$BUILDARCH" = "$TARGETARCH" ]; then /usr/local/bin/gosu --version; fi
+
+# The upstream entrypoint supports starting as the database account. Keeping
+# the final image non-root also covers the psql-only migration/init use cases.
+USER postgres
