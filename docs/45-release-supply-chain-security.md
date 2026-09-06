@@ -120,6 +120,13 @@ Pinned tools perform secret scanning, SAST, Go dependency analysis, and
 container scanning. Every Go module and every pinned shipped/development image
 is covered. Scanners emit machine-readable, sanitized reports.
 
+Container vulnerability evidence combines an OS-package scan of the immutable
+image with a language-package scan of its Syft SPDX SBOM. The two Trivy schema
+version 2 reports are validated and merged into one image report. Because the
+SBOM already identifies Java artifacts, this path does not download Trivy's
+separate Java index database and therefore does not trade runner capacity for
+language-package coverage.
+
 Release-blocking outcomes are:
 
 - any active secret finding;

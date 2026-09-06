@@ -99,7 +99,7 @@ if [[ -n "$trivy_cache_dir" ]]; then
     die "--trivy-cache-dir must be a separate child of $safe_root"
 fi
 
-for command_name in awk date go jq mktemp realpath sha256sum tail wc; do
+for command_name in awk cp date go jq mktemp realpath sha256sum sleep tail wc; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
@@ -263,6 +263,11 @@ enforce_license_policy() {
   local report=$1
   local check_name=$2
 
+  if ! jq -e '.SchemaVersion == 2 and (.Results | type == "array")' "$report" >/dev/null; then
+    echo "scan-supply-chain: $check_name has no valid Trivy license report" >&2
+    record_status "$check_name-spdx-policy" failed
+    return
+  fi
   if GOFLAGS=-mod=readonly go -C "$repo_root/tools/contractcheck" run ./cmd/licensecheck \
     -policy "$license_policy" -report "$report" >/dev/null; then
     record_status "$check_name-spdx-policy" passed
@@ -309,10 +314,13 @@ run_trivy_json_check() {
   local raw="$work_dir/raw/${check_name}.json"
   local command_status sanitize_status
 
-  set +e
-  "$trivy" "$@" --format json --output "$raw" >/dev/null 2>"$work_dir/raw/${check_name}.stderr"
-  command_status=$?
-  set -e
+  if run_trivy_json_with_retries "$trivy" "$raw" \
+    "$work_dir/raw/${check_name}.stderr" 3 2 "$@"; then
+    command_status=0
+  else
+    command_status=$?
+    echo "scan-supply-chain: $check_name failed after 3 scanner attempts" >&2
+  fi
   sanitize_status=0
   sanitize_json "$raw" "$destination" || sanitize_status=$?
   if ((sanitize_status == 0 && command_status == 0)); then
@@ -336,6 +344,53 @@ run_trivy_json_check() {
   fi
 }
 
+run_image_vulnerability_check() {
+  local check_name=$1
+  local destination=$2
+  local image=$3
+  local platform=$4
+  local sbom_path=$5
+  local os_raw="$work_dir/raw/${check_name}-os.json"
+  local os_report="$work_dir/raw/${check_name}-os.sanitized.json"
+  local language_raw="$work_dir/raw/${check_name}-language.json"
+  local language_report="$work_dir/raw/${check_name}-language.sanitized.json"
+  local command_status=0
+
+  if ! run_trivy_json_with_retries "$trivy" "$os_raw" \
+    "$work_dir/raw/${check_name}-os.stderr" 3 2 \
+    image --image-src remote --cache-dir "$trivy_cache_dir" \
+    --skip-db-update --skip-java-db-update --platform "$platform" \
+    --scanners vuln --pkg-types os --detection-priority precise \
+    --exit-on-eol 1 --exit-code 0 "$image"; then
+    command_status=1
+    echo "scan-supply-chain: $check_name OS scan failed after 3 scanner attempts" >&2
+  fi
+  if ! run_trivy_json_with_retries "$trivy" "$language_raw" \
+    "$work_dir/raw/${check_name}-language.stderr" 3 2 \
+    sbom --cache-dir "$trivy_cache_dir" --skip-db-update --skip-java-db-update \
+    --scanners vuln --pkg-types library --detection-priority precise \
+    --exit-code 0 "$sbom_path"; then
+    command_status=1
+    echo "scan-supply-chain: $check_name language scan failed after 3 scanner attempts" >&2
+  fi
+
+  if ((command_status == 0)) && \
+    sanitize_json "$os_raw" "$os_report" && \
+    normalize_trivy_report "$os_report" && \
+    sanitize_json "$language_raw" "$language_report" && \
+    normalize_trivy_report "$language_report" && \
+    merge_trivy_vulnerability_reports "$os_report" "$language_report" \
+      "$image" "$destination"; then
+    record_status "$check_name" passed
+    return
+  fi
+
+  rm -f -- "$destination"
+  jq -n --arg check "$check_name" \
+    '{version: 1, status: "scanner_error", check: $check}' >"$destination"
+  record_status "$check_name" failed
+}
+
 go -C "$repo_root/tools/contractcheck" run ./cmd/supplychaincheck -root ../..
 for module_dir in "$repo_root" "$repo_root/tools/contractcheck" "$repo_root/tools/securitytools"; do
   go -C "$module_dir" mod tidy -diff
@@ -343,7 +398,8 @@ for module_dir in "$repo_root" "$repo_root/tools/contractcheck" "$repo_root/tool
   go -C "$module_dir" mod verify
 done
 
-"$trivy" image --cache-dir "$trivy_cache_dir" --download-db-only >/dev/null
+run_command_with_retries 3 2 "$trivy" image --cache-dir "$trivy_cache_dir" \
+  --download-db-only >/dev/null || die "Trivy vulnerability database download failed after 3 attempts"
 trivy_update_flags=(--skip-db-update)
 
 metadata="$trivy_cache_dir/db/metadata.json"
@@ -444,6 +500,7 @@ if [[ "$scope" == images || "$scope" == all ]]; then
   jq -er '.development_runtime[] | . as $runtime | .platforms[] |
     [$runtime.name, $runtime.image, .] | @tsv' "$inventory" >"$work_dir/images.tsv"
   image_count=0
+  declare -A scanned_image_platforms=()
   while IFS=$'\t' read -r name image platform; do
     [[ "$name" =~ ^[a-z][a-z0-9-]*$ ]] || die "unsafe image name: $name"
     [[ "$platform" == linux/amd64 || "$platform" == linux/arm64 ]] || die "unsupported image platform: $platform"
@@ -452,6 +509,29 @@ if [[ "$scope" == images || "$scope" == all ]]; then
     report_stem="${name}_${platform//\//_}"
     sbom_raw="$work_dir/raw/${report_stem}.spdx.json"
     sbom_path="$output_dir/${report_stem}.spdx.json"
+    scan_key="$image|$platform"
+    cached_report_stem="${scanned_image_platforms[$scan_key]:-}"
+    if [[ -n "$cached_report_stem" ]]; then
+      for suffix in spdx.json vulnerability.json license.json secret.json; do
+        cp -- "$output_dir/${cached_report_stem}.${suffix}" \
+          "$output_dir/${report_stem}.${suffix}"
+      done
+      if jq -e '.spdxVersion == "SPDX-2.3"' "$sbom_path" >/dev/null; then
+        record_status "syft-${report_stem}" passed
+      else
+        record_status "syft-${report_stem}" failed
+      fi
+      validate_trivy_report "$output_dir/${report_stem}.vulnerability.json" \
+        "trivy-image-vulnerability-${report_stem}" vulnerability
+      validate_trivy_report "$output_dir/${report_stem}.license.json" \
+        "trivy-image-license-${report_stem}" license
+      enforce_license_policy "$output_dir/${report_stem}.license.json" \
+        "trivy-image-license-${report_stem}"
+      validate_trivy_report "$output_dir/${report_stem}.secret.json" \
+        "trivy-image-secret-${report_stem}" secret
+      continue
+    fi
+    scanned_image_platforms["$scan_key"]="$report_stem"
 
     set +e
     "$syft" scan "registry:$image" --platform "$platform" \
@@ -468,11 +548,8 @@ if [[ "$scope" == images || "$scope" == all ]]; then
       record_status "syft-${report_stem}" failed
     fi
 
-    run_trivy_json_check "trivy-image-vulnerability-${report_stem}" \
-      "$output_dir/${report_stem}.vulnerability.json" \
-      image --image-src remote --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
-      --platform "$platform" --scanners vuln \
-      --detection-priority precise --exit-on-eol 1 --exit-code 0 "$image"
+    run_image_vulnerability_check "trivy-image-vulnerability-${report_stem}" \
+      "$output_dir/${report_stem}.vulnerability.json" "$image" "$platform" "$sbom_path"
     validate_trivy_report "$output_dir/${report_stem}.vulnerability.json" \
       "trivy-image-vulnerability-${report_stem}" vulnerability
     run_trivy_json_check "trivy-image-license-${report_stem}" \
