@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
@@ -24,26 +25,47 @@ func New(database *sql.DB) (*Repository, error) {
 	return &Repository{database: database}, nil
 }
 
-// Observe registers a validated OIDC session or rejects a previously revoked one.
+// Observe registers a validated OIDC session exactly once under concurrent
+// first requests, or rejects a previously revoked or differently bound session.
 func (r *Repository) Observe(ctx context.Context, scope tenancy.Scope, value securitysettings.Observation) error {
-	if err := validate(ctx, r, scope); err != nil || !validObservation(value) {
+	if err := validate(ctx, r, scope); err != nil {
+		return err
+	}
+	if !validObservation(value) {
 		return securitysettings.ErrInvalid
 	}
 	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
-		var status string
-		err := tx.QueryRowContext(ctx, `SELECT status FROM settings_identity_sessions WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef).Scan(&status)
+		var status, subjectRef string
+		readSession := func() error {
+			return tx.QueryRowContext(ctx, `SELECT status,subject_ref FROM settings_identity_sessions WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef).Scan(&status, &subjectRef)
+		}
+		err := readSession()
 		if errors.Is(err, sql.ErrNoRows) {
-			if _, err = tx.ExecContext(ctx, `INSERT INTO settings_identity_sessions(organization_id,workspace_id,session_ref,subject_ref,status,client_kind,authenticated_at,first_seen_at,last_seen_at,expires_at) VALUES($1,$2,$3,$4,'active',$5,$6,$7,$7,$8)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.SubjectRef, value.ClientKind, value.AuthenticatedAt.UTC(), value.ObservedAt.UTC(), value.ExpiresAt.UTC()); err != nil {
-				return fmt.Errorf("insert identity session: %w", err)
+			result, insertErr := tx.ExecContext(ctx, `INSERT INTO settings_identity_sessions(organization_id,workspace_id,session_ref,subject_ref,status,client_kind,authenticated_at,first_seen_at,last_seen_at,expires_at) VALUES($1,$2,$3,$4,'active',$5,$6,$7,$7,$8) ON CONFLICT (organization_id,workspace_id,session_ref) DO NOTHING`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.SubjectRef, value.ClientKind, value.AuthenticatedAt.UTC(), value.ObservedAt.UTC(), value.ExpiresAt.UTC())
+			if insertErr != nil {
+				return fmt.Errorf("insert identity session: %w", insertErr)
 			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO settings_login_events(id,organization_id,workspace_id,session_ref,event_type,client_kind,occurred_at) VALUES($1,$2,$3,$4,'session_observed',$5,$6)`, value.EventID, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ClientKind, value.ObservedAt.UTC())
-			return err
+			inserted, insertErr := result.RowsAffected()
+			if insertErr != nil {
+				return fmt.Errorf("count inserted identity sessions: %w", insertErr)
+			}
+			if inserted == 1 {
+				_, err = tx.ExecContext(ctx, `INSERT INTO settings_login_events(id,organization_id,workspace_id,session_ref,event_type,client_kind,occurred_at) VALUES($1,$2,$3,$4,'session_observed',$5,$6)`, value.EventID, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ClientKind, value.ObservedAt.UTC())
+				return err
+			}
+			// FOR UPDATE cannot lock a missing row. A concurrent creator won the
+			// INSERT; use a fresh READ COMMITTED statement to see its committed
+			// row, then check revocation under the same lock used by Revoke.
+			err = readSession()
 		}
 		if err != nil {
 			return fmt.Errorf("read identity session: %w", err)
 		}
 		if status == "revoked" {
 			return securitysettings.ErrSessionRevoked
+		}
+		if status != "active" || subjectRef != value.SubjectRef {
+			return securitysettings.ErrInvalid
 		}
 		_, err = tx.ExecContext(ctx, `UPDATE settings_identity_sessions SET last_seen_at=GREATEST(last_seen_at,$4),expires_at=GREATEST(expires_at,$5) WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 AND status='active'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ObservedAt.UTC(), value.ExpiresAt.UTC())
 		return err
@@ -181,6 +203,14 @@ func (r *Repository) Revoke(ctx context.Context, scope tenancy.Scope, command se
 }
 
 func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly bool, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.database); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.database.BeginTx(ctx, &sql.TxOptions{ReadOnly: readOnly, Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return err

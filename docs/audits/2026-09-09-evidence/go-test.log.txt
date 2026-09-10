@@ -1,0 +1,241 @@
+ok  	github.com/torgnexa/torgnexa/cmd/api	0.121s
+ok  	github.com/torgnexa/torgnexa/cmd/mcp	0.067s
+?   	github.com/torgnexa/torgnexa/cmd/scheduler	[no test files]
+?   	github.com/torgnexa/torgnexa/cmd/torgnexa-connector-conformance	[no test files]
+?   	github.com/torgnexa/torgnexa/cmd/torgnexa-connector-emulator	[no test files]
+ok  	github.com/torgnexa/torgnexa/cmd/torgnexa-marketplace-live-smoke	(cached)
+ok  	github.com/torgnexa/torgnexa/cmd/torgnexa-runtime-qualifier	0.039s
+?   	github.com/torgnexa/torgnexa/cmd/torgnexa-slo-report	[no test files]
+?   	github.com/torgnexa/torgnexa/cmd/worker	[no test files]
+ok  	github.com/torgnexa/torgnexa/connectors/ai/claude	0.079s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/deepseek	0.051s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/gemini	0.068s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/gigachat	0.060s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/grok	0.070s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/kimi	0.039s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/lm-studio	0.060s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/ollama	0.071s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/open-webui	0.068s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/openai-compatible	0.060s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/qwen	0.070s
+ok  	github.com/torgnexa/torgnexa/connectors/ai/yandexgpt	0.058s
+ok  	github.com/torgnexa/torgnexa/connectors/classified/auto-ru	0.067s
+ok  	github.com/torgnexa/torgnexa/connectors/classified/avito	0.060s
+ok  	github.com/torgnexa/torgnexa/connectors/classified/cian	0.073s
+ok  	github.com/torgnexa/torgnexa/connectors/crm/bitrix24	0.071s
+ok  	github.com/torgnexa/torgnexa/connectors/edo/diadoc	0.062s
+ok  	github.com/torgnexa/torgnexa/connectors/edo/saby-edo	0.052s
+ok  	github.com/torgnexa/torgnexa/connectors/erp/moysklad	0.070s
+ok  	github.com/torgnexa/torgnexa/connectors/erp/onec	0.080s
+ok  	github.com/torgnexa/torgnexa/connectors/finance/cbr-fx	0.063s
+ok  	github.com/torgnexa/torgnexa/connectors/government/chestny-znak	0.062s
+ok  	github.com/torgnexa/torgnexa/connectors/government/egais	0.055s
+ok  	github.com/torgnexa/torgnexa/connectors/government/vetis-mercury	0.104s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/cdek	0.069s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/dellin	0.073s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/fivepost	0.074s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/ozon-delivery	0.072s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/pek	0.050s
+ok  	github.com/torgnexa/torgnexa/connectors/logistics/pochta-russia	0.063s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/aliexpress-ru	0.056s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/lamoda	0.036s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/magnit-market	0.066s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/megamarket	0.047s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/mvideo	0.040s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/ozon	0.068s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/wildberries	0.065s
+ok  	github.com/torgnexa/torgnexa/connectors/marketplaces/yandex-market	0.077s
+ok  	github.com/torgnexa/torgnexa/connectors/payments/dolyami	0.051s
+ok  	github.com/torgnexa/torgnexa/connectors/payments/ozon-pay	0.070s
+ok  	github.com/torgnexa/torgnexa/connectors/payments/robokassa	0.065s
+ok  	github.com/torgnexa/torgnexa/connectors/payments/sbp	0.046s
+ok  	github.com/torgnexa/torgnexa/connectors/payments/yookassa	0.040s
+ok  	github.com/torgnexa/torgnexa/connectors/social/instagram	0.046s
+ok  	github.com/torgnexa/torgnexa/connectors/social/max-messenger	0.058s
+ok  	github.com/torgnexa/torgnexa/connectors/social/odnoklassniki	0.037s
+ok  	github.com/torgnexa/torgnexa/connectors/social/rutube	0.046s
+ok  	github.com/torgnexa/torgnexa/connectors/social/telegram	0.048s
+ok  	github.com/torgnexa/torgnexa/connectors/social/threads	0.066s
+ok  	github.com/torgnexa/torgnexa/connectors/social/vk	0.067s
+ok  	github.com/torgnexa/torgnexa/connectors/social/youtube	0.061s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/bitrix	0.056s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/cs-cart	0.050s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/magento	0.050s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/medusa	0.057s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/opencart	0.058s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/prestashop	0.048s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/saleor	0.188s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/shopify	0.033s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/shopware	0.038s
+ok  	github.com/torgnexa/torgnexa/connectors/storefronts/woocommerce	0.026s
+ok  	github.com/torgnexa/torgnexa/internal/app/api	0.175s
+ok  	github.com/torgnexa/torgnexa/internal/app/mcp	0.038s
+ok  	github.com/torgnexa/torgnexa/internal/app/worker	0.079s
+ok  	github.com/torgnexa/torgnexa/internal/core/advertising	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/catalog	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/catalogbulk	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/compliance	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/customerservice	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/ecosystem	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/financialcompleteness	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/integrationcenter	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/inventory	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/legalparty	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/logistics	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/marketplacegrowth	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/marketplacelisting	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/marketplaceoperations	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/marketplacepublication	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/marking	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/operatorassistant	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/orders	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/payments	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/pim	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/pricing	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/repricing	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/returns	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/social	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/tenancy	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/uniteconomics	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/core/userprofile	0.005s
+ok  	github.com/torgnexa/torgnexa/internal/core/workflow	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/advertising	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/agentgovernance	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/aiadvisory	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/approval	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/architecture	1.245s
+ok  	github.com/torgnexa/torgnexa/internal/platform/audit	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/background	0.042s
+ok  	github.com/torgnexa/torgnexa/internal/platform/backupdr	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/bootstrap	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/builtinruntime	11.010s
+ok  	github.com/torgnexa/torgnexa/internal/platform/claims	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/cloudbilling	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/complianceguard	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/config	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectorauth	0.041s
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectorruntime	0.034s
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectors	0.046s
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectors/conformance	0.039s
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectorsandbox	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/connectorsandbox/emulator	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/customerinbox	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/domain	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/edo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/enterpriseiam	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/entitlementguard	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/entitlements	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/eventbus	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/fiscalization	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/fx	0.039s
+ok  	github.com/torgnexa/torgnexa/internal/platform/importexport	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/inbox	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/incidents	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/kafkaeventbus	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/kafkatransport	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/lineage	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/logging	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/logistics	0.026s
+ok  	github.com/torgnexa/torgnexa/internal/platform/marking	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/mcpaccounts	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/migration	0.049s
+ok  	github.com/torgnexa/torgnexa/internal/platform/notifications	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/outbox	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/paymentreconciliation	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/payments	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/pluginmarketplace	0.034s
+ok  	github.com/torgnexa/torgnexa/internal/platform/pluginsecurity	0.030s
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/advertisingrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/agentgovernancerepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/aiadvisoryrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/approvalrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/backfillrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/catalogbulkrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/catalogimagerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/catalogrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/compliancerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/connectorconfigrepo	0.029s
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/connectormaprepo	0.026s
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo	0.035s
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/customerservicerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/database	0.011s
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/ecosystemrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/entitlementrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/financialcompletenessrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/financialrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/fxrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/inboxrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/integrationcenterrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/inventoryrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/legalpartyrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/lineagerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/logisticsrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacegrowthrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacelistingrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/marketplaceoperationsrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/marketplacepublicationrepo	[no test files]
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/markingrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/mcpaccountsrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/notificationrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/operatorassistantrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/ordersrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/pimrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/pluginmarketplacerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/pricingrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/privacyrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/procurementrepo	[no test files]
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/publicationqualityrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/reconciliationrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/replenishmentrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/reportrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/retentionrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/returnsrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/searchrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/securitysettingsrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/settlementrepo	[no test files]
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/socialdispatchrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/socialrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/trustcontrolrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/uniteconomicsrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/uploadrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/userprofilerepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/webhookrepo	(cached)
+?   	github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo	[no test files]
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/workflowrepo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/privacy	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/procurement	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/promotions	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/publicationquality	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/pudo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/reconciliation	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/replenishment	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/reporting	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/retention	0.007s
+ok  	github.com/torgnexa/torgnexa/internal/platform/runtimeposture	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/search	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/secrets	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/securityedge	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/securitysettings	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/settlements	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/siem	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/signing	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/slo	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/sms	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/syncengine	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/trustcontrol	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/uploads	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/vetis	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/webhooks	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/wmsexecution	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/wmsledger	(cached)
+ok  	github.com/torgnexa/torgnexa/internal/platform/workflowengine	(cached)
+?   	github.com/torgnexa/torgnexa/tools/approval-debug	[no test files]
+?   	github.com/torgnexa/torgnexa/tools/architecturecheck	[no test files]
+ok  	github.com/torgnexa/torgnexa/tools/migrationcheck	(cached)

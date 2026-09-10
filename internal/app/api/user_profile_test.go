@@ -188,3 +188,7 @@ func TestUserProfilePrivacyRequestUsesOpaqueCurrentSubject(t *testing.T) {
 		t.Fatalf("unexpected privacy subject: %#v", privacy.spec)
 	}
 }
+
+func (stub *auditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}

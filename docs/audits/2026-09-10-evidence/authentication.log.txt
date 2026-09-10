@@ -1,0 +1,30 @@
+=== RUN   TestA09OIDCSessionFailureClassification
+=== RUN   TestA09OIDCSessionFailureClassification/active
+=== RUN   TestA09OIDCSessionFailureClassification/revoked
+=== RUN   TestA09OIDCSessionFailureClassification/wrapped_revocation
+=== RUN   TestA09OIDCSessionFailureClassification/invalid_binding
+=== RUN   TestA09OIDCSessionFailureClassification/database_unavailable
+=== RUN   TestA09OIDCSessionFailureClassification/deadline
+=== RUN   TestA09OIDCSessionFailureClassification/cancellation
+--- PASS: TestA09OIDCSessionFailureClassification (0.05s)
+    --- PASS: TestA09OIDCSessionFailureClassification/active (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/revoked (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/wrapped_revocation (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/invalid_binding (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/database_unavailable (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/deadline (0.01s)
+    --- PASS: TestA09OIDCSessionFailureClassification/cancellation (0.01s)
+=== RUN   TestA09SessionOutageContract
+--- PASS: TestA09SessionOutageContract (0.00s)
+=== RUN   TestProductionCompositionFailsClosedAtEachAuthorizationStage
+=== RUN   TestProductionCompositionFailsClosedAtEachAuthorizationStage/authn
+=== RUN   TestProductionCompositionFailsClosedAtEachAuthorizationStage/session_store_unavailable
+=== RUN   TestProductionCompositionFailsClosedAtEachAuthorizationStage/tenant
+=== RUN   TestProductionCompositionFailsClosedAtEachAuthorizationStage/authz
+--- PASS: TestProductionCompositionFailsClosedAtEachAuthorizationStage (0.00s)
+    --- PASS: TestProductionCompositionFailsClosedAtEachAuthorizationStage/authn (0.00s)
+    --- PASS: TestProductionCompositionFailsClosedAtEachAuthorizationStage/session_store_unavailable (0.00s)
+    --- PASS: TestProductionCompositionFailsClosedAtEachAuthorizationStage/tenant (0.00s)
+    --- PASS: TestProductionCompositionFailsClosedAtEachAuthorizationStage/authz (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.203s

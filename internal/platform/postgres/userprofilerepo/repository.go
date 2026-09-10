@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/core/userprofile"
@@ -139,6 +140,7 @@ func (repository *Repository) Update(ctx context.Context, scope tenancy.Scope, u
 				return userprofile.ErrConflict
 			}
 			profile = current
+			profile.Replayed = true
 			return nil
 		}
 		if current.Version != update.ExpectedVersion {
@@ -171,6 +173,14 @@ func applyScope(ctx context.Context, tx *sql.Tx, scope tenancy.Scope) error {
 }
 
 func (repository *Repository) withTransaction(ctx context.Context, scope tenancy.Scope, readOnly bool, operation func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, repository.database); err != nil {
+		return err
+	} else if tx != nil {
+		return operation(tx)
+	}
 	if ctx == nil || !scope.Valid() || repository == nil || repository.database == nil || operation == nil {
 		return userprofile.ErrInvalid
 	}

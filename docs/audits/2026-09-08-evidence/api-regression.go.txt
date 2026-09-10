@@ -1,0 +1,137 @@
+package api
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/torgnexa/torgnexa/internal/core/payments"
+	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/config"
+	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
+)
+
+type auditFailingPaymentRepo struct {
+	*fakePaymentsRepository
+	statusCalls  int
+	failEvidence bool
+}
+
+func (r *auditFailingPaymentRepo) ChangePaymentStatus(ctx context.Context, s payments.Scope, c payments.ChangePaymentStatus, m payments.Mutation) (payments.Payment, error) {
+	r.statusCalls++
+	if r.statusCalls == 1 {
+		return payments.Payment{}, payments.ErrConflict
+	}
+	return r.fakePaymentsRepository.ChangePaymentStatus(ctx, s, c, m)
+}
+
+func (r *auditFailingPaymentRepo) RecordWebhookEvidence(ctx context.Context, s payments.Scope, e payments.WebhookEvidence) (bool, error) {
+	if r.failEvidence {
+		return false, errors.New("synthetic temporary database failure")
+	}
+	return r.fakePaymentsRepository.RecordWebhookEvidence(ctx, s, e)
+}
+
+func auditWebhook(r *auditFailingPaymentRepo) (paymentWebhookAPI, string) {
+	r.seed(testWebhookPayment())
+	gateway := &fakeGatewayResolver{gateway: fakeWebhookGateway{verify: func(context.Context, []byte, []byte) (sdk.PaymentWebhook, error) {
+		return sdk.PaymentWebhook{DeliveryID: "audit-delivery", EventType: "payment_succeeded", RemotePaymentID: "yk_remote_1", BodyDigest: strings.Repeat("a", 64), OccurredAt: time.Now().UTC()}, nil
+	}}}
+	a := testWebhookAccount()
+	return paymentWebhookAPI{repository: r, accounts: fakeWebhookAccounts{account: a}, secrets: fakeWebhookSecrets{}, registry: gateway}, paymentWebhooksPathPrefix + a.ConnectorID + "/" + a.OrganizationID + "/" + a.WorkspaceID + "/" + a.ID
+}
+
+func TestAuditPaymentWebhookRetryAfterConflict(t *testing.T) {
+	r := &auditFailingPaymentRepo{fakePaymentsRepository: newFakePaymentsRepository()}
+	a, path := auditWebhook(r)
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		a.receive(w, webhookRequest(path, `{}`))
+		t.Logf("delivery %d HTTP %d", i+1, w.Code)
+	}
+	if got := r.byID[testWebhookPayment().ID].Status; got != payments.StatusSucceeded {
+		t.Fatalf("verified success lost after retry: status=%s, status calls=%d, receipts=%d", got, r.statusCalls, len(r.evidence))
+	}
+}
+
+func TestAuditPaymentWebhookStorageFailureNeedsRetry(t *testing.T) {
+	r := &auditFailingPaymentRepo{fakePaymentsRepository: newFakePaymentsRepository(), failEvidence: true}
+	a, path := auditWebhook(r)
+	w := httptest.NewRecorder()
+	a.receive(w, webhookRequest(path, `{}`))
+	if w.Code < 500 {
+		t.Fatalf("temporary storage failure acknowledged with HTTP %d; receipts=%d", w.Code, len(r.evidence))
+	}
+}
+
+type auditRoundTrip func(*http.Request) (*http.Response, error)
+
+func (f auditRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type auditSessionStore struct{ securitysettings.Store }
+
+func (auditSessionStore) Observe(context.Context, tenancy.Scope, securitysettings.Observation) error {
+	return nil
+}
+
+func TestAuditOIDCUnverifiedEmailCannotBeUsedForInvitation(t *testing.T) {
+	s := validTestScope(t)
+	now := time.Now()
+	claims := map[string]any{"iss": "https://id.example.test/realm", "sub": "synthetic-user", "azp": "client-id", "exp": now.Add(time.Hour).Unix(), "iat": now.Unix(), "sid": "audit-session", "organization_id": s.OrganizationID().String(), "workspace_id": s.WorkspaceID().String(), "email": "invited-admin@example.test", "email_verified": false}
+	payload, _ := json.Marshal(claims)
+	// The fake trusted UserInfo service accepts this synthetic token; this test
+	// checks email-ownership policy, not JWT-signature validation.
+	token := "eyJhbGciOiJSUzI1NiJ9." + base64.RawURLEncoding.EncodeToString(payload) + ".synthetic"
+	a := oidcAuthenticator{cfg: config.OIDC{Issuer: "https://id.example.test/realm", UserInfoURL: "https://id.example.test/realm/userinfo", ClientID: "client-id"}, environment: config.EnvironmentProduction, sessions: auditSessionStore{}, client: &http.Client{Transport: auditRoundTrip(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"sub":"synthetic-user","email":"invited-admin@example.test","email_verified":false}`))}, nil
+	})}}
+	r := httptest.NewRequest("GET", "/api/v1/orders", nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	p, err := a.Authenticate(context.Background(), r)
+	if err == nil && p.Email != "" {
+		t.Fatalf("unverified email propagated to Principal.Email used by invitation resolver: %s", p.Email)
+	}
+}
+
+type auditChangingAudit struct {
+	realtimeAuditStub
+	calls int
+}
+
+func (a *auditChangingAudit) LatestID(context.Context, tenancy.Scope) (string, error) {
+	a.calls++
+	return fmt.Sprintf("audit-%d", a.calls), nil
+}
+
+func TestAuditRealtimeSurvivesServerWriteDeadline(t *testing.T) {
+	scope := validTestScope(t)
+	route := newRealtimeRoutes(&auditChangingAudit{})[0]
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		route.Handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestScopeKey{}, scope)))
+	}))
+	// Same server-wide deadline as production, shortened for this regression.
+	srv.Config.WriteTimeout = 100 * time.Millisecond
+	srv.Start()
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL, nil)
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(data), "event: invalidate") {
+		t.Fatalf("SSE lost update after write deadline; received %q", data)
+	}
+}

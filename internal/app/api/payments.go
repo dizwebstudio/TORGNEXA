@@ -40,7 +40,7 @@ type paymentsAPI struct {
 	accounts   paymentsConnectorAccounts
 	configs    paymentsRuntimeConfig
 	secrets    secrets.SecretProvider
-	registry   *builtinruntime.Registry
+	registry   paymentGatewayResolver
 }
 
 type paymentView struct {
@@ -251,6 +251,7 @@ func (api paymentsAPI) createPayment(w http.ResponseWriter, r *http.Request) {
 	expiresAt := time.Now().UTC().Add(time.Duration(input.ExpiresInSeconds) * time.Second)
 	command := payments.CreatePayment{ID: id, ConnectorAccountID: account.ID, ExternalID: input.ID, Purpose: strings.TrimSpace(input.Purpose), Amount: amount, ExpiresAt: expiresAt}
 	created, err := api.repository.CreatePayment(r.Context(), scope, command, paymentsMutation(principal.Subject, key))
+	fresh := err == nil
 	if errors.Is(err, payments.ErrConflict) {
 		created, err = api.repository.Payment(r.Context(), scope, id)
 		actual := struct {
@@ -265,7 +266,7 @@ func (api paymentsAPI) createPayment(w http.ResponseWriter, r *http.Request) {
 			minorUnits int64
 			currency   string
 		}{account.ID, input.ID, amount.MinorUnits(), string(amount.Currency())}
-		if err == nil && actual != expected {
+		if err == nil && (actual != expected || created.Purpose != command.Purpose) {
 			err = payments.ErrConflict
 		}
 	}
@@ -273,7 +274,7 @@ func (api paymentsAPI) createPayment(w http.ResponseWriter, r *http.Request) {
 		writePaymentsError(w, err)
 		return
 	}
-	if created.Status == payments.StatusPending {
+	if fresh && created.Status == payments.StatusPending {
 		created, err = api.dispatchCreate(r.Context(), tenantScope, scope, account, created, principal.Subject, key)
 		if err != nil {
 			writePaymentsError(w, err)
@@ -283,12 +284,9 @@ func (api paymentsAPI) createPayment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, paymentResponse(created))
 }
 
-// dispatchCreate makes the one outbound call to the payment rail, synchronous
-// with the API request — matching how a real checkout flow needs the
-// provider's redirect URL back immediately, not after a worker cycle. A
-// failure here still leaves a durable "pending" row the reconciliation
-// worker will pick up, so a request that times out client-side never loses
-// track of money.
+// dispatchCreate is attempted only by the request that inserted the durable intent.
+// A transport error cannot prove rejection: keep pending until authenticated
+// reconciliation binds the original external ID. Client retries never reissue a create.
 func (api paymentsAPI) dispatchCreate(ctx context.Context, tenantScope tenancy.Scope, scope payments.Scope, account sdk.Account, payment payments.Payment, actor, correlation string) (payments.Payment, error) {
 	gateway, err := api.registry.PaymentGateway(account, api.configLoader(tenantScope))
 	if err != nil {
@@ -302,8 +300,7 @@ func (api paymentsAPI) dispatchCreate(ctx context.Context, tenantScope tenancy.S
 		ExternalID: payment.ExternalID, IdempotencyKey: payment.ExternalID, Purpose: payment.Purpose, Amount: sdk.PaymentAmount{MinorUnits: payment.Amount.MinorUnits(), Currency: string(payment.Amount.Currency())}, ExpiresAt: payment.ExpiresAt,
 	})
 	if createErr != nil {
-		reason := paymentsReasonCode(createErr)
-		return api.repository.ChangePaymentStatus(ctx, scope, payments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: payments.StatusFailed, ReasonCode: reason}, paymentsMutation(actor, correlation))
+		return payment, nil
 	}
 	return api.repository.ChangePaymentStatus(ctx, scope, payments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: payments.StatusCreated, RemoteID: result.RemoteID, RemoteStatus: result.Status}, paymentsMutation(actor, correlation))
 }

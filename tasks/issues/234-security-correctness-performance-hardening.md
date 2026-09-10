@@ -2,15 +2,145 @@
 
 ## Статус
 
-`planned` — follow-up по результатам статического security/performance-аудита
-от 2026-09-04.
+`in_progress` — follow-up по результатам security/performance-аудитов;
+A01–A10 из аудита 2026-09-08 исправлены в указанной ниже области.
 
 ```yaml
-repository_status: backlog
-release_blockers: [234.1, 234.2, 234.3]
+repository_status: in_progress
+release_blockers: [234.1, 234.3]
 security_priority: high
 external_evidence_required: false
 ```
+
+## Выполнено 2026-09-10 — A10 / таймауты и восстановление SSE
+
+- [x] После auth/tenant/authz SSE использует отдельный deadline на каждую
+  запись/flush; между кадрами deadline снят. Общие таймауты API сохранены.
+- [x] Ошибки write, Flush и управления deadline завершают поток; медленный
+  клиент не удерживает обработчик бесконечно. Cancellation освобождает поток.
+- [x] После каждого ready отправляется invalidate/reason connected, чтобы
+  перечитать изменения за время разрыва; heartbeat остаётся только liveness.
+- [x] Реальные HTTP/1.1 и HTTP/2: поток переживает общий timeout и два
+  heartbeat-интервала, доставляет последующее изменение; проверены reconnect,
+  401/403, обычный API timeout и backpressure через http.Server/net.Pipe.
+- [x] Chrome с настоящими React/Query/SDK: пропущенное изменение видно после
+  reconnect, восемь invalidate дают один refetch, logout отменяет SSE/retry.
+- [x] Целевые Go/race, общий Go test/vet, contracts, architecture,
+  frontend tests/build и generated SDK checks — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-10-a10-fix.md),
+  [ADR-0189](../../adr/0189-sse-write-deadlines-and-reconnect-refresh.md).
+
+A10 закрыта в репозитории; исходный список A01–A10 завершён. Для применения
+обновить все API instances; миграция и изменение frontend runtime не нужны.
+Рабочий Docker stack не пересобирался/перезапускался. Task 234 остаётся
+`in_progress`: масштабирование SSE и остальные незавершённые подзадачи ниже
+не входят в закрытые дефекты A01–A10.
+
+## Выполнено 2026-09-10 — A09 / конкурентная регистрация OIDC-сессии
+
+- [x] Первый INSERT идемпотентен; проигравший конкурент читает созданную
+  строку заново под блокировкой и проверяет status/subject. Только создатель
+  записывает `session_observed`, атомарно с сессией.
+- [x] На реальной PostgreSQL с forced RLS и двумя application pools:
+  8 одновременных первых API-запросов успешны, одна сессия и одно событие.
+  До исправления тот же тест давал 7 ложных 401 из 8 запросов.
+- [x] Проверены оба порядка Observe/Revoke, отказ после отзыва, cancellation,
+  rollback при ошибке login event, retry, неизменность subject и tenant scope.
+- [x] Сбой хранилища сессий возвращает 503 без раскрытия DB-ошибки и без
+  запуска бизнес-обработчика; неверная/отозванная сессия по-прежнему даёт 401.
+  Поведение описано в OpenAPI, generated SDK hashes обновлены.
+- [x] Целевые unit/contract и PostgreSQL `-count=1 -race`, общий Go test,
+  vet, contracts, architecture, SDK и TypeScript declarations — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-10-a09-fix.md),
+  [ADR-0188](../../adr/0188-concurrent-oidc-session-observation.md).
+
+A09 закрыта в репозитории. Для применения обновить все API instances;
+миграция и переписывание истории сессий не нужны. Развёртывание не выполнялось.
+После следующего продолжения A10 также закрыта. Общая Task 234 сохраняет `in_progress`:
+JWKS, уменьшение количества membership/IdP calls, throttle last_seen и метрики
+из 234.6, а также остальные незавершённые подзадачи, остаются открытыми.
+
+## Выполнено 2026-09-09 — A02 / подтверждение email приглашения
+
+- [x] Привязка приглашения требует email и boolean `email_verified=true`
+  из одного аутентифицированного UserInfo response с совпадающим subject.
+- [x] Profile email отделён от invitation proof; token/profile fallback и
+  подтверждение другого адреса не разрешают привязку. `false`, `null` и
+  отсутствие признака означают отсутствие доказательства владения.
+- [x] Реальная PostgreSQL + полная auth/tenant/authz цепочка: попытка получить
+  приглашённую admin-роль без proof отклоняется, приглашение не меняется.
+  Подтверждённый владелец принимает его один раз; retry не меняет version.
+- [x] Проверены bound viewer, disabled member, другой workspace, неверный
+  subject/тип claim, неизменность публичных отказов и отсутствие нового PII
+  в public projection. Вход существующего активного участника сохранён.
+- [x] Целевые unit/contract и PostgreSQL тесты с `-count=1 -race`, общий
+  `go test ./...`, vet, contracts, architecture и SDK checks — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-09-a02-fix.md),
+  [ADR-0187](../../adr/0187-verified-email-invitation-binding.md).
+
+A02 закрыта в репозитории; развёртывание API не выполнялось. Для применения
+обновить все API instances и проверить UserInfo mapper провайдера. Старые
+привязки автоматически не отзываются: их проверка описана в ADR-0187.
+A09 и A10 закрыты в продолжениях от 2026-09-10; оставшиеся подзадачи ниже открыты.
+
+## Выполнено 2026-09-09 — A01 / изоляция браузерного кеша
+
+- [x] Отдельный QueryClient и дерево UI для каждого контекста
+  пользователя/workspace/прав; обычное продление scoped-сессии сохраняет кеш.
+- [x] Logout немедленно отменяет запросы и очищает старое состояние, включая
+  случай медленного logout в host adapter. Истечение и ошибки сессии работают
+  fail-closed; старый таймер не завершает уже продлённую сессию.
+- [x] Поздние API/OIDC ответы не восстанавливают A, не меняют сессию B и не
+  повторяют старую команду с правами нового пользователя.
+- [x] Браузерный сценарий A → logout → B: загрузка, ошибка API B и успешный
+  повтор; поздние 200/401 A, смена workspace/прав, истечение сессии.
+- [x] 22 целевых logic-теста, общий frontend gate с production build,
+  `go test ./...`, `go vet ./...`, contracts и architecture — PASS.
+- [Отчёт и ограничения проверки](../../docs/audits/2026-09-09-a01-fix.md),
+  [ADR-0186](../../adr/0186-frontend-session-cache-lifetime.md).
+
+A01 закрыта в репозитории. A09 и A10 закрыты 2026-09-10; незавершённые
+подзадачи ниже открыты. Развёртывание frontend не выполнялось; после обновления артефакта
+существующие вкладки нужно перезагрузить.
+
+## Выполнено 2026-09-09 — webhook A03–A04 / 234.2
+
+- `ApplyVerifiedWebhook` атомарно фиксирует receipt, payment transition, audit
+  и outbox. Ошибка, конфликт версии и отказ COMMIT откатывают receipt.
+- Проверенные payment/commerce/social deliveries получают 503 при ошибке
+  сохранения; pre-verification ответы остаются uniform 200.
+- Исправлены повтор commerce-события без provider timestamp и сохранение
+  типизированной ссылки на webhook secret в runtime config.
+- Реальная PostgreSQL: все стадии failure injection, конфликт версии,
+  concurrent replay, потеря DB connection, проверка неизменности payload.
+  Реальные WooCommerce/Telegram/MAX verifiers: неверная подпись/секрет,
+  outbox failure, redelivery; обычный Inbox fingerprint остаётся строгим.
+- [Отчёт](../../docs/audits/2026-09-09-webhook-fixes.md),
+  [ADR-0185](../../adr/0185-verified-webhook-atomic-commit-and-retry.md).
+
+## Выполнено 2026-09-09 — A05–A08
+
+- A05: pending intent после неопределённого create; retry без повторного remote
+  вызова; YooKassa `metadata.external_id` → SDK observation → проверка
+  account/amount/currency → восстановление remote binding. Исправлен формат
+  payment reconciliation audit ID на UUIDv7.
+- A06 / часть 234.3: общая транзакция mutation + audit для member, workspace,
+  profile/avatar removal, identity provider и connector runtime config.
+  Остальной inventory security/connector-account writes остаётся открытым.
+- A07 / 234.4: случайные subscription references с SHA-256 в tenant/account
+  runtime config, exact topic, проверка до Inbox, revocation, OpenAPI/SDK и
+  инструкция maintenance window.
+- A08 / основная часть 234.5: единое соединение для lock/read/rotation; реальная
+  PostgreSQL с pool=1/4, cancel/rejected refresh и rollback. Пул не увеличивался;
+  дополнительные метрики и jitter из 234.5 остаются follow-up.
+- Воспроизведение: `./scripts/check-audit-postgres.sh` (полный migration catalog,
+  непривилегированный application role, локальный HTTP mock, `go test -race`).
+- [Подробности и границы результата](../../docs/audits/2026-09-09-a05-a08-fixes.md),
+  [ADR-0184](../../adr/0184-audit-transaction-and-webhook-topic-binding.md).
+
+Дополнительный follow-up: согласовать family storefront между каталогом,
+Go-манифестами WooCommerce/Saleor и PostgreSQL с миграцией существующих аккаунтов;
+расширить recovery beyond bounded provider list/window для pending платежей.
 
 ## Цель
 
@@ -54,20 +184,21 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.2 — Сделать verified payment webhook атомарным и повторяемым
 
-- [ ] После удалённой проверки передавать нормализованный verified result в
+- [x] После удалённой проверки передавать нормализованный verified result в
   один repository boundary, который атомарно фиксирует receipt, меняет payment,
   добавляет audit и Transactional Outbox event.
-- [ ] Не переводить receipt в terminal/applied до успешного status transition.
+- [x] Не переводить receipt в terminal/applied до успешного status transition.
   Если выбран `pending/applied/rejected` state machine, pending должен иметь
   lease/retry/DLQ и наблюдаемую причину остановки.
-- [ ] После доказанной подлинности внутренняя ошибка должна либо дать провайдеру
+- [x] После доказанной подлинности внутренняя ошибка должна либо дать провайдеру
   retryable ответ, либо быть надёжно поставлена в durable retry до `2xx`.
   До verification сохранить одинаковый ответ без account enumeration.
-- [ ] Повтор уже применённой доставки остаётся no-op и не создаёт повторных
+- [x] Повтор уже применённой доставки остаётся no-op и не создаёт повторных
   audit/outbox side effects.
-- [ ] Добавить failure-injection тесты: receipt insert success + transition
-  failure, optimistic conflict, DB outage, redelivery и worker recovery.
-- [ ] Подтвердить, что reconciliation остаётся safety net, а не единственным
+- [x] Добавить failure-injection тесты: receipt insert success + transition
+  failure, optimistic conflict, DB outage и redelivery; существующие PostgreSQL-сценарии worker reconciliation
+  также проходят в общем gate A03–A08.
+- [x] Подтвердить, что reconciliation остаётся safety net, а не единственным
   способом восстановить потерянную verified delivery.
 
 ### 234.3 — Объединить привилегированные settings mutations с аудитом
@@ -81,42 +212,45 @@ capability-based connector boundary и запрет на plaintext credentials.
   тем же idempotency key не должен создавать дубликаты.
 - [ ] Audit summary остаётся bounded/redacted и не получает email, raw OIDC
   subject, credentials или provider payload.
-- [ ] Добавить тесты с injected audit failure для role/status, identity-provider
+- [x] Добавить тесты с injected audit failure для role/status, identity-provider
   enable/disable и profile update.
 
 ### 234.4 — Привязать commerce webhook topic к доверенному ожиданию
 
-- [ ] Перестать формировать `ExpectedTopic` из того же HTTP-заголовка, который
+- [x] Перестать формировать `ExpectedTopic` из того же HTTP-заголовка, который
   заполняет `HeaderTopic`.
-- [ ] Для провайдеров, у которых topic не входит в подпись body, выдавать
+- [x] Для провайдеров, у которых topic не входит в подпись body, выдавать
   отдельный непредсказуемый subscription endpoint/reference, серверно
   связанный с account и exact expected topic.
-- [ ] Сравнивать provider header с серверной subscription configuration до
+- [x] Сравнивать provider header с серверной subscription configuration до
   dedup/outbox claim; для подписанного event в body дополнительно проверять
   семантическое совпадение внутри connector adapter.
-- [ ] Delivery fingerprint не должен позволять replay одного подписанного body
+- [x] Delivery fingerprint не должен позволять replay одного подписанного body
   сначала зарегистрировать под ложным topic и поглотить корректную доставку.
-- [ ] Обновить OpenAPI, migration/compatibility notes и connector conformance
+- [x] Обновить OpenAPI, migration/compatibility notes и connector conformance
   fixtures для WooCommerce и Saleor.
 
 ### 234.5 — Убрать nested-transaction deadlock из OAuth refresh
 
-- [ ] Advisory lock, повторное чтение bundle и encrypted rotation должны
+- [x] Advisory lock, повторное чтение bundle и encrypted rotation должны
   использовать один явно переданный SQL transaction/connection boundary либо
   отдельный coordinator pool с гарантированным резервом connections.
-- [ ] Не допускать схему, где все connections удерживают outer lock-транзакции
+- [x] Не допускать схему, где все connections удерживают outer lock-транзакции
   и одновременно ждут nested `SecretProvider.Use/Rotate`.
-- [ ] Сохранить distributed serialization между API/worker и не выполнять два
+- [x] Сохранить distributed serialization между API/worker и не выполнять два
   remote refresh для rotating refresh token.
 - [ ] Добавить bounded concurrency, jittered backoff и метрики lock wait,
   refresh latency/failure и pool saturation.
-- [ ] Добавить тесты для `MaxOpenConns=1`, pool-size concurrent accounts,
+- [x] Добавить тесты для `MaxOpenConns=1`, pool-size concurrent accounts,
   timeout/cancel, rejected refresh и rotated-token replay.
 - [ ] Если минимальный размер пула временно повышается, валидировать его при
   startup и задокументировать как mitigation, а не окончательное исправление.
 
 ### 234.6 — Сократить OIDC/session/membership hot path
 
+- [x] A09: идемпотентная первая регистрация сессии, единственное login event,
+  сериализация с Revoke и различение 401/503; PostgreSQL regression с двумя
+  пулами и восемью одновременными запросами. См. ADR-0188.
 - [ ] Проверять подпись JWT локально через issuer-bound JWKS cache с rotation;
   валидировать issuer, audience/authorized party, expiry/not-before и subject.
   Неподписанный decoded payload не является authorization evidence.
@@ -133,11 +267,16 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.7 — Исправить lifecycle и fan-out realtime SSE
 
-- [ ] Для SSE явно снять или продлевать write deadline после прохождения
+- [x] Для SSE явно снять или продлевать write deadline после прохождения
   обычной auth/tenant/authz композиции; общие HTTP timeouts для остальных
   маршрутов не ослаблять.
-- [ ] Добавить integration-тест с реальным `http.Server`: stream переживает
+- [x] Добавить integration-тест с реальным `http.Server`: stream переживает
   configured `WriteTimeout`, получает heartbeat и завершается по cancel.
+- [x] A10: bounded frame write/Flush и refresh при reconnect, включая
+  пропущенные изменения, прежний/пустой cursor; браузерная проверка coalescing.
+- [ ] Определить bounded срок жизни/повторную проверку полномочий открытого
+  SSE при expiry токена, отзыве сессии и изменении прав; сейчас authn/authz
+  выполняются при установлении соединения, а не для каждого кадра.
 - [ ] Заменить polling audit head каждые две секунды на каждого клиента одним
   tenant-scoped watcher/broadcaster или эквивалентным multiplexing. Durable
   event/outbox остаётся источником сигнала; SSE payload остаётся metadata-only.

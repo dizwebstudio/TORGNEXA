@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -65,22 +67,23 @@ type oidcClaims struct {
 }
 
 type userInfoClaims struct {
-	Subject     string `json:"sub"`
-	Username    string `json:"preferred_username"`
-	Email       string `json:"email"`
-	GivenName   string `json:"given_name"`
-	FamilyName  string `json:"family_name"`
-	PictureURL  string `json:"picture"`
-	Birthdate   string `json:"birthdate"`
-	JobTitle    string `json:"job_title"`
-	Position    string `json:"position"`
-	Title       string `json:"title"`
-	Department  string `json:"department"`
-	PhoneNumber string `json:"phone_number"`
+	Subject       string `json:"sub"`
+	Username      string `json:"preferred_username"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	PictureURL    string `json:"picture"`
+	Birthdate     string `json:"birthdate"`
+	JobTitle      string `json:"job_title"`
+	Position      string `json:"position"`
+	Title         string `json:"title"`
+	Department    string `json:"department"`
+	PhoneNumber   string `json:"phone_number"`
 }
 
 type workspaceMembershipStore interface {
-	ResolveActiveMember(context.Context, tenancy.Scope, string, string) (tenancyrepo.Member, error)
+	ResolveActiveMember(context.Context, tenancy.Scope, tenancyrepo.MemberIdentity) (tenancyrepo.Member, error)
 	BootstrapDevelopmentAdministrator(context.Context, tenancy.Scope, string, string) (tenancyrepo.Member, error)
 }
 
@@ -212,11 +215,34 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if claims.IssuedAt <= 0 || authenticatedAt.IsZero() {
 		return Principal{}, ErrUnauthenticated
 	}
-	if authenticator.sessions == nil || authenticator.sessions.Observe(ctx, scope, securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}) != nil {
-		return Principal{}, ErrUnauthenticated
+	if authenticator.sessions == nil {
+		return Principal{}, ErrAuthenticationUnavailable
+	}
+	if err := authenticator.sessions.Observe(ctx, scope, securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}); err != nil {
+		if errors.Is(err, securitysettings.ErrSessionRevoked) || errors.Is(err, securitysettings.ErrInvalid) {
+			return Principal{}, ErrUnauthenticated
+		}
+		// Do not expose a DB error or challenge a valid credential when the
+		// authoritative session check could not complete. Access stays denied.
+		return Principal{}, ErrAuthenticationUnavailable
 	}
 	profile := profileFromOIDCClaims(claims, info, subjectRef)
-	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: profile.Email, Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: profile.Email, VerifiedEmail: verifiedUserInfoEmail(info), Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+}
+
+// Verification belongs to the email in this authenticated UserInfo response.
+// Never combine its flag with profile/token fallbacks or trust a decoded token
+// claim as independent invitation evidence. Missing/null/false means no proof.
+func verifiedUserInfoEmail(info userInfoClaims) string {
+	if !info.EmailVerified {
+		return ""
+	}
+	email := profileEmailClaim(info.Email, "")
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email || address.Name != "" {
+		return ""
+	}
+	return email
 }
 
 func profileFromOIDCClaims(claims oidcClaims, info userInfoClaims, subjectRef string) userprofile.Identity {
@@ -361,7 +387,8 @@ func (resolver claimTenantResolver) ResolveTenant(ctx context.Context, principal
 	if resolver.memberships == nil || principal.SubjectRef == "" {
 		return tenancy.Scope{}, ErrUnauthorized
 	}
-	if _, err := resolver.memberships.ResolveActiveMember(ctx, scope, principal.SubjectRef, principal.Email); err != nil {
+	identity := tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef, VerifiedEmail: principal.VerifiedEmail}
+	if _, err := resolver.memberships.ResolveActiveMember(ctx, scope, identity); err != nil {
 		if resolver.environment != config.EnvironmentDevelopment || !principalHasRole(principal, "admin") {
 			return tenancy.Scope{}, ErrUnauthorized
 		}
@@ -382,7 +409,7 @@ func (authorizer roleAuthorizer) Authorize(ctx context.Context, principal Princi
 	if authorizer.memberships == nil {
 		return ErrUnauthorized
 	}
-	member, err := authorizer.memberships.ResolveActiveMember(ctx, scope, principal.SubjectRef, "")
+	member, err := authorizer.memberships.ResolveActiveMember(ctx, scope, tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef})
 	if err != nil {
 		return ErrUnauthorized
 	}

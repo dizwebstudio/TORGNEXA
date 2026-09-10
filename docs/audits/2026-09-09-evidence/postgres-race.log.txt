@@ -1,0 +1,43 @@
+=== RUN   TestA07PostgresSignedWebhookTopicBindingBeforeInbox
+2026/09/09 00:42:34 WARN commerce webhook verification or publication failed event=commerce.webhook_received error="secrets: consumer failed"
+--- PASS: TestA07PostgresSignedWebhookTopicBindingBeforeInbox (0.05s)
+=== RUN   TestA05PostgresCreateResponseLostDoesNotReplayCharge
+--- PASS: TestA05PostgresCreateResponseLostDoesNotReplayCharge (0.04s)
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay/active
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay/disabled
+--- PASS: TestA06PostgresMemberAuditRollbackAndReplay (0.09s)
+    --- PASS: TestA06PostgresMemberAuditRollbackAndReplay/active (0.05s)
+    --- PASS: TestA06PostgresMemberAuditRollbackAndReplay/disabled (0.04s)
+=== RUN   TestA06PostgresProfileAuditRollbackAndReplay
+--- PASS: TestA06PostgresProfileAuditRollbackAndReplay (0.04s)
+=== RUN   TestA06PostgresIdentityProviderAuditRollbackAndReplay
+--- PASS: TestA06PostgresIdentityProviderAuditRollbackAndReplay (0.05s)
+=== RUN   TestA06PostgresWorkspaceAuditRollback
+--- PASS: TestA06PostgresWorkspaceAuditRollback (0.03s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.455s
+=== RUN   TestA05PostgresReconcileUnboundIntent
+=== RUN   TestA05PostgresReconcileUnboundIntent/succeeded
+=== RUN   TestA05PostgresReconcileUnboundIntent/canceled
+=== RUN   TestA05PostgresReconcileUnboundIntent/wrong_amount
+=== RUN   TestA05PostgresReconcileUnboundIntent/wrong_account
+=== RUN   TestA05PostgresReconcileUnboundIntent/missing_external_id
+--- PASS: TestA05PostgresReconcileUnboundIntent (0.20s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/succeeded (0.05s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/canceled (0.04s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/wrong_amount (0.03s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/wrong_account (0.03s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/missing_external_id (0.03s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/worker	1.337s
+=== RUN   TestA08PostgresRefreshBoundedPool
+=== RUN   TestA08PostgresRefreshBoundedPool/1
+=== RUN   TestA08PostgresRefreshBoundedPool/4
+--- PASS: TestA08PostgresRefreshBoundedPool (0.11s)
+    --- PASS: TestA08PostgresRefreshBoundedPool/1 (0.04s)
+    --- PASS: TestA08PostgresRefreshBoundedPool/4 (0.07s)
+=== RUN   TestA08PostgresRefreshRollbackAndCancellation
+--- PASS: TestA08PostgresRefreshRollbackAndCancellation (0.11s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectorauth	1.274s

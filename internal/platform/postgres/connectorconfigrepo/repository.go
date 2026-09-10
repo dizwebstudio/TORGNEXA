@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"strings"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -120,6 +122,14 @@ func (r *Repository) Put(ctx context.Context, scope tenancy.Scope, accountID str
 }
 
 func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly bool, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.database); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("connector runtime config: begin: %w", err)
@@ -152,7 +162,22 @@ func validateConfig(raw json.RawMessage) error {
 		return ErrInvalid
 	}
 	root, ok := value.(map[string]any)
-	if !ok || len(root) == 0 || containsSensitiveKey(root) {
+	if !ok || len(root) == 0 {
+		return ErrInvalid
+	}
+	// This existing social-webhook field holds an opaque SecretProvider
+	// reference, never secret material. Only the exact top-level key is allowed.
+	if reference, exists := root["webhook_secret_reference"]; exists {
+		value, ok := reference.(string)
+		if !ok || !sdk.SecretReference(value).Valid() {
+			return ErrInvalid
+		}
+		delete(root, "webhook_secret_reference")
+	}
+	if containsSensitiveKey(root) {
+		return ErrInvalid
+	}
+	if _, err := sdk.CommerceWebhookSubscriptions(raw); err != nil {
 		return ErrInvalid
 	}
 	return nil

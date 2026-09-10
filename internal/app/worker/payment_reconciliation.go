@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +16,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectorruntime"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/paymentsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/workerrepo"
@@ -35,6 +38,7 @@ type paymentAccountLister interface {
 }
 
 type paymentReconciliationStore interface {
+	PaymentByExternalID(context.Context, corepayments.Scope, string) (corepayments.Payment, error)
 	PaymentByRemoteID(context.Context, corepayments.Scope, string, string) (corepayments.Payment, error)
 	RefundByRemoteID(context.Context, corepayments.Scope, string, string) (corepayments.Refund, error)
 	ChangePaymentStatus(context.Context, corepayments.Scope, corepayments.ChangePaymentStatus, corepayments.Mutation) (corepayments.Payment, error)
@@ -171,6 +175,12 @@ func (runner paymentReconciliationRunner) reconcileAccount(ctx context.Context, 
 			continue
 		}
 		payment, lookupErr := runner.payments.PaymentByRemoteID(ctx, paymentScope, account.ID, observation.RemoteID)
+		if errors.Is(lookupErr, corepayments.ErrNotFound) && observation.ExternalID != "" {
+			payment, lookupErr = runner.payments.PaymentByExternalID(ctx, paymentScope, observation.ExternalID)
+			if lookupErr == nil && (payment.ConnectorAccountID != account.ID || payment.Status != corepayments.StatusPending || payment.RemoteID != "") {
+				continue
+			}
+		}
 		if errors.Is(lookupErr, corepayments.ErrNotFound) {
 			continue
 		}
@@ -184,6 +194,21 @@ func (runner paymentReconciliationRunner) reconcileAccount(ctx context.Context, 
 		target, ok := reconciledPaymentStatus(observation.Status)
 		if !ok || target == payment.Status {
 			continue
+		}
+		if payment.Status == corepayments.StatusPending {
+			// Persist the remote binding before applying the terminal observation.
+			// If the next commit fails, the following cycle finds it by remote ID.
+			bound, bindErr := runner.payments.ChangePaymentStatus(ctx, paymentScope, corepayments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: corepayments.StatusCreated, RemoteID: observation.RemoteID, RemoteStatus: observation.Status}, paymentReconciliationMutation(account.ID+":"+payment.ID.String()+":bind", observation.RemoteID))
+			if errors.Is(bindErr, corepayments.ErrConflict) {
+				continue
+			}
+			if bindErr != nil {
+				return bindErr
+			}
+			payment = bound
+			if payment.Status == target {
+				continue
+			}
 		}
 		if corepayments.ValidatePaymentTransition(payment.Status, target) != nil {
 			logger.Warn("payment reconciliation transition ignored", "event", "worker.payment_reconciliation_transition_ignored", "account_id", account.ID, "remote_id", observation.RemoteID, "from", payment.Status, "to", target)
@@ -266,7 +291,20 @@ func reconciledRefundStatus(remote string) (corepayments.RefundStatus, bool) {
 func paymentReconciliationMutation(key, causation string) corepayments.Mutation {
 	now := time.Now().UTC()
 	return corepayments.Mutation{
-		EventID: stableUUID("payment-reconciliation:event:" + key), AuditID: stableUUID("payment-reconciliation:audit:" + key),
+		EventID: stableUUID("payment-reconciliation:event:" + key), AuditID: paymentReconciliationAuditID(key, now),
 		ActorID: "system:payment-reconciliation", Source: "worker.payment_reconciliation", CorrelationID: stableUUID("payment-reconciliation:correlation:" + key), CausationID: causation, OccurredAt: now,
 	}
+}
+
+// Audit records require sortable UUIDv7 identifiers. Retry deduplication remains
+// anchored by the deterministic outbox event ID and locked payment version.
+func paymentReconciliationAuditID(key string, at time.Time) string {
+	value := sha256.Sum256([]byte("payment-reconciliation:audit:" + key))
+	if domain.PutUUIDv7Timestamp(value[:6], at) != nil {
+		return ""
+	}
+	value[6] = (value[6] & 15) | 0x70
+	value[8] = (value[8] & 63) | 0x80
+	raw := hex.EncodeToString(value[:16])
+	return raw[:8] + "-" + raw[8:12] + "-" + raw[12:16] + "-" + raw[16:20] + "-" + raw[20:]
 }

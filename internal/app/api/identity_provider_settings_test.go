@@ -119,3 +119,7 @@ func TestIdentityProviderValidationFailureIsPersistedAndBlocksActivationEvidence
 		t.Fatalf("status=%d validation=%+v item=%+v body=%s", response.Code, store.validation, store.item, response.Body.String())
 	}
 }
+
+func (stub *idpAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}

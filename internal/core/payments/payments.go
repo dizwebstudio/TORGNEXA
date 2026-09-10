@@ -346,6 +346,27 @@ type WebhookEvidence struct {
 	VerifiedAt         time.Time
 }
 
+// VerifiedWebhook is an independently verified payment observation. The receipt,
+// status transition, audit and outbox must commit together before acknowledgement.
+type VerifiedWebhook struct {
+	Evidence     WebhookEvidence
+	Status       Status
+	RemoteStatus string
+}
+
+// Validate rejects observations outside the payment webhook lifecycle.
+func (w VerifiedWebhook) Validate() error {
+	if w.Evidence.Validate() != nil || !domain.ValidToken(w.RemoteStatus) {
+		return ErrInvalidRecord
+	}
+	switch w.Status {
+	case StatusCreated, StatusSucceeded, StatusCanceled, StatusFailed:
+		return nil
+	default:
+		return ErrInvalidState
+	}
+}
+
 func (e WebhookEvidence) Validate() error {
 	accountRef := e.ConnectorAccountID
 	if !refPattern.MatchString(e.DeliveryID) || !accountRefPattern.MatchString(accountRef) ||
@@ -383,6 +404,8 @@ type Repository interface {
 	CreateRefund(context.Context, Scope, CreateRefund, Mutation) (Refund, error)
 	ChangeRefundStatus(context.Context, Scope, ChangeRefundStatus, Mutation) (Refund, error)
 	RecordWebhookEvidence(context.Context, Scope, WebhookEvidence) (bool, error)
+	// ApplyVerifiedWebhook returns false for an already committed delivery.
+	ApplyVerifiedWebhook(context.Context, Scope, VerifiedWebhook, Mutation) (bool, error)
 }
 
 func validMetadata(version int64, createdAt, updatedAt time.Time) bool {

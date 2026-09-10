@@ -15,9 +15,11 @@ type membershipStub struct {
 	member         tenancyrepo.Member
 	err            error
 	bootstrapCalls int
+	identity       tenancyrepo.MemberIdentity
 }
 
-func (store *membershipStub) ResolveActiveMember(context.Context, tenancy.Scope, string, string) (tenancyrepo.Member, error) {
+func (store *membershipStub) ResolveActiveMember(_ context.Context, _ tenancy.Scope, identity tenancyrepo.MemberIdentity) (tenancyrepo.Member, error) {
+	store.identity = identity
 	return store.member, store.err
 }
 
@@ -60,5 +62,27 @@ func TestDevelopmentBootstrapRequiresAdminClaim(t *testing.T) {
 	principal.Roles = []string{"admin"}
 	if _, err := resolver.ResolveTenant(context.Background(), principal, httptest.NewRequest("GET", "/", nil)); err != nil || store.bootstrapCalls != 1 {
 		t.Fatalf("development admin bootstrap failed: %v calls=%d", err, store.bootstrapCalls)
+	}
+}
+
+func TestA02TenantResolverUsesOnlyVerifiedEmailForInvitations(t *testing.T) {
+	scope := validTestScope(t)
+	store := &membershipStub{member: tenancyrepo.Member{Role: "viewer", Status: "active"}}
+	resolver := claimTenantResolver{memberships: store}
+	principal := Principal{Issuer: "issuer", Subject: "subject", SubjectRef: "synthetic-reference", Email: "invited-admin@example.test", OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String()}
+	for _, verified := range []string{"", "own-address@example.test"} {
+		principal.VerifiedEmail = verified
+		if _, err := resolver.ResolveTenant(t.Context(), principal, httptest.NewRequest("GET", "/", nil)); err != nil {
+			t.Fatal(err)
+		}
+		if store.identity.SubjectRef != principal.SubjectRef || store.identity.VerifiedEmail != verified {
+			t.Fatal("resolver promoted profile email to invitation ownership evidence")
+		}
+		if err := (roleAuthorizer{memberships: store}).Authorize(t.Context(), principal, scope, "products.read"); err != nil {
+			t.Fatal(err)
+		}
+		if store.identity.VerifiedEmail != "" {
+			t.Fatal("authorization lookup must not bind invitations")
+		}
 	}
 }

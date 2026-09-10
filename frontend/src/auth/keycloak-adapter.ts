@@ -1,7 +1,7 @@
-import type {AuthAdapter} from "./auth-adapter";
-import type {AuthSession, UserProfile} from "./session-model";
-import {sessionExpired, sessionNeedsRefresh} from "./session-model";
-import {accountConsoleURL} from "./oidc-urls";
+import type {AuthAdapter} from "./auth-adapter.js";
+import type {AuthSession, UserProfile} from "./session-model.js";
+import {sessionExpired, sessionNeedsRefresh} from "./session-model.js";
+import {accountConsoleURL} from "./oidc-urls.js";
 
 interface TokenClaims {
   sub?: string;
@@ -20,6 +20,10 @@ interface TokenClaims {
   locale?: string;
   exp?: number;
   iss?: string;
+  organization_id?: string;
+  workspace_id?: string;
+  sid?: string;
+  session_state?: string;
   realm_access?: {roles?: string[]};
 }
 
@@ -154,6 +158,10 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
   const issuer = config.issuer.replace(/\/$/, "");
   const manageAccountURL = accountConsoleURL(issuer);
   let session: AuthSession | null = null;
+  let sessionRevision = 0;
+  const requireRevision = (revision: number) => {
+    if (revision !== sessionRevision) throw new DOMException("Session changed", "AbortError");
+  };
   let refreshToken: string | null = null;
   let silentAttempted = false;
   let silentInFlight: Promise<AuthSession | null> | null = null;
@@ -182,7 +190,8 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
     return authorize;
   };
 
-  const requestTokens = async (parameters: Record<string, string>): Promise<TokenResponse> => {
+  const requestTokens = async (parameters: Record<string, string>, revision: number): Promise<TokenResponse> => {
+    requireRevision(revision);
     const response = await fetch(`${issuer}/protocol/openid-connect/token`, {
       method: "POST",
       headers: {"Content-Type": "application/x-www-form-urlencoded"},
@@ -191,10 +200,13 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
       redirect: "error",
     });
     if (!response.ok) throw new TokenEndpointError(response.status === 400 || response.status === 401);
-    return await response.json() as TokenResponse;
+    const result = await response.json() as TokenResponse;
+    requireRevision(revision);
+    return result;
   };
 
-  const applyTokens = (tokens: TokenResponse, preserveRefreshToken: boolean): AuthSession => {
+  const applyTokens = (tokens: TokenResponse, preserveRefreshToken: boolean, revision: number): AuthSession => {
+    requireRevision(revision);
     if (typeof tokens.access_token !== "string" || !tokens.access_token || tokens.access_token.length > 16_384) {
       throw new Error("OIDC access token is missing");
     }
@@ -205,8 +217,11 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
     const nextRefreshToken = typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0 && tokens.refresh_token.length <= 16_384
       ? tokens.refresh_token
       : preserveRefreshToken ? refreshToken : null;
+    const partition = [issuer, claims.organization_id ?? "", claims.workspace_id ?? "", claims.sid ?? claims.session_state ?? ""];
+    if (partition.some(value => typeof value !== "string" || value.length > 1024)) throw new Error("OIDC scope is invalid");
     session = {
       subject: claims.sub,
+      cacheScope: JSON.stringify(partition),
       // Never promote the opaque OIDC subject to presentation data. The
       // session normalizer also rejects UUID-shaped/equal display claims and
       // uses a role-derived neutral label when no human name is available.
@@ -221,14 +236,15 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
     return session;
   };
 
-  const exchangeAuthorizationCode = async (code: string, verifier: string, redirectURI: string) => applyTokens(await requestTokens({
+  const exchangeAuthorizationCode = async (code: string, verifier: string, redirectURI: string, revision: number) => applyTokens(await requestTokens({
     grant_type: "authorization_code",
     redirect_uri: redirectURI,
     code,
     code_verifier: verifier,
-  }), false);
+  }, revision), false, revision);
 
   const silentSignIn = async (): Promise<AuthSession | null> => {
+    const revision = sessionRevision;
     silentAttempted = true;
     const verifier = randomValue(64);
     const state = randomValue();
@@ -242,7 +258,7 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
     try {
       frame.src = (await authorizationURL(redirectURI, state, verifier, true)).toString();
       const code = await waitForSilentCallback(frame, window.location.origin, state);
-      return code ? await exchangeAuthorizationCode(code, verifier, redirectURI) : null;
+      return code ? await exchangeAuthorizationCode(code, verifier, redirectURI, revision) : null;
     } finally {
       frame.remove();
     }
@@ -250,16 +266,19 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
 
   const startSilentSignIn = () => {
     if (!silentInFlight) {
-      silentInFlight = silentSignIn().finally(() => { silentInFlight = null; });
+      const pending = silentSignIn().finally(() => { if (silentInFlight === pending) silentInFlight = null; });
+      silentInFlight = pending;
     }
     return silentInFlight;
   };
 
   const renewSession = async (): Promise<AuthSession | null> => {
+    const revision = sessionRevision;
     if (!refreshToken) return startSilentSignIn();
     try {
-      return applyTokens(await requestTokens({grant_type: "refresh_token", refresh_token: refreshToken}), true);
+      return applyTokens(await requestTokens({grant_type: "refresh_token", refresh_token: refreshToken}, revision), true, revision);
     } catch (error) {
+      requireRevision(revision);
       if (!(error instanceof TokenEndpointError) || !error.terminal) throw error;
       clearSession();
       return startSilentSignIn();
@@ -268,40 +287,64 @@ export function createKeycloakAdapter(config: KeycloakConfig): AuthAdapter {
 
   const startRenewal = () => {
     if (!refreshInFlight) {
-      refreshInFlight = renewSession().finally(() => { refreshInFlight = null; });
+      const pending = renewSession().finally(() => { if (refreshInFlight === pending) refreshInFlight = null; });
+      refreshInFlight = pending;
     }
     return refreshInFlight;
   };
 
   return {
     async getSession(options) {
-      if (!session && !silentAttempted) session = await startSilentSignIn();
+      const revision = sessionRevision;
+      // StrictMode/remount and concurrent callers must join an ongoing lookup;
+      // returning anonymous here could win over the valid in-flight session.
+      if (!session && (!silentAttempted || silentInFlight)) {
+        try {
+          const result = await startSilentSignIn();
+          if (revision !== sessionRevision) return null;
+          session = result;
+        } catch (error) {
+          if (revision !== sessionRevision) return null;
+          throw error;
+        }
+      }
       if (!session) return null;
       if (!options?.forceRefresh && !sessionNeedsRefresh(session)) return session;
       try {
         const renewed = await startRenewal();
+        if (revision !== sessionRevision) return null;
         if (!renewed) clearSession();
         return renewed;
       } catch (error) {
-        if (!sessionExpired(session)) return session;
+        if (revision !== sessionRevision) return null;
+        if (session && !sessionExpired(session)) return session;
         clearSession();
         throw error;
       }
     },
     async login(returnTo: string) {
+      const revision = ++sessionRevision;
+      clearSession();
+      silentInFlight = null;
+      refreshInFlight = null;
       silentAttempted = true;
       const verifier = randomValue(64);
       const state = randomValue();
       const redirectURI = new URL("/oidc/callback", window.location.origin).toString();
       const authorize = await authorizationURL(redirectURI, state, verifier, false);
+      requireRevision(revision);
       const popup = window.open(authorize, "torgnexa-oidc", "popup,width=520,height=720");
       if (!popup) throw new Error("OIDC popup was blocked");
       const code = await waitForCallback(popup, window.location.origin, state);
-      session = await exchangeAuthorizationCode(code, verifier, redirectURI);
+      await exchangeAuthorizationCode(code, verifier, redirectURI, revision);
+      requireRevision(revision);
       window.history.replaceState({}, "", returnTo.startsWith("/") ? returnTo : "/");
       notify();
     },
     async logout() {
+      ++sessionRevision;
+      silentInFlight = null;
+      refreshInFlight = null;
       silentAttempted = true;
       clearSession();
       notify();

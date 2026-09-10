@@ -76,17 +76,26 @@ UNION ALL
 SELECT * FROM updated`
 
 type Member struct {
+	Replayed                                                         bool
 	ID, Email, DisplayName, OIDCSubject, Role, Status, InvitationKey string
 	Version                                                          int64
 	InvitedAt, UpdatedAt                                             time.Time
 }
 
-// ResolveActiveMember returns the database-authoritative workspace role. When
-// an invited row has the same normalized email, the first successful login
-// binds its opaque issuer+subject reference and activates it atomically.
-func (r *Repository) ResolveActiveMember(ctx context.Context, scope tenancy.Scope, subjectRef, email string) (Member, error) {
-	subjectRef = strings.TrimSpace(subjectRef)
-	email = strings.ToLower(strings.TrimSpace(email))
+// MemberIdentity contains only authenticated identity and optional proof of
+// email ownership supplied by the trusted identity boundary. Profile email must
+// never populate VerifiedEmail. Its zero value permits no invitation binding.
+type MemberIdentity struct {
+	SubjectRef    string
+	VerifiedEmail string
+}
+
+// ResolveActiveMember returns the database-authoritative workspace role.
+// Existing active members resolve by subject without email proof. Only an
+// unbound invitation matching VerifiedEmail may bind and activate atomically.
+func (r *Repository) ResolveActiveMember(ctx context.Context, scope tenancy.Scope, identity MemberIdentity) (Member, error) {
+	subjectRef := strings.TrimSpace(identity.SubjectRef)
+	email := strings.ToLower(strings.TrimSpace(identity.VerifiedEmail))
 	if len(subjectRef) != 64 || (email != "" && (!strings.Contains(email, "@") || len(email) > 254)) {
 		return Member{}, ErrMemberNotFound
 	}
@@ -182,7 +191,7 @@ func (r *Repository) InviteMember(ctx context.Context, scope tenancy.Scope, memb
 	if member.ID == "" || member.InvitationKey == "" || !validMemberRole(member.Role) || !strings.Contains(member.Email, "@") {
 		return Member{}, ErrMemberConflict
 	}
-	requestedEmail, requestedRole := member.Email, member.Role
+	requestedID, requestedEmail, requestedRole := member.ID, member.Email, member.Role
 	err := r.withWriteScope(ctx, scope, func(q queryer) error {
 		row := q.QueryRowContext(ctx, `INSERT INTO workspace_members(id,organization_id,workspace_id,email,display_name,role_code,status,invitation_key) VALUES($1,$2,$3,$4,$5,$6,'invited',$7) ON CONFLICT(organization_id,workspace_id,invitation_key) DO UPDATE SET invitation_key=workspace_members.invitation_key RETURNING id,email,display_name,COALESCE(oidc_subject,''),role_code,status,invitation_key,version,invited_at,updated_at`, member.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), member.Email, member.DisplayName, member.Role, member.InvitationKey)
 		return scanMember(row, &member)
@@ -190,6 +199,7 @@ func (r *Repository) InviteMember(ctx context.Context, scope tenancy.Scope, memb
 	if err != nil {
 		return Member{}, fmt.Errorf("invite member: %w", err)
 	}
+	member.Replayed = member.ID != requestedID
 	if member.Email != requestedEmail || member.Role != requestedRole {
 		return Member{}, ErrMemberConflict
 	}
@@ -227,7 +237,8 @@ func (r *Repository) UpdateMember(ctx context.Context, scope tenancy.Scope, id, 
 		if err := q.QueryRowContext(ctx, workspaceMemberStateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id).Scan(&oldRole, &oldStatus, &oldMutationKey, &oldMutationHash); err != nil {
 			return err
 		}
-		if oldMutationKey != "" && (oldMutationHash == "" || oldMutationHash != digest) {
+		member.Replayed = oldMutationKey == mutationKey
+		if oldMutationKey == mutationKey && (oldMutationHash == "" || oldMutationHash != digest) {
 			return ErrMemberConflict
 		}
 		if oldRole == "admin" && oldStatus == "active" && (role != "admin" || status != "active") {
@@ -252,6 +263,7 @@ func updateMemberWithoutDigest(ctx context.Context, q queryer, scope tenancy.Sco
 	if err := q.QueryRowContext(ctx, workspaceMemberLegacyStateQuery, scope.OrganizationID().String(), scope.WorkspaceID().String(), id).Scan(&oldRole, &oldStatus, &oldMutationKey); err != nil {
 		return err
 	}
+	member.Replayed = oldMutationKey == mutationKey
 	if oldRole == "admin" && oldStatus == "active" && (role != "admin" || status != "active") {
 		var count int
 		if err := q.QueryRowContext(ctx, workspaceMemberAdminCountQuery, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&count); err != nil {

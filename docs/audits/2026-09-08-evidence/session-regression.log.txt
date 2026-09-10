@@ -1,0 +1,13 @@
+=== RUN   TestAuditConcurrentFirstSessionObservation
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:71: insert identity session: ERROR: duplicate key value violates unique constraint "settings_identity_sessions_pkey" (SQLSTATE 23505)
+    audit_session_test.go:75: valid concurrent requests rejected: 7/8
+--- FAIL: TestAuditConcurrentFirstSessionObservation (0.54s)
+FAIL
+FAIL	github.com/torgnexa/torgnexa/internal/platform/postgres/securitysettingsrepo	0.545s
+FAIL

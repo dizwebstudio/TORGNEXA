@@ -3,7 +3,7 @@
   "generator": "torgnexa-sdkgen/v1",
   "openapi": {
     "path": "contracts/openapi/torgnexa-v1.yaml",
-    "sha256": "452fecbc038890eb5554f6c2c74d2e764cd4b74af4d80b969ff04f9bebbdbfe2",
+    "sha256": "d9899258ae0e78244fb069a6e9ac6955add64374238a2c1792ee7dd19751b219",
     "openapi_version": "3.1.0",
     "api_version": "0.21.2",
     "server_path": "/api/v1"
@@ -1463,6 +1463,11 @@
       "operation_id": "receiveCommerceWebhook",
       "method": "POST",
       "path": "/webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
+    },
+    {
+      "operation_id": "receivePaymentWebhook",
+      "method": "POST",
+      "path": "/webhooks/payments/{connector_id}/{organization_id}/{workspace_id}/{account_id}"
     },
     {
       "operation_id": "receiveProcurementPurchaseOrder",

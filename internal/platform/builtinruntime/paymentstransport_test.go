@@ -88,6 +88,7 @@ func TestYooKassaCreateStatusRefundRoundTrip(t *testing.T) {
 					"amount":        map[string]string{"value": "150.00", "currency": "RUB"},
 					"income_amount": map[string]string{"value": "147.00", "currency": "RUB"},
 					"created_at":    "2026-08-30T09:00:00Z",
+					"metadata":      map[string]string{"external_id": "order-1"},
 				}}})
 				return
 			}
@@ -180,7 +181,7 @@ func TestYooKassaCreateStatusRefundRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
-	if len(reconciled.Items) != 2 || reconciled.Items[0].Kind != "sale" || reconciled.Items[1].Kind != "refund" {
+	if len(reconciled.Items) != 2 || reconciled.Items[0].ExternalID != "order-1" || reconciled.Items[0].Kind != "sale" || reconciled.Items[1].Kind != "refund" {
 		t.Fatalf("unexpected reconciliation result: %+v", reconciled.Items)
 	}
 

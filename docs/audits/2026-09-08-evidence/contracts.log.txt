@@ -1,0 +1,10 @@
+?   	github.com/torgnexa/torgnexa/tools/contractcheck/cmd/contractcheck	[no test files]
+?   	github.com/torgnexa/torgnexa/tools/contractcheck/cmd/licensecheck	[no test files]
+?   	github.com/torgnexa/torgnexa/tools/contractcheck/cmd/releasecheck	[no test files]
+?   	github.com/torgnexa/torgnexa/tools/contractcheck/cmd/supplychaincheck	[no test files]
+ok  	github.com/torgnexa/torgnexa/tools/contractcheck/internal/checker	0.702s
+ok  	github.com/torgnexa/torgnexa/tools/contractcheck/internal/licensepolicy	0.003s
+ok  	github.com/torgnexa/torgnexa/tools/contractcheck/internal/releasecheck	0.088s
+Contract validation passed
+all modules verified
+Task numbering contiguous: 001-234

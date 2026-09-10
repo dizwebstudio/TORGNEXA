@@ -1,13 +1,9 @@
-import {createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode} from "react";
+import {createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode} from "react";
 import type {AuthAdapter} from "./auth-adapter";
-import {normalizeSession, sessionExpired, type AuthSession} from "./session-model";
+import {SessionController, type AuthSnapshot} from "./session-controller";
+import type {AuthSession} from "./session-model";
 
-type AuthStatus = "loading" | "anonymous" | "authenticated" | "error";
-
-interface AuthContextValue {
-  readonly status: AuthStatus;
-  readonly session: AuthSession | null;
-  readonly error: string | null;
+interface AuthContextValue extends AuthSnapshot {
   refresh(options?: {forceRefresh?: boolean}): Promise<AuthSession | null>;
   login(): Promise<void>;
   logout(): Promise<void>;
@@ -17,88 +13,29 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({adapter, children}: {adapter: AuthAdapter; children: ReactNode}) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
-  const [session, setSession] = useState<AuthSession | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async (options?: {forceRefresh?: boolean}) => {
-    setStatus((current) => current === "authenticated" ? current : "loading");
-    setError(null);
-    try {
-      const next = await adapter.getSession(options);
-      if (!next) {
-        setSession(null);
-        setStatus("anonymous");
-        return null;
-      }
-      const normalized = normalizeSession(next);
-      if (sessionExpired(normalized)) {
-        setSession(null);
-        setStatus("anonymous");
-        return null;
-      }
-      setSession(normalized);
-      setStatus("authenticated");
-      return normalized;
-    } catch {
-      setSession(null);
-      setError("Не удалось проверить сессию. Повторите попытку.");
-      setStatus("error");
-      return null;
-    }
-  }, [adapter]);
+  const controller = useMemo(() => new SessionController(adapter), [adapter]);
+  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
+  useEffect(controller.start, [controller]);
 
   useEffect(() => {
-    void refresh();
-    return adapter.subscribe?.(() => { void refresh(); });
-  }, [adapter, refresh]);
-
-  useEffect(() => {
-    if (!session?.expiresAt) return;
-    const expires = Date.parse(session.expiresAt);
-    if (!Number.isFinite(expires)) return;
-    const delay = Math.max(15_000, expires - Date.now() - 60_000);
-    const timer = window.setTimeout(() => { void refresh({forceRefresh: true}); }, delay);
-    return () => window.clearTimeout(timer);
-  }, [session, refresh]);
+    if (!snapshot.session?.expiresAt || !snapshot.lifetime) return;
+    const expires = Date.parse(snapshot.session.expiresAt);
+    const lifetime = snapshot.lifetime;
+    const refresh = window.setTimeout(() => { void controller.refresh({forceRefresh: true}); }, Math.max(15_000, expires - Date.now() - 60_000));
+    const expiry = window.setTimeout(() => { controller.expire(lifetime); }, Math.max(0, expires - Date.now()));
+    return () => { window.clearTimeout(refresh); window.clearTimeout(expiry); };
+  }, [snapshot.session, snapshot.lifetime, controller]);
 
   useEffect(() => {
     const resume = () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (document.visibilityState === "visible") void controller.refresh();
     };
     document.addEventListener("visibilitychange", resume);
     return () => document.removeEventListener("visibilitychange", resume);
-  }, [refresh]);
+  }, [controller]);
 
-  const login = useCallback(async () => {
-    setError(null);
-    try {
-      await adapter.login(window.location.pathname + window.location.search);
-      await refresh();
-    } catch {
-      setError("Вход недоступен: OIDC-адаптер не настроен или отклонил запрос.");
-      setStatus("error");
-    }
-  }, [adapter, refresh]);
-
-  const logout = useCallback(async () => {
-    try { await adapter.logout(); } finally {
-      setSession(null);
-      setStatus("anonymous");
-    }
-  }, [adapter]);
-
-  const manageAccount = useCallback(async () => {
-    setError(null);
-    try {
-      if (!adapter.manageAccount) throw new Error("OIDC account management is not configured");
-      await adapter.manageAccount();
-    } catch {
-      setError("Не удалось открыть управление учётной записью OIDC.");
-    }
-  }, [adapter]);
-
-  const value = useMemo<AuthContextValue>(() => ({status, session, error, refresh, login, logout, manageAccount}), [status, session, error, refresh, login, logout, manageAccount]);
+  const login = useCallback(() => controller.login(window.location.pathname + window.location.search), [controller]);
+  const value = useMemo<AuthContextValue>(() => ({...snapshot, refresh: controller.refresh, login, logout: controller.logout, manageAccount: controller.manageAccount}), [snapshot, controller, login]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

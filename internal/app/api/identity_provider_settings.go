@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -130,9 +131,15 @@ func (api *identityProviderSettingsAPI) save(w http.ResponseWriter, r *http.Requ
 		}
 		draft.SecretReference = created.Reference.String()
 	}
-	item, err := api.store.SaveProvider(r.Context(), scope, draft)
+	item, err := api.mutate(r, scope, "draft_saved", correlation, func(ctx context.Context) (securitysettings.ProviderConfiguration, error) {
+		return api.store.SaveProvider(ctx, scope, draft)
+	})
 	if (err != nil || item.Replayed) && created.Reference.Valid() {
 		_, _ = api.secrets.Revoke(r.Context(), scope, created.Reference)
+	}
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, 500, "Internal Server Error")
+		return
 	}
 	if errors.Is(err, securitysettings.ErrIdentityConflict) {
 		writeProblem(w, http.StatusConflict, "Conflict")
@@ -140,13 +147,6 @@ func (api *identityProviderSettingsAPI) save(w http.ResponseWriter, r *http.Requ
 	}
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
-		return
-	}
-	if !item.Replayed {
-		err = api.capture(r, scope, "settings.identity_provider.draft_saved", item, correlation)
-	}
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusOK, identityProviderToView(item))
@@ -193,32 +193,44 @@ func (api *identityProviderSettingsAPI) action(w http.ResponseWriter, r *http.Re
 					evidence.ReasonCode = "unsafe_metadata_url"
 				}
 			}
-			item, err = api.store.RecordProviderValidation(r.Context(), scope, evidence)
+			auditAction := "validate"
+			if evidence.Status == "invalid" {
+				auditAction = "validation_failed"
+			}
+			item, err = api.mutate(r, scope, auditAction, correlation, func(ctx context.Context) (securitysettings.ProviderConfiguration, error) {
+				return api.store.RecordProviderValidation(ctx, scope, evidence)
+			})
 			if err == nil && item.Replayed {
 				writeJSON(w, http.StatusOK, identityProviderToView(item))
 				return
 			}
 			if err == nil && evidence.Status == "invalid" {
-				if captureErr := api.capture(r, scope, "settings.identity_provider.validation_failed", item, correlation); captureErr != nil {
-					writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-					return
-				}
 				writeProblem(w, http.StatusUnprocessableEntity, "Provider validation failed")
 				return
 			}
 		}
 	case "activate":
-		item, err = api.store.ActivateProvider(r.Context(), scope, idpID, input.ExpectedVersion, correlation, now)
+		item, err = api.mutate(r, scope, "activate", correlation, func(ctx context.Context) (securitysettings.ProviderConfiguration, error) {
+			return api.store.ActivateProvider(ctx, scope, idpID, input.ExpectedVersion, correlation, now)
+		})
 	case "rollback":
-		item, err = api.store.RollbackProvider(r.Context(), scope, idpID, input.TargetRevision, input.ExpectedVersion, newApprovalID(), correlation, now)
+		item, err = api.mutate(r, scope, "rollback", correlation, func(ctx context.Context) (securitysettings.ProviderConfiguration, error) {
+			return api.store.RollbackProvider(ctx, scope, idpID, input.TargetRevision, input.ExpectedVersion, newApprovalID(), correlation, now)
+		})
 	case "disable":
-		item, err = api.store.DisableProvider(r.Context(), scope, idpID, input.ExpectedVersion, correlation, now)
+		item, err = api.mutate(r, scope, "disable", correlation, func(ctx context.Context) (securitysettings.ProviderConfiguration, error) {
+			return api.store.DisableProvider(ctx, scope, idpID, input.ExpectedVersion, correlation, now)
+		})
 	default:
 		writeProblem(w, http.StatusNotFound, "Not Found")
 		return
 	}
 	if errors.Is(err, securitysettings.ErrIdentityNotFound) {
 		writeProblem(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
 	if errors.Is(err, securitysettings.ErrIdentityConflict) {
@@ -233,19 +245,12 @@ func (api *identityProviderSettingsAPI) action(w http.ResponseWriter, r *http.Re
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	if !item.Replayed {
-		err = api.capture(r, scope, "settings.identity_provider."+action, item, correlation)
-	}
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
 	writeJSON(w, http.StatusOK, identityProviderToView(item))
 }
 
 func (api *identityProviderSettingsAPI) capture(r *http.Request, scope tenancy.Scope, action string, item securitysettings.ProviderConfiguration, correlation string) error {
 	principal, _ := PrincipalFromContext(r.Context())
-	_, err := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: action, ResourceType: "identity_provider", ResourceID: item.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"protocol": item.Protocol, "revision": item.Revision, "active_revision": item.ActiveRevision, "enabled": item.Enabled, "validation_status": item.ValidationStatus}})
+	_, err := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: action, ResourceType: "identity_provider", ResourceID: item.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"protocol": item.Protocol, "revision": item.Revision, "active_revision": item.ActiveRevision, "enabled": item.Enabled, "validation_status": item.ValidationStatus}})
 	return err
 }
 
@@ -263,4 +268,13 @@ func identityProviderPath(path string) (string, string, bool) {
 
 func identityProviderToView(item securitysettings.ProviderConfiguration) identityProviderView {
 	return identityProviderView{ProviderID: item.ID, Protocol: item.Protocol, DisplayName: item.DisplayName, IssuerURL: item.IssuerURL, ClientID: item.ClientID, CallbackURL: item.CallbackURL, SecretConfigured: item.SecretReference != "", Revision: item.Revision, Version: item.Version, ActiveRevision: item.ActiveRevision, Enabled: item.Enabled, ValidationStatus: item.ValidationStatus, ValidationReason: item.ValidationReason, ValidatedAt: item.ValidatedAt, UpdatedAt: item.UpdatedAt}
+}
+
+func (api *identityProviderSettingsAPI) mutate(r *http.Request, scope tenancy.Scope, action, correlation string, mutation func(context.Context) (securitysettings.ProviderConfiguration, error)) (securitysettings.ProviderConfiguration, error) {
+	return auditedSettingsMutation(r.Context(), scope, api.audit, mutation, func(ctx context.Context, item securitysettings.ProviderConfiguration) error {
+		if item.Replayed {
+			return nil
+		}
+		return api.capture(r.WithContext(ctx), scope, "settings.identity_provider."+action, item, correlation)
+	})
 }

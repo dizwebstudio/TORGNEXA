@@ -1,0 +1,6 @@
+PASS A -> logout -> B: loading, API failure, recovery; no old data frame
+PASS late A HTTP 200: aborted, cannot populate B cache or alter B session
+PASS late A HTTP 401: aborted, cannot populate B cache or alter B session
+PASS workspace and permissions change: old cached orders and UI state discarded
+PASS hard session expiry: authenticated subtree removed
+A01 browser regression: PASS (real React StrictMode, QueryClient, generated SDK, Orders UI; synthetic auth/API)

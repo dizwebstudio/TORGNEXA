@@ -2269,9 +2269,10 @@ func (source wooConfigSource) Resolve(ctx context.Context, account sdk.Account) 
 		return woocommerce.Configuration{}, err
 	}
 	var value struct {
-		StoreHost     string `json:"store_host"`
-		BasePath      string `json:"base_path"`
-		StoreCurrency string `json:"store_currency"`
+		CommerceWebhookSubscriptions []sdk.CommerceWebhookSubscription `json:"commerce_webhook_subscriptions,omitempty"`
+		StoreHost                    string                            `json:"store_host"`
+		BasePath                     string                            `json:"base_path"`
+		StoreCurrency                string                            `json:"store_currency"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return woocommerce.Configuration{}, woocommerce.ErrInvalidConfiguration
@@ -2451,10 +2452,11 @@ func (source saleorConfigSource) Resolve(ctx context.Context, account sdk.Accoun
 		return saleor.Configuration{}, err
 	}
 	var value struct {
-		StoreHost string `json:"store_host"`
-		BasePath  string `json:"base_path"`
-		Channel   string `json:"channel"`
-		Warehouse string `json:"warehouse"`
+		CommerceWebhookSubscriptions []sdk.CommerceWebhookSubscription `json:"commerce_webhook_subscriptions,omitempty"`
+		StoreHost                    string                            `json:"store_host"`
+		BasePath                     string                            `json:"base_path"`
+		Channel                      string                            `json:"channel"`
+		Warehouse                    string                            `json:"warehouse"`
 	}
 	if decodeStrict(raw, &value) != nil {
 		return saleor.Configuration{}, saleor.ErrInvalidConfiguration

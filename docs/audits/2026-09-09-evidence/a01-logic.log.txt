@@ -1,0 +1,21 @@
+
+> @torgnexa/frontend@0.1.0 test:logic
+> tsc -p tsconfig.logic.json && node --test test/*.test.mjs
+
+✔ test/auth-retry.test.mjs (82.079728ms)
+✔ test/decoders.test.mjs (49.239497ms)
+✔ test/keycloak-session-race.test.mjs (78.286961ms)
+✔ test/navigation.test.mjs (51.469774ms)
+✔ test/realtime.test.mjs (44.593094ms)
+✔ test/session-isolation.test.mjs (48.79969ms)
+✔ test/session.test.mjs (45.629428ms)
+✔ test/settings-tabs.test.mjs (37.981212ms)
+✔ test/ui-experience.test.mjs (70.694584ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.126426

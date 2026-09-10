@@ -1,0 +1,21 @@
+=== RUN   TestAuditPaymentWebhookRetryAfterConflict
+2026/09/08 00:59:39 WARN payment webhook status not applied event=payments.webhook_received path=/api/v1/webhooks/payments/test-gateway/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1 connector_id=test-gateway account_id=acct-1 error="payments: optimistic version conflict"
+    audit_regression_test.go:59: delivery 1 HTTP 200
+    audit_regression_test.go:59: delivery 2 HTTP 200
+    audit_regression_test.go:62: verified success lost after retry: status=created, status calls=1, receipts=1
+--- FAIL: TestAuditPaymentWebhookRetryAfterConflict (0.00s)
+=== RUN   TestAuditPaymentWebhookStorageFailureNeedsRetry
+2026/09/08 00:59:39 ERROR payment webhook evidence not recorded event=payments.webhook_received path=/api/v1/webhooks/payments/test-gateway/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001/018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002/acct-1 connector_id=test-gateway account_id=acct-1 error="synthetic temporary database failure"
+    audit_regression_test.go:72: temporary storage failure acknowledged with HTTP 200; receipts=0
+--- FAIL: TestAuditPaymentWebhookStorageFailureNeedsRetry (0.00s)
+=== RUN   TestAuditOIDCUnverifiedEmailCannotBeUsedForInvitation
+    audit_regression_test.go:101: unverified email propagated to Principal.Email used by invitation resolver: invited-admin@example.test
+--- FAIL: TestAuditOIDCUnverifiedEmailCannotBeUsedForInvitation (0.00s)
+=== RUN   TestAuditRealtimeSurvivesServerWriteDeadline
+    audit_regression_test.go:135: SSE lost update after write deadline; received "event: ready\ndata: {\"reason\":\"connected\",\"cursor\":\"audit-1\",\"at\":\"2026-09-07T21:59:39.452561232Z\"}\n\n"
+--- FAIL: TestAuditRealtimeSurvivesServerWriteDeadline (2.00s)
+=== RUN   TestAuditRouteUsesAuthorizedScope
+--- PASS: TestAuditRouteUsesAuthorizedScope (0.00s)
+FAIL
+FAIL	github.com/torgnexa/torgnexa/internal/app/api	2.037s
+FAIL

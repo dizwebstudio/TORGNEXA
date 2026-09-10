@@ -140,20 +140,26 @@ func (api profileAPI) update(w http.ResponseWriter, r *http.Request) {
 	update.ExpectedVersion = input.Version
 	update.MutationKey = key
 	update.MutationHash = profileMutationHash(update)
-	updated, err := api.profiles.Update(r.Context(), scope, update)
+	updated, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (userprofile.Profile, error) {
+		return api.profiles.Update(ctx, scope, update)
+	}, func(ctx context.Context, updated userprofile.Profile) error {
+		if updated.Replayed {
+			return nil
+		}
+		changed := changedProfileFields(current, updated)
+		if len(changed) > 0 {
+			if _, auditErr := api.audit.Capture(ctx, scope, audit.Entry{
+				ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.updated", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive,
+				Summary: audit.Summary{"changed_fields": changed, "picture_changed": current.PictureUploadID != updated.PictureUploadID, "version": updated.Version},
+			}); auditErr != nil {
+				return auditErr
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		writeProfileError(w, err)
 		return
-	}
-	changed := changedProfileFields(current, updated)
-	if len(changed) > 0 {
-		if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.updated", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive,
-			Summary: audit.Summary{"changed_fields": changed, "picture_changed": current.PictureUploadID != updated.PictureUploadID, "version": updated.Version},
-		}); auditErr != nil {
-			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
-			return
-		}
 	}
 	writeJSON(w, http.StatusOK, api.view(principal, updated))
 }
@@ -189,16 +195,22 @@ func (api profileAPI) deleteAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	update := userprofile.Update{SubjectRef: principal.SubjectRef, GivenName: current.GivenName, FamilyName: current.FamilyName, Birthdate: current.Birthdate, JobTitle: current.JobTitle, Department: current.Department, PhoneNumber: current.PhoneNumber, ExpectedVersion: input.Version, MutationKey: key}
 	update.MutationHash = profileMutationHash(update)
-	updated, err := api.profiles.Update(r.Context(), scope, update)
+	updated, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (userprofile.Profile, error) {
+		return api.profiles.Update(ctx, scope, update)
+	}, func(ctx context.Context, updated userprofile.Profile) error {
+		if updated.Replayed {
+			return nil
+		}
+		if current.PictureUploadID != updated.PictureUploadID {
+			if _, auditErr := api.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.avatar_removed", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"picture_changed": true, "version": updated.Version}}); auditErr != nil {
+				return auditErr
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		writeProfileError(w, err)
 		return
-	}
-	if current.PictureUploadID != updated.PictureUploadID {
-		if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.profile.avatar_removed", ResourceType: "user_profile", ResourceID: principal.SubjectRef, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"picture_changed": true, "version": updated.Version}}); auditErr != nil {
-			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
-			return
-		}
 	}
 	writeJSON(w, http.StatusOK, api.view(principal, updated))
 }

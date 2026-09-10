@@ -1,0 +1,4 @@
+[
+  {"adapter_id":"telegram","verification_header":"X-Telegram-Bot-Api-Secret-Token","body":{"update_id":123,"channel_post":{"message_id":42,"date":1788170400,"chat":{"id":-70801090403050,"type":"channel"}}}},
+  {"adapter_id":"max-messenger","verification_header":"X-Max-Bot-Api-Secret","body":{"update_type":"message_created","timestamp":1788170400000,"chat_id":-70801090403050,"message_id":"mid.synthetic"}}
+]

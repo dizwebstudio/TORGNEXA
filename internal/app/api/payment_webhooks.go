@@ -48,10 +48,8 @@ func newPaymentWebhookRoutes(repository paymentsAPIRepository, accounts payments
 	}
 }
 
-// receive always acknowledges with 200, regardless of outcome — a provider
-// enumerating account/connector IDs must see the same response whether the
-// account exists, the delivery replayed, or verification failed (ADR-0105).
-// Every rejection reason is logged internally only.
+// receive keeps pre-verification rejections uniform. A verified delivery is
+// acknowledged only after its receipt and business effects durably commit.
 func (api paymentWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	logger := slog.Default().With("event", "payments.webhook_received", "path", r.URL.Path)
 	connectorID, organizationID, workspaceID, accountID, ok := parsePaymentWebhookPath(r.URL.Path)
@@ -121,54 +119,24 @@ func (api paymentWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	evidence := payments.WebhookEvidence{DeliveryID: verified.DeliveryID, ConnectorAccountID: account.ID, RemotePaymentID: verified.RemotePaymentID, EventType: verified.EventType, BodyDigest: verified.BodyDigest, VerifiedAt: verified.OccurredAt}
-	fresh, err := api.repository.RecordWebhookEvidence(r.Context(), scope, evidence)
-	if err != nil {
-		logger.Error("payment webhook evidence not recorded", "error", err)
-		acknowledgeWebhook(w)
+	remoteStatus := strings.TrimPrefix(verified.EventType, "payment_")
+	observation := payments.VerifiedWebhook{Evidence: evidence, Status: paymentsCanonicalStatus(remoteStatus), RemoteStatus: remoteStatus}
+	if _, err := api.repository.ApplyVerifiedWebhook(r.Context(), scope, observation, paymentsMutation("system:webhook", verified.DeliveryID)); err != nil {
+		logger.Error("verified payment webhook not committed")
+		retryVerifiedWebhook(w)
 		return
-	}
-	if !fresh {
-		// A true provider retry of an already-processed delivery: nothing
-		// left to do, and applying it again must not double-count. Still
-		// worth a provider-shaped ack (below) so the provider stops retrying.
-		acknowledgeVerifiedWebhook(w, verified)
-		return
-	}
-
-	if err := api.applyVerifiedStatus(r.Context(), scope, account.ID, verified); err != nil {
-		logger.Warn("payment webhook status not applied", "error", err)
 	}
 	acknowledgeVerifiedWebhook(w, verified)
 }
 
-// applyVerifiedStatus moves the local payment through the same
-// ValidatePaymentTransition/ChangePaymentStatus path every other payment
-// mutation uses. The target status comes only from the verified
-// EventType ("payment_"+remote status, per paymentstransport.go's
-// VerifyWebhook contract) — never from the unverified request body.
-func (api paymentWebhookAPI) applyVerifiedStatus(ctx context.Context, scope payments.Scope, connectorAccountID string, verified sdk.PaymentWebhook) error {
-	payment, err := api.repository.PaymentByRemoteID(ctx, scope, connectorAccountID, verified.RemotePaymentID)
-	if err != nil {
-		return err
-	}
-	remoteStatus := strings.TrimPrefix(verified.EventType, "payment_")
-	target := paymentsCanonicalStatus(remoteStatus)
-	if target == payment.Status {
-		return nil
-	}
-	if payments.ValidatePaymentTransition(payment.Status, target) != nil {
-		return payments.ErrInvalidState
-	}
-	change := payments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: target, RemoteStatus: remoteStatus}
-	if target == payments.StatusSucceeded {
-		at := verified.OccurredAt
-		change.SucceededAt = &at
-	}
-	if target == payments.StatusFailed {
-		change.ReasonCode = "provider_declined"
-	}
-	_, err = api.repository.ChangePaymentStatus(ctx, scope, change, paymentsMutation("system:webhook", verified.DeliveryID))
-	return err
+// retryVerifiedWebhook is used only after independent provider verification.
+// No internal error or provider acknowledgement token is exposed on failure.
+func retryVerifiedWebhook(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", "5")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write([]byte("{}"))
 }
 
 func (api paymentWebhookAPI) configLoader(tenantScope tenancy.Scope) builtinruntime.ConfigLoader {

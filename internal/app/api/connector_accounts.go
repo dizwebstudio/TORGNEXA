@@ -228,7 +228,17 @@ func (api *connectorAccountAPI) runtimeConfigPut(w http.ResponseWriter, request 
 		writeProblem(w, http.StatusNotFound, "Not Found")
 		return
 	}
-	version, err := api.configs.Put(request.Context(), scope, account.ID, input.Config, input.ExpectedVersion)
+	principal, ok := PrincipalFromContext(request.Context())
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	version, err := auditedSettingsMutation(request.Context(), scope, api.audit, func(ctx context.Context) (int64, error) {
+		return api.configs.Put(ctx, scope, account.ID, input.Config, input.ExpectedVersion)
+	}, func(ctx context.Context, version int64) error {
+		_, err := api.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "connector.account.runtime_config_updated", ResourceType: "connector_account", ResourceID: account.ID, CorrelationID: request.Header.Get("Idempotency-Key"), Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"connector_id": account.ConnectorID, "config_version": version}})
+		return err
+	})
 	switch {
 	case errors.Is(err, runtimeconfigstore.ErrInvalid):
 		writeProblem(w, http.StatusUnprocessableEntity, "Runtime configuration must be non-secret JSON")
@@ -237,16 +247,6 @@ func (api *connectorAccountAPI) runtimeConfigPut(w http.ResponseWriter, request 
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	case err != nil:
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
-	principal, ok := PrincipalFromContext(request.Context())
-	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
-	_, err = api.audit.Capture(request.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "connector.account.runtime_config_updated", ResourceType: "connector_account", ResourceID: account.ID, CorrelationID: request.Header.Get("Idempotency-Key"), Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"connector_id": account.ConnectorID, "config_version": version}})
-	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}

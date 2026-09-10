@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -68,8 +69,8 @@ func New(database *sql.DB) (*Repository, error) {
 // WithRefreshLock serializes one OAuth refresh-token exchange across all API
 // and worker processes sharing PostgreSQL. The transaction-scoped advisory lock
 // is released by PostgreSQL even when the caller context is cancelled. Waiters
-// use try-lock transactions so they cannot exhaust the pool while the winner
-// re-reads and rotates the encrypted secret through a separate transaction.
+// use try-lock transactions. The winner reads and rotates the encrypted secret
+// on the same connection, including when the pool has only one connection.
 func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy.Scope, reference secrets.Reference, operation func(context.Context) error) error {
 	if err := validateCall(ctx, scope, repository); err != nil {
 		return err
@@ -79,7 +80,11 @@ func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy
 	}
 	lockKey := "connector-oauth-refresh:" + scope.OrganizationID().String() + ":" + scope.WorkspaceID().String() + ":" + reference.String()
 	for {
-		err := repository.readWrite(ctx, scope, func(tx *sql.Tx) error {
+		err := txboundary.WithinTransaction(ctx, repository.database, scope, func(lockCtx context.Context) error {
+			tx, err := txboundary.CurrentTransaction(lockCtx, repository.database)
+			if err != nil {
+				return err
+			}
 			var acquired bool
 			if err := tx.QueryRowContext(ctx, oauthRefreshLockStatement, lockKey).Scan(&acquired); err != nil {
 				return fmt.Errorf("lock oauth refresh: %w", err)
@@ -87,7 +92,7 @@ func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy
 			if !acquired {
 				return errOAuthRefreshLockBusy
 			}
-			return operation(ctx)
+			return operation(lockCtx)
 		})
 		if !errors.Is(err, errOAuthRefreshLockBusy) {
 			return err
@@ -364,6 +369,14 @@ func (repository *Repository) readOnly(ctx context.Context, scope tenancy.Scope,
 	return repository.transaction(ctx, scope, true, operation)
 }
 func (repository *Repository) transaction(ctx context.Context, scope tenancy.Scope, readOnly bool, operation func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, repository.database); err != nil {
+		return err
+	} else if tx != nil {
+		return operation(tx)
+	}
 	tx, err := repository.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("begin secret transaction: %w", err)

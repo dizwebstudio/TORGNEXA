@@ -1,0 +1,40 @@
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=false
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=true
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/unauthenticated
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/forbidden
+--- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization (0.42s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=false (0.21s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=true (0.21s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/unauthenticated (0.00s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/forbidden (0.00s)
+=== RUN   TestA10RealtimeSlowClientReleasesHandler
+--- PASS: TestA10RealtimeSlowClientReleasesHandler (0.12s)
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect/http1
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect/http2
+--- PASS: TestA10RealtimeHTTPDeadlineAndReconnect (1.28s)
+    --- PASS: TestA10RealtimeHTTPDeadlineAndReconnect/http1 (0.65s)
+    --- PASS: TestA10RealtimeHTTPDeadlineAndReconnect/http2 (0.63s)
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/frame_deadline
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/write
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/flush
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/idle_deadline_clear
+--- PASS: TestA10RealtimeWriteFailuresStopStreaming (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/frame_deadline (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/write (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/flush (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/idle_deadline_clear (0.00s)
+=== RUN   TestA10RealtimeRequiresDeadlineSupport
+=== RUN   TestA10RealtimeRequiresDeadlineSupport/unsupported
+=== RUN   TestA10RealtimeRequiresDeadlineSupport/control_error
+--- PASS: TestA10RealtimeRequiresDeadlineSupport (0.00s)
+    --- PASS: TestA10RealtimeRequiresDeadlineSupport/unsupported (0.00s)
+    --- PASS: TestA10RealtimeRequiresDeadlineSupport/control_error (0.00s)
+=== RUN   TestRealtimeStreamIsMetadataOnlyAndTenantScoped
+--- PASS: TestRealtimeStreamIsMetadataOnlyAndTenantScoped (0.00s)
+=== RUN   TestRealtimeStreamUsesLatestIDFastPath
+--- PASS: TestRealtimeStreamUsesLatestIDFastPath (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	2.977s

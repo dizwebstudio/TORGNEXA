@@ -1,0 +1,4 @@
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.593s
+ok  	github.com/torgnexa/torgnexa/internal/platform/securityedge	1.013s
+ok  	github.com/torgnexa/torgnexa/internal/platform/outbox	1.020s
+ok  	github.com/torgnexa/torgnexa/internal/platform/webhooks	1.020s

@@ -1,5 +1,5 @@
-import type {AuthSession} from "./session-model";
-import {createKeycloakAdapter} from "./keycloak-adapter";
+import type {AuthSession} from "./session-model.js";
+import {createKeycloakAdapter} from "./keycloak-adapter.js";
 
 export interface AuthAdapter {
   getSession(options?: {forceRefresh?: boolean}): Promise<AuthSession | null>;

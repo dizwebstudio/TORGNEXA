@@ -8,8 +8,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/eventbus"
 	"github.com/torgnexa/torgnexa/internal/platform/inbox"
 )
@@ -72,7 +74,7 @@ func (processor *Processor) Process(ctx context.Context, scope tenancy.Scope, co
 	}
 	return processor.process(ctx, scope, consumer, delivery, func(callCtx context.Context, tx *sql.Tx, item eventbus.Delivery) error {
 		return handler(callCtx, sqlTransaction{tx: tx}, item)
-	})
+	}, false)
 }
 
 // ProcessWithSQLTransaction executes a transaction-aware handler exactly once
@@ -82,10 +84,22 @@ func (processor *Processor) ProcessWithSQLTransaction(ctx context.Context, scope
 	if handler == nil {
 		return 0, errors.New("inbox processor: SQL handler is required")
 	}
-	return processor.process(ctx, scope, consumer, delivery, handler)
+	return processor.process(ctx, scope, consumer, delivery, handler, false)
 }
 
-func (processor *Processor) process(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler SQLHandler) (inbox.Result, error) {
+// ProcessWithFirstObservedTime handles content-addressed webhook deliveries
+// whose occurrence time may be inferred from arrival. On replay it retains the
+// receipt's original occurrence time while comparing every other envelope field.
+// The caller must bind the event ID to the verified body and set FirstObservedAt
+// to Event.OccurredAt. Ordinary immutable EventBus deliveries use Process instead.
+func (processor *Processor) ProcessWithFirstObservedTime(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler SQLHandler) (inbox.Result, error) {
+	if handler == nil || !delivery.FirstObservedAt.Time().Equal(delivery.Event.OccurredAt.Time()) {
+		return 0, inbox.ErrInvalidRecord
+	}
+	return processor.process(ctx, scope, consumer, delivery, handler, true)
+}
+
+func (processor *Processor) process(ctx context.Context, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, handler SQLHandler, retainObservedTime bool) (inbox.Result, error) {
 	if ctx == nil {
 		return 0, errors.New("inbox processor: context is required")
 	}
@@ -97,6 +111,15 @@ func (processor *Processor) process(ctx context.Context, scope tenancy.Scope, co
 	}
 	if err := validateInput(scope, consumer, delivery); err != nil {
 		return 0, err
+	}
+	if retainObservedTime {
+		// PostgreSQL timestamptz stores microseconds. Canonicalize before the
+		// first fingerprint so reconstructing its time on replay is lossless.
+		instant, err := domain.NewUTCInstant(delivery.Event.OccurredAt.Time().UTC().Truncate(time.Microsecond))
+		if err != nil {
+			return 0, err
+		}
+		delivery.Event.OccurredAt, delivery.FirstObservedAt = instant, instant
 	}
 
 	tx, err := processor.database.BeginTx(ctx, nil)
@@ -110,9 +133,9 @@ func (processor *Processor) process(ctx context.Context, scope tenancy.Scope, co
 		}
 	}()
 
-	result, err := processTransaction(ctx, sqlQueries{tx: tx}, scope, consumer, delivery, func(callCtx context.Context) error {
+	result, err := processTransactionWithObservedTime(ctx, sqlQueries{tx: tx}, scope, consumer, delivery, func(callCtx context.Context) error {
 		return handler(callCtx, tx, delivery)
-	})
+	}, retainObservedTime)
 	if err != nil {
 		return 0, err
 	}
@@ -159,6 +182,10 @@ func validateInput(scope tenancy.Scope, consumer string, delivery eventbus.Deliv
 type transactionOperation func(context.Context) error
 
 func processTransaction(ctx context.Context, queries queryer, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, operation transactionOperation) (inbox.Result, error) {
+	return processTransactionWithObservedTime(ctx, queries, scope, consumer, delivery, operation, false)
+}
+
+func processTransactionWithObservedTime(ctx context.Context, queries queryer, scope tenancy.Scope, consumer string, delivery eventbus.Delivery, operation transactionOperation, retainObservedTime bool) (inbox.Result, error) {
 	if queries == nil || operation == nil {
 		return 0, errors.New("inbox processor: transaction operation is not initialized")
 	}
@@ -184,6 +211,20 @@ func processTransaction(ctx context.Context, queries queryer, scope tenancy.Scop
 	).Scan(&eventType, &existingFingerprint)
 	switch {
 	case err == nil:
+		if retainObservedTime {
+			var original time.Time
+			if err := queries.QueryRowContext(ctx, `SELECT first_observed_at FROM inbox_receipts WHERE organization_id=$1 AND workspace_id=$2 AND consumer=$3 AND event_id=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), consumer, delivery.Event.ID).Scan(&original); err != nil {
+				return 0, fmt.Errorf("inbox processor: read original observation time: %w", err)
+			}
+			delivery.Event.OccurredAt, err = domain.NewUTCInstant(original.UTC())
+			if err != nil {
+				return 0, err
+			}
+			fingerprint, err = inbox.Fingerprint(delivery.Event)
+			if err != nil {
+				return 0, err
+			}
+		}
 		if eventType != delivery.Event.Type.String() || existingFingerprint != fingerprint {
 			return 0, inbox.ErrCollision
 		}

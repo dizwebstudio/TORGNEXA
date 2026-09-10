@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -152,6 +153,9 @@ func newRepository(transactions transactor) *Repository {
 
 // Append persists exactly one immutable tenant-scoped record.
 func (repository *Repository) Append(ctx context.Context, scope tenancy.Scope, record audit.Record) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
 	if ctx == nil {
 		return errors.New("audit repository: context is required")
 	}
@@ -241,6 +245,11 @@ type sqlTransactor struct {
 }
 
 func (transactions sqlTransactor) readWrite(ctx context.Context, operation func(queryer) error) error {
+	if tx, err := txboundary.CurrentTransaction(ctx, transactions.database); err != nil {
+		return err
+	} else if tx != nil {
+		return operation(sqlQueries{transaction: tx})
+	}
 	transaction, err := transactions.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return fmt.Errorf("begin audit transaction: %w", err)
@@ -272,4 +281,9 @@ func (queries sqlQueries) QueryRowContext(ctx context.Context, statement string,
 
 func (queries sqlQueries) ExecContext(ctx context.Context, statement string, arguments ...any) (result, error) {
 	return queries.transaction.ExecContext(ctx, statement, arguments...)
+}
+
+// WithinTransaction binds settings mutations and their authoritative audit to one commit.
+func (repository *Repository) WithinTransaction(ctx context.Context, scope tenancy.Scope, operation func(context.Context) error) error {
+	return txboundary.WithinTransaction(ctx, repository.database, scope, operation)
 }

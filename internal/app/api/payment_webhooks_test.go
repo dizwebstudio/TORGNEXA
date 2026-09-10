@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -116,6 +117,29 @@ func (f *fakePaymentsRepository) RecordWebhookEvidence(_ context.Context, _ paym
 	}
 	f.evidence[key] = true
 	return true, nil
+}
+
+func (f *fakePaymentsRepository) ApplyVerifiedWebhook(ctx context.Context, scope payments.Scope, observation payments.VerifiedWebhook, mutation payments.Mutation) (bool, error) {
+	before := maps.Clone(f.evidence)
+	fresh, err := f.RecordWebhookEvidence(ctx, scope, observation.Evidence)
+	if err != nil || !fresh {
+		return false, err
+	}
+	payment, err := f.PaymentByRemoteID(ctx, scope, observation.Evidence.ConnectorAccountID, observation.Evidence.RemotePaymentID)
+	if err == nil && payment.Status != observation.Status {
+		change := payments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: observation.Status, RemoteStatus: observation.RemoteStatus}
+		if change.Status == payments.StatusSucceeded {
+			change.SucceededAt = &observation.Evidence.VerifiedAt
+		}
+		if change.Status == payments.StatusFailed {
+			change.ReasonCode = "provider_declined"
+		}
+		_, err = f.ChangePaymentStatus(ctx, scope, change, mutation)
+	}
+	if err != nil {
+		f.evidence = before
+	}
+	return fresh && err == nil, err
 }
 
 var errNotImplementedInFake = payments.ErrInvalidRecord

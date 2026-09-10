@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/userprofile"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 )
@@ -103,14 +105,26 @@ func (a *memberSettingsAPI) invite(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "Bad Request")
 		return
 	}
-	member, err := a.repository.InviteMember(r.Context(), scope, tenancyrepo.Member{ID: newApprovalID(), Email: input.Email, DisplayName: input.DisplayName, Role: input.Role, InvitationKey: key})
-	if err != nil {
-		writeProblem(w, 409, "Conflict")
+	principal, _ := PrincipalFromContext(r.Context())
+	member, err := auditedSettingsMutation(r.Context(), scope, a.audit, func(ctx context.Context) (tenancyrepo.Member, error) {
+		return a.repository.InviteMember(ctx, scope, tenancyrepo.Member{ID: newApprovalID(), Email: input.Email, DisplayName: input.DisplayName, Role: input.Role, InvitationKey: key})
+	}, func(ctx context.Context, member tenancyrepo.Member) error {
+		if member.Replayed {
+			return nil
+		}
+		_, err := a.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.member.invited", ResourceType: "workspace_member", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"role": member.Role, "status": member.Status}})
+		return err
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
-	principal, _ := PrincipalFromContext(r.Context())
-	if _, err = a.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "settings.member.invited", ResourceType: "workspace_member", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"role": member.Role, "status": member.Status}}); err != nil {
-		writeProblem(w, 500, "Internal Server Error")
+	if errors.Is(err, tenancyrepo.ErrLastAdministrator) {
+		writeProblem(w, 409, "Last active administrator cannot be disabled")
+		return
+	}
+	if err != nil {
+		writeProblem(w, 409, "Conflict")
 		return
 	}
 	writeJSON(w, 201, memberToView(member))
@@ -137,18 +151,26 @@ func (a *memberSettingsAPI) update(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "Bad Request")
 		return
 	}
-	member, err := a.repository.UpdateMember(r.Context(), scope, id, input.Role, input.Status, key, input.ExpectedVersion)
+	principal, _ := PrincipalFromContext(r.Context())
+	member, err := auditedSettingsMutation(r.Context(), scope, a.audit, func(ctx context.Context) (tenancyrepo.Member, error) {
+		return a.repository.UpdateMember(ctx, scope, id, input.Role, input.Status, key, input.ExpectedVersion)
+	}, func(ctx context.Context, member tenancyrepo.Member) error {
+		if member.Replayed {
+			return nil
+		}
+		_, err := a.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.member.updated", ResourceType: "workspace_member", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"role": member.Role, "status": member.Status, "version": member.Version}})
+		return err
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, 500, "Internal Server Error")
+		return
+	}
 	if errors.Is(err, tenancyrepo.ErrLastAdministrator) {
 		writeProblem(w, 409, "Last active administrator cannot be disabled")
 		return
 	}
 	if err != nil {
 		writeProblem(w, 409, "Conflict")
-		return
-	}
-	principal, _ := PrincipalFromContext(r.Context())
-	if _, err = a.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "settings.member.updated", ResourceType: "workspace_member", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"role": member.Role, "status": member.Status, "version": member.Version}}); err != nil {
-		writeProblem(w, 500, "Internal Server Error")
 		return
 	}
 	writeJSON(w, 200, memberToView(member))
@@ -218,17 +240,23 @@ func (a *memberSettingsAPI) updateProfile(w http.ResponseWriter, r *http.Request
 	update.ExpectedVersion = input.Version
 	update.MutationKey = key
 	update.MutationHash = profileMutationHash(update)
-	updated, err := a.profiles.Update(r.Context(), scope, update)
+	updated, err := auditedSettingsMutation(r.Context(), scope, a.audit, func(ctx context.Context) (userprofile.Profile, error) {
+		return a.profiles.Update(ctx, scope, update)
+	}, func(ctx context.Context, updated userprofile.Profile) error {
+		if updated.Replayed {
+			return nil
+		}
+		changed := changedProfileFields(current, updated)
+		if len(changed) > 0 {
+			if _, auditErr := a.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.member.profile.updated", ResourceType: "user_profile", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"changed_fields": changed, "version": updated.Version}}); auditErr != nil {
+				return auditErr
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		writeProfileError(w, err)
 		return
-	}
-	changed := changedProfileFields(current, updated)
-	if len(changed) > 0 {
-		if _, auditErr := a.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.member.profile.updated", ResourceType: "user_profile", ResourceID: member.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"changed_fields": changed, "version": updated.Version}}); auditErr != nil {
-			writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
-			return
-		}
 	}
 	writeJSON(w, http.StatusOK, profileViewFromProfile(updated))
 }

@@ -10,6 +10,16 @@ The account profile presents the provider-owned `email` and `username` plus the 
 
 Missing, expired or invalid session state is anonymous. Missing route capability is denied both in navigation and direct URL access. These checks do not authorize API calls: the Go API remains responsible for bearer verification, RBAC/scopes, tenant/workspace derivation, approval policy and RLS.
 
+ADR-0186 isolates all server-state caches and local authenticated UI state by
+session lifetime. Logout, identity/workspace/permission changes, invalid sessions
+and hard expiry cancel requests and remove the old QueryClient before another
+session can use it. Late API and OIDC results cannot restore the previous user or
+retry an earlier write as the next user. Optional memory-only `cacheScope` lets a
+host preserve caches across ordinary token renewal while distinguishing all its
+issuer/tenant/workspace/login contexts; see
+[the adapter contract](../contracts/frontend/auth-adapter-v1.md). Existing open
+tabs must reload after deployment to receive this lifecycle fix.
+
 ## Generated API boundary
 
 `frontend/src/api/client.ts` creates `@torgnexa/sdk` from Task 062 at same-origin `/api/v1`. A 401 causes session re-evaluation. Redirects are rejected. No `organization_id` or `workspace_id` selectors are constructed by the shell.
@@ -42,6 +52,17 @@ Responses remain `unknown` at the generated transport boundary today, so the she
 
 `make frontend-check` runs TypeScript logic compilation, Node tests, repository TSX validation and static security checks without downloaded npm packages. If `frontend/node_modules` is present, the same target also runs the actual `tsc --noEmit && vite build` production bundle.
 
+`make frontend-auth-cache-check` (or `npm --prefix frontend run test:auth-cache`)
+runs the A01 browser regression after frontend dependencies are installed.
+It needs Node 22.12+ and Chrome/Chromium (`CHROME_BIN` overrides `google-chrome`).
+It starts a temporary loopback Vite server and disposable headless browser profile;
+no running TORGNEXA stack or real accounts are used. Actual React/Query/SDK and
+Orders UI execute against a synthetic host adapter and intercepted API responses.
+The test checks A → logout → B including B's loading, failure and recovery,
+request cancellation, late 200/401, workspace/permission changes and expiry.
+Its server refuses unmocked API calls. Temporary server/profile state is removed
+on completion; failure screenshots contain only synthetic data.
+
 The sandbox used for Task 032 cannot reach the npm registry, so a real dependency install/build is not claimed here. Task 065 already requires any supported package ecosystem to have lockfile/scanner/license/SBOM policy before release. This operational release gate remains fail-closed and does not turn the repository shell into a release candidate.
 
 ## Hosting
@@ -66,13 +87,22 @@ Daily workflows are focused rather than nested inline: product, order and invent
 
 The operator shell no longer treats bounded API pages as the complete tenant dataset. Catalog and Orders use `ServerDataGrid`, which sends text/status filters and opaque cursors to the existing PostgreSQL search APIs. Canonical backend order is preserved; the browser does not advertise unsupported arbitrary server sorts.
 
-`GET /api/v1/realtime` is an authenticated SSE **invalidation** channel. Frames contain only liveness/change metadata. The browser invalidates TanStack Query data only for explicit `invalidate` frames and rereads the same capability-protected APIs used by normal navigation. `ready` and `heartbeat` frames report connection health only and never invalidate the query cache. This avoids duplicating authorization or business state in the streaming layer and prevents periodic refetch storms.
+`GET /api/v1/realtime` is an authenticated SSE **invalidation** channel. Frames contain only liveness/change metadata. The browser invalidates TanStack Query data only for explicit `invalidate` frames and rereads the same capability-protected APIs used by normal navigation. `ready` and `heartbeat` frames report connection health only and never invalidate the query cache. Each connection now follows `ready` with `invalidate` / reason `connected`: one refresh recovers changes missed while disconnected, even when the audit cursor is unchanged or absent. The cursor is a baseline rather than a replay token; `Last-Event-ID` does not resume history. This avoids duplicating authorization or business state in the streaming layer and prevents periodic refetch storms.
 
 Invalidation frames are coalesced for 150 ms in the browser. A worker batch can
 produce several audit records at once; one short debounce window turns that
 burst into one Query invalidation instead of a fan-out of identical refetches.
 The API side compares only the newest opaque audit ID through an indexed
 tenant lookup and never serializes the audit summary into SSE.
+
+After the protected-route checks, SSE clears the ordinary HTTP write deadline
+and applies a five-second budget to each frame write/flush. Successful flush
+clears that deadline for the idle interval; cancellation or a control/write/flush
+failure ends the handler. Ordinary API timeouts remain unchanged. See
+[ADR-0189](../adr/0189-sse-write-deadlines-and-reconnect-refresh.md).
+`npm --prefix frontend run test:realtime` checks reconnect recovery, heartbeat
+behavior, coalescing and logout in isolated Chrome with synthetic transports;
+Go `TestA10*` tests separately exercise real HTTP/1.1 and HTTP/2 servers.
 
 `/incidents` composes warehouse incidents, open reconciliation drift, degraded connector accounts and pending approvals into one triage surface. `/catalog/{id}` and `/orders/{id}` are durable route-controlled drawers; incident rows also receive bookmarkable routes. `Ctrl/Cmd+K` sends product/order searches to server endpoints rather than searching a fixed browser sample.
 

@@ -177,6 +177,76 @@ path instead of inheriting an approval from an older image.
 
 Task 117 records the approved TORGNEXA-owned Community-core repository license as Apache-2.0. The top-level `LICENSE`, `LICENSE-DECISION.md`, and owned package metadata carry that decision and `supply-chain/release-artifacts.json` may set `public_release_ready:true`. This field removes only the repository-license blocker: dependency-license, vulnerability, provenance/signing, protected-hosting and deployment qualification gates remain independently fail-closed.
 
+#### Keycloak candidate license review — 2026-09-08
+
+The release owner's request to review and admit the new candidate metadata is
+implemented by adding the following 15 exact raw values (149 -> 164 total).
+No entry is added to `allowed_spdx`, and no license obligation or security
+finding is waived. This is a technical provenance review under the owner's
+existing decision to retain the runtime images, not a certification of all
+redistribution obligations.
+
+Reviewed subject:
+`ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:bea2b70b46ede14511bec0ada31edf00af73bee9a986eebd2f16af4628bf9553`.
+The retained Trivy 0.70.0 full-license reports for `linux/amd64` and
+`linux/arm64` both contain 74 distinct raw values, including the same 15
+additions. Package versions and origins were cross-checked against the
+retained OS reports and Syft SPDX inventories. License texts were also read
+from this exact image's amd64 filesystem in a read-only, network-disabled
+container; the arm64 license files were not independently extracted.
+
+Paths below are relative to `/usr/share/licenses` in the image. Compound RPM
+labels are preserved verbatim, not claimed to be canonical SPDX expressions.
+
+| Exact raw value | Observed package/version or file | Review basis |
+| --- | --- | --- |
+| `ASL 2.0` | `dbus-broker` 28-9.el9_8; `openssl-fips-provider` and `openssl-fips-provider-so` 3.0.7-11.el9_8 | RPM metadata; `dbus-broker/LICENSE` and shared `openssl-libs/LICENSE.txt` identify Apache 2.0. |
+| `BSD and ISC` | `libevent` 2.1.12-8.el9_4 | `libevent/LICENSE` contains the BSD terms and the ISC-style arc4 notice. Retain the full bundled notices. |
+| `BSD or GPLv2+` | `libpwquality` 1.4.4-8.el9 | `libpwquality/COPYING` explicitly offers alternatives. Select the BSD branch for this reviewed package; retain its three conditions. This records the raw-image choice, without adding a global SPDX OR rule. |
+| `BSD with advertising` | `cyrus-sasl-lib` 2.1.27-22.el9 | `cyrus-sasl-lib/COPYING` requires the Carnegie Mellon acknowledgment and preservation of notices. Do not simplify this label to BSD-3-Clause. |
+| `BSD-4-Clause-UC` | `krb5-libs` 1.21.1-10.el9_8, `krb5-libs/LICENSE` | Composite Kerberos notice contains the four-clause Berkeley acknowledgment text; retain it. |
+| `Bitstream Vera and Public Domain` | `dejavu-sans-fonts` 2.37-18.el9 | `dejavu-sans-fonts/LICENSE` identifies Bitstream fonts and public-domain DejaVu changes; also retain the included Arev terms and font-name restrictions. |
+| `GPLv2 and GPLv2+ and LGPLv2+ and BSD with advertising and Public Domain` | `util-linux` and `util-linux-core` 2.37.4-25.el9 | RPM aggregate metadata, supported by `util-linux/COPYING.*`. Preserve every component's terms; this is not an OR choice or a reduction to one permissive license. |
+| `GPLv3+ and GFDL` | `gzip` 1.12-2.el9_8 | RPM metadata plus `gzip/COPYING` and `gzip/fdl-1.3.txt`; code and documentation terms remain applicable. |
+| `LGPLv2+ and BSD and Public Domain` | `libxcrypt` 4.4.18-3.el9 | `libxcrypt/LICENSING` inventories LGPL-2.1-or-later, BSD and public-domain components. Keep the legacy RPM label without reinterpreting it as a different LGPL version. |
+| `LicenseRef-C-Ares` | `krb5-libs/LICENSE` | Trivy loose-file classifier label (confidence approximately 0.978), not evidence of a separate c-ares package or a canonical SPDX identifier. Admit the observed label for the reviewed composite Kerberos notice, without creating a generic custom-license alias. |
+| `OpenLDAP` | `openldap` 2.6.8-4.el9, `openldap/LICENSE`; also `krb5-libs/LICENSE` | Both contain OpenLDAP Public License 2.8 text; preserve its notices and license copy. |
+| `OpenVision` | `krb5-libs/LICENSE` | Explicit OpenVision Kerberos administration notice permits source/object redistribution with its notices retained. |
+| `RSA` | `krb5-libs/LICENSE` | Explicit MD4/MD5 notices, including identification and notice-retention terms; not a blanket approval of unrelated RSA products. |
+| `bzip2` | `bzip2-libs` 1.0.8-11.el9, `bzip2-libs/LICENSE` | Bundled bzip2/libbzip2 1.0.8 notice permits redistribution subject to origin, modification and attribution conditions. Preserve this raw label; do not silently substitute a different version's license. |
+| `pubkey` | `gpg-pubkey` 5a6340b3-6229229e and fd431d51-4ae0493b, architecture `None` | RPM public-key metadata for Red Hat auxiliary key 3 and release key 2, not executable software, a private key, or an unknown software license. |
+
+External primary-source corroboration: the
+[RHEL package manifest](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/package_manifest/repositories)
+records legacy RPM license labels; the
+[MIT Kerberos notices](https://web.mit.edu/kerberos/krb5-1.21/doc/mitK5license.html)
+document its composite licenses. The
+[RPM maintainers' keyring example](https://lists.rpm.org/pipermail/rpm-maint/2024-October/029436.html)
+shows the `pubkey` metadata convention, and
+[Red Hat's key verification documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/security_hardening/verifying-rpm-packages-with-post-quantum-signatures_security-hardening)
+identifies the two observed key versions. These corroborate origins; the
+digest-bound local reports remain the candidate evidence.
+
+Evidence directory (Git-ignored):
+`qualification/evidence/runtime-candidate-scan-20260908.TuFPmS/`.
+The original scan evidence is not rewritten by this policy review.
+
+| Evidence file | SHA-256 |
+| --- | --- |
+| `keycloak_linux_amd64.license.json` | `c476a8b001c772e81a655914484d5d2010bbe41f5917667d22876cf7797b2684` |
+| `keycloak_linux_arm64.license.json` | `19148d1d99e0c2600336277d32e2f96b6a9f3579c467c3c245ddea149a28aa44` |
+| Image `krb5-libs/LICENSE` (amd64) | `0d5373486138cb176c063db98274b4c4ab6ef3518c4191360736384b780306c2` |
+| Image `openldap/LICENSE` (amd64) | `310fe25c858a9515fc8c8d7d1f24a67c9496f84a91e0a0e41ea9975b1371e569` |
+| Image `bzip2-libs/LICENSE` (amd64) | `c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3` |
+
+The current schema uses two separate allowlists: these raw values are accepted
+for **every** exact image reference in `approved_image_artifacts`, not through
+a package-specific or Keycloak-only rule. That existing boundary is unchanged;
+new image references and unlisted raw values still fail closed. In particular,
+`UNKNOWN` and `NOASSERTION` remain forbidden, and `pubkey` is not a global SPDX
+approval. Revalidating saved reports proves license-policy compatibility only;
+it does not replace a fresh complete release scan or authorize a release tag.
+
 ## Signing and provenance (`SC-PROV-01`)
 
 A trusted release job uses short-lived OIDC identity for keyless signing. No

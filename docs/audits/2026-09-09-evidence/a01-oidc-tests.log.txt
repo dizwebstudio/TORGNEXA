@@ -1,0 +1,15 @@
+✔ OIDC cache scope changes with workspace while a token renewal keeps the same scope (22.461731ms)
+✔ concurrent initial lookups join silent sign-in instead of publishing anonymous (1.950109ms)
+✔ StrictMode start-cleanup-start keeps the result of the joined OIDC lookup (1.373453ms)
+✔ token refresh finishing after logout cannot restore the adapter session (1.052944ms)
+✔ old refresh finishing after login B cannot overwrite the new adapter session (1.563171ms)
+✔ an authorization-code response after logout cannot restore the session (0.818195ms)
+✔ a newer login wins over an older authorization-code response (0.836495ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.295897

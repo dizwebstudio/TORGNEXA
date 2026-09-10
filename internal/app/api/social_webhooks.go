@@ -62,9 +62,8 @@ func newSocialWebhookRoutes(accounts socialWebhookAccounts, configs socialWebhoo
 	return []PublicWebhookRoute{{Method: http.MethodPost, Path: socialWebhooksPathPrefix, PathPrefix: true, Handler: http.HandlerFunc(api.receive)}}
 }
 
-// receive always acknowledges with 200. MAX retries are therefore independent
-// of account enumeration and verification outcomes; only a verified event can
-// reach the durable Inbox/outbox transaction.
+// receive keeps pre-verification rejections uniform. Once verified, a delivery
+// must reach the durable Inbox/outbox before it is acknowledged.
 func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	logger := slog.Default().With("event", "social.webhook_received", "path", r.URL.Path)
 	routeID, organizationID, workspaceID, accountID, ok := parseSocialWebhookPath(r.URL.Path)
@@ -127,10 +126,30 @@ func (api socialWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dedup := socialWebhookDeduplicator{processor: api.processor, scope: scope}
-	if _, err := receiver.ReceiveSocialWebhook(r.Context(), account, runtime, request, dedup); err != nil {
-		logger.Warn("social webhook verification or publication failed", "error", err)
+	commit := &socialWebhookCommit{next: dedup}
+	_, err = receiver.ReceiveSocialWebhook(r.Context(), account, runtime, request, commit)
+	if commit.failed {
+		logger.Error("verified social webhook not committed")
+		retryVerifiedWebhook(w)
+		return
+	}
+	if err != nil {
+		logger.Warn("social webhook verification failed")
 	}
 	acknowledgeWebhook(w)
+}
+
+// Qualified receivers call Claim only after authenticating and validating the
+// delivery. A persistence failure must survive connector error wrapping.
+type socialWebhookCommit struct {
+	next   sdk.SocialWebhookDeduplicator
+	failed bool
+}
+
+func (commit *socialWebhookCommit) ClaimSocialWebhook(ctx context.Context, account sdk.Account, claim sdk.SocialWebhookClaim) (bool, error) {
+	duplicate, err := commit.next.ClaimSocialWebhook(ctx, account, claim)
+	commit.failed = commit.failed || err != nil
+	return duplicate, err
 }
 
 func (api socialWebhookAPI) configLoader(scope tenancy.Scope) builtinruntime.ConfigLoader {

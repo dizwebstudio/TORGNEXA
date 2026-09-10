@@ -69,9 +69,17 @@ source_files = [p for p in sorted((root/'frontend/src').rglob('*')) if p.is_file
 source = '\n'.join(p.read_text(errors='strict') for p in source_files)
 handwritten_source = '\n'.join(p.read_text(errors='strict') for p in source_files if 'generated' not in p.relative_to(root/'frontend/src').parts)
 lower = source.lower()
-for forbidden in ('localstorage', 'sessionstorage', 'document.cookie', 'organization_id', 'workspace_id'):
+for forbidden in ('localstorage', 'sessionstorage', 'document.cookie'):
     if forbidden in lower:
         raise SystemExit(f'frontend-check: forbidden browser/session or tenant selector token: {forbidden}')
+# Only the OIDC adapter may read tenant claims to partition its in-memory cache.
+# Every other source still forbids tenant selectors, including API transport.
+for path in source_files:
+    if path == root/'frontend/src/auth/keycloak-adapter.ts':
+        continue
+    text = path.read_text().lower()
+    if 'organization_id' in text or 'workspace_id' in text:
+        raise SystemExit(f'frontend-check: client tenant selector outside OIDC cache partition: {path}')
 provider_names = ('wildberries', 'ozon', 'yandex_market', 'aliexpress', 'avito', 'megamarket')
 # Provider names are valid display data (the catalog and documentation must
 # show the services). Only reject routing branches that compare a connector

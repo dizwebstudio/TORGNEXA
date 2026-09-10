@@ -1,0 +1,137 @@
+=== RUN   TestA07PostgresSignedWebhookTopicBindingBeforeInbox
+2026/09/09 18:20:37 WARN commerce webhook verification failed event=commerce.webhook_received
+--- PASS: TestA07PostgresSignedWebhookTopicBindingBeforeInbox (0.05s)
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/verified
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/verified_normalized
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/unverified
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/missing_verification
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/null_verification
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/token_email_only
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/different_verified_address
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/malformed_address
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/display_address
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/string_verification
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/numeric_verification
+=== RUN   TestA02PostgresInvitationOwnershipAndReplay/different_userinfo_subject
+--- PASS: TestA02PostgresInvitationOwnershipAndReplay (0.42s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/verified (0.04s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/verified_normalized (0.04s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/unverified (0.04s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/missing_verification (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/null_verification (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/token_email_only (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/different_verified_address (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/malformed_address (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/display_address (0.04s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/string_verification (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/numeric_verification (0.03s)
+    --- PASS: TestA02PostgresInvitationOwnershipAndReplay/different_userinfo_subject (0.03s)
+=== RUN   TestA02PostgresExistingMemberCannotClaimAnotherRole
+=== RUN   TestA02PostgresExistingMemberCannotClaimAnotherRole/true
+=== RUN   TestA02PostgresExistingMemberCannotClaimAnotherRole/false
+=== RUN   TestA02PostgresExistingMemberCannotClaimAnotherRole/missing
+--- PASS: TestA02PostgresExistingMemberCannotClaimAnotherRole (0.14s)
+    --- PASS: TestA02PostgresExistingMemberCannotClaimAnotherRole/true (0.05s)
+    --- PASS: TestA02PostgresExistingMemberCannotClaimAnotherRole/false (0.05s)
+    --- PASS: TestA02PostgresExistingMemberCannotClaimAnotherRole/missing (0.05s)
+=== RUN   TestA02PostgresInvitationCannotCrossWorkspace
+--- PASS: TestA02PostgresInvitationCannotCrossWorkspace (0.04s)
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery/receipt
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/4c35bdc4-24f9-7880-b467-f20b17386291/0d587a25-09bc-73de-9fbf-348784758a94/66a88138-a36c-72f5-a6de-d33aec6e4c9e connector_id=synthetic account_id=66a88138-a36c-72f5-a6de-d33aec6e4c9e
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery/transition
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/7d3732d6-4a9f-76ff-89b2-b82b27ccc265/e5b84591-50f2-7a98-a35d-2cb8c3fc61c4/e79ad9c1-3acf-72ef-bd35-a4dfcfa55fd3 connector_id=synthetic account_id=e79ad9c1-3acf-72ef-bd35-a4dfcfa55fd3
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery/audit
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/c4c3806c-fa4c-7895-97cc-15f554d0acc6/53713d58-f200-77ad-8165-75e828faea91/949f8648-318a-7a5b-b34d-11f943987c43 connector_id=synthetic account_id=949f8648-318a-7a5b-b34d-11f943987c43
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery/outbox
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/da799e14-43ac-7c1e-9fac-5c15849d5040/69fbbe59-2952-7d9b-b306-0761c9a09925/fc6d89c8-5629-7ca9-8f9f-4af706ae8a06 connector_id=synthetic account_id=fc6d89c8-5629-7ca9-8f9f-4af706ae8a06
+=== RUN   TestA03PostgresPaymentWebhookRollbackAndRedelivery/commit
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/6246722c-bd67-7aa0-b85d-e9034324152a/f7c43566-c085-7d52-88cd-79470c4ba047/06a35f73-ac8d-7ba7-8327-2a08953fa5ab connector_id=synthetic account_id=06a35f73-ac8d-7ba7-8327-2a08953fa5ab
+--- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery (0.24s)
+    --- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery/receipt (0.05s)
+    --- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery/transition (0.05s)
+    --- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery/audit (0.05s)
+    --- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery/outbox (0.05s)
+    --- PASS: TestA03PostgresPaymentWebhookRollbackAndRedelivery/commit (0.05s)
+=== RUN   TestA03PostgresPaymentWebhookConcurrentDeliveries
+=== RUN   TestA03PostgresPaymentWebhookConcurrentDeliveries/true
+=== RUN   TestA03PostgresPaymentWebhookConcurrentDeliveries/false
+--- PASS: TestA03PostgresPaymentWebhookConcurrentDeliveries (0.11s)
+    --- PASS: TestA03PostgresPaymentWebhookConcurrentDeliveries/true (0.06s)
+    --- PASS: TestA03PostgresPaymentWebhookConcurrentDeliveries/false (0.06s)
+=== RUN   TestA04PostgresPaymentWebhookDatabaseUnavailableAfterVerification
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/ea8e16f2-46b6-7753-8f29-f29438ec59c3/cee99589-77e0-7a33-97c0-c56da81c3929/993cd85d-a8c4-7c51-8006-cf85157c5ac0 connector_id=synthetic account_id=993cd85d-a8c4-7c51-8006-cf85157c5ac0
+--- PASS: TestA04PostgresPaymentWebhookDatabaseUnavailableAfterVerification (0.05s)
+=== RUN   TestA03PostgresPaymentWebhookOptimisticConflictDoesNotConsumeReceipt
+2026/09/09 18:20:38 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/744a5642-6408-7fac-9bec-83b68ff464bc/969e492f-2ad1-70ee-865c-547fbc8d53a2/0e61ffb9-3d67-711b-9b1e-20b1a81ca795 connector_id=synthetic account_id=0e61ffb9-3d67-711b-9b1e-20b1a81ca795
+--- PASS: TestA03PostgresPaymentWebhookOptimisticConflictDoesNotConsumeReceipt (0.05s)
+=== RUN   TestA03PostgresPaymentWebhookReceiptCollision
+2026/09/09 18:20:39 ERROR verified payment webhook not committed event=payments.webhook_received path=/api/v1/webhooks/payments/synthetic/bf2fa88c-6f1c-78f9-9e37-69856ce43543/9a39447f-a1db-7d20-b9ec-b51c7663565e/dd060730-854a-7652-ac80-40cd533adc3d connector_id=synthetic account_id=dd060730-854a-7652-ac80-40cd533adc3d
+--- PASS: TestA03PostgresPaymentWebhookReceiptCollision (0.04s)
+=== RUN   TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses
+=== RUN   TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/created
+=== RUN   TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/succeeded
+=== RUN   TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/canceled
+=== RUN   TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/declined
+--- PASS: TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses (0.17s)
+    --- PASS: TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/created (0.04s)
+    --- PASS: TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/succeeded (0.04s)
+    --- PASS: TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/canceled (0.05s)
+    --- PASS: TestA03PostgresPaymentWebhookTerminalAndUnchangedStatuses/declined (0.05s)
+=== RUN   TestA05PostgresCreateResponseLostDoesNotReplayCharge
+--- PASS: TestA05PostgresCreateResponseLostDoesNotReplayCharge (0.04s)
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay/active
+=== RUN   TestA06PostgresMemberAuditRollbackAndReplay/disabled
+--- PASS: TestA06PostgresMemberAuditRollbackAndReplay (0.08s)
+    --- PASS: TestA06PostgresMemberAuditRollbackAndReplay/active (0.04s)
+    --- PASS: TestA06PostgresMemberAuditRollbackAndReplay/disabled (0.04s)
+=== RUN   TestA06PostgresProfileAuditRollbackAndReplay
+--- PASS: TestA06PostgresProfileAuditRollbackAndReplay (0.03s)
+=== RUN   TestA06PostgresIdentityProviderAuditRollbackAndReplay
+--- PASS: TestA06PostgresIdentityProviderAuditRollbackAndReplay (0.05s)
+=== RUN   TestA06PostgresWorkspaceAuditRollback
+--- PASS: TestA06PostgresWorkspaceAuditRollback (0.03s)
+=== RUN   TestA04PostgresCommerceWebhookOutboxFailureAndRetry
+2026/09/09 18:20:39 WARN commerce webhook verification failed event=commerce.webhook_received
+2026/09/09 18:20:39 ERROR verified commerce webhook not committed event=commerce.webhook_received
+--- PASS: TestA04PostgresCommerceWebhookOutboxFailureAndRetry (0.05s)
+=== RUN   TestA04PostgresSocialWebhookOutboxFailureAndRetry
+=== RUN   TestA04PostgresSocialWebhookOutboxFailureAndRetry/telegram
+2026/09/09 18:20:39 WARN social webhook verification failed event=social.webhook_received path=/api/v1/webhooks/social/telegram/ab5b2525-777c-74b2-8e8e-231aa55b2cc7/d9176cd9-78b4-763d-a4cb-c3b8d77c9055/547bc392-c3c9-7246-85a6-3a12dca755d2
+2026/09/09 18:20:39 ERROR verified social webhook not committed event=social.webhook_received path=/api/v1/webhooks/social/telegram/ab5b2525-777c-74b2-8e8e-231aa55b2cc7/d9176cd9-78b4-763d-a4cb-c3b8d77c9055/547bc392-c3c9-7246-85a6-3a12dca755d2
+=== RUN   TestA04PostgresSocialWebhookOutboxFailureAndRetry/max-messenger
+2026/09/09 18:20:39 WARN social webhook verification failed event=social.webhook_received path=/api/v1/webhooks/social/max-messenger/e922e654-a5f9-753f-8437-a8cbd07ca2fc/207a808d-1eef-7a25-8e95-067e6d2e1e00/70560632-b462-7db6-8fb9-836231a925a1
+2026/09/09 18:20:39 ERROR verified social webhook not committed event=social.webhook_received path=/api/v1/webhooks/social/max-messenger/e922e654-a5f9-753f-8437-a8cbd07ca2fc/207a808d-1eef-7a25-8e95-067e6d2e1e00/70560632-b462-7db6-8fb9-836231a925a1
+--- PASS: TestA04PostgresSocialWebhookOutboxFailureAndRetry (0.11s)
+    --- PASS: TestA04PostgresSocialWebhookOutboxFailureAndRetry/telegram (0.05s)
+    --- PASS: TestA04PostgresSocialWebhookOutboxFailureAndRetry/max-messenger (0.06s)
+=== RUN   TestA04PostgresCommerceReplayRetainsTimeAndDetectsCollision
+--- PASS: TestA04PostgresCommerceReplayRetainsTimeAndDetectsCollision (0.02s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	2.876s
+=== RUN   TestA05PostgresReconcileUnboundIntent
+=== RUN   TestA05PostgresReconcileUnboundIntent/succeeded
+=== RUN   TestA05PostgresReconcileUnboundIntent/canceled
+=== RUN   TestA05PostgresReconcileUnboundIntent/wrong_amount
+=== RUN   TestA05PostgresReconcileUnboundIntent/wrong_account
+=== RUN   TestA05PostgresReconcileUnboundIntent/missing_external_id
+--- PASS: TestA05PostgresReconcileUnboundIntent (0.18s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/succeeded (0.05s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/canceled (0.04s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/wrong_amount (0.03s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/wrong_account (0.03s)
+    --- PASS: TestA05PostgresReconcileUnboundIntent/missing_external_id (0.03s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/worker	1.317s
+=== RUN   TestA08PostgresRefreshBoundedPool
+=== RUN   TestA08PostgresRefreshBoundedPool/1
+=== RUN   TestA08PostgresRefreshBoundedPool/4
+--- PASS: TestA08PostgresRefreshBoundedPool (0.11s)
+    --- PASS: TestA08PostgresRefreshBoundedPool/1 (0.04s)
+    --- PASS: TestA08PostgresRefreshBoundedPool/4 (0.07s)
+=== RUN   TestA08PostgresRefreshRollbackAndCancellation
+--- PASS: TestA08PostgresRefreshRollbackAndCancellation (0.11s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/connectorauth	1.267s

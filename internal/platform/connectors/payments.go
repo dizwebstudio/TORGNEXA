@@ -83,6 +83,9 @@ func (r PaymentRefundRequest) Validate() error {
 
 type PaymentReconcileRequest struct{ From, To time.Time }
 type PaymentSettlement struct {
+	// ExternalID is echoed merchant metadata from an authenticated provider read.
+	// Empty means the provider cannot recover an unbound create intent.
+	ExternalID             string
 	RemoteID, Kind, Status string
 	Amount                 PaymentAmount
 	CommissionMinorUnits   int64
@@ -94,7 +97,7 @@ type PaymentSettlement struct {
 // the provider's safe machine code; the host maps it to the canonical payment
 // lifecycle only after matching the remote payment and exact amount.
 func (s PaymentSettlement) Validate() error {
-	if !paymentRefPattern.MatchString(s.RemoteID) || !safeCodePattern.MatchString(s.Kind) || !safeCodePattern.MatchString(s.Status) || s.Amount.Validate() != nil || s.CommissionMinorUnits < 0 || s.OccurredAt.IsZero() || s.OccurredAt.Location() != time.UTC {
+	if (s.ExternalID != "" && !paymentRefPattern.MatchString(s.ExternalID)) || !paymentRefPattern.MatchString(s.RemoteID) || !safeCodePattern.MatchString(s.Kind) || !safeCodePattern.MatchString(s.Status) || s.Amount.Validate() != nil || s.CommissionMinorUnits < 0 || s.OccurredAt.IsZero() || s.OccurredAt.Location() != time.UTC {
 		return ErrInvalidPaymentRequest
 	}
 	return nil

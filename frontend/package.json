@@ -12,6 +12,8 @@
     "build:docs": "vite build --ssr src/ssr/docs-entry.tsx --outDir .prerender && node scripts/prerender-docs.mjs",
     "typecheck": "tsc --noEmit",
     "test:logic": "tsc -p tsconfig.logic.json && node --test test/*.test.mjs",
+    "test:auth-cache": "node ../scripts/check-auth-cache-browser.mjs",
+    "test:realtime": "node ../scripts/check-realtime-browser.mjs",
     "test:docs": "node scripts/check-public-docs.mjs"
   },
   "dependencies": {

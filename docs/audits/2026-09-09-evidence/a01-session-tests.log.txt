@@ -1,0 +1,18 @@
+✔ logout retires the old lifetime before awaiting the adapter (1.899809ms)
+✔ latest identity wins over a late refresh from the previous user (0.295168ms)
+✔ subject, scope, permissions and roles each retire cached state (0.499267ms)
+✔ same scoped session token renewal preserves cache, opaque adapter replacement does not (0.261248ms)
+✔ expired, missing, malformed and failed sessions discard old data lifetime (0.700446ms)
+✔ adding or removing scope metadata retires cache even with the same token (0.207559ms)
+✔ an expiry timer queued before renewal cannot expire the renewed session (0.203359ms)
+✔ adapter change notification hides the old identity while lookup is pending (0.276418ms)
+✔ an old expiry or failed account-management operation cannot disturb a newer session (0.267409ms)
+✔ cache partition is bounded, memory-only metadata excluded from public session (0.309708ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11.850841

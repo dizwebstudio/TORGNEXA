@@ -102,6 +102,9 @@ type yookassaAmount struct {
 }
 
 type yookassaPayment struct {
+	Metadata struct {
+		ExternalID string `json:"external_id"`
+	} `json:"metadata"`
 	ID           string          `json:"id"`
 	Status       string          `json:"status"`
 	Amount       yookassaAmount  `json:"amount"`
@@ -310,7 +313,7 @@ func (t yookassaHTTP) Reconcile(ctx context.Context, secret []byte, request sdk.
 				commission = minor - income
 			}
 		}
-		items = append(items, sdk.PaymentSettlement{RemoteID: payment.ID, Kind: "sale", Status: payment.Status, Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: payment.Amount.Currency}, CommissionMinorUnits: commission, OccurredAt: occurred.UTC()})
+		items = append(items, sdk.PaymentSettlement{ExternalID: payment.Metadata.ExternalID, RemoteID: payment.ID, Kind: "sale", Status: payment.Status, Amount: sdk.PaymentAmount{MinorUnits: minor, Currency: payment.Amount.Currency}, CommissionMinorUnits: commission, OccurredAt: occurred.UTC()})
 	}
 	refundQuery := url.Values{
 		"created_at.gte": []string{request.From.UTC().Format(time.RFC3339)},

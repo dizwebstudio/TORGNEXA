@@ -1,0 +1,5 @@
+PASS ready/heartbeat frames do not cause periodic query refresh
+PASS reconnect reloads missed state via connected invalidation, including unchanged cursor and split frames
+PASS eight audit invalidations coalesce into one authorized API refetch
+PASS logout aborts SSE and leaves no reconnect/refetch timer
+A10 realtime browser regression: PASS

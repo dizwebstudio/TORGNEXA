@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -25,10 +27,14 @@ func (stub commerceWebhookAccountStub) AccountByID(_ context.Context, _, _, acco
 	return stub.account, nil
 }
 
+const commerceTestReference = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
 type commerceWebhookConfigStub struct{}
 
 func (commerceWebhookConfigStub) Config(context.Context, tenancy.Scope, string) (json.RawMessage, int64, error) {
-	return json.RawMessage(`{"store_host":"shop.example.com"}`), 1, nil
+	digest := sha256.Sum256([]byte(commerceTestReference))
+	raw, _ := json.Marshal(map[string]any{"store_host": "shop.example.com", "commerce_webhook_subscriptions": []sdk.CommerceWebhookSubscription{{ReferenceSHA256: hex.EncodeToString(digest[:]), Topic: "product.updated"}}})
+	return raw, 1, nil
 }
 
 type commerceWebhookReceiverStub struct {
@@ -100,11 +106,19 @@ func TestCommerceWebhookRouteNormalizesTopicAndPassesRawBodyToReceiver(t *testin
 			return strings.TrimSpace(headers.Get("X-Test-Signature")), normalizeCommerceWebhookTopic(headers.Get("X-Test-Topic")), true
 		},
 	}
-	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID + "?subscription=" + commerceTestReference
 	body := `{"event":"PRODUCT_UPDATED","data":{"object":{"id":"UHJvZHVjdDox"}}}`
 	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(body))
 	req.Header.Set("X-Test-Signature", "protected..signature")
 	req.Header.Set("X-Test-Topic", "PRODUCT_UPDATED")
+	bad := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(body))
+	bad.Header = req.Header.Clone()
+	bad.Header.Set("X-Test-Topic", "ORDER_DELETED")
+	rejected := httptest.NewRecorder()
+	api.receive(rejected, bad)
+	if rejected.Code != http.StatusOK || receiver.called || dedup.claim.DeliveryID != "" {
+		t.Fatal("untrusted topic reached receiver or dedup")
+	}
 	recorder := httptest.NewRecorder()
 	api.receive(recorder, req)
 	if recorder.Code != http.StatusOK || recorder.Body.String() != "{}" {
@@ -123,7 +137,7 @@ func TestCommerceWebhookRouteRejectsUnsupportedHeadersBeforeReceiver(t *testing.
 	account := sdk.Account{ID: "storefront-main", OrganizationID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0001", WorkspaceID: "018f0e8b-8a58-7f42-8c2d-5c2f9b1a0002", ConnectorID: "storefront-a", Family: sdk.FamilyStorefront, Status: sdk.AccountActive, Version: 1, CreatedAt: at, UpdatedAt: at, Health: sdk.Health{Status: sdk.HealthUnknown}}
 	receiver := &commerceWebhookReceiverStub{}
 	api := commerceWebhookAPI{accounts: commerceWebhookAccountStub{account: account}, configs: commerceWebhookConfigStub{}, secrets: fakeWebhookSecrets{}, registry: commerceWebhookResolverStub{receiver: receiver}, dedup: func(tenancy.Scope) sdk.CommerceWebhookDeduplicator { return &commerceWebhookDedupStub{} }, headers: func(string, http.Header) (string, string, bool) { return "", "", false }}
-	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID
+	path := commerceWebhooksPathPrefix + "storefront-a/" + account.OrganizationID + "/" + account.WorkspaceID + "/" + account.ID + "?subscription=" + commerceTestReference
 	req := httptest.NewRequest(http.MethodPost, "https://api.example.test"+path, strings.NewReader(`{"event":"PRODUCT_UPDATED"}`))
 	req.Header.Set("X-Webhook-Signature", "not-used")
 	req.Header.Set("X-Webhook-Topic", "product.updated")

@@ -60,7 +60,9 @@ type RevokeCommand struct {
 	OccurredAt    time.Time
 }
 
-// Store persists and enforces application session state.
+// Store persists and enforces application session state. Concurrent Observe
+// calls for the same tenant/session create one session and one login event.
+// Observe must never reactivate a revoked session or change its subject binding.
 type Store interface {
 	Observe(context.Context, tenancy.Scope, Observation) error
 	ListSessions(context.Context, tenancy.Scope, int, string) ([]Session, string, error)

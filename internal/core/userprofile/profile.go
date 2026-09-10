@@ -58,6 +58,8 @@ func (identity Identity) Valid() bool {
 // Email and username are synchronized from the identity provider and are not
 // editable through the profile API.
 type Profile struct {
+	// Replayed marks an idempotent mutation result; it is not persisted or exposed.
+	Replayed        bool `json:"-"`
 	OrganizationID  tenancy.OrganizationID
 	WorkspaceID     tenancy.WorkspaceID
 	SubjectRef      string

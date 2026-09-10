@@ -316,3 +316,18 @@ func TestWriteInventorySingleLocation(t *testing.T) {
 		t.Fatalf("unexpected %#v", receipt)
 	}
 }
+
+func TestWebhookSignedEventCannotContradictSubscriptionTopic(t *testing.T) {
+	body := []byte(`{"event":"ORDER_UPDATED","data":{"object":{"id":"synthetic-order"}}}`)
+	signature, jwks := saleorDetachedJWS(t, body)
+	connector := New(scriptedTransport{fn: func(Request) (Response, error) { return Response{StatusCode: 200, Body: jwks}, nil }}, testConfig{}, nil)
+	dedup := &memoryDedup{seen: map[string]bool{}}
+	request := sdk.CommerceWebhookRequest{Signature: signature, HeaderTopic: "product.updated", ExpectedTopic: "product.updated", Body: body, ReceivedAt: time.Now().UTC()}
+	if _, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, dedup); err == nil || len(dedup.seen) != 0 {
+		t.Fatal("signed body event mismatch consumed delivery")
+	}
+	request.HeaderTopic, request.ExpectedTopic = "order.updated", "order.updated"
+	if _, err := connector.ReceiveCommerceWebhook(context.Background(), testAccount(), testRuntime{[]byte(testToken)}, request, dedup); err != nil || len(dedup.seen) != 1 {
+		t.Fatal("valid delivery after mismatch failed", err)
+	}
+}

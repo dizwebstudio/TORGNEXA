@@ -7,8 +7,13 @@ const ApiContext = createContext<TorgnexaClient | null>(null);
 
 export function ApiProvider({children}: {children: ReactNode}) {
   const auth = useAuth();
-  if (!auth.session) throw new Error("ApiProvider requires authenticated session");
-  const client = useMemo(() => createApiClient(auth.session!, () => auth.refresh({forceRefresh: true}), () => auth.logout()), [auth.session, auth.refresh, auth.logout]);
+  if (!auth.session || !auth.lifetime) throw new Error("ApiProvider requires authenticated session");
+  const client = useMemo(() => {
+    const signal = auth.lifetime!.signal;
+    return createApiClient(auth.session!,
+      () => signal.aborted ? Promise.resolve(null) : auth.refresh({forceRefresh: true}),
+      () => signal.aborted ? Promise.resolve() : auth.logout(), signal);
+  }, [auth.session, auth.lifetime, auth.refresh, auth.logout]);
   return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>;
 }
 

@@ -143,6 +143,7 @@ func TestProductionCompositionFailsClosedAtEachAuthorizationStage(t *testing.T) 
 		want   int
 	}{
 		{"authn", authnStub{err: ErrUnauthenticated}, tenantStub{scope: scope}, authzStub{}, http.StatusUnauthorized},
+		{"session_store_unavailable", authnStub{err: errors.Join(ErrAuthenticationUnavailable, errors.New("synthetic database detail"))}, tenantStub{scope: scope}, authzStub{}, http.StatusServiceUnavailable},
 		{"tenant", authnStub{principal: principal}, tenantStub{err: ErrUnauthorized}, authzStub{}, http.StatusForbidden},
 		{"authz", authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{err: ErrUnauthorized}, http.StatusForbidden},
 	}
@@ -159,6 +160,9 @@ func TestProductionCompositionFailsClosedAtEachAuthorizationStage(t *testing.T) 
 			handler.ServeHTTP(rr, req)
 			if rr.Code != tc.want {
 				t.Fatalf("status=%d want=%d", rr.Code, tc.want)
+			}
+			if tc.want == http.StatusServiceUnavailable && (rr.Header().Get("WWW-Authenticate") != "" || rr.Header().Get("Retry-After") != "5" || rr.Header().Get("Cache-Control") != "no-store" || strings.Contains(rr.Body.String(), "database")) {
+				t.Fatal("session outage challenged credentials, exposed details or omitted retry/cache policy")
 			}
 		})
 	}

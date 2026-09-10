@@ -21,6 +21,9 @@ sdk-check:
 	./scripts/check-generated-sdks.sh
 frontend-check:
 	./scripts/check-frontend-shell.sh
+.PHONY: frontend-auth-cache-check
+frontend-auth-cache-check:
+	node scripts/check-auth-cache-browser.mjs
 js-policy:
 	./scripts/check-js-supply-chain.sh repository
 architecture:

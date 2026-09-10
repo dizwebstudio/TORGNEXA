@@ -15,6 +15,8 @@ export interface AuthSession {
   readonly subject: string;
   readonly displayName: string;
   readonly accessToken: string;
+  // Host-owned issuer/tenant/workspace/session partition; memory-only, never a selector.
+  readonly cacheScope?: string;
   readonly capabilities: readonly string[];
   readonly roles?: readonly string[];
   readonly expiresAt?: string;
@@ -105,7 +107,8 @@ export function normalizeSession(input: AuthSession): AuthSession {
     expiresAt = parsed.toISOString();
   }
 
-  return {subject, displayName, accessToken, capabilities, roles, expiresAt, profile: normalizeProfile(input.profile)};
+  const cacheScope = boundedProfileValue(input.cacheScope, 2048);
+  return {subject, displayName, accessToken, cacheScope, capabilities, roles, expiresAt, profile: normalizeProfile(input.profile)};
 }
 
 export function publicSession(session: AuthSession): PublicSession {

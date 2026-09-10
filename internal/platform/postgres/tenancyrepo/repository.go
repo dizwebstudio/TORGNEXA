@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 )
@@ -169,6 +170,9 @@ func (repository *Repository) withWriteScope(ctx context.Context, scope tenancy.
 }
 
 func (repository *Repository) withScopedTransaction(ctx context.Context, scope tenancy.Scope, readOnly bool, operation func(queryer) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
 	if ctx == nil {
 		return errors.New("tenancy repository: context is required")
 	}
@@ -320,6 +324,11 @@ type sqlTransactor struct {
 }
 
 func (transactions sqlTransactor) run(ctx context.Context, readOnly bool, operation func(queryer) error) error {
+	if tx, err := txboundary.CurrentTransaction(ctx, transactions.database); err != nil {
+		return err
+	} else if tx != nil {
+		return operation(sqlQueries{transaction: tx})
+	}
 	transaction, err := transactions.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("begin tenant read transaction: %w", err)

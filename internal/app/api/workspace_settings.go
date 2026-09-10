@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -72,21 +73,27 @@ func (api *workspaceSettingsAPI) update(w http.ResponseWriter, request *http.Req
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	organization, workspace, err := api.repository.UpdateProfile(request.Context(), scope, tenancy.ProfileUpdate{OrganizationName: input.OrganizationName, WorkspaceName: input.WorkspaceName, OrganizationVersion: input.OrganizationVersion, WorkspaceVersion: input.WorkspaceVersion})
-	if err != nil {
-		if errors.Is(err, tenancy.ErrConflict) {
-			writeProblem(w, http.StatusConflict, "Conflict")
-			return
-		}
-		writeProblem(w, http.StatusBadRequest, "Bad Request")
-		return
-	}
 	principal, _ := PrincipalFromContext(request.Context())
-	_, err = api.audit.Capture(request.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "settings.workspace.updated", ResourceType: "workspace", ResourceID: workspace.ID.String(), CorrelationID: request.Header.Get("Idempotency-Key"), Risk: audit.RiskWriteSafe, Summary: audit.Summary{"organization_version": organization.Version, "workspace_version": workspace.Version}})
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+	type snapshot struct {
+		organization tenancy.Organization
+		workspace    tenancy.Workspace
+	}
+	result, err := auditedSettingsMutation(request.Context(), scope, api.audit, func(ctx context.Context) (snapshot, error) {
+		organization, workspace, err := api.repository.UpdateProfile(ctx, scope, tenancy.ProfileUpdate{OrganizationName: input.OrganizationName, WorkspaceName: input.WorkspaceName, OrganizationVersion: input.OrganizationVersion, WorkspaceVersion: input.WorkspaceVersion})
+		return snapshot{organization, workspace}, err
+	}, func(ctx context.Context, result snapshot) error {
+		_, err := api.audit.Capture(ctx, scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.workspace.updated", ResourceType: "workspace", ResourceID: result.workspace.ID.String(), CorrelationID: request.Header.Get("Idempotency-Key"), Risk: audit.RiskWriteSafe, Summary: audit.Summary{"organization_version": result.organization.Version, "workspace_version": result.workspace.Version}})
+		return err
+	})
+	if errors.Is(err, tenancy.ErrConflict) {
+		writeProblem(w, 409, "Conflict")
 		return
 	}
+	if err != nil {
+		writeProblem(w, 500, "Internal Server Error")
+		return
+	}
+	organization, workspace := result.organization, result.workspace
 	writeJSON(w, http.StatusOK, workspaceView(organization, workspace))
 }
 

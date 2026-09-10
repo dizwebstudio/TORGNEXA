@@ -206,3 +206,7 @@ func TestPaymentReconciliationSkipsUnknownOrMismatchedObservation(t *testing.T) 
 		})
 	}
 }
+
+func (s *paymentStoreStub) PaymentByExternalID(context.Context, corepayments.Scope, string) (corepayments.Payment, error) {
+	return s.payment, nil
+}

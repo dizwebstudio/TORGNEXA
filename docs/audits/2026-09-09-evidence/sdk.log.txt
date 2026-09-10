@@ -1,0 +1,12 @@
+ok  	github.com/torgnexa/torgnexa/tools/sdkgen	0.009s
+Generated SDKs are current: 357 operations, OpenAPI 0.21.2, source sha256 b03752a21fccae4639d4cb838ff407a8a6573260783aff63eedcd8bb517bb08e
+ok  	github.com/torgnexa/torgnexa-sdk-go/torgnexa	0.003s
+?   	github.com/torgnexa/torgnexa-sdk-examples-go	[no test files]
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+TypeScript SDK runtime tests: PASS
+TypeScript declaration compile skipped: tsc not installed; runtime syntax/tests still passed
+SDK boundary check: PASS (357 public operations; no internal DB model tokens)

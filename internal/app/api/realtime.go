@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,12 @@ import (
 )
 
 const RealtimePath = "/api/v1/realtime"
+
+type realtimeTiming struct {
+	pollInterval      time.Duration
+	heartbeatInterval time.Duration
+	writeTimeout      time.Duration
+}
 
 // realtimeEvent is intentionally metadata-only: the browser receives an
 // invalidation signal, never raw audit payloads or tenant data through the
@@ -40,15 +47,31 @@ func latestAuditID(ctx context.Context, repository auditReader, scope tenancy.Sc
 }
 
 func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
+	return newRealtimeRoutesWithTiming(repository, realtimeTiming{2 * time.Second, 15 * time.Second, 5 * time.Second})
+}
+
+func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) []ProtectedRoute {
 	return []ProtectedRoute{{Method: http.MethodGet, Path: RealtimePath, Permission: "operations.realtime.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		scope, ok := ScopeFromContext(r.Context())
 		if !ok || repository == nil {
 			writeProblem(w, http.StatusForbidden, "Forbidden")
 			return
 		}
-		flusher, ok := unwrapFlusher(w)
+		_, ok = unwrapFlusher(w)
 		if !ok {
 			writeProblem(w, http.StatusNotImplemented, "Streaming Unsupported")
+			return
+		}
+		controller := http.NewResponseController(w)
+		// This handler runs only after auth/tenant/authz. Idle SSE connections
+		// outlive the ordinary HTTP response deadline, but each frame below
+		// has its own bounded write + flush budget for slow clients.
+		if err := controller.SetWriteDeadline(time.Time{}); err != nil {
+			if errors.Is(err, http.ErrNotSupported) {
+				writeProblem(w, http.StatusNotImplemented, "Streaming Unsupported")
+			} else {
+				writeProblem(w, http.StatusServiceUnavailable, "Streaming Unavailable")
+			}
 			return
 		}
 		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
@@ -57,15 +80,23 @@ func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
 		w.Header().Set("X-Accel-Buffering", "no")
 
 		write := func(name string, value realtimeEvent) bool {
+			if r.Context().Err() != nil {
+				return false
+			}
 			raw, err := json.Marshal(value)
 			if err != nil {
+				return false
+			}
+			if err := controller.SetWriteDeadline(time.Now().Add(timing.writeTimeout)); err != nil {
 				return false
 			}
 			if _, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, raw); err != nil {
 				return false
 			}
-			flusher.Flush()
-			return true
+			if err := controller.Flush(); err != nil {
+				return false
+			}
+			return controller.SetWriteDeadline(time.Time{}) == nil
 		}
 
 		latest := ""
@@ -75,9 +106,16 @@ func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
 		if !write("ready", realtimeEvent{Reason: "connected", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
 			return
 		}
+		// The cursor is a fresh baseline, not replay evidence. Always request
+		// one authorized refresh, including reconnects whose gap contained
+		// changes the client never saw. Existing clients already understand
+		// explicit invalidate frames; heartbeats remain liveness-only.
+		if !write("invalidate", realtimeEvent{Reason: "connected", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
+			return
+		}
 
-		poll := time.NewTicker(2 * time.Second)
-		heartbeat := time.NewTicker(15 * time.Second)
+		poll := time.NewTicker(timing.pollInterval)
+		heartbeat := time.NewTicker(timing.heartbeatInterval)
 		defer poll.Stop()
 		defer heartbeat.Stop()
 		for {

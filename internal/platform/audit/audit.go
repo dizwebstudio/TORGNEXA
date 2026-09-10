@@ -390,3 +390,18 @@ func newUUIDv7(now time.Time, random io.Reader) (string, error) {
 	hex.Encode(encoded[24:36], raw[10:16])
 	return string(encoded[:]), nil
 }
+
+// WithinTransaction runs a mutation and Capture calls in the repository's shared unit of work.
+// It fails closed when the repository cannot provide atomic persistence.
+func (service *Service) WithinTransaction(ctx context.Context, scope tenancy.Scope, operation func(context.Context) error) error {
+	if service == nil {
+		return ErrInvalidRecord
+	}
+	repository, ok := service.repository.(interface {
+		WithinTransaction(context.Context, tenancy.Scope, func(context.Context) error) error
+	})
+	if !ok {
+		return errors.New("audit: atomic persistence unavailable")
+	}
+	return repository.WithinTransaction(ctx, scope, operation)
+}

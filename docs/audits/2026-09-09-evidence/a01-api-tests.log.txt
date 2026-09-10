@@ -1,0 +1,13 @@
+✔ a 401 refreshes the session and retries the request exactly once (28.690215ms)
+✔ a second 401 rejects the refreshed application session (0.641987ms)
+✔ an old 401 cannot refresh, log out or replay a request in a retired session (2.045128ms)
+✔ renewal cannot replay an old command with another identity or workspace (2.231367ms)
+✔ successful late responses and a late second 401 remain fenced after retirement (1.624501ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39.608602

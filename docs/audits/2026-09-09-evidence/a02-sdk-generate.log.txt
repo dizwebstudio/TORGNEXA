@@ -1,0 +1,1 @@
+Generated 5 SDK artifacts from 358 OpenAPI operations

@@ -15,6 +15,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/eventbus"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
+	"github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/outboxrepo"
 )
 
@@ -340,6 +341,46 @@ func reflectRefundOnPayment(ctx context.Context, tx *sql.Tx, scope payments.Scop
 	return nil
 }
 
+// ApplyVerifiedWebhook commits a receipt only together with the payment change,
+// authoritative audit and outbox. A failed transition leaves the delivery retryable.
+func (r *Repository) ApplyVerifiedWebhook(ctx context.Context, scope payments.Scope, observation payments.VerifiedWebhook, mutation payments.Mutation) (bool, error) {
+	if err := validateMutation(ctx, r, scope, mutation); err != nil {
+		return false, err
+	}
+	if err := observation.Validate(); err != nil {
+		return false, err
+	}
+	tenantScope, err := tenancy.ParseScope(scope.OrganizationID(), scope.WorkspaceID())
+	if err != nil {
+		return false, err
+	}
+	var fresh bool
+	err = database.WithinTransaction(ctx, r.db, tenantScope, func(callCtx context.Context) error {
+		var err error
+		fresh, err = r.RecordWebhookEvidence(callCtx, scope, observation.Evidence)
+		if err != nil || !fresh {
+			return err
+		}
+		payment, err := r.PaymentByRemoteID(callCtx, scope, observation.Evidence.ConnectorAccountID, observation.Evidence.RemotePaymentID)
+		if err != nil {
+			return err
+		}
+		if payment.Status == observation.Status {
+			return nil
+		}
+		change := payments.ChangePaymentStatus{ID: payment.ID, ExpectedVersion: payment.Version, Status: observation.Status, RemoteStatus: observation.RemoteStatus}
+		if change.Status == payments.StatusSucceeded {
+			change.SucceededAt = &observation.Evidence.VerifiedAt
+		}
+		if change.Status == payments.StatusFailed {
+			change.ReasonCode = "provider_declined"
+		}
+		_, err = r.ChangePaymentStatus(callCtx, scope, change, mutation)
+		return err
+	})
+	return fresh && err == nil, err
+}
+
 func (r *Repository) RecordWebhookEvidence(ctx context.Context, scope payments.Scope, evidence payments.WebhookEvidence) (bool, error) {
 	if err := validate(ctx, r, scope); err != nil {
 		return false, err
@@ -359,12 +400,26 @@ func (r *Repository) RecordWebhookEvidence(ctx context.Context, scope payments.S
 			return fmt.Errorf("payments repository: webhook evidence rows affected: %w", err)
 		}
 		inserted = affected == 1
+		if !inserted {
+			var remoteID, eventType, digest string
+			if err := tx.QueryRowContext(ctx, `SELECT remote_payment_id,event_type,body_digest FROM payment_webhook_receipts WHERE organization_id=$1 AND workspace_id=$2 AND connector_account_id=$3 AND delivery_id=$4`, scope.OrganizationID(), scope.WorkspaceID(), evidence.ConnectorAccountID, evidence.DeliveryID).Scan(&remoteID, &eventType, &digest); err != nil {
+				return fmt.Errorf("payments repository: read webhook evidence: %w", err)
+			}
+			if remoteID != evidence.RemotePaymentID || eventType != evidence.EventType || digest != evidence.BodyDigest {
+				return payments.ErrConflict
+			}
+		}
 		return nil
 	})
 	return inserted, err
 }
 
 func (r *Repository) tx(ctx context.Context, scope payments.Scope, readOnly bool, fn func(*sql.Tx) error) error {
+	if tx, err := database.CurrentTransaction(ctx, r.db); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("payments repository: begin: %w", err)
@@ -399,7 +454,11 @@ func validate(ctx context.Context, r *Repository, scope payments.Scope) error {
 	if !scope.Valid() {
 		return payments.ErrInvalidScope
 	}
-	return nil
+	tenantScope, err := tenancy.ParseScope(scope.OrganizationID(), scope.WorkspaceID())
+	if err != nil {
+		return err
+	}
+	return database.CheckScope(ctx, tenantScope)
 }
 func validateMutation(ctx context.Context, r *Repository, scope payments.Scope, mutation payments.Mutation) error {
 	if err := validate(ctx, r, scope); err != nil {

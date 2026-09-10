@@ -64,11 +64,10 @@ func newCommerceWebhookRoutes(accounts commerceWebhookAccounts, configs commerce
 	return []PublicWebhookRoute{{Method: http.MethodPost, Path: commerceWebhooksPathPrefix, PathPrefix: true, Handler: http.HandlerFunc(api.receive)}}
 }
 
-// receive always acknowledges with 200. Provider retry behavior must not
-// reveal whether an account exists or whether a signature matched; only a
-// verified delivery reaches the durable inbox/outbox boundary.
+// receive keeps rejections uniform until the qualified connector verifies a
+// delivery. Failure at the subsequent inbox/outbox boundary requests redelivery.
 func (api commerceWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
-	logger := slog.Default().With("event", "commerce.webhook_received", "path", r.URL.Path)
+	logger := slog.Default().With("event", "commerce.webhook_received")
 	connectorID, organizationID, workspaceID, accountID, ok := parseCommerceWebhookPath(r.URL.Path)
 	if !ok {
 		logger.Warn("commerce webhook path malformed")
@@ -103,13 +102,33 @@ func (api commerceWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		acknowledgeWebhook(w)
 		return
 	}
+	if api.configs == nil {
+		acknowledgeWebhook(w)
+		return
+	}
+	references := r.URL.Query()["subscription"]
+	if len(references) != 1 {
+		acknowledgeWebhook(w)
+		return
+	}
+	rawConfig, _, err := api.configs.Config(r.Context(), scope, account.ID)
+	if err != nil {
+		acknowledgeWebhook(w)
+		return
+	}
+	expectedTopic, err := sdk.ExpectedCommerceWebhookTopic(rawConfig, references[0])
+	if err != nil || topic != expectedTopic {
+		acknowledgeWebhook(w)
+		return
+	}
+
 	runtime, err := connectorruntime.New(api.secrets, scope)
 	if err != nil {
 		logger.Warn("commerce webhook runtime unavailable", "error", err)
 		acknowledgeWebhook(w)
 		return
 	}
-	receiver, err := api.registry.CommerceWebhookReceiver(account, runtime, api.configLoader(scope))
+	receiver, err := api.registry.CommerceWebhookReceiver(account, runtime, func(context.Context, string) (json.RawMessage, error) { return rawConfig, nil })
 	if err != nil {
 		logger.Warn("commerce webhook receiver unavailable", "error", err)
 		acknowledgeWebhook(w)
@@ -118,7 +137,7 @@ func (api commerceWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 	request := sdk.CommerceWebhookRequest{
 		Signature:     signature,
 		HeaderTopic:   topic,
-		ExpectedTopic: topic,
+		ExpectedTopic: expectedTopic,
 		Body:          body,
 		ReceivedAt:    time.Now().UTC(),
 	}
@@ -127,10 +146,34 @@ func (api commerceWebhookAPI) receive(w http.ResponseWriter, r *http.Request) {
 		acknowledgeWebhook(w)
 		return
 	}
-	if _, err := receiver.ReceiveCommerceWebhook(r.Context(), account, runtime, request, api.dedup(scope)); err != nil {
-		logger.Warn("commerce webhook verification or publication failed", "error", err)
+	commit := &commerceWebhookCommit{next: api.dedup(scope)}
+	_, err = receiver.ReceiveCommerceWebhook(r.Context(), account, runtime, request, commit)
+	if commit.failed {
+		logger.Error("verified commerce webhook not committed")
+		retryVerifiedWebhook(w)
+		return
+	}
+	if err != nil {
+		logger.Warn("commerce webhook verification failed")
 	}
 	acknowledgeWebhook(w)
+}
+
+// Qualified receivers call Claim only after signature and payload verification.
+// Track the host-owned commit independently of connector error wrapping.
+type commerceWebhookCommit struct {
+	next   sdk.CommerceWebhookDeduplicator
+	failed bool
+}
+
+func (commit *commerceWebhookCommit) ClaimCommerceWebhook(ctx context.Context, account sdk.Account, claim sdk.CommerceWebhookClaim) (bool, error) {
+	if commit.next == nil {
+		commit.failed = true
+		return false, sdk.ErrInvalidCommerceWebhook
+	}
+	duplicate, err := commit.next.ClaimCommerceWebhook(ctx, account, claim)
+	commit.failed = commit.failed || err != nil
+	return duplicate, err
 }
 
 func (api commerceWebhookAPI) configLoader(scope tenancy.Scope) builtinruntime.ConfigLoader {
@@ -211,8 +254,8 @@ func (dedup commerceWebhookDeduplicator) ClaimCommerceWebhook(ctx context.Contex
 		return false, err
 	}
 	delivery := eventbus.Delivery{Event: event, Attempt: 1, FirstObservedAt: instant}
-	result, err := dedup.processor.ProcessWithSQLTransaction(ctx, dedup.scope, "commerce.webhook.v1", delivery, func(callCtx context.Context, tx *sql.Tx, _ eventbus.Delivery) error {
-		return enqueueCommerceWebhook(callCtx, tx, event)
+	result, err := dedup.processor.ProcessWithFirstObservedTime(ctx, dedup.scope, "commerce.webhook.v1", delivery, func(callCtx context.Context, tx *sql.Tx, item eventbus.Delivery) error {
+		return enqueueCommerceWebhook(callCtx, tx, item.Event)
 	})
 	if err != nil {
 		return false, err

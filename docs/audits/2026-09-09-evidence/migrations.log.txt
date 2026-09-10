@@ -1,0 +1,3 @@
+Migration catalog validation passed: 62 migrations, latest=000062
+TORGNEXA pre-v1 baseline: PASS — 11 active migrations equivalent to legacy head 000074 (62 active migrations total)
+TORGNEXA migration inventory: PASS — 11 active baseline SQL files; 74-file pre-v1 history archived outside runtime migrations

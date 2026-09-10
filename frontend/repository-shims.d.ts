@@ -12,13 +12,14 @@ declare module "react" {
   export function useContext<T>(context: Context<T>): T;
   export function useCallback<T extends (...args: any[]) => unknown>(callback: T, deps: readonly unknown[]): T;
   export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void;
+  export function useLayoutEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void;
   export function useId(): string;
   export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T;
   export function useRef<T>(initial: T | null): RefObject<T | null>;
   export function useRef<T>(initial: T): RefObject<T>;
   export function useState<T = undefined>(): [T | undefined, Dispatch<SetStateAction<T | undefined>>];
   export function useState<T>(initial: T | (() => T)): [T, Dispatch<SetStateAction<T>>];
-  export function useSyncExternalStore(subscribe: (listener: () => void) => () => void, getSnapshot: () => string, getServerSnapshot?: () => string): string;
+  export function useSyncExternalStore<T>(subscribe: (listener: () => void) => () => void, getSnapshot: () => T, getServerSnapshot?: () => T): T;
 }
 declare module "react/jsx-runtime" {
   export function jsx(type: unknown, props: unknown, key?: unknown): unknown;
@@ -46,7 +47,7 @@ declare module "react-dom/server" {
   export function renderToStaticMarkup(node: unknown, options?: unknown): string;
 }
 declare module "@tanstack/react-query" {
-  export class QueryClient { constructor(config?: unknown); invalidateQueries(input?: unknown): Promise<void>; setQueryData(queryKey: readonly unknown[], data: unknown): void; }
+  export class QueryClient { constructor(config?: unknown); cancelQueries(): Promise<void>; clear(): void; invalidateQueries(input?: unknown): Promise<void>; setQueryData(queryKey: readonly unknown[], data: unknown): void; }
   export function QueryClientProvider(props: {client: QueryClient; children?: unknown}): unknown;
   export function useQuery<T>(options: {queryKey: readonly unknown[]; queryFn: () => Promise<T>; staleTime?: number; gcTime?: number; enabled?: boolean; retry?: number | boolean; refetchOnWindowFocus?: boolean; refetchInterval?: number}): {isPending: boolean; isError: boolean; isFetching: boolean; data: T; refetch(): Promise<unknown>};
   export function useQueryClient(): QueryClient;

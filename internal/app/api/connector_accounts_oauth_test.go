@@ -224,3 +224,7 @@ func TestOAuthPreparationClassifiesSafeHealthReasons(t *testing.T) {
 		t.Fatalf("temporary failure classified as %q", got)
 	}
 }
+
+func (stub *oauthAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}

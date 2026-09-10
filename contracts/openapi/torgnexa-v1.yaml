@@ -2,6 +2,13 @@ openapi: 3.1.0
 info:
   title: TORGNEXA API
   version: 0.21.2
+  description: >-
+    Protected operations fail closed during authoritative OIDC session checks.
+    A session-store persistence failure returns 503 Service Unavailable with
+    Retry-After: 5 and Cache-Control: no-store, without WWW-Authenticate or
+    database details. Invalid or revoked sessions still return 401. This shared
+    authentication behavior applies before operation-specific authorization
+    and handlers; no business mutation runs when the session check fails.
 servers:
   - url: /api/v1
 paths:
@@ -849,6 +856,11 @@ paths:
         '403': {description: Caller lacks connectors.read}
     post:
       operationId: createPayment
+      description: >-
+        Creates a durable payment intent. A lost or ambiguous provider response
+        leaves status pending; retrying the same id returns that intent without
+        another remote create. Provider reconciliation resolves pending by the
+        original external_id when the provider echoes merchant metadata.
       security: [{bearerAuth: []}]
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}}
@@ -1359,6 +1371,14 @@ paths:
         '403': {description: Caller lacks settings.members.read}
     post:
       operationId: inviteWorkspaceMember
+      description: >-
+        Creates a workspace invitation. Automatic binding requires the matching
+        email and boolean email_verified=true in the authenticated issuer's
+        UserInfo response for the same subject. False, null, absent verification
+        or a token/profile-only email cannot accept an invitation. Existing
+        active members resolve by issuer-bound subject without requiring email
+        verification on every login. An unbound caller without ownership proof
+        receives the normal 403 response and the invitation remains unchanged.
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceMemberInvite'}}}}
@@ -3650,7 +3670,18 @@ paths:
   /realtime:
     get:
       operationId: streamRealtimeInvalidations
-      description: Tenant-scoped Server-Sent Events stream carrying metadata-only cache invalidation and heartbeat signals. Entity data is re-read through normal authorized APIs.
+      description: >-
+        Tenant-scoped Server-Sent Events stream carrying only reason, cursor and
+        at metadata. Each connection sends ready followed by invalidate with
+        reason connected, so clients refresh authorized API data after a gap.
+        The cursor is an opaque baseline, not a replay token; Last-Event-ID does
+        not resume history. Later audit changes send invalidate with reason
+        audit; heartbeat every 15 seconds indicates liveness only. Clients
+        coalesce invalidate bursts and re-read normal authorized APIs.
+        After authorization, SSE replaces the ordinary response write deadline
+        with a 5-second deadline for each frame write and flush, cleared while
+        idle. A write or flush failure ends the stream; clients reconnect with
+        backoff. No business entity or audit payload is sent through SSE.
       responses:
         '200':
           description: Streaming text/event-stream response
@@ -3659,6 +3690,8 @@ paths:
               schema: {type: string}
         '401': {description: Authenticated tenant scope missing}
         '403': {description: Realtime read capability required}
+        '501': {description: Response writer does not support streaming with write deadlines}
+        '503': {description: Streaming controls or authoritative session storage unavailable before streaming begins}
 
   /audit:
     get:
@@ -3724,6 +3757,44 @@ paths:
         '400': {description: 'Invalid subscription, event allowlist, signing secret or unsafe endpoint'}
         '401': {description: Authenticated tenant scope missing}
         '409': {description: Subscription already exists}
+  /webhooks/payments/{connector_id}/{organization_id}/{workspace_id}/{account_id}:
+    post:
+      operationId: receivePaymentWebhook
+      security: []
+      description: >-
+        Public payment callback. The connector independently verifies the
+        observation before its receipt, payment transition, audit and outbox
+        commit together. Unverified deliveries receive a uniform acknowledgement.
+        A verified delivery that cannot commit receives 503 and must be retried.
+        Replaying an already committed delivery does not repeat business effects.
+      parameters:
+        - {name: connector_id, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9-]{1,63}$'}}
+        - {name: organization_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: workspace_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
+        - {name: account_id, in: path, required: true, schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}}
+        - {name: X-Webhook-Signature, in: header, required: false, schema: {type: string, maxLength: 4096}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, maxProperties: 10000, additionalProperties: true}
+          application/x-www-form-urlencoded:
+            schema: {type: object, maxProperties: 100, additionalProperties: {type: string}}
+      responses:
+        '200':
+          description: Uniform unverified acknowledgement, or provider acknowledgement after successful commit or replay.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
+            text/plain:
+              schema: {type: string, maxLength: 4096}
+        '503':
+          description: Verified delivery could not commit; retry the same delivery. No provider acknowledgement is emitted.
+          headers:
+            Retry-After: {schema: {type: integer, minimum: 1}, description: Suggested retry delay in seconds.}
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
   /webhooks/commerce/{connector_id}/{organization_id}/{workspace_id}/{account_id}:
     post:
       operationId: receiveCommerceWebhook
@@ -3734,8 +3805,13 @@ paths:
         a minimized event is placed in the transactional outbox. Saleor uses
         Saleor-Signature/Saleor-Event; WooCommerce uses
         X-WC-Webhook-Signature/X-WC-Webhook-Topic. Invalid deliveries are
-        acknowledged uniformly and are not persisted.
+        acknowledged uniformly and are not persisted. Each callback must supply a
+        distinct random 256-bit subscription reference whose SHA-256 and exact
+        topic are configured in the account runtime configuration under
+        commerce_webhook_subscriptions. Missing, revoked or mismatched bindings
+        are rejected before inbox/outbox claim. The reference must not be logged.
       parameters:
+        - {name: subscription, in: query, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}, description: One-time provisioned reference bound to this account and exact topic.}
         - {name: connector_id, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9-]{1,63}$'}}
         - {name: organization_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
         - {name: workspace_id, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 64}}
@@ -3752,6 +3828,13 @@ paths:
       responses:
         '200':
           description: Uniform provider acknowledgement; verification failures are not disclosed.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
+        '503':
+          description: Verified delivery could not commit; retry the same delivery. No internal error details are disclosed.
+          headers:
+            Retry-After: {schema: {type: integer, minimum: 1}, description: Suggested retry delay in seconds.}
           content:
             application/json:
               schema: {type: object, additionalProperties: false}
@@ -3783,6 +3866,13 @@ paths:
       responses:
         '200':
           description: Uniform provider acknowledgement; verification failures are not disclosed.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false}
+        '503':
+          description: Verified delivery could not commit; retry the same delivery. No internal error details are disclosed.
+          headers:
+            Retry-After: {schema: {type: integer, minimum: 1}, description: Suggested retry delay in seconds.}
           content:
             application/json:
               schema: {type: object, additionalProperties: false}
@@ -9046,6 +9136,13 @@ components:
         account_id: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'}
         expected_version: {type: integer, minimum: 1}
         material_base64: {type: string, minLength: 4, maxLength: 90000, description: Transient base64 transport envelope; never returned or logged}
+    CommerceWebhookBinding:
+      type: object
+      additionalProperties: false
+      required: [reference_sha256, topic]
+      properties:
+        reference_sha256: {type: string, pattern: '^[0-9a-f]{64}$', description: SHA-256 of the random callback reference; never the reference itself.}
+        topic: {type: string, pattern: '^(order|product|coupon|customer)\.(created|updated|deleted)$'}
     ConnectorRuntimeConfigWrite:
       type: object
       additionalProperties: false
@@ -9058,6 +9155,11 @@ components:
           minProperties: 1
           maxProperties: 100
           description: Host-owned non-secret provider configuration. Credential, token, password, private-key and authorization fields are rejected.
+          properties:
+            commerce_webhook_subscriptions:
+              type: array
+              maxItems: 32
+              items: {$ref: '#/components/schemas/CommerceWebhookBinding'}
           additionalProperties: true
     ConnectorRuntimeConfig:
       type: object
@@ -9070,6 +9172,11 @@ components:
           type: object
           minProperties: 1
           maxProperties: 100
+          properties:
+            commerce_webhook_subscriptions:
+              type: array
+              maxItems: 32
+              items: {$ref: '#/components/schemas/CommerceWebhookBinding'}
           additionalProperties: true
     ConnectorOAuthStart:
       type: object

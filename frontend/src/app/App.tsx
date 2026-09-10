@@ -1,4 +1,4 @@
-import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {SessionQueryProvider} from "../auth/SessionQueryProvider";
 import {lazy,Suspense,useState} from "react";
 import {AuthProvider} from "../auth/AuthProvider";
 import {AuthBoundary} from "../auth/AuthBoundary";
@@ -11,7 +11,6 @@ const PublicDocumentationPage = lazy(() => import("../pages/PublicDocumentationP
 
 export function App() {
   if (window.location.pathname === "/docs" || window.location.pathname.startsWith("/docs/")) return <Suspense fallback={<main className="page-loading" aria-busy="true">Загрузка документации…</main>}><PublicDocumentationPage /></Suspense>;
-  const [queryClient] = useState(() => new QueryClient({defaultOptions: {queries: {retry: 1, refetchOnWindowFocus: false}, mutations: {retry: false}}}));
   const [authAdapter] = useState(runtimeAuthAdapter);
-  return <QueryClientProvider client={queryClient}><AuthProvider adapter={authAdapter}><AuthBoundary><ApiProvider><UiProvider><AppShell /></UiProvider></ApiProvider></AuthBoundary></AuthProvider></QueryClientProvider>;
+  return <AuthProvider adapter={authAdapter}><AuthBoundary><SessionQueryProvider><ApiProvider><UiProvider><AppShell /></UiProvider></ApiProvider></SessionQueryProvider></AuthBoundary></AuthProvider>;
 }

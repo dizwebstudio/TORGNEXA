@@ -1,0 +1,32 @@
+=== RUN   TestA02OIDCInvitationEmailProof
+=== RUN   TestA02OIDCInvitationEmailProof/verified
+=== RUN   TestA02OIDCInvitationEmailProof/verified_normalized
+=== RUN   TestA02OIDCInvitationEmailProof/unverified
+=== RUN   TestA02OIDCInvitationEmailProof/missing_verification
+=== RUN   TestA02OIDCInvitationEmailProof/null_verification
+=== RUN   TestA02OIDCInvitationEmailProof/token_email_only
+=== RUN   TestA02OIDCInvitationEmailProof/different_verified_address
+=== RUN   TestA02OIDCInvitationEmailProof/malformed_address
+=== RUN   TestA02OIDCInvitationEmailProof/display_address
+=== RUN   TestA02OIDCInvitationEmailProof/string_verification
+=== RUN   TestA02OIDCInvitationEmailProof/numeric_verification
+=== RUN   TestA02OIDCInvitationEmailProof/different_userinfo_subject
+--- PASS: TestA02OIDCInvitationEmailProof (0.08s)
+    --- PASS: TestA02OIDCInvitationEmailProof/verified (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/verified_normalized (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/unverified (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/missing_verification (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/null_verification (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/token_email_only (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/different_verified_address (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/malformed_address (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/display_address (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/string_verification (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/numeric_verification (0.01s)
+    --- PASS: TestA02OIDCInvitationEmailProof/different_userinfo_subject (0.01s)
+=== RUN   TestA02InvitationContractRequiresUserInfoOwnership
+--- PASS: TestA02InvitationContractRequiresUserInfoOwnership (0.00s)
+=== RUN   TestA02TenantResolverUsesOnlyVerifiedEmailForInvitations
+--- PASS: TestA02TenantResolverUsesOnlyVerifiedEmailForInvitations (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.220s

@@ -18,17 +18,23 @@ var (
 	ErrSecurityCompositionInvalid = errors.New("api: invalid security composition")
 	ErrUnauthenticated            = errors.New("api: unauthenticated")
 	ErrUnauthorized               = errors.New("api: unauthorized")
+	// ErrAuthenticationUnavailable denies access without treating a failed
+	// session-store operation as proof that the caller's credential is invalid.
+	ErrAuthenticationUnavailable = errors.New("api: authentication unavailable")
 )
 
 // Principal is the minimal authenticated identity propagated to application
 // handlers. Raw bearer tokens and unbounded identity-provider claims are never
 // copied into request context.
 type Principal struct {
-	Issuer         string
-	Subject        string
-	SessionRef     string
-	SubjectRef     string
-	Email          string
+	Issuer     string
+	Subject    string
+	SessionRef string
+	SubjectRef string
+	Email      string
+	// VerifiedEmail is invitation-binding evidence from authenticated UserInfo,
+	// distinct from the optional, possibly unverified profile email. Memory only.
+	VerifiedEmail  string `json:"-"`
 	Profile        userprofile.Identity
 	Roles          []string
 	OrganizationID string
@@ -300,6 +306,12 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 	}
 
 	principal, err := deps.authenticator.Authenticate(ctx, r)
+	if errors.Is(err, ErrAuthenticationUnavailable) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Retry-After", "5")
+		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
 	if err != nil || !principal.Valid() {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="torgnexa-api"`)
 		writeProblem(w, http.StatusUnauthorized, "Unauthorized")
