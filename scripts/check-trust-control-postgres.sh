@@ -15,7 +15,7 @@ die(){ echo "check-trust-control-postgres: $*" >&2; exit 1; }
 for executable in docker jq; do command -v "$executable" >/dev/null 2>&1 || die "$executable is required"; done
 [[ "$container_name" =~ ^torgnexa-trust-control-smoke-[0-9]+$ ]] || die "unsafe container name"
 image="$(jq -er '.development_runtime[] | select(.name == "postgres") | .image' "$inventory")" || die "PostgreSQL image is missing"
-[[ "$image" =~ ^postgres:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || die "PostgreSQL image is not immutable"
+[[ "$image" =~ ^(postgres|ghcr\.io/dizwebstudio/torgnexa-postgres):[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || die "PostgreSQL image is not immutable"
 
 cleanup(){ if [[ "$started" == true ]]; then docker stop --time 5 "$container_name" >/dev/null; fi; }
 trap cleanup EXIT HUP INT TERM

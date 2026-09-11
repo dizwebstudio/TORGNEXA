@@ -65,7 +65,7 @@ fi
 [[ "$container_name" =~ ^torgnexa-postgres-restore-[0-9]+$ ]] || die "unsafe container name"
 postgres_image="$(jq -er '[.development_runtime[] | select(.name == "postgres") | .image] | if length == 1 then .[0] else error("expected exactly one postgres image") end' "$inventory")" || \
   die "PostgreSQL runtime image is not registered exactly once"
-[[ "$postgres_image" =~ ^postgres:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || \
+[[ "$postgres_image" =~ ^(postgres|ghcr\.io/dizwebstudio/torgnexa-postgres):[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || \
   die "PostgreSQL runtime image is not immutable"
 [[ -z "$(docker ps --all --filter "name=^/${container_name}$" --format '{{.Names}}')" ]] || \
   die "temporary container name already exists"
