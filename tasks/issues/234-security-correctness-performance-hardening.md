@@ -7,7 +7,6 @@ A01–A10 из аудита 2026-09-08 исправлены в указанно�
 
 ```yaml
 repository_status: in_progress
-release_blockers: [234.1]
 security_priority: high
 external_evidence_required: false
 ```
