@@ -182,6 +182,14 @@ API заполняет `HeaderTopic` и `ExpectedTopic` одним значен�
 
 Исправление: единая SQL connection/transaction boundary для координации и работы с секретом либо отдельный ограниченный coordinator pool с гарантированным резервом. Увеличение пула само по себе не устраняет причину. Сценарий повторно проверен по коду, отдельный DB-тест refresh в этом аудите не запускался; задача 234.5 остаётся актуальной.
 
+Статус 2026-09-12: 234.5 закрыта ADR-0194. Помимо ранее исправленной единой
+transaction boundary, процесс ограничивает refresh до восьми операций и
+оставляет один pool slot при `MaxOpenConns>1`; try-lock использует jittered
+backoff, а label-free snapshot измеряет admission/lock wait, refresh
+latency/failure и pool saturation. Forced-RLS PostgreSQL gate с `-race`
+проверяет pool=1/4, десять разных аккаунтов при pool=12, contention, cancel,
+reject и rollback.
+
 ## Оптимизация
 
 1. **Сократить стоимость каждого авторизованного запроса.** Сейчас выполняются внешний UserInfo HTTP-вызов, транзакция Observe с обновлением сессии и два ResolveActiveMember — в tenant resolver и authorizer. Это минимум три служебные DB-транзакции до бизнес-запроса. Передавать один database-authoritative member через typed context, объединять обновления last_seen, затем внедрять локальную JWT-проверку с корректным JWKS cache/rotation и сохранением fail-closed revocation. Основание: 234.6 и текущий OIDC-код.

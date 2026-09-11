@@ -61,6 +61,19 @@ reference, access/refresh tokens and provider payload stay absent. If evidence
 cannot be committed, the refresh is not attempted. The evidence records intent,
 while existing health state records a later provider or rotation failure.
 
+ADR-0194 adds a process-wide admission bound shared by all OAuth accounts using
+one secret repository. The limit is `min(8, MaxOpenConns-1)` when the pool has
+more than one connection and one for a one-connection pool. Advisory try-lock
+contention uses jittered exponential backoff capped at 250 ms. Only that safe
+local lock attempt is retried; an OAuth token request is never repeated after an
+ambiguous provider response. The configured database pool is not enlarged.
+
+The repository publishes a label-free metrics snapshot for current/peak
+in-flight refreshes, admission wait/cancellation, lock attempts/contention and
+wait, successful/failed refreshes, end-to-end refresh/rotation latency and
+current/peak PostgreSQL pool saturation. It contains no tenant, account,
+connector, endpoint, secret reference, credential or provider error labels.
+
 If refresh material is absent or revoked, health becomes
 `oauth_reauthorization_required`. Token endpoint or encrypted rotation failure
 becomes `oauth_refresh_failed`. Neither outcome exposes provider error bodies.

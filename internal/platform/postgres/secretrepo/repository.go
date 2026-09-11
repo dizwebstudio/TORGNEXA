@@ -56,7 +56,10 @@ const oauthRefreshLockStatement = `SELECT pg_try_advisory_xact_lock(hashtextexte
 var errOAuthRefreshLockBusy = errors.New("secret repository: oauth refresh lock busy")
 
 // Repository stores only opaque references, metadata, nonces, and ciphertext.
-type Repository struct{ database *sql.DB }
+type Repository struct {
+	database     *sql.DB
+	oauthRefresh *oauthRefreshRuntime
+}
 
 var _ secrets.Repository = (*Repository)(nil)
 
@@ -70,7 +73,7 @@ func New(database *sql.DB) (*Repository, error) {
 	if database == nil {
 		return nil, errors.New("secret repository: database is required")
 	}
-	return &Repository{database: database}, nil
+	return &Repository{database: database, oauthRefresh: newOAuthRefreshRuntime(database)}, nil
 }
 
 // RecordRefreshIntent commits idempotent, minimized evidence before the
@@ -112,17 +115,32 @@ func (repository *Repository) RecordRefreshIntent(ctx context.Context, scope ten
 // WithRefreshLock serializes one OAuth refresh-token exchange across all API
 // and worker processes sharing PostgreSQL. The transaction-scoped advisory lock
 // is released by PostgreSQL even when the caller context is cancelled. Waiters
-// use try-lock transactions. The winner reads and rotates the encrypted secret
-// on the same connection, including when the pool has only one connection.
+// use jittered try-lock transactions behind a process-wide admission bound. The
+// winner reads and rotates the encrypted secret on the same connection,
+// including when the pool has only one connection.
 func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy.Scope, reference secrets.Reference, operation func(context.Context) error) error {
 	if err := validateCall(ctx, scope, repository); err != nil {
 		return err
 	}
-	if !reference.Valid() || operation == nil {
+	if !reference.Valid() || operation == nil || repository.oauthRefresh == nil {
 		return secrets.ErrInvalidReference
 	}
+	release, err := repository.oauthRefresh.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	lockWaitStarted := time.Now()
+	lockWaitRecorded := false
+	defer func() {
+		if !lockWaitRecorded {
+			repository.oauthRefresh.lockWait.record(time.Since(lockWaitStarted))
+		}
+	}()
 	lockKey := "connector-oauth-refresh:" + scope.OrganizationID().String() + ":" + scope.WorkspaceID().String() + ":" + reference.String()
+	var retry uint
 	for {
+		repository.oauthRefresh.lockAttempts.Add(1)
 		err := txboundary.WithinTransaction(ctx, repository.database, scope, func(lockCtx context.Context) error {
 			tx, err := txboundary.CurrentTransaction(lockCtx, repository.database)
 			if err != nil {
@@ -135,21 +153,46 @@ func (repository *Repository) WithRefreshLock(ctx context.Context, scope tenancy
 			if !acquired {
 				return errOAuthRefreshLockBusy
 			}
+			repository.oauthRefresh.samplePool()
+			repository.oauthRefresh.lockWait.record(time.Since(lockWaitStarted))
+			lockWaitRecorded = true
 			return operation(lockCtx)
 		})
 		if !errors.Is(err, errOAuthRefreshLockBusy) {
 			return err
 		}
-		timer := time.NewTimer(25 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
-			return fmt.Errorf("wait for oauth refresh lock: %w", ctx.Err())
-		case <-timer.C:
+		repository.oauthRefresh.lockContentions.Add(1)
+		if err := repository.oauthRefresh.backoffWait(ctx, retry); err != nil {
+			return fmt.Errorf("wait for oauth refresh lock: %w", err)
 		}
+		retry++
 	}
+}
+
+// RecordOAuthRefresh records one provider refresh and its complete local
+// rotation latency. It is called by the host token manager through an optional
+// metrics interface and intentionally accepts no tenant or provider labels.
+func (repository *Repository) RecordOAuthRefresh(elapsed time.Duration, failed bool) {
+	if repository == nil || repository.oauthRefresh == nil {
+		return
+	}
+	repository.oauthRefresh.refreshLatency.record(elapsed)
+	if failed {
+		repository.oauthRefresh.refreshFailures.Add(1)
+	} else {
+		repository.oauthRefresh.refreshSuccesses.Add(1)
+	}
+	repository.oauthRefresh.samplePool()
+}
+
+// OAuthRefreshMetrics returns a label-free process-local snapshot. An
+// observability adapter can export it without receiving tenant, account,
+// connector or secret identifiers.
+func (repository *Repository) OAuthRefreshMetrics() OAuthRefreshRuntimeMetrics {
+	if repository == nil || repository.oauthRefresh == nil {
+		return OAuthRefreshRuntimeMetrics{}
+	}
+	return repository.oauthRefresh.snapshot()
 }
 
 func (repository *Repository) Create(ctx context.Context, scope tenancy.Scope, metadata secrets.Metadata, version secrets.EncryptedVersion) error {

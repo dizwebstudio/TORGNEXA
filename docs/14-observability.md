@@ -4,6 +4,26 @@ OpenTelemetry for correlation. Track HTTP latency/errors, connector remote laten
 
 Structured logs carry request/correlation/event IDs and redact secrets. Dashboards cover API, Kafka/outbox, connectors, sync, social, compliance and analytics freshness.
 
+## OAuth refresh runtime
+
+ADR-0194 exposes a label-free process snapshot from the shared secret
+repository. Export these fixed fields as gauges, counters and histograms:
+
+- refresh concurrency limit, current/peak in-flight work and current admission
+  waiters;
+- admission waits/cancellations and admission wait duration;
+- PostgreSQL advisory-lock attempts/contentions and lock wait duration;
+- refresh successes/failures and end-to-end provider plus encrypted-rotation
+  latency;
+- database pool open/in-use/idle connections, pool wait count/duration and
+  current/peak saturation.
+
+Duration snapshots use fixed cumulative buckets. Pool saturation uses parts per
+million. Do not add tenant, account, connector, URL, secret-reference, provider
+payload or raw error labels. Alert on sustained admission waiters or pool
+saturation and on a refresh failure-rate increase; a single provider rejection
+can be an expected reauthorization event.
+
 ## Workflow automation (Task 163)
 
 The workflow control plane exposes the same correlation/causation context as

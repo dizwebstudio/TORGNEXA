@@ -181,6 +181,23 @@ A01 закрыта в репозитории. A09 и A10 закрыты 2026-09-
 подзадачи ниже открыты. Развёртывание frontend не выполнялось; после обновления артефакта
 существующие вкладки нужно перезагрузить.
 
+## Выполнено 2026-09-12 — 234.5 OAuth refresh follow-up
+
+- Один общий для процесса admission limit действует до открытия refresh
+  transaction: `1` для односоединительного пула, иначе
+  `min(8, MaxOpenConns-1)`. Размер PostgreSQL pool не повышался.
+- Занятый advisory try-lock повторяется с jittered exponential backoff
+  25–250 ms; remote OAuth refresh после неоднозначного результата не
+  повторяется.
+- Добавлены label-free метрики admission wait/cancel, current/peak in-flight,
+  lock wait/contention, refresh latency/success/failure и current/peak pool
+  saturation.
+- PostgreSQL `go test -race` проверяет 10 аккаунтов при pool=12, очередь и
+  предел 8, lock contention/backoff, pool=1/4, cancel/reject/rollback и одну
+  ротацию rotating token.
+- [ADR-0194](../../adr/0194-bounded-oauth-refresh-admission.md),
+  [отчёт](../../docs/audits/2026-09-12-oauth-refresh-admission.md).
+
 ## Выполнено 2026-09-09 — webhook A03–A04 / 234.2
 
 - `ApplyVerifiedWebhook` атомарно фиксирует receipt, payment transition, audit
@@ -211,7 +228,7 @@ A01 закрыта в репозитории. A09 и A10 закрыты 2026-09-
   инструкция maintenance window.
 - A08 / основная часть 234.5: единое соединение для lock/read/rotation; реальная
   PostgreSQL с pool=1/4, cancel/rejected refresh и rollback. Пул не увеличивался;
-  дополнительные метрики и jitter из 234.5 остаются follow-up.
+  bounded concurrency, метрики и jitter закрыты 2026-09-12 в ADR-0194.
 - Воспроизведение: `./scripts/check-audit-postgres.sh` (полный migration catalog,
   непривилегированный application role, локальный HTTP mock, `go test -race`).
 - [Подробности и границы результата](../../docs/audits/2026-09-09-a05-a08-fixes.md),
@@ -323,12 +340,12 @@ capability-based connector boundary и запрет на plaintext credentials.
   и одновременно ждут nested `SecretProvider.Use/Rotate`.
 - [x] Сохранить distributed serialization между API/worker и не выполнять два
   remote refresh для rotating refresh token.
-- [ ] Добавить bounded concurrency, jittered backoff и метрики lock wait,
+- [x] Добавить bounded concurrency, jittered backoff и метрики lock wait,
   refresh latency/failure и pool saturation.
 - [x] Добавить тесты для `MaxOpenConns=1`, pool-size concurrent accounts,
   timeout/cancel, rejected refresh и rotated-token replay.
-- [ ] Если минимальный размер пула временно повышается, валидировать его при
-  startup и задокументировать как mitigation, а не окончательное исправление.
+- [x] Минимальный размер пула не повышался: admission bound выводится из
+  валидированного `MaxOpenConns` и не является pool-size mitigation.
 
 ### 234.6 — Сократить OIDC/session/membership hot path
 

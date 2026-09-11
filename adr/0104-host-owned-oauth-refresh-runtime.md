@@ -86,6 +86,11 @@ means an operator must repeat OAuth. Binary rollback leaves the latest encrypted
 version readable but restores the old bundle-exposure defect, so OAuth connector
 admission must not roll back independently from this runtime boundary.
 
+ADR-0194 bounds concurrent refreshes per process, adds jitter only to safe
+advisory try-lock retries, preserves one pool slot when possible and exposes
+label-free wait/latency/failure/pool metrics. It does not raise the PostgreSQL
+pool minimum and never retries an ambiguous provider refresh response.
+
 ## Alternatives considered
 
 Refreshing in each provider adapter was rejected because adapters must not see

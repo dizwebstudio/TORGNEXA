@@ -54,13 +54,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 680
-- adrs: 193
+- docs: 681
+- adrs: 194
 - tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3653
+- total source files (excluding local secrets/build/dependency/cache trees): 3657
 
 
 ## Connector category layout
@@ -744,6 +744,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0191-atomic-connector-account-audit.md`
 - `adr/0192-distributed-api-rate-limits.md`
 - `adr/0193-atomic-privileged-dispatch-and-refresh-intent.md`
+- `adr/0194-bounded-oauth-refresh-admission.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -2131,6 +2132,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/audits/2026-09-11-evidence/privileged-audit-validation.md`
 - `docs/audits/2026-09-11-evidence/privileged-audit-vet.log.txt`
 - `docs/audits/2026-09-11-privileged-audit-completion.md`
+- `docs/audits/2026-09-12-oauth-refresh-admission.md`
 - `docs/billing/086-cloud-billing-lifecycle.md`
 - `docs/compliance/083-egais-government-connector.md`
 - `docs/connectors/aliexpress-ru/README.md`
@@ -3457,6 +3459,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/searchrepo/migration_test.go`
 - `internal/platform/postgres/searchrepo/repository.go`
 - `internal/platform/postgres/secretrepo/migration_test.go`
+- `internal/platform/postgres/secretrepo/refresh_runtime.go`
+- `internal/platform/postgres/secretrepo/refresh_runtime_test.go`
 - `internal/platform/postgres/secretrepo/repository.go`
 - `internal/platform/postgres/securitysettingsrepo/identity_provider_migration_test.go`
 - `internal/platform/postgres/securitysettingsrepo/identity_providers.go`

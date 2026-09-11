@@ -55,12 +55,19 @@ func (store *tokenSecretStore) Revoke(context.Context, tenancy.Scope, secrets.Re
 }
 
 type mutexRefreshCoordinator struct {
-	mu        sync.Mutex
-	intent    RefreshIntent
-	intentErr error
+	mu                sync.Mutex
+	intentMu          sync.Mutex
+	intent            RefreshIntent
+	intentErr         error
+	afterOperationErr error
+	refreshSuccesses  atomic.Int64
+	refreshFailures   atomic.Int64
+	refreshLatencyNS  atomic.Int64
 }
 
 func (coordinator *mutexRefreshCoordinator) RecordRefreshIntent(_ context.Context, _ tenancy.Scope, intent RefreshIntent) error {
+	coordinator.intentMu.Lock()
+	defer coordinator.intentMu.Unlock()
 	coordinator.intent = intent
 	return coordinator.intentErr
 }
@@ -68,7 +75,19 @@ func (coordinator *mutexRefreshCoordinator) RecordRefreshIntent(_ context.Contex
 func (coordinator *mutexRefreshCoordinator) WithRefreshLock(ctx context.Context, _ tenancy.Scope, _ secrets.Reference, operation func(context.Context) error) error {
 	coordinator.mu.Lock()
 	defer coordinator.mu.Unlock()
-	return operation(ctx)
+	if err := operation(ctx); err != nil {
+		return err
+	}
+	return coordinator.afterOperationErr
+}
+
+func (coordinator *mutexRefreshCoordinator) RecordOAuthRefresh(elapsed time.Duration, failed bool) {
+	coordinator.refreshLatencyNS.Add(int64(elapsed))
+	if failed {
+		coordinator.refreshFailures.Add(1)
+	} else {
+		coordinator.refreshSuccesses.Add(1)
+	}
 }
 
 func tokenManagerScope(t *testing.T) tenancy.Scope {
@@ -169,6 +188,9 @@ func TestTokenManagerSerializesRefreshAndRotatesBundleOnce(t *testing.T) {
 	if refreshes.Load() != 1 || store.rotated != 1 || store.metadata.CurrentVersion != 2 {
 		t.Fatalf("refreshes=%d rotations=%d version=%d", refreshes.Load(), store.rotated, store.metadata.CurrentVersion)
 	}
+	if coordinator.refreshSuccesses.Load() != 1 || coordinator.refreshFailures.Load() != 0 || coordinator.refreshLatencyNS.Load() < 0 {
+		t.Fatalf("unexpected refresh metrics: successes=%d failures=%d latency=%d", coordinator.refreshSuccesses.Load(), coordinator.refreshFailures.Load(), coordinator.refreshLatencyNS.Load())
+	}
 	expectedRuntime := account.ConnectorID
 	if !coordinator.intent.Valid() || coordinator.intent.AccountID != account.ID || coordinator.intent.RuntimeID != expectedRuntime || coordinator.intent.SecretVersion != 1 || strings.Contains(coordinator.intent.ID, tokenManagerReference.String()) {
 		t.Fatalf("invalid refresh intent: %+v", coordinator.intent)
@@ -210,7 +232,8 @@ func TestTokenManagerFailsClosedWhenReauthorizationIsRequired(t *testing.T) {
 func TestTokenManagerMapsRejectedRefreshToReauthorization(t *testing.T) {
 	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
 	store := tokenManagerStore(t, secrets.ClassOAuthRefresh, TokenBundle{AccessToken: "expired-access-token-123", RefreshToken: "revoked-refresh-token-123", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "secret"})
-	manager, _ := NewTokenManager(store, &mutexRefreshCoordinator{})
+	coordinator := &mutexRefreshCoordinator{}
+	manager, _ := NewTokenManager(store, coordinator)
 	manager.now = func() time.Time { return now }
 	manager.refresh = func(context.Context, sdk.OAuth2Configuration, TokenBundle, time.Duration, time.Time) ([]byte, error) {
 		return nil, ErrOAuthRefreshRejected
@@ -218,6 +241,26 @@ func TestTokenManagerMapsRejectedRefreshToReauthorization(t *testing.T) {
 	err := manager.Prepare(context.Background(), tokenManagerScope(t), oauthAccount(grantID(t, "authorization_code")))
 	if !errors.Is(err, ErrOAuthReauthorizationRequired) || store.rotated != 0 {
 		t.Fatalf("got %v with %d rotations", err, store.rotated)
+	}
+	if coordinator.refreshFailures.Load() != 1 || coordinator.refreshSuccesses.Load() != 0 {
+		t.Fatalf("unexpected refresh metrics: successes=%d failures=%d", coordinator.refreshSuccesses.Load(), coordinator.refreshFailures.Load())
+	}
+}
+
+func TestTokenManagerMeasuresCoordinatorCommitFailureAsRefreshFailure(t *testing.T) {
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	store := tokenManagerStore(t, secrets.ClassOAuthRefresh, TokenBundle{AccessToken: "expired-access-token-123", RefreshToken: "refresh-token-123", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "secret"})
+	coordinator := &mutexRefreshCoordinator{afterOperationErr: errors.New("synthetic commit failure")}
+	manager, _ := NewTokenManager(store, coordinator)
+	manager.now = func() time.Time { return now }
+	manager.refresh = func(_ context.Context, _ sdk.OAuth2Configuration, current TokenBundle, _ time.Duration, at time.Time) ([]byte, error) {
+		return json.Marshal(TokenBundle{AccessToken: "new-access-token-123", RefreshToken: "new-refresh-token-123", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+	}
+	if err := manager.Prepare(context.Background(), tokenManagerScope(t), oauthAccount(grantID(t, "authorization_code"))); !errors.Is(err, ErrOAuthRefreshUnavailable) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if coordinator.refreshFailures.Load() != 1 || coordinator.refreshSuccesses.Load() != 0 {
+		t.Fatalf("commit failure metrics: successes=%d failures=%d", coordinator.refreshSuccesses.Load(), coordinator.refreshFailures.Load())
 	}
 }
 

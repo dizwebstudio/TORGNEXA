@@ -30,6 +30,10 @@ type RefreshCoordinator interface {
 	WithRefreshLock(context.Context, tenancy.Scope, secrets.Reference, func(context.Context) error) error
 }
 
+type refreshMetricRecorder interface {
+	RecordOAuthRefresh(time.Duration, bool)
+}
+
 // RefreshIntent aliases the secrets-layer evidence contract used by refresh
 // coordinators. It contains no credential reference or provider payload.
 type RefreshIntent = secrets.RefreshIntent
@@ -125,6 +129,8 @@ func (manager *TokenManager) UseAccessToken(ctx context.Context, scope tenancy.S
 		return ErrOAuthRefreshUnavailable
 	}
 	var accessToken string
+	var refreshStarted time.Time
+	refreshAttempted := false
 	err = manager.locks.WithRefreshLock(ctx, scope, reference, func(lockContext context.Context) error {
 		latest, readErr := manager.readBundle(lockContext, scope, reference)
 		if readErr != nil {
@@ -138,6 +144,8 @@ func (manager *TokenManager) UseAccessToken(ctx context.Context, scope tenancy.S
 			return ErrOAuthReauthorizationRequired
 		}
 		now := manager.now().UTC()
+		refreshStarted = time.Now()
+		refreshAttempted = true
 		material, refreshErr := manager.refresh(lockContext, configuration, latest, timeout, now)
 		if refreshErr != nil {
 			if errors.Is(refreshErr, ErrOAuthRefreshRejected) {
@@ -156,6 +164,11 @@ func (manager *TokenManager) UseAccessToken(ctx context.Context, scope tenancy.S
 		accessToken = updated.AccessToken
 		return nil
 	})
+	if refreshAttempted {
+		if recorder, ok := manager.locks.(refreshMetricRecorder); ok {
+			recorder.RecordOAuthRefresh(time.Since(refreshStarted), err != nil)
+		}
+	}
 	if err != nil {
 		if errors.Is(err, ErrOAuthReauthorizationRequired) {
 			return ErrOAuthReauthorizationRequired

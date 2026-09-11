@@ -179,6 +179,13 @@ Volumes при этом не удаляются. Не используйте `do
 Увеличение пула умножается на количество процессов и экземпляров. Учитывайте
 общий лимит подключений PostgreSQL.
 
+OAuth refresh не требует увеличивать пул. Каждый API/worker процесс допускает
+один refresh при `MAX_OPEN_CONNS=1`, иначе не более
+`min(8, MAX_OPEN_CONNS-1)`, сохраняя один connection slot для другой работы.
+Лимит выводится при старте repository, поэтому изменение pool settings требует
+перезапуска процесса. Наблюдайте admission/lock wait, refresh failures и
+current/peak pool saturation из label-free snapshot ADR-0194.
+
 ## Распределённый лимит API
 
 Community Compose подключает API к общему Valkey, поэтому увеличение числа
