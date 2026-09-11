@@ -68,7 +68,7 @@ x-app-common: &app-common
 
 services:
   postgres:
-    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166
+    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: unless-stopped
     init: true
     environment:
@@ -88,7 +88,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   keycloak-db-init:
-    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166
+    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: "no"
     depends_on:
       postgres:
@@ -106,7 +106,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   migrate:
-    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166
+    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: "no"
     depends_on:
       postgres:
@@ -126,7 +126,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   app-db-role:
-    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166
+    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: "no"
     depends_on:
       migrate:
@@ -145,7 +145,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   kafka:
-    image: ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:acc896ca3012c2935a9bc40ca5f00a73fccc2d912b3fec02845362c386234db8
+    image: ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34648191406.1@sha256:6dd81c8544b849bfa514cfee4edf2d3c87b46c19ddb62c337dbade05d7a058ca
     restart: unless-stopped
     init: true
     ports:
@@ -175,7 +175,7 @@ services:
   # empty broker. Bootstrap every canonical base topic and its retry/DLQ
   # variants before any application process can publish an outbox event.
   kafka-init:
-    image: ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:acc896ca3012c2935a9bc40ca5f00a73fccc2d912b3fec02845362c386234db8
+    image: ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34648191406.1@sha256:6dd81c8544b849bfa514cfee4edf2d3c87b46c19ddb62c337dbade05d7a058ca
     restart: "no"
     depends_on:
       kafka:
@@ -192,7 +192,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   valkey:
-    image: ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34063412327.1@sha256:ef2e9b42e4655807a57af995ca8e78ec8aefbb7bac03d1da5dd810e58bec6ef3
+    image: ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34648191406.1@sha256:2c1162f2481514a212509310c46364bef8923715351b685814c83ffd39632502
     restart: unless-stopped
     init: true
     user: "999:1000"
@@ -232,7 +232,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   garage-config:
-    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166
+    image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: "no"
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?run scripts/init-community-env.sh}
@@ -289,7 +289,7 @@ services:
       start_period: 60s
 
   keycloak:
-    image: ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:bea2b70b46ede14511bec0ada31edf00af73bee9a986eebd2f16af4628bf9553
+    image: ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34648191406.1@sha256:d1da8092eeb21a9c2e514700a16809506c9faa373994ccc1526f246fb6167abe
     restart: unless-stopped
     init: true
     depends_on:

@@ -183,7 +183,7 @@ path instead of inheriting an approval from an older image.
 
 Task 117 records the approved TORGNEXA-owned Community-core repository license as Apache-2.0. The top-level `LICENSE`, `LICENSE-DECISION.md`, and owned package metadata carry that decision and `supply-chain/release-artifacts.json` may set `public_release_ready:true`. This field removes only the repository-license blocker: dependency-license, vulnerability, provenance/signing, protected-hosting and deployment qualification gates remain independently fail-closed.
 
-#### Keycloak candidate license review — 2026-09-08
+#### Keycloak candidate license review — 2026-09-12
 
 The release owner's request to review and admit the new candidate metadata is
 implemented by adding the following 15 exact raw values (149 -> 164 total).
@@ -193,7 +193,7 @@ existing decision to retain the runtime images, not a certification of all
 redistribution obligations.
 
 Reviewed subject:
-`ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:bea2b70b46ede14511bec0ada31edf00af73bee9a986eebd2f16af4628bf9553`.
+`ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34648191406.1@sha256:d1da8092eeb21a9c2e514700a16809506c9faa373994ccc1526f246fb6167abe`.
 The retained Trivy 0.70.0 full-license reports for `linux/amd64` and
 `linux/arm64` both contain 74 distinct raw values, including the same 15
 additions. Package versions and origins were cross-checked against the

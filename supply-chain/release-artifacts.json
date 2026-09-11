@@ -79,7 +79,7 @@
   "development_runtime": [
     {
       "name": "app-db-role",
-      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
+      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -110,7 +110,7 @@
     },
     {
       "name": "garage-config",
-      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
+      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -118,7 +118,7 @@
     },
     {
       "name": "kafka",
-      "image": "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:acc896ca3012c2935a9bc40ca5f00a73fccc2d912b3fec02845362c386234db8",
+      "image": "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34648191406.1@sha256:6dd81c8544b849bfa514cfee4edf2d3c87b46c19ddb62c337dbade05d7a058ca",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -126,7 +126,7 @@
     },
     {
       "name": "kafka-init",
-      "image": "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:acc896ca3012c2935a9bc40ca5f00a73fccc2d912b3fec02845362c386234db8",
+      "image": "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34648191406.1@sha256:6dd81c8544b849bfa514cfee4edf2d3c87b46c19ddb62c337dbade05d7a058ca",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -134,7 +134,7 @@
     },
     {
       "name": "keycloak",
-      "image": "ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:bea2b70b46ede14511bec0ada31edf00af73bee9a986eebd2f16af4628bf9553",
+      "image": "ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34648191406.1@sha256:d1da8092eeb21a9c2e514700a16809506c9faa373994ccc1526f246fb6167abe",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -142,7 +142,7 @@
     },
     {
       "name": "keycloak-db-init",
-      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
+      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -150,7 +150,7 @@
     },
     {
       "name": "migrate",
-      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
+      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -158,7 +158,7 @@
     },
     {
       "name": "postgres",
-      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
+      "image": "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
       "platforms": [
         "linux/amd64",
         "linux/arm64"
@@ -166,7 +166,7 @@
     },
     {
       "name": "valkey",
-      "image": "ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34063412327.1@sha256:ef2e9b42e4655807a57af995ca8e78ec8aefbb7bac03d1da5dd810e58bec6ef3",
+      "image": "ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34648191406.1@sha256:2c1162f2481514a212509310c46364bef8923715351b685814c83ffd39632502",
       "platforms": [
         "linux/amd64",
         "linux/arm64"

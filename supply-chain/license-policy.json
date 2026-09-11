@@ -36,10 +36,10 @@
     "clamav/clamav:1.4.6@sha256:b25d9199257ae7ef45e0cc4c7eaa60ce7e5447796f0090d5ff311d1a30980cc3",
     "clickhouse/clickhouse-server:26.6@sha256:a63a90ffdcb574683ebfe96e4c53e2dbe401864add7bb06dc244eb935d828e7f",
     "dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690",
-    "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:acc896ca3012c2935a9bc40ca5f00a73fccc2d912b3fec02845362c386234db8",
-    "ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:bea2b70b46ede14511bec0ada31edf00af73bee9a986eebd2f16af4628bf9553",
-    "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:50fe5aff6d7658f0e37eef7058c447a5756858bdf7bdaeb05bb17156e5345166",
-    "ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34063412327.1@sha256:ef2e9b42e4655807a57af995ca8e78ec8aefbb7bac03d1da5dd810e58bec6ef3"
+    "ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34648191406.1@sha256:6dd81c8544b849bfa514cfee4edf2d3c87b46c19ddb62c337dbade05d7a058ca",
+    "ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34648191406.1@sha256:d1da8092eeb21a9c2e514700a16809506c9faa373994ccc1526f246fb6167abe",
+    "ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0",
+    "ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34648191406.1@sha256:2c1162f2481514a212509310c46364bef8923715351b685814c83ffd39632502"
   ],
   "approved_trivy_license_expressions": [
     "(GPLv2+ or AFL) and GPLv2+",
