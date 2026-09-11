@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -109,6 +110,7 @@ func (r *Repository) InstallPolicyGoverned(ctx context.Context, scope tenancy.Sc
 		return agentgovernance.Policy{}, false, agentgovernance.ErrInvalid
 	}
 	policy.Rules = canonical
+	versionArgument := strconv.FormatUint(policy.Version, 10)
 	var out agentgovernance.Policy
 	replayed := false
 	err = r.withTx(ctx, scope, func(tx *sql.Tx) error {
@@ -133,7 +135,7 @@ func (r *Repository) InstallPolicyGoverned(ctx context.Context, scope tenancy.Sc
 			until = policy.EffectiveUntil.UTC()
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO ai_agent_policies(id,organization_id,workspace_id,version,agent_id,integration_id,rules,effective_from,effective_until,changed_by,reason,created_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, policy.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), int64(policy.Version), policy.AgentID, policy.IntegrationID, raw, policy.EffectiveFrom.UTC(), until, change.ActorID, change.Reason, change.OccurredAt.UTC())
+VALUES($1,$2,$3,$4::bigint,$5,$6,$7,$8,$9,$10,$11,$12)`, policy.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), versionArgument, policy.AgentID, policy.IntegrationID, raw, policy.EffectiveFrom.UTC(), until, change.ActorID, change.Reason, change.OccurredAt.UTC())
 		if err != nil {
 			return fmt.Errorf("agent governance repository: install governed policy: %w", err)
 		}
@@ -186,6 +188,7 @@ func (r *Repository) RecordKillSwitchGoverned(ctx context.Context, scope tenancy
 		return agentgovernance.KillChange{}, false, agentgovernance.ErrInvalid
 	}
 	out := change
+	versionArgument := strconv.FormatUint(change.Version, 10)
 	replayed := false
 	err := r.withTx(ctx, scope, func(tx *sql.Tx) error {
 		claimed, result, err := claimMutationReceipt(ctx, tx, scope, "mcp_agent_kill_switch.set", key, digest)
@@ -206,7 +209,7 @@ func (r *Repository) RecordKillSwitchGoverned(ctx context.Context, scope tenancy
 			return err
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO ai_agent_kill_switches(organization_id,workspace_id,scope_kind,subject_id,version,disabled,changed_by,reason,changed_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), string(change.Scope), change.SubjectID, int64(change.Version), change.Disabled, change.Change.ActorID, change.Change.Reason, change.Change.OccurredAt.UTC())
+VALUES($1,$2,$3,$4,$5::bigint,$6,$7,$8,$9)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), string(change.Scope), change.SubjectID, versionArgument, change.Disabled, change.Change.ActorID, change.Change.Reason, change.Change.OccurredAt.UTC())
 		if err != nil {
 			return fmt.Errorf("agent governance repository: record governed kill switch: %w", err)
 		}
@@ -430,7 +433,7 @@ func loadPolicyVersion(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, id 
 	var out agentgovernance.Policy
 	var raw []byte
 	var until sql.NullTime
-	err := tx.QueryRowContext(ctx, `SELECT id,version,agent_id,integration_id,rules,effective_from,effective_until FROM ai_agent_policies WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, int64(version)).Scan(&out.ID, &out.Version, &out.AgentID, &out.IntegrationID, &raw, &out.EffectiveFrom, &until)
+	err := tx.QueryRowContext(ctx, `SELECT id,version,agent_id,integration_id,rules,effective_from,effective_until FROM ai_agent_policies WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$4::bigint`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, strconv.FormatUint(version, 10)).Scan(&out.ID, &out.Version, &out.AgentID, &out.IntegrationID, &raw, &out.EffectiveFrom, &until)
 	if err != nil {
 		return agentgovernance.Policy{}, agentgovernance.ErrConflict
 	}
@@ -448,7 +451,7 @@ func loadPolicyVersion(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, id 
 func loadKillChange(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, scopeKind, subjectID string, version uint64) (agentgovernance.KillChange, error) {
 	var out agentgovernance.KillChange
 	var kind string
-	err := tx.QueryRowContext(ctx, `SELECT scope_kind,subject_id,version,disabled,changed_by,reason,changed_at FROM ai_agent_kill_switches WHERE organization_id=$1 AND workspace_id=$2 AND scope_kind=$3 AND subject_id=$4 AND version=$5`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scopeKind, subjectID, int64(version)).Scan(&kind, &out.SubjectID, &out.Version, &out.Disabled, &out.Change.ActorID, &out.Change.Reason, &out.Change.OccurredAt)
+	err := tx.QueryRowContext(ctx, `SELECT scope_kind,subject_id,version,disabled,changed_by,reason,changed_at FROM ai_agent_kill_switches WHERE organization_id=$1 AND workspace_id=$2 AND scope_kind=$3 AND subject_id=$4 AND version=$5::bigint`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scopeKind, subjectID, strconv.FormatUint(version, 10)).Scan(&kind, &out.SubjectID, &out.Version, &out.Disabled, &out.Change.ActorID, &out.Change.Reason, &out.Change.OccurredAt)
 	if err != nil {
 		return agentgovernance.KillChange{}, agentgovernance.ErrConflict
 	}

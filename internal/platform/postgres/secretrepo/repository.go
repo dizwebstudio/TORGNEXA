@@ -6,10 +6,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
+	"strconv"
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 )
 
@@ -82,8 +83,9 @@ func (repository *Repository) RecordRefreshIntent(ctx context.Context, scope ten
 	if !intent.Valid() {
 		return secrets.ErrInvalidRecord
 	}
+	secretVersion := strconv.FormatUint(intent.SecretVersion, 10)
 	return repository.readWrite(ctx, scope, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `INSERT INTO security_evidence(id,organization_id,workspace_id,evidence_type,actor_ref,resource_type,resource_id,correlation_id,decision,summary,occurred_at) VALUES($1,$2,$3,'connector.oauth_refresh.requested','system.connector_oauth_refresh','connector_account',$4,$5,'allowed',jsonb_build_object('connector_id',$6::text,'secret_version',$7::bigint),$8) ON CONFLICT (organization_id,workspace_id,id) DO NOTHING`, intent.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), intent.AccountID, intent.CorrelationID, intent.RuntimeID, int64(intent.SecretVersion), intent.OccurredAt.UTC())
+		result, err := tx.ExecContext(ctx, `INSERT INTO security_evidence(id,organization_id,workspace_id,evidence_type,actor_ref,resource_type,resource_id,correlation_id,decision,summary,occurred_at) VALUES($1,$2,$3,'connector.oauth_refresh.requested','system.connector_oauth_refresh','connector_account',$4,$5,'allowed',jsonb_build_object('connector_id',$6::text,'secret_version',$7::bigint),$8) ON CONFLICT (organization_id,workspace_id,id) DO NOTHING`, intent.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), intent.AccountID, intent.CorrelationID, intent.RuntimeID, secretVersion, intent.OccurredAt.UTC())
 		if err != nil {
 			return fmt.Errorf("record oauth refresh intent: %w", err)
 		}
@@ -95,12 +97,12 @@ func (repository *Repository) RecordRefreshIntent(ctx context.Context, scope ten
 			return nil
 		}
 		var evidenceType, actorRef, resourceType, resourceID, correlationID, decision, runtimeID string
-		var secretVersion int64
-		err = tx.QueryRowContext(ctx, `SELECT evidence_type,actor_ref,resource_type,resource_id,correlation_id,decision,COALESCE(summary->>'connector_id',''),COALESCE((summary->>'secret_version')::bigint,0) FROM security_evidence WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), intent.ID).Scan(&evidenceType, &actorRef, &resourceType, &resourceID, &correlationID, &decision, &runtimeID, &secretVersion)
+		var storedSecretVersion string
+		err = tx.QueryRowContext(ctx, `SELECT evidence_type,actor_ref,resource_type,resource_id,correlation_id,decision,COALESCE(summary->>'connector_id',''),COALESCE(summary->>'secret_version','') FROM security_evidence WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), intent.ID).Scan(&evidenceType, &actorRef, &resourceType, &resourceID, &correlationID, &decision, &runtimeID, &storedSecretVersion)
 		if err != nil {
 			return fmt.Errorf("read oauth refresh intent: %w", err)
 		}
-		if evidenceType != "connector.oauth_refresh.requested" || actorRef != "system.connector_oauth_refresh" || resourceType != "connector_account" || resourceID != intent.AccountID || correlationID != intent.CorrelationID || decision != "allowed" || runtimeID != intent.RuntimeID || secretVersion != int64(intent.SecretVersion) {
+		if evidenceType != "connector.oauth_refresh.requested" || actorRef != "system.connector_oauth_refresh" || resourceType != "connector_account" || resourceID != intent.AccountID || correlationID != intent.CorrelationID || decision != "allowed" || runtimeID != intent.RuntimeID || storedSecretVersion != secretVersion {
 			return secrets.ErrConflict
 		}
 		return nil

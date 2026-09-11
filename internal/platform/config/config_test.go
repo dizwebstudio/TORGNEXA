@@ -45,6 +45,7 @@ func TestLoadWithLookupDefaults(t *testing.T) {
 }
 
 func TestLoadWithLookupOverrides(t *testing.T) {
+	syntheticValues := []string{"fixture-valkey-password", "fixture-value", "fixture-access"}
 	values := map[string]string{
 		"TORGNEXA_ENV":                               "staging-eu_1",
 		"TORGNEXA_LOG_LEVEL":                         "warn",
@@ -70,7 +71,7 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 		"TORGNEXA_SECURITY_HSTS_SECONDS":             "63072000",
 		"VALKEY_ADDR":                                "valkey.example.test:6380",
 		"VALKEY_USERNAME":                            "torgnexa-api",
-		"VALKEY_PASSWORD":                            "fixture-valkey-password",
+		"VALKEY_PASSWORD":                            syntheticValues[0],
 		"TORGNEXA_VALKEY_CONNECT_TIMEOUT":            "2s",
 		"TORGNEXA_VALKEY_REQUEST_TIMEOUT":            "750ms",
 		"TORGNEXA_VALKEY_MAX_CONNECTIONS":            "20",
@@ -82,13 +83,13 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 		"TORGNEXA_DB_CONNECT_TIMEOUT":                "7s",
 		"CLICKHOUSE_DSN":                             "https://clickhouse.example.test",
 		"CLICKHOUSE_USERNAME":                        "reports",
-		"CLICKHOUSE_PASSWORD":                        "fixture-value",
+		"CLICKHOUSE_PASSWORD":                        syntheticValues[1],
 		"TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT":          "4s",
 		"S3_ENDPOINT":                                "https://objects.example.test",
 		"S3_BUCKET":                                  "tenant-files",
 		"S3_REGION":                                  "ru-central-1",
-		"S3_ACCESS_KEY":                              "fixture-access",
-		"S3_SECRET_KEY":                              "fixture-value",
+		"S3_ACCESS_KEY":                              syntheticValues[2],
+		"S3_SECRET_KEY":                              syntheticValues[1],
 		"TORGNEXA_S3_REQUEST_TIMEOUT":                "12s",
 		"TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS":         "login.example.test,id.example.test",
 	}

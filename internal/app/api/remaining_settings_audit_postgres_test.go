@@ -257,14 +257,17 @@ func assertReconciliationEvidenceCounts(t *testing.T, ctx context.Context, admin
 
 func assertTableCount(t *testing.T, ctx context.Context, admin *sql.DB, scope tenancy.Scope, table string, want int) {
 	t.Helper()
-	queries := map[string]string{
-		"ai_provider_accounts": `SELECT count(*) FROM ai_provider_accounts WHERE workspace_id=$1`,
-		"mcp_client_accounts":  `SELECT count(*) FROM mcp_client_accounts WHERE workspace_id=$1`,
-		"secret_references":    `SELECT count(*) FROM secret_references WHERE workspace_id=$1`,
-		"security_evidence":    `SELECT count(*) FROM security_evidence WHERE workspace_id=$1`,
-	}
-	query, ok := queries[table]
-	if !ok {
+	var query string
+	switch table {
+	case "ai_provider_accounts":
+		query = `SELECT count(*) FROM ai_provider_accounts WHERE workspace_id=$1`
+	case "mcp_client_accounts":
+		query = `SELECT count(*) FROM mcp_client_accounts WHERE workspace_id=$1`
+	case "secret_references":
+		query = `SELECT count(*) FROM secret_references WHERE workspace_id=$1`
+	case "security_evidence":
+		query = `SELECT count(*) FROM security_evidence WHERE workspace_id=$1`
+	default:
 		t.Fatalf("unsupported table %q", table)
 	}
 	var count int
