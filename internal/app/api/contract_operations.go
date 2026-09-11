@@ -17,6 +17,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/legalparty"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/cloudbilling"
 	"github.com/torgnexa/torgnexa/internal/platform/pluginmarketplace"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/cloudbillingrepo"
@@ -38,6 +39,7 @@ type counterpartyLister interface {
 
 type reconciliationJobStore interface {
 	CreateRun(context.Context, tenancy.Scope, reconciliation.Run) (reconciliation.Run, error)
+	CreateRunWithReplay(context.Context, tenancy.Scope, reconciliation.Run) (reconciliation.Run, bool, error)
 	Run(context.Context, tenancy.Scope, string) (reconciliation.Run, error)
 }
 
@@ -85,7 +87,7 @@ func newReservedContractRoutes(deps productionRouteDependencies, guard ...syncPo
 	return []ProtectedRoute{
 		{Method: http.MethodGet, Path: "/api/v1/connectors", Permission: "connectors.accounts.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { listConnectors(w, r, deps.accounts) })},
 		{Method: http.MethodPost, Path: "/api/v1/reconciliation/jobs", Permission: "sync.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			createReconciliationJob(w, r, deps.syncPolicies, deps.reconciliations, capabilityGuard)
+			createReconciliationJob(w, r, deps.syncPolicies, deps.reconciliations, deps.auditService, capabilityGuard)
 		})},
 		{Method: http.MethodGet, Path: "/api/v1/settlements", Permission: "settlements.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { listSettlements(w, r, deps.settlements) })},
 		{Method: http.MethodPost, Path: "/api/v1/privacy/requests", Permission: "privacy.requests.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { createPrivacyRequest(w, r, deps.privacy) })},
@@ -120,12 +122,12 @@ type reconciliationJobInput struct {
 	Mode     reconciliation.Mode `json:"mode,omitempty"`
 }
 
-func createReconciliationJob(w http.ResponseWriter, r *http.Request, policies syncPolicyRepository, repository reconciliationJobStore, guard syncPolicyCapabilityGuard) {
+func createReconciliationJob(w http.ResponseWriter, r *http.Request, policies syncPolicyRepository, repository reconciliationJobStore, auditService auditCapturer, guard syncPolicyCapabilityGuard) {
 	scope, scoped := ScopeFromContext(r.Context())
 	principal, identified := PrincipalFromContext(r.Context())
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	var input reconciliationJobInput
-	if !scoped || !identified || policies == nil || repository == nil || !validIdempotencyKey(key) || decodeStrictJSON(r, &input) != nil || strings.TrimSpace(input.PolicyID) == "" {
+	if !scoped || !identified || policies == nil || repository == nil || auditService == nil || !validIdempotencyKey(key) || decodeStrictJSON(r, &input) != nil || strings.TrimSpace(input.PolicyID) == "" {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -148,14 +150,30 @@ func createReconciliationJob(w http.ResponseWriter, r *http.Request, policies sy
 	}
 	id := stableID("rec_api_", 40, scope, key)
 	now := time.Now().UTC()
-	created, err := repository.CreateRun(r.Context(), scope, reconciliation.Run{ID: id, PolicyID: input.PolicyID, Mode: input.Mode, TriggerRef: boundedActorRef(principal.Subject), Status: reconciliation.RunRunning, Version: 1, StartedAt: now, UpdatedAt: now})
-	if err != nil {
-		existing, lookupErr := repository.Run(r.Context(), scope, id)
-		if lookupErr != nil || existing.PolicyID != input.PolicyID || existing.Mode != input.Mode {
-			writeProblem(w, http.StatusConflict, "Conflict")
-			return
+	var replayed bool
+	created, err := auditedSettingsMutation(r.Context(), scope, auditService, func(txCtx context.Context) (reconciliation.Run, error) {
+		var run reconciliation.Run
+		var createErr error
+		run, replayed, createErr = repository.CreateRunWithReplay(txCtx, scope, reconciliation.Run{ID: id, PolicyID: input.PolicyID, Mode: input.Mode, TriggerRef: boundedActorRef(principal.Subject), Status: reconciliation.RunRunning, Version: 1, StartedAt: now, UpdatedAt: now})
+		return run, createErr
+	}, func(txCtx context.Context, run reconciliation.Run) error {
+		if replayed {
+			return nil
 		}
-		created = existing
+		_, captureErr := auditService.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "reconciliation.run.queued",
+			ResourceType: "reconciliation_run", ResourceID: run.ID, CorrelationID: key,
+			Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"policy_id": input.PolicyID, "mode": string(input.Mode)},
+		})
+		return captureErr
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusConflict, "Conflict")
+		return
 	}
 	writeJSON(w, http.StatusAccepted, syncRunView{created.ID, created.PolicyID, created.Mode, created.Status, created.ScannedCount, created.DriftCount, created.StartedAt, created.UpdatedAt})
 }

@@ -461,19 +461,31 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return newRuntimeError("oidc_security_startup_failed", err)
 	}
+	limiter, limiterCloser, err := newAPIRateLimiter(ctx, cfg)
+	if err != nil {
+		return newRuntimeError("rate_limiter_startup_failed", err)
+	}
+	if limiterCloser != nil {
+		defer func() {
+			if closeErr := limiterCloser.Close(); closeErr != nil {
+				logger.Error("rate limiter close failed", "event", "security.rate_limiter_close_failed")
+			}
+		}()
+	}
 
 	listener, err := net.Listen("tcp", cfg.HTTP.Address)
 	if err != nil {
 		return newRuntimeError("http_listen_failed", err)
 	}
 	edge := securityedge.Config{
-		TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs,
-		AdminCIDRs:        cfg.Security.AdminCIDRs,
-		AllowedOrigins:    cfg.Security.AllowedOrigins,
-		MaxRequestBytes:   cfg.Security.MaxRequestBytes,
-		MaxUploadBytes:    cfg.Security.MaxUploadBytes,
-		RatePerMinute:     cfg.Security.RatePerMinute,
-		HSTSSeconds:       cfg.Security.HSTSSeconds,
+		TrustedProxyCIDRs:    cfg.Security.TrustedProxyCIDRs,
+		AdminCIDRs:           cfg.Security.AdminCIDRs,
+		AllowedOrigins:       cfg.Security.AllowedOrigins,
+		MaxRequestBytes:      cfg.Security.MaxRequestBytes,
+		MaxUploadBytes:       cfg.Security.MaxUploadBytes,
+		PreAuthRatePerMinute: cfg.Security.PreAuthRatePerMinute,
+		RatePerMinute:        cfg.Security.RatePerMinute,
+		HSTSSeconds:          cfg.Security.HSTSSeconds,
 	}
 	routeDeps := productionRouteDependencies{
 		accounts: accountRepository, connectorConfigs: connectorConfigRepository, auditRepository: auditRepository, auditService: auditService, secretProvider: secretProvider, oauthRefresh: secretRepository, connectorCallbacks: connectorCallbacks,
@@ -488,7 +500,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		integrationCenter: integrationCenterSource{accounts: accountRepository, configs: connectorConfigRepository, policies: syncRepository, reconciliation: reconciliationRepository, runtime: builtinruntime.New()}, customerService: customerServiceRepository, ecosystem: ecosystemRepository,
 	}
 	routes := newProductionRoutes(routeDeps)
-	handler, err := NewProductionHandler(logger, edge, securityedge.NewLimiter(), authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))
+	handler, err := NewProductionHandler(logger, edge, limiter, authn, tenantResolver, authz, routes, newProductionWebhookRoutes(routeDeps))
 	if err != nil {
 		_ = listener.Close()
 		return newRuntimeError("http_security_composition_failed", err)

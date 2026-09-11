@@ -20,13 +20,21 @@ const (
 // CreateBootstrapPreview persists immutable dry-run evidence. Reusing an ID is
 // idempotent only when every immutable field matches.
 func (r *Repository) CreateBootstrapPreview(ctx context.Context, scope tenancy.Scope, preview syncengine.BootstrapPreview) (syncengine.BootstrapPreview, error) {
+	result, _, err := r.CreateBootstrapPreviewWithReplay(ctx, scope, preview)
+	return result, err
+}
+
+// CreateBootstrapPreviewWithReplay reports whether the existing result was reused,
+// so the caller can omit duplicate audit within the same transaction.
+func (r *Repository) CreateBootstrapPreviewWithReplay(ctx context.Context, scope tenancy.Scope, preview syncengine.BootstrapPreview) (syncengine.BootstrapPreview, bool, error) {
 	if err := r.validate(ctx, scope); err != nil {
-		return syncengine.BootstrapPreview{}, err
+		return syncengine.BootstrapPreview{}, false, err
 	}
 	if preview.Validate() != nil || preview.ConsumedAt != nil {
-		return syncengine.BootstrapPreview{}, syncengine.ErrInvalidRecord
+		return syncengine.BootstrapPreview{}, false, syncengine.ErrInvalidRecord
 	}
 	var out syncengine.BootstrapPreview
+	replayed := false
 	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `INSERT INTO connector_bootstrap_previews(id,organization_id,workspace_id,connector_account_id,account_version,policy_count,read_count,write_count,created_at,expires_at)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`, preview.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), preview.AccountID, preview.AccountVersion, preview.PolicyCount, preview.ReadCount, preview.WriteCount, preview.CreatedAt, preview.ExpiresAt)
@@ -41,12 +49,13 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`, preview.ID, scop
 		if err != nil {
 			return err
 		}
-		if inserted == 0 && !samePreview(out, preview) {
+		replayed = inserted == 0
+		if replayed && !samePreview(out, preview) {
 			return syncengine.ErrJobConflict
 		}
 		return nil
 	})
-	return out, err
+	return out, replayed, err
 }
 
 // HasCurrentBootstrapPreview reports whether the account has unexpired preview
@@ -69,17 +78,26 @@ func (r *Repository) HasCurrentBootstrapPreview(ctx context.Context, scope tenan
 // CreateInitialJob atomically consumes a current preview and creates one
 // durable initial-import job. The job ID is the caller's idempotency key.
 func (r *Repository) CreateInitialJob(ctx context.Context, scope tenancy.Scope, previewID, jobID string, at time.Time) (syncengine.SyncJob, error) {
+	result, _, err := r.CreateInitialJobWithReplay(ctx, scope, previewID, jobID, at)
+	return result, err
+}
+
+// CreateInitialJobWithReplay reports whether the existing result was reused,
+// so the caller can omit duplicate audit within the same transaction.
+func (r *Repository) CreateInitialJobWithReplay(ctx context.Context, scope tenancy.Scope, previewID, jobID string, at time.Time) (syncengine.SyncJob, bool, error) {
 	if err := r.validate(ctx, scope); err != nil {
-		return syncengine.SyncJob{}, err
+		return syncengine.SyncJob{}, false, err
 	}
 	if previewID == "" || jobID == "" || at.IsZero() || at.Location() != time.UTC {
-		return syncengine.SyncJob{}, syncengine.ErrInvalidRecord
+		return syncengine.SyncJob{}, false, syncengine.ErrInvalidRecord
 	}
 	var out syncengine.SyncJob
+	replayed := false
 	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
 		var err error
 		out, err = scanJob(tx.QueryRowContext(ctx, `SELECT `+jobColumns+` FROM connector_sync_jobs WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), jobID))
 		if err == nil {
+			replayed = true
 			if out.Kind != syncengine.SyncJobInitialImport || out.PreviewID != previewID {
 				return syncengine.ErrJobConflict
 			}
@@ -104,7 +122,7 @@ VALUES($1,$2,$3,$4,'initial_import','incremental','pending',$5,$6,$6,$6) RETURNI
 		_, err = tx.ExecContext(ctx, `UPDATE connector_bootstrap_previews SET consumed_at=$4 WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, scope.OrganizationID().String(), scope.WorkspaceID().String(), preview.ID, at)
 		return err
 	})
-	return out, err
+	return out, replayed, err
 }
 
 // PutAccountSchedule creates or optimistically replaces an account schedule.
@@ -325,6 +343,8 @@ func scanPreview(row scanner) (syncengine.BootstrapPreview, error) {
 		}
 		return v, err
 	}
+	v.CreatedAt, v.ExpiresAt = v.CreatedAt.UTC(), v.ExpiresAt.UTC()
+	v.ConsumedAt = utcOptionalTime(v.ConsumedAt)
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}
@@ -340,6 +360,8 @@ func scanSchedule(row scanner) (syncengine.AccountSchedule, error) {
 		return v, err
 	}
 	v.Mode = syncengine.ScheduleMode(mode)
+	v.CreatedAt, v.UpdatedAt = v.CreatedAt.UTC(), v.UpdatedAt.UTC()
+	v.NextRunAt, v.LastEnqueuedAt = utcOptionalTime(v.NextRunAt), utcOptionalTime(v.LastEnqueuedAt)
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}
@@ -357,11 +379,22 @@ func scanJob(row scanner) (syncengine.SyncJob, error) {
 	v.Kind = syncengine.SyncJobKind(kind)
 	v.Mode = syncengine.ScheduleMode(mode)
 	v.Status = syncengine.SyncJobStatus(status)
+	v.AvailableAt, v.CreatedAt, v.UpdatedAt = v.AvailableAt.UTC(), v.CreatedAt.UTC(), v.UpdatedAt.UTC()
+	v.StartedAt, v.CompletedAt = utcOptionalTime(v.StartedAt), utcOptionalTime(v.CompletedAt)
 	if v.Validate() != nil {
 		return v, syncengine.ErrInvalidRecord
 	}
 	return v, nil
 }
+
+func utcOptionalTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	utc := value.UTC()
+	return &utc
+}
+
 func samePreview(a, b syncengine.BootstrapPreview) bool {
 	return a.ID == b.ID && a.AccountID == b.AccountID && a.AccountVersion == b.AccountVersion && a.PolicyCount == b.PolicyCount && a.ReadCount == b.ReadCount && a.WriteCount == b.WriteCount
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/aiadvisory"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 )
 
 var ErrInvalid = errors.New("aiadvisoryrepo: invalid")
@@ -29,8 +30,13 @@ func New(db *sql.DB) (*Repository, error) {
 }
 
 func (r *Repository) withTx(ctx context.Context, readOnly bool, scope tenancy.Scope, fn func(*sql.Tx) error) error {
-	if !scope.Valid() {
-		return ErrInvalid
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.db); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
 	}
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: readOnly})
 	if err != nil {
@@ -217,7 +223,7 @@ func claimReceipt(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, operatio
 }
 
 func finishReceipt(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, operation, key, resourceID string) error {
-	result, err := tx.ExecContext(ctx, `UPDATE operation_receipts SET state='completed',resource_type='ai_provider_account',resource_id=$5,result=jsonb_build_object('account_id',$5),completed_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 AND state='pending'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, resourceID)
+	result, err := tx.ExecContext(ctx, `UPDATE operation_receipts SET state='completed',resource_type='ai_provider_account',resource_id=$5,result=jsonb_build_object('account_id',$5::text),completed_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 AND state='pending'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, resourceID)
 	if err != nil {
 		return err
 	}

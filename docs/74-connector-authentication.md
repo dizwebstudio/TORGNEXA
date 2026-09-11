@@ -24,6 +24,26 @@ stores the token bundle encrypted, and revokes both the client-registration and
 temporary state secrets. No client secret, verifier, access token, refresh
 token or provider response body is returned or logged.
 
+Account mutations and their authoritative audit now share one PostgreSQL
+transaction (ADR-0191). Enrollment includes encrypted material creation, binding
+and revocation of the old reference. A failed transaction preserves the old
+binding and leaves no new secret. This also covers status, capabilities,
+persisted health/history and bootstrap preview/job/schedule changes.
+
+OAuth start commits PKCE material, pending state and audit together; replay
+creates neither another secret nor duplicate audit. Callback claim and temporary
+material revocation commit with `connector.account.oauth_callback_claimed`
+before the remote exchange. Completion then commits the new bundle/binding,
+old reference revocation and audit together. An exchange failure commits only
+normalized health/history and `connector.account.oauth_failed`. Audit failure
+rolls back that local mutation and returns 500.
+
+After a successful claim, callback retries return 409 even if the exchange or
+completion failed. Start a fresh OAuth flow with a new idempotency key. A failure
+before claim commit leaves the state retryable. No database rollback can undo
+the remote exchange; previous local credentials remain bound on completion
+failure. Health probes and runtime refresh retain ADR-0104's separate boundary.
+
 Task 134 makes that encrypted bundle executable without exposing its storage
 shape to a connector. An account-aware host runtime supplies only the current
 access token through `SecretAccessor.UseSecret`. One minute before expiry, API
@@ -32,6 +52,14 @@ lock, re-reads the bundle and performs at most one refresh against the exact
 manifest token endpoint. The stable secret reference is rotated to one new
 immutable ciphertext version. A returned replacement refresh token is stored;
 if the provider omits it, the prior refresh token is preserved.
+
+ADR-0193 adds durable admission evidence before the non-rollbackable token
+endpoint call. `connector.oauth_refresh.requested` is deterministic for one
+tenant/account/connector/reference-version, so concurrent workers append one
+row. The row contains connector ID and numeric secret version, while the opaque
+reference, access/refresh tokens and provider payload stay absent. If evidence
+cannot be committed, the refresh is not attempted. The evidence records intent,
+while existing health state records a later provider or rotation failure.
 
 If refresh material is absent or revoked, health becomes
 `oauth_reauthorization_required`. Token endpoint or encrypted rotation failure

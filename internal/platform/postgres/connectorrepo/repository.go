@@ -12,6 +12,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 )
 
 const applyScopeStatement = `SELECT set_config('app.organization_id',$1,true), set_config('app.workspace_id',$2,true)`
@@ -379,6 +380,14 @@ func validateRepositoryCall(ctx context.Context, repository *Repository) error {
 }
 
 func (repository *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly bool, operation func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, repository.database); err != nil {
+		return err
+	} else if tx != nil {
+		return operation(tx)
+	}
 	tx, err := repository.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("connector account repository: begin: %w", err)

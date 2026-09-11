@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -53,7 +54,16 @@ func (store *tokenSecretStore) Revoke(context.Context, tenancy.Scope, secrets.Re
 	return secrets.Metadata{}, errors.New("unused")
 }
 
-type mutexRefreshCoordinator struct{ mu sync.Mutex }
+type mutexRefreshCoordinator struct {
+	mu        sync.Mutex
+	intent    RefreshIntent
+	intentErr error
+}
+
+func (coordinator *mutexRefreshCoordinator) RecordRefreshIntent(_ context.Context, _ tenancy.Scope, intent RefreshIntent) error {
+	coordinator.intent = intent
+	return coordinator.intentErr
+}
 
 func (coordinator *mutexRefreshCoordinator) WithRefreshLock(ctx context.Context, _ tenancy.Scope, _ secrets.Reference, operation func(context.Context) error) error {
 	coordinator.mu.Lock()
@@ -125,7 +135,8 @@ func TestTokenManagerSerializesRefreshAndRotatesBundleOnce(t *testing.T) {
 	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
 	account := oauthAccount(grantID(t, "authorization_code"))
 	store := tokenManagerStore(t, secrets.ClassOAuthRefresh, TokenBundle{AccessToken: "expired-access-token-123", RefreshToken: "old-refresh-token-123", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "secret"})
-	manager, err := NewTokenManager(store, &mutexRefreshCoordinator{})
+	coordinator := &mutexRefreshCoordinator{}
+	manager, err := NewTokenManager(store, coordinator)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,9 +169,30 @@ func TestTokenManagerSerializesRefreshAndRotatesBundleOnce(t *testing.T) {
 	if refreshes.Load() != 1 || store.rotated != 1 || store.metadata.CurrentVersion != 2 {
 		t.Fatalf("refreshes=%d rotations=%d version=%d", refreshes.Load(), store.rotated, store.metadata.CurrentVersion)
 	}
+	expectedRuntime := account.ConnectorID
+	if !coordinator.intent.Valid() || coordinator.intent.AccountID != account.ID || coordinator.intent.RuntimeID != expectedRuntime || coordinator.intent.SecretVersion != 1 || strings.Contains(coordinator.intent.ID, tokenManagerReference.String()) {
+		t.Fatalf("invalid refresh intent: %+v", coordinator.intent)
+	}
 	bundle, err := ParseTokenBundle(store.material)
 	if err != nil || bundle.RefreshToken != "rotated-refresh-token-123" {
 		t.Fatalf("rotated bundle invalid: %+v %v", bundle, err)
+	}
+}
+
+func TestTokenManagerDoesNotCallProviderWithoutDurableRefreshIntent(t *testing.T) {
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	store := tokenManagerStore(t, secrets.ClassOAuthRefresh, TokenBundle{AccessToken: "expired-access-token-123", RefreshToken: "old-refresh-token-123", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "secret"})
+	coordinator := &mutexRefreshCoordinator{intentErr: errors.New("synthetic evidence failure")}
+	manager, _ := NewTokenManager(store, coordinator)
+	manager.now = func() time.Time { return now }
+	called := false
+	manager.refresh = func(context.Context, sdk.OAuth2Configuration, TokenBundle, time.Duration, time.Time) ([]byte, error) {
+		called = true
+		return nil, nil
+	}
+	err := manager.Prepare(context.Background(), tokenManagerScope(t), oauthAccount(grantID(t, "authorization_code")))
+	if !errors.Is(err, ErrOAuthRefreshUnavailable) || called || store.rotated != 0 {
+		t.Fatalf("error=%v called=%v rotations=%d", err, called, store.rotated)
 	}
 }
 

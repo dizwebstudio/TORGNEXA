@@ -22,6 +22,10 @@ func (s *mcpAgentPolicyAuditStub) Capture(_ context.Context, _ tenancy.Scope, en
 	return audit.Record{}, nil
 }
 
+func (s *mcpAgentPolicyAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}
+
 type mcpAccountFinderStub struct {
 	accounts map[string]mcpaccounts.Account
 }
@@ -40,10 +44,11 @@ func (s *mcpAccountFinderStub) FindByID(_ context.Context, _ tenancy.Scope, id s
 // spending limit) is rejected here exactly as it would be in production.
 type fakeAgentPolicyStore struct {
 	installed map[string][]agentgovernance.Policy
+	receipts  map[string]agentgovernance.Policy
 }
 
 func newFakeAgentPolicyStore() *fakeAgentPolicyStore {
-	return &fakeAgentPolicyStore{installed: map[string][]agentgovernance.Policy{}}
+	return &fakeAgentPolicyStore{installed: map[string][]agentgovernance.Policy{}, receipts: map[string]agentgovernance.Policy{}}
 }
 
 func (s *fakeAgentPolicyStore) ResolveAgentPolicy(_ context.Context, _ tenancy.Scope, agent agentgovernance.Agent, at time.Time) (agentgovernance.Policy, error) {
@@ -66,6 +71,17 @@ func (s *fakeAgentPolicyStore) InstallPolicy(_ context.Context, _ tenancy.Scope,
 	return nil
 }
 
+func (s *fakeAgentPolicyStore) InstallPolicyGoverned(ctx context.Context, scope tenancy.Scope, policy agentgovernance.Policy, change agentgovernance.Change, key string, _ []byte) (agentgovernance.Policy, bool, error) {
+	if stored, ok := s.receipts[key]; ok {
+		return stored, true, nil
+	}
+	if err := s.InstallPolicy(ctx, scope, policy, change); err != nil {
+		return agentgovernance.Policy{}, false, err
+	}
+	s.receipts[key] = policy
+	return policy, false, nil
+}
+
 func (s *fakeAgentPolicyStore) LatestPolicyVersion(_ context.Context, _ tenancy.Scope, policyID string) (uint64, error) {
 	versions := s.installed[policyID]
 	if len(versions) == 0 {
@@ -78,6 +94,7 @@ type fakeAgentKillSwitchStore struct {
 	tenantDisabled bool
 	tenantVersion  uint64
 	changes        []agentgovernance.KillChange
+	receipts       map[string]agentgovernance.KillChange
 }
 
 func (s *fakeAgentKillSwitchStore) AgentKillState(context.Context, tenancy.Scope, agentgovernance.Agent) (agentgovernance.KillState, error) {
@@ -92,6 +109,20 @@ func (s *fakeAgentKillSwitchStore) RecordKillSwitch(_ context.Context, _ tenancy
 	s.tenantDisabled = change.Disabled
 	s.tenantVersion = change.Version
 	return nil
+}
+
+func (s *fakeAgentKillSwitchStore) RecordKillSwitchGoverned(ctx context.Context, scope tenancy.Scope, change agentgovernance.KillChange, key string, _ []byte) (agentgovernance.KillChange, bool, error) {
+	if s.receipts == nil {
+		s.receipts = map[string]agentgovernance.KillChange{}
+	}
+	if stored, ok := s.receipts[key]; ok {
+		return stored, true, nil
+	}
+	if err := s.RecordKillSwitch(ctx, scope, change); err != nil {
+		return agentgovernance.KillChange{}, false, err
+	}
+	s.receipts[key] = change
+	return change, false, nil
 }
 
 func testMCPAccount(id string) mcpaccounts.Account {
@@ -129,6 +160,7 @@ func TestInstallMCPAccountPolicyDerivesRulesFromGrantedPermissionsAndIncrementsV
 	for attempt := 1; attempt <= 2; attempt++ {
 		request := productionRequestContext(t, httptest.NewRequest(http.MethodPost, "/api/v1/settings/mcp-accounts/mcp_1:install-policy", strings.NewReader(body)))
 		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Idempotency-Key", "policy-install-"+strconv.Itoa(attempt))
 		response := httptest.NewRecorder()
 		installRoute.Handler.ServeHTTP(response, request)
 		if response.Code != http.StatusOK {
@@ -141,7 +173,20 @@ func TestInstallMCPAccountPolicyDerivesRulesFromGrantedPermissionsAndIncrementsV
 			t.Fatalf("attempt %d unexpected rule set: %s", attempt, response.Body.String())
 		}
 	}
-	if len(audit.actions) != 2 || audit.actions[0] != "mcp_agent_policy.install" {
+	replay := productionRequestContext(t, httptest.NewRequest(http.MethodPost, "/api/v1/settings/mcp-accounts/mcp_1:install-policy", strings.NewReader(body)))
+	replay.Header.Set("Content-Type", "application/json")
+	replay.Header.Set("Idempotency-Key", "policy-install-2")
+	replayResponse := httptest.NewRecorder()
+	installRoute.Handler.ServeHTTP(replayResponse, replay)
+	if replayResponse.Code != http.StatusOK || !strings.Contains(replayResponse.Body.String(), `"version":2`) || len(policies.receipts) != 2 || len(policies.installed) != 1 {
+		t.Fatalf("replay status=%d body=%s", replayResponse.Code, replayResponse.Body.String())
+	}
+	for _, versions := range policies.installed {
+		if len(versions) != 2 {
+			t.Fatalf("policy replay appended a version: %+v", policies.installed)
+		}
+	}
+	if len(audit.actions) != 2 || audit.actions[0] != "settings.mcp_agent_policy.installed" {
 		t.Fatalf("audit actions = %v", audit.actions)
 	}
 
@@ -165,6 +210,7 @@ func TestInstallMCPAccountPolicyRejectsSensitiveToolWithoutSpendingLimit(t *test
 
 	request := productionRequestContext(t, httptest.NewRequest(http.MethodPost, "/api/v1/settings/mcp-accounts/mcp_1:install-policy", strings.NewReader(`{}`)))
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "policy-invalid")
 	response := httptest.NewRecorder()
 	installRoute.Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest {
@@ -201,6 +247,7 @@ func TestMCPAgentKillSwitchTogglesTenantWideAndRequiresReason(t *testing.T) {
 
 	missingReason := productionRequestContext(t, httptest.NewRequest(http.MethodPost, MCPAgentKillSwitchPath, strings.NewReader(`{"disabled":true}`)))
 	missingReason.Header.Set("Content-Type", "application/json")
+	missingReason.Header.Set("Idempotency-Key", "kill-missing")
 	missingReasonResponse := httptest.NewRecorder()
 	setRoute.Handler.ServeHTTP(missingReasonResponse, missingReason)
 	if missingReasonResponse.Code != http.StatusBadRequest {
@@ -209,10 +256,19 @@ func TestMCPAgentKillSwitchTogglesTenantWideAndRequiresReason(t *testing.T) {
 
 	stop := productionRequestContext(t, httptest.NewRequest(http.MethodPost, MCPAgentKillSwitchPath, strings.NewReader(`{"disabled":true,"reason":"suspected prompt injection incident"}`)))
 	stop.Header.Set("Content-Type", "application/json")
+	stop.Header.Set("Idempotency-Key", "kill-stop")
 	stopResponse := httptest.NewRecorder()
 	setRoute.Handler.ServeHTTP(stopResponse, stop)
 	if stopResponse.Code != http.StatusOK || !strings.Contains(stopResponse.Body.String(), `"disabled":true`) {
 		t.Fatalf("stop status=%d body=%s", stopResponse.Code, stopResponse.Body.String())
+	}
+	replayStop := productionRequestContext(t, httptest.NewRequest(http.MethodPost, MCPAgentKillSwitchPath, strings.NewReader(`{"disabled":true,"reason":"suspected prompt injection incident"}`)))
+	replayStop.Header.Set("Content-Type", "application/json")
+	replayStop.Header.Set("Idempotency-Key", "kill-stop")
+	replayStopResponse := httptest.NewRecorder()
+	setRoute.Handler.ServeHTTP(replayStopResponse, replayStop)
+	if replayStopResponse.Code != http.StatusOK {
+		t.Fatalf("kill replay status=%d body=%s", replayStopResponse.Code, replayStopResponse.Body.String())
 	}
 
 	getRequest := productionRequestContext(t, httptest.NewRequest(http.MethodGet, MCPAgentKillSwitchPath, nil))

@@ -93,7 +93,7 @@ func TestA10RealtimeWriteFailuresStopStreaming(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			head := &a10AuditHead{scope: validTestScope(t)}
 			head.id.Store("synthetic-head")
-			ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), requestScopeKey{}, head.scope), time.Second)
+			ctx, cancel := context.WithTimeout(realtimeAuthorizedTestContext(t.Context(), head.scope), time.Second)
 			defer cancel()
 			w := &a10FailingStream{ResponseRecorder: httptest.NewRecorder(), deadlineFailureAt: tc.deadlineFail, writeFailure: tc.writeFail, flushFailure: tc.flushFail}
 			newRealtimeRoutes(head)[0].Handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, RealtimePath, nil).WithContext(ctx))
@@ -112,7 +112,7 @@ func TestA10RealtimeRequiresDeadlineSupport(t *testing.T) {
 		t.Run(map[bool]string{false: "unsupported", true: "control_error"}[supported], func(t *testing.T) {
 			head := &a10AuditHead{scope: validTestScope(t)}
 			head.id.Store("synthetic-head")
-			ctx := context.WithValue(t.Context(), requestScopeKey{}, head.scope)
+			ctx := realtimeAuthorizedTestContext(t.Context(), head.scope)
 			recorder := httptest.NewRecorder()
 			var w http.ResponseWriter = recorder
 			want := http.StatusNotImplemented
@@ -136,7 +136,7 @@ func TestRealtimeStreamIsMetadataOnlyAndTenantScoped(t *testing.T) {
 	now := time.Date(2026, 8, 18, 0, 0, 0, 0, time.UTC)
 	stub := realtimeAuditStub{rows: []audit.Record{{ID: "018f0000-0000-7000-8000-000000000003", OrganizationID: scope.OrganizationID(), WorkspaceID: scope.WorkspaceID(), ActorID: "user", Source: "api", Action: "orders.updated", ResourceType: "order", ResourceID: "secret-order-id", Risk: audit.RiskRead, Summary: audit.Summary{"pii": "must-not-stream"}, CreatedAt: now}}}
 	route := newRealtimeRoutes(stub)[0]
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	ctx, cancel := context.WithCancel(realtimeAuthorizedTestContext(context.Background(), scope))
 	req := httptest.NewRequest(http.MethodGet, RealtimePath, nil).WithContext(ctx)
 	rec := &cancellingRecorder{ResponseRecorder: httptest.NewRecorder(), cancel: cancel}
 	route.Handler.ServeHTTP(rec, req)
@@ -159,7 +159,7 @@ func TestRealtimeStreamUsesLatestIDFastPath(t *testing.T) {
 	}
 	stub := &realtimeLatestAuditStub{latest: "018f0000-0000-7000-8000-000000000003"}
 	route := newRealtimeRoutes(stub)[0]
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), requestScopeKey{}, scope))
+	ctx, cancel := context.WithCancel(realtimeAuthorizedTestContext(context.Background(), scope))
 	defer cancel()
 	rec := &cancellingRecorder{ResponseRecorder: httptest.NewRecorder(), cancel: cancel}
 	route.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, RealtimePath, nil).WithContext(ctx))

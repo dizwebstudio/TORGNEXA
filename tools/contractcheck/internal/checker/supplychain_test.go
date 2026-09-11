@@ -929,6 +929,10 @@ func TestTask093CommunityImageRepositoriesAreExplicitlyApproved(t *testing.T) {
 		"node:22.16.0-alpine3.21@sha256:" + testDigestD,
 		"dxflrs/garage:v2.3.0@sha256:" + testDigestB,
 		"quay.io/keycloak/keycloak:26.7.0@sha256:" + testDigestC,
+		"ghcr.io/dizwebstudio/torgnexa-kafka:v0.21.14-build.34063412327.1@sha256:" + testDigestA,
+		"ghcr.io/dizwebstudio/torgnexa-keycloak:v0.21.14-build.34063412327.1@sha256:" + testDigestB,
+		"ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34063412327.1@sha256:" + testDigestC,
+		"ghcr.io/dizwebstudio/torgnexa-valkey:v0.21.14-build.34063412327.1@sha256:" + testDigestD,
 	}
 	for _, ref := range refs {
 		if err := validateImmutableImage(ref); err != nil {

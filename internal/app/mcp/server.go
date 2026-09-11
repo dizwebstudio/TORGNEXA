@@ -152,7 +152,7 @@ type Dependencies struct {
 	EcosystemReader             EcosystemReader
 	AllowedOrigins              []string
 	Edge                        securityedge.Config
-	Limiter                     *securityedge.Limiter
+	Limiter                     securityedge.Limiter
 }
 
 type Server struct {
@@ -172,7 +172,7 @@ type Server struct {
 	customerService       CustomerServiceReader
 	ecosystem             EcosystemReader
 	edge                  securityedge.Config
-	limiter               *securityedge.Limiter
+	limiter               securityedge.Limiter
 }
 
 func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
@@ -189,7 +189,7 @@ func NewServer(logger *slog.Logger, deps Dependencies) (*Server, error) {
 	}
 	edge := deps.Edge
 	if edge.MaxRequestBytes == 0 {
-		edge = securityedge.Config{AllowedOrigins: origins, MaxRequestBytes: maxRequestBytes, MaxUploadBytes: maxRequestBytes, RatePerMinute: 600, HSTSSeconds: 31536000}
+		edge = securityedge.Config{AllowedOrigins: origins, MaxRequestBytes: maxRequestBytes, MaxUploadBytes: maxRequestBytes, PreAuthRatePerMinute: 600, RatePerMinute: 600, HSTSSeconds: 31536000}
 	}
 	if len(edge.AllowedOrigins) == 0 {
 		edge.AllowedOrigins = origins
@@ -395,13 +395,15 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		writeRPCError(w, http.StatusBadRequest, json.RawMessage("null"), -32000, "Bad Request", nil)
 		return
 	}
-	if edgeErr = s.limiter.Allow(clientIP.String(), s.edge); edgeErr != nil {
+	decision, edgeErr := s.limiter.Allow(r.Context(), securityedge.Limit{Name: "mcp_pre_auth_ip", Key: clientIP.String(), Max: s.edge.PreAuthRatePerMinute, Window: time.Minute})
+	if edgeErr != nil {
 		if errors.Is(edgeErr, securityedge.ErrRateLimited) {
-			w.Header().Set("Retry-After", "60")
+			w.Header().Set("Retry-After", retryAfterSeconds(decision.RetryAfter))
 			writeRPCError(w, http.StatusTooManyRequests, json.RawMessage("null"), -32000, "Too Many Requests", nil)
 			return
 		}
-		writeRPCError(w, http.StatusBadRequest, json.RawMessage("null"), -32000, "Bad Request", nil)
+		w.Header().Set("Retry-After", "1")
+		writeRPCError(w, http.StatusServiceUnavailable, json.RawMessage("null"), -32000, "Service Unavailable", nil)
 		return
 	}
 	if r.URL.Path != EndpointPath {
@@ -471,6 +473,14 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeRPCError(w, http.StatusNotFound, request.ID, -32601, "Method not found", nil)
 	}
+}
+
+func retryAfterSeconds(duration time.Duration) string {
+	seconds := int64((duration + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	return strconv.FormatInt(seconds, 10)
 }
 
 func (s *Server) discover(w http.ResponseWriter, id json.RawMessage, identity Identity) {
@@ -844,7 +854,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("mcp agent governance service: %w", err)
 	}
-	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
+	edge := securityedge.Config{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, AdminCIDRs: cfg.Security.AdminCIDRs, AllowedOrigins: cfg.Security.AllowedOrigins, MaxRequestBytes: cfg.Security.MaxRequestBytes, MaxUploadBytes: cfg.Security.MaxUploadBytes, PreAuthRatePerMinute: cfg.Security.PreAuthRatePerMinute, RatePerMinute: cfg.Security.RatePerMinute, HSTSSeconds: cfg.Security.HSTSSeconds}
 	server, err := NewServer(logger, Dependencies{IdentityResolver: PostgresIdentityResolver{Accounts: mcpAccounts}, Authorizer: ExactPermissionAuthorizer{}, Governor: governanceService, Auditor: auditService, ListingPreviewer: localListingPreviewer{}, CatalogBulkPreviewer: localCatalogBulkPreviewer{}, GrowthPreviewer: localGrowthPreviewer{}, ReadinessReader: localReadinessReader{}, EcosystemReader: localEcosystemReader{}, FinancialCompletenessReader: postgresFinancialCompletenessReader{repository: financialCompletenessRepository}, CustomerServiceReader: postgresCustomerServiceReader{repository: customerServiceRepository}, Edge: edge, Limiter: securityedge.NewLimiter()})
 	if err != nil {
 		return err

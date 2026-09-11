@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -208,7 +209,7 @@ func TestConnectorOAuthStartIsIdempotentAndCallbackIsOneTime(t *testing.T) {
 	if replayed.Code != http.StatusConflict || exchanges != 1 {
 		t.Fatalf("replay status=%d exchanges=%d body=%s", replayed.Code, exchanges, replayed.Body.String())
 	}
-	if len(auditor.actions) != 3 || auditor.actions[0] != "connector.account.oauth_started" || auditor.actions[2] != "connector.account.oauth_completed" {
+	if len(auditor.actions) != 3 || auditor.actions[0] != "connector.account.oauth_started" || auditor.actions[1] != "connector.account.oauth_callback_claimed" || auditor.actions[2] != "connector.account.oauth_completed" {
 		t.Fatalf("audit actions=%v", auditor.actions)
 	}
 }
@@ -227,4 +228,13 @@ func TestOAuthPreparationClassifiesSafeHealthReasons(t *testing.T) {
 
 func (stub *oauthAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
 	return operation(ctx)
+}
+
+func (stub *oauthSecretsStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	values, classes, revoked, next := maps.Clone(stub.values), maps.Clone(stub.classes), maps.Clone(stub.revoked), stub.next
+	if err := operation(ctx); err != nil {
+		stub.values, stub.classes, stub.revoked, stub.next = values, classes, revoked, next
+		return err
+	}
+	return nil
 }

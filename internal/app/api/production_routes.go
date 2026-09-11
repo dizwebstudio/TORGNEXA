@@ -138,7 +138,7 @@ type productionRouteDependencies struct {
 
 func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	capabilityGuard := connectorAccountCapabilityGuard{repository: deps.accounts, runtime: deps.aiRegistry}
-	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
+	routes := append(newConnectorAccountRoutes(deps.accounts, deps.connectorConfigs, deps.auditService, deps.secretProvider, deps.oauthRefresh, deps.connectorCallbacks, deps.aiRegistry, connectorManualSync{policies: deps.syncPolicies, runs: deps.reconciliations, guard: capabilityGuard, audit: deps.auditService, previews: deps.syncPolicies}), newWorkspaceSettingsRoutes(deps.tenancy, deps.auditService)...)
 	routes = append(routes, newConnectorBootstrapRoutes(deps.accounts, deps.syncPolicies, capabilityGuard, deps.auditService)...)
 	routes = append(routes, newIntegrationCenterRoutes(deps.integrationCenter)...)
 	routes = append(routes, newConnectorReadinessRoutes()...)
@@ -177,7 +177,7 @@ func newProductionRoutes(deps productionRouteDependencies) []ProtectedRoute {
 	routes = append(routes, newFinancialCompletenessRoutes(deps.financialCompleteness, deps.auditService)...)
 	routes = append(routes, newAdvertisingRoutes(deps.advertising)...)
 	routes = append(routes, newReportRoutes(deps.reports)...)
-	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, capabilityGuard)...)
+	routes = append(routes, newSyncRoutes(deps.syncPolicies, deps.reconciliations, deps.auditService, capabilityGuard)...)
 	routes = append(routes, newLineageRoutes(deps.lineage)...)
 	routes = append(routes, newLegalPartyRoutes(deps.legalParties, deps.legalPartyWriter)...)
 	routes = append(routes, newCounterpartyWriteRoutes(deps.counterpartyWriter)...)

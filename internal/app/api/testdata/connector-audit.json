@@ -1,0 +1,6 @@
+{
+  "probe_connector": "telegram",
+  "probe_family": "social",
+  "oauth_connector": "avito",
+  "oauth_family": "classified"
+}

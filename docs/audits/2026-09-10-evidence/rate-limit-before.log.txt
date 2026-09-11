@@ -1,0 +1,5 @@
+--- FAIL: TestRateLimitReplicasShareBudget (0.00s)
+    security_composition_test.go:390: replica multiplication bypassed the shared budget: status=204
+FAIL
+FAIL	github.com/torgnexa/torgnexa/internal/app/api	0.031s
+FAIL

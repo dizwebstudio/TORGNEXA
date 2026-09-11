@@ -8,6 +8,15 @@ After UserInfo validates a bearer token, the API derives SHA-256 references from
 
 Revocation is application-enforced: the session row becomes `revoked` and subsequent requests using that OIDC session receive `401`. The same transaction appends `settings.security.session_revoked` audit evidence with actor and correlation ID. Provider-wide logout is intentionally delegated to the Keycloak account console.
 
+Already-open SSE streams repeat OIDC/session, membership and permission checks
+every 15 seconds, with a five-second total timeout. Revocation, member disable
+or inability to verify access cancels the stream; a write already underway
+retains its bounded deadline. Original token expiry independently cancels the
+context and caps frame writes. Rechecks cannot reactivate revoked sessions or
+duplicate first-login evidence. This is bounded periodic enforcement, not an
+instantaneous logout of every network connection. See
+[ADR-0190](../adr/0190-continuous-sse-authorization.md).
+
 The login timeline means “first observed by TORGNEXA after successful OIDC validation”; it is not presented as a complete Keycloak authentication history. Runtime configuration is shown as `configured`, while provider health is explicitly `not_verified` until a separate external probe has run.
 
 ADR-0188 makes first observation safe when several requests register the same
@@ -24,6 +33,30 @@ handlers do not run on either failure. This distinction covers session storage;
 provider errors and membership resolution keep their existing handling.
 No migration or session-history rewrite is needed. See
 [ADR-0188](../adr/0188-concurrent-oidc-session-observation.md).
+
+## Privileged mutation audit inventory
+
+Task 234.3 completed the Settings inventory in ADR-0193. Member invitation and
+role/status, workspace metadata, current/member profile, avatar removal,
+identity-provider revisions/actions and session revocation commit with their
+authoritative audit through the tenant/pool-bound transaction introduced by
+ADR-0184. Connector accounts, runtime configuration, OAuth local state and
+bootstrap controls use the same guarantee through ADR-0191.
+
+AI egress policy and connector replay already commit immutable
+`security_evidence` with their operation receipts. MCP and AI provider accounts
+now commit governed evidence and the Settings audit in one transaction. MCP
+agent policy and tenant kill-switch revisions now require an idempotency key and
+commit the immutable revision, receipt and audit together. Manual sync and
+reconciliation dispatch commit deterministic run rows with audit; exact retries
+append neither. Audit failures return 500 and roll back every local business
+row. Summaries contain bounded field names, versions, state and internal IDs;
+email, raw OIDC subject and credentials are excluded.
+
+OAuth worker refresh is the one non-rollbackable remote boundary. It commits a
+minimized deterministic `connector.oauth_refresh.requested` intent before the
+provider call and fails closed when that evidence cannot be stored. See
+[ADR-0193](../adr/0193-atomic-privileged-dispatch-and-refresh-intent.md).
 
 ## Invitation ownership
 
@@ -47,7 +80,8 @@ bindings are not automatically revoked: review prior suspicious acceptances and
 use governed member disable/session revocation when warranted. Details and
 compatibility: [ADR-0187](../adr/0187-verified-email-invitation-binding.md).
 
-`./scripts/check-audit-postgres.sh` runs A02 ownership/replay and A09 concurrent
+`./scripts/check-audit-postgres.sh` runs Task 234.3 settings/dispatch/refresh
+failure and replay cases, A02 ownership/replay and A09 concurrent
 session registration/revocation scenarios with local synthetic TLS UserInfo and
 disposable PostgreSQL alongside A03–A08. A09 uses two independent application
 pools and deterministic database barriers to exercise the conflicting requests.

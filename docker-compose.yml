@@ -330,6 +330,13 @@ services:
     environment:
       <<: *app-env
       TORGNEXA_HTTP_ADDR: 0.0.0.0:8080
+      TORGNEXA_SECURITY_PRE_AUTH_RATE_PER_MINUTE: "6000"
+      TORGNEXA_SECURITY_RATE_LIMIT_BACKEND: valkey
+      TORGNEXA_SECURITY_RATE_LIMIT_NAMESPACE: torgnexa:community:edge:v1
+      TORGNEXA_SECURITY_RATE_LIMIT_MAX_KEYS: "100000"
+      TORGNEXA_VALKEY_CONNECT_TIMEOUT: 1s
+      TORGNEXA_VALKEY_REQUEST_TIMEOUT: 250ms
+      TORGNEXA_VALKEY_MAX_CONNECTIONS: "32"
     depends_on:
       app-db-role:
         condition: service_completed_successfully

@@ -97,3 +97,15 @@ func TestEnabledScheduleRequiresCurrentPreview(t *testing.T) {
 		t.Fatalf("status=%d schedule=%+v body=%s", response.Code, store.schedule, response.Body.String())
 	}
 }
+
+func (s *bootstrapAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}
+func (s *bootstrapStoreStub) CreateBootstrapPreviewWithReplay(ctx context.Context, scope tenancy.Scope, value syncengine.BootstrapPreview) (syncengine.BootstrapPreview, bool, error) {
+	result, err := s.CreateBootstrapPreview(ctx, scope, value)
+	return result, false, err
+}
+func (s *bootstrapStoreStub) CreateInitialJobWithReplay(ctx context.Context, scope tenancy.Scope, previewID, jobID string, at time.Time) (syncengine.SyncJob, bool, error) {
+	result, err := s.CreateInitialJob(ctx, scope, previewID, jobID, at)
+	return result, false, err
+}

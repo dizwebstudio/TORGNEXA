@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 )
@@ -46,7 +47,10 @@ func (s *syncPolicyReaderStub) UpdatePolicy(_ context.Context, scope tenancy.Sco
 	return syncengine.Policy{ID: command.ID, ConnectorAccountID: "cabinet-1", EntityType: "orders", Direction: command.Direction, SourceOfTruth: command.SourceOfTruth, Enabled: command.Enabled, Version: command.ExpectedVersion + 1, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, nil
 }
 
-type reconciliationReaderStub struct{ scope tenancy.Scope }
+type reconciliationReaderStub struct {
+	scope tenancy.Scope
+	run   reconciliation.Run
+}
 
 func (s *reconciliationReaderStub) ListRuns(_ context.Context, scope tenancy.Scope, _ int) ([]reconciliation.Run, error) {
 	s.scope = scope
@@ -59,6 +63,17 @@ func (s *reconciliationReaderStub) ListRecentDrifts(_ context.Context, scope ten
 func (s *reconciliationReaderStub) CreateRun(_ context.Context, scope tenancy.Scope, run reconciliation.Run) (reconciliation.Run, error) {
 	s.scope = scope
 	return run, nil
+}
+func (s *reconciliationReaderStub) CreateRunWithReplay(_ context.Context, scope tenancy.Scope, run reconciliation.Run) (reconciliation.Run, bool, error) {
+	s.scope = scope
+	if s.run.ID != "" {
+		if s.run.ID != run.ID || s.run.PolicyID != run.PolicyID || s.run.Mode != run.Mode {
+			return reconciliation.Run{}, false, reconciliation.ErrConflict
+		}
+		return s.run, true, nil
+	}
+	s.run = run
+	return run, false, nil
 }
 func (s *reconciliationReaderStub) Run(_ context.Context, scope tenancy.Scope, id string) (reconciliation.Run, error) {
 	s.scope = scope
@@ -78,12 +93,29 @@ func (s *reconciliationReaderStub) RecordAction(_ context.Context, scope tenancy
 	return nil
 }
 
+type syncAuditStub struct {
+	entries []audit.Entry
+	err     error
+}
+
+func (s *syncAuditStub) Capture(_ context.Context, _ tenancy.Scope, entry audit.Entry) (audit.Record, error) {
+	if s.err != nil {
+		return audit.Record{}, s.err
+	}
+	s.entries = append(s.entries, entry)
+	return audit.Record{}, nil
+}
+
+func (s *syncAuditStub) WithinTransaction(ctx context.Context, _ tenancy.Scope, operation func(context.Context) error) error {
+	return operation(ctx)
+}
+
 func TestSyncStatusUsesAuthorizedScopeAndSummarizesState(t *testing.T) {
 	scope := validTestScope(t)
 	policies := &syncPolicyReaderStub{}
 	reconciliations := &reconciliationReaderStub{}
 	var route ProtectedRoute
-	for _, candidate := range newSyncRoutes(policies, reconciliations) {
+	for _, candidate := range newSyncRoutes(policies, reconciliations, nil) {
 		if candidate.Method == http.MethodGet && candidate.Path == SyncStatusPath {
 			route = candidate
 			break
@@ -106,7 +138,7 @@ func TestSyncPolicyCanBeUpdated(t *testing.T) {
 	request.Header.Set("Idempotency-Key", "update-policy-1")
 	request = request.WithContext(context.WithValue(request.Context(), requestScopeKey{}, scope))
 	response := httptest.NewRecorder()
-	newSyncRoutes(policies, reconciliations)[1].Handler.ServeHTTP(response, request)
+	newSyncRoutes(policies, reconciliations, nil)[1].Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"enabled":false`) || !strings.Contains(response.Body.String(), `"version":2`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -121,7 +153,7 @@ func TestSyncPolicyCreationFailsClosedWithoutAccountCapability(t *testing.T) {
 	request.Header.Set("Idempotency-Key", "policy-denied")
 	request = request.WithContext(context.WithValue(request.Context(), requestScopeKey{}, scope))
 	response := httptest.NewRecorder()
-	newSyncRoutes(policies, reconciliations, guard)[0].Handler.ServeHTTP(response, request)
+	newSyncRoutes(policies, reconciliations, nil, guard)[0].Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnprocessableEntity || guard.calls != 1 || policies.created {
 		t.Fatalf("status=%d guard_calls=%d created=%v body=%s", response.Code, guard.calls, policies.created, response.Body.String())
 	}
@@ -135,8 +167,29 @@ func TestOpenDriftCanBeIgnored(t *testing.T) {
 	request.Header.Set("Idempotency-Key", "ignore-drift-1")
 	request = request.WithContext(context.WithValue(request.Context(), requestScopeKey{}, scope))
 	response := httptest.NewRecorder()
-	newSyncRoutes(policies, reconciliations)[3].Handler.ServeHTTP(response, request)
+	newSyncRoutes(policies, reconciliations, nil)[3].Handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"status":"ignored"`) || !strings.Contains(response.Body.String(), `"version":2`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestManualSyncRunIsIdempotentAndAudited(t *testing.T) {
+	scope := validTestScope(t)
+	policies, reconciliations, auditor := &syncPolicyReaderStub{}, &reconciliationReaderStub{}, &syncAuditStub{}
+	send := func() *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, SyncPoliciesPath+"/policy-1/run", nil)
+		request.Header.Set("Idempotency-Key", "run-policy-1")
+		ctx := context.WithValue(request.Context(), requestScopeKey{}, scope)
+		ctx = context.WithValue(ctx, requestIdentityKey{}, Principal{Issuer: "https://id.example.test", Subject: "user|opaque"})
+		response := httptest.NewRecorder()
+		newSyncRoutes(policies, reconciliations, auditor)[2].Handler.ServeHTTP(response, request.WithContext(ctx))
+		return response
+	}
+	first, second := send(), send()
+	if first.Code != http.StatusAccepted || second.Code != http.StatusAccepted || len(auditor.entries) != 1 {
+		t.Fatalf("first=%d second=%d audit=%d", first.Code, second.Code, len(auditor.entries))
+	}
+	if auditor.entries[0].ActorID == "user|opaque" || auditor.entries[0].Risk != audit.RiskWriteSensitive {
+		t.Fatalf("unsafe audit entry: %+v", auditor.entries[0])
 	}
 }

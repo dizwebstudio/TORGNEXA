@@ -104,6 +104,17 @@ failure ends the handler. Ordinary API timeouts remain unchanged. See
 behavior, coalescing and logout in isolated Chrome with synthetic transports;
 Go `TestA10*` tests separately exercise real HTTP/1.1 and HTTP/2 servers.
 
+Open streams repeat authentication, canonical tenant resolution and the route's
+permission check every 15 seconds with a five-second total check timeout.
+Denial or unavailable checks close the stream; any in-progress write keeps its
+bounded deadline. The original token expiry independently cancels the stream
+and caps every frame deadline, including blocked writes. A connection cannot
+switch identity, session, tenant or expiry. Reconnection passes the usual
+authorization checks; after streaming starts, access failure sends no JSON or
+authentication event. This bounds stale access without promising instantaneous
+revocation. See [ADR-0190](../adr/0190-continuous-sse-authorization.md) and the
+[HTTP/PostgreSQL regression evidence](audits/2026-09-10-sse-authorization-fix.md).
+
 `/incidents` composes warehouse incidents, open reconciliation drift, degraded connector accounts and pending approvals into one triage surface. `/catalog/{id}` and `/orders/{id}` are durable route-controlled drawers; incident rows also receive bookmarkable routes. `Ctrl/Cmd+K` sends product/order searches to server endpoints rather than searching a fixed browser sample.
 
 Reports use the dependency-free `AnalyticsChart` SVG primitive with 7/30/90-day presets, KPI summaries and accessible point labels. Dashboard order/GMV cards use the replay-safe reporting projection when the caller has `reports.read`; they no longer total the first 100 orders.

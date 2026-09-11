@@ -1,0 +1,92 @@
+=== RUN   TestRealtimeAuthorizationUsesFreshContextAndOriginalPermission
+--- PASS: TestRealtimeAuthorizationUsesFreshContextAndOriginalPermission (0.00s)
+=== RUN   TestRealtimeAuthorizationBoundsBlockedWriteAtExpiry
+--- PASS: TestRealtimeAuthorizationBoundsBlockedWriteAtExpiry (0.50s)
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/unchanged
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/fresh_permitted_role
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/issuer
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/subject
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/session
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/subject_reference
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/extended_expiry
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/expired
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/workspace
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/session_revoked
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/session_store_unavailable
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/member_disabled
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/membership_store_failure
+=== RUN   TestRealtimeAuthorizationRechecksBindingAndPermission/permission_removed
+--- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/unchanged (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/fresh_permitted_role (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/issuer (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/subject (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/session (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/subject_reference (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/extended_expiry (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/expired (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/workspace (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/session_revoked (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/session_store_unavailable (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/member_disabled (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/membership_store_failure (0.00s)
+    --- PASS: TestRealtimeAuthorizationRechecksBindingAndPermission/permission_removed (0.00s)
+=== RUN   TestRealtimeAuthorizationExpiryIsPrivateAndRequired
+--- PASS: TestRealtimeAuthorizationExpiryIsPrivateAndRequired (0.00s)
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/expiry_http1
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/expiry_http2
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/provider_error
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/check_timeout
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/late_success
+=== RUN   TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/cancel_during_check
+--- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP (1.15s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/expiry_http1 (0.30s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/expiry_http2 (0.30s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/provider_error (0.09s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/check_timeout (0.19s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/late_success (0.19s)
+    --- PASS: TestRealtimeAuthorizationExpiryAndUnavailableCloseHTTP/cancel_during_check (0.09s)
+=== RUN   TestRealtimeAuthorizationClosesDeniedStream
+--- PASS: TestRealtimeAuthorizationClosesDeniedStream (0.05s)
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=false
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=true
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/unauthenticated
+=== RUN   TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/forbidden
+--- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization (0.42s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=false (0.21s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/http2=true (0.21s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/unauthenticated (0.00s)
+    --- PASS: TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization/forbidden (0.00s)
+=== RUN   TestA10RealtimeSlowClientReleasesHandler
+--- PASS: TestA10RealtimeSlowClientReleasesHandler (0.12s)
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect/http1
+=== RUN   TestA10RealtimeHTTPDeadlineAndReconnect/http2
+--- PASS: TestA10RealtimeHTTPDeadlineAndReconnect (1.27s)
+    --- PASS: TestA10RealtimeHTTPDeadlineAndReconnect/http1 (0.64s)
+    --- PASS: TestA10RealtimeHTTPDeadlineAndReconnect/http2 (0.63s)
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/frame_deadline
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/write
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/flush
+=== RUN   TestA10RealtimeWriteFailuresStopStreaming/idle_deadline_clear
+--- PASS: TestA10RealtimeWriteFailuresStopStreaming (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/frame_deadline (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/write (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/flush (0.00s)
+    --- PASS: TestA10RealtimeWriteFailuresStopStreaming/idle_deadline_clear (0.00s)
+=== RUN   TestA10RealtimeRequiresDeadlineSupport
+=== RUN   TestA10RealtimeRequiresDeadlineSupport/unsupported
+=== RUN   TestA10RealtimeRequiresDeadlineSupport/control_error
+--- PASS: TestA10RealtimeRequiresDeadlineSupport (0.00s)
+    --- PASS: TestA10RealtimeRequiresDeadlineSupport/unsupported (0.00s)
+    --- PASS: TestA10RealtimeRequiresDeadlineSupport/control_error (0.00s)
+=== RUN   TestRealtimeStreamIsMetadataOnlyAndTenantScoped
+--- PASS: TestRealtimeStreamIsMetadataOnlyAndTenantScoped (0.00s)
+=== RUN   TestRealtimeStreamUsesLatestIDFastPath
+--- PASS: TestRealtimeStreamUsesLatestIDFastPath (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	4.664s

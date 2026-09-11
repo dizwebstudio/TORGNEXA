@@ -8,6 +8,7 @@ import (
 	sdk "github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -140,5 +141,53 @@ func TestA08PostgresRefreshRollbackAndCancellation(t *testing.T) {
 	}
 	if err := repo.WithRefreshLock(ctx, scope, metadata.Reference, func(context.Context) error { return nil }); err != nil {
 		t.Fatal("lock leaked", err)
+	}
+}
+
+func TestConnectorAuditPostgresRefreshIntentPrecedesRemoteEffect(t *testing.T) {
+	ctx, db, admin, scope := auditPostgres(t)
+	repo, _ := secretrepo.New(db)
+	keys, _ := secrets.NewStaticKeyring("synthetic", map[string][]byte{"synthetic": make([]byte, 32)})
+	provider, _ := secrets.NewLocalEncryptedProvider(repo, keys)
+	now := time.Now().UTC()
+	raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"})
+	metadata, err := provider.Create(ctx, scope, secrets.ClassOAuthRefresh, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := oauthAccount(grantID(t, "authorization_code"))
+	account.SecretReference = sdk.SecretReference(metadata.Reference)
+	manager, _ := NewTokenManager(provider, repo)
+	manager.now = func() time.Time { return now }
+	var calls atomic.Int64
+	manager.refresh = func(_ context.Context, _ sdk.OAuth2Configuration, current TokenBundle, _ time.Duration, at time.Time) ([]byte, error) {
+		calls.Add(1)
+		return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+	}
+	_, err = admin.ExecContext(ctx, `CREATE FUNCTION fail_oauth_refresh_intent() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''synthetic refresh evidence failure''; END'; CREATE TRIGGER fail_oauth_refresh_intent BEFORE INSERT ON security_evidence FOR EACH ROW WHEN (NEW.evidence_type='connector.oauth_refresh.requested') EXECUTE FUNCTION fail_oauth_refresh_intent()`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = manager.Prepare(ctx, scope, account); !errors.Is(err, ErrOAuthRefreshUnavailable) || calls.Load() != 0 {
+		t.Fatalf("refresh escaped missing intent: error=%v calls=%d", err, calls.Load())
+	}
+	stored, err := provider.Describe(ctx, scope, metadata.Reference)
+	if err != nil || stored.CurrentVersion != 1 {
+		t.Fatalf("failed intent changed secret: version=%d error=%v", stored.CurrentVersion, err)
+	}
+	if _, err = admin.ExecContext(ctx, `DROP TRIGGER fail_oauth_refresh_intent ON security_evidence; DROP FUNCTION fail_oauth_refresh_intent()`); err != nil {
+		t.Fatal(err)
+	}
+	if err = manager.Prepare(ctx, scope, account); err != nil || calls.Load() != 1 {
+		t.Fatalf("retry failed: error=%v calls=%d", err, calls.Load())
+	}
+	var count int
+	var summary string
+	if err = admin.QueryRowContext(ctx, `SELECT count(*),COALESCE(min(summary::text),'') FROM security_evidence WHERE organization_id=$1 AND workspace_id=$2 AND evidence_type='connector.oauth_refresh.requested'`, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&count, &summary); err != nil {
+		t.Fatal(err)
+	}
+	expectedRuntime := account.ConnectorID
+	if count != 1 || strings.Contains(summary, metadata.Reference.String()) || strings.Contains(summary, "synthetic-old-refresh") || !strings.Contains(summary, expectedRuntime) {
+		t.Fatalf("unsafe or missing refresh evidence: count=%d summary=%s", count, summary)
 	}
 }

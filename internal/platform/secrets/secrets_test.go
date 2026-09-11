@@ -21,6 +21,25 @@ const (
 	otherWS  = "018f0e8b-8a58-7f42-8c2d-5c2f9b1b0002"
 )
 
+func TestLocalEncryptedProviderRejectsNontransactionalRepository(t *testing.T) {
+	keyring, err := NewStaticKeyring("synthetic", map[string][]byte{"synthetic": bytes.Repeat([]byte{0x42}, 32)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := NewLocalEncryptedProvider(newMemoryRepository(), keyring)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	err = provider.WithinTransaction(t.Context(), mustScope(t, testOrg, testWS), func(context.Context) error {
+		called = true
+		return nil
+	})
+	if !errors.Is(err, ErrTransactionUnavailable) || called {
+		t.Fatal("unsupported repository allowed an unaudited lifecycle mutation", err)
+	}
+}
+
 func TestLocalEncryptedProviderLifecycle(t *testing.T) {
 	t.Parallel()
 	scope := mustScope(t, testOrg, testWS)

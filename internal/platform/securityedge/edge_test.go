@@ -1,13 +1,17 @@
 package securityedge
 
 import (
+	"context"
+	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func cfg() Config {
-	return Config{TrustedProxyCIDRs: []string{"10.0.0.0/8"}, AdminCIDRs: []string{"10.10.0.0/16"}, AllowedOrigins: []string{"https://app.example"}, MaxRequestBytes: 11 << 30, MaxUploadBytes: 10 << 30, RatePerMinute: 2, HSTSSeconds: 31536000}
+	return Config{TrustedProxyCIDRs: []string{"10.0.0.0/8"}, AdminCIDRs: []string{"10.10.0.0/16"}, AllowedOrigins: []string{"https://app.example"}, MaxRequestBytes: 11 << 30, MaxUploadBytes: 10 << 30, PreAuthRatePerMinute: 20, RatePerMinute: 2, HSTSSeconds: 31536000}
 }
 func TestSpoofedForwardedHeadersRejected(t *testing.T) {
 	if _, e := ClientIP("203.0.113.5:1234", "198.51.100.1", cfg()); e != ErrSpoofedForwarding {
@@ -31,8 +35,15 @@ func TestHeadersCSRFAndLimits(t *testing.T) {
 		t.Fatal("cross-origin state change allowed")
 	}
 	l := NewLimiter()
-	l.Now = func() time.Time { return time.Date(2026, 8, 12, 1, 0, 0, 0, time.UTC) }
-	if l.Allow("tenant/ip", c) != nil || l.Allow("tenant/ip", c) != nil || l.Allow("tenant/ip", c) != ErrRateLimited {
+	l.now = func() time.Time { return time.Date(2026, 8, 12, 1, 0, 0, 0, time.UTC) }
+	limit := Limit{Name: "test", Key: "tenant/ip", Max: c.RatePerMinute, Window: time.Minute}
+	if _, err := l.Allow(context.Background(), limit); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Allow(context.Background(), limit); err != nil {
+		t.Fatal(err)
+	}
+	if decision, err := l.Allow(context.Background(), limit); !errors.Is(err, ErrRateLimited) || decision.RetryAfter != time.Minute {
 		t.Fatal("rate limit failed")
 	}
 }
@@ -69,25 +80,63 @@ func TestForwardedChainRejectsMalformedOrExcessiveHops(t *testing.T) {
 }
 
 func TestLimiterBoundsKeyCardinalityAndEvictsExpiredEntries(t *testing.T) {
-	c := cfg()
-	l := NewLimiter()
-	l.maxKeys = 2
+	l := NewLocalLimiter(2)
 	now := time.Date(2026, 8, 12, 1, 0, 0, 0, time.UTC)
-	l.Now = func() time.Time { return now }
-	if err := l.Allow("key-1", c); err != nil {
+	l.now = func() time.Time { return now }
+	limit := func(key string) Limit { return Limit{Name: "test", Key: key, Max: 10, Window: time.Minute} }
+	if _, err := l.Allow(context.Background(), limit("key-1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.Allow("key-2", c); err != nil {
+	if _, err := l.Allow(context.Background(), limit("key-2")); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.Allow("key-3", c); err != ErrRateLimited {
+	if _, err := l.Allow(context.Background(), limit("key-3")); !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("third unique key err=%v", err)
 	}
 	now = now.Add(time.Minute + time.Second)
-	if err := l.Allow("key-3", c); err != nil {
+	if _, err := l.Allow(context.Background(), limit("key-3")); err != nil {
 		t.Fatalf("expired entries were not evicted: %v", err)
 	}
-	if len(l.window) != 1 || len(l.count) != 1 {
-		t.Fatalf("window=%d count=%d", len(l.window), len(l.count))
+	if active := l.activeKeys.Load(); active != 1 {
+		t.Fatalf("active keys=%d", active)
+	}
+	metrics := l.Metrics()
+	if metrics.Allowed != 3 || metrics.Limited != 1 || metrics.CapacityLimited != 1 {
+		t.Fatalf("metrics=%+v", metrics)
+	}
+}
+
+func TestLocalLimiterIsAtomicUnderConcurrency(t *testing.T) {
+	limiter := NewLocalLimiter(100)
+	limit := Limit{Name: "concurrent", Key: "same-principal", Max: 37, Window: time.Minute}
+	var allowed atomic.Int64
+	var limited atomic.Int64
+	var wait sync.WaitGroup
+	for range 200 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			_, err := limiter.Allow(context.Background(), limit)
+			switch {
+			case err == nil:
+				allowed.Add(1)
+			case errors.Is(err, ErrRateLimited):
+				limited.Add(1)
+			default:
+				t.Errorf("Allow() error = %v", err)
+			}
+		}()
+	}
+	wait.Wait()
+	if allowed.Load() != 37 || limited.Load() != 163 {
+		t.Fatalf("allowed=%d limited=%d", allowed.Load(), limited.Load())
+	}
+}
+
+func TestLimiterHashesIdentityKeys(t *testing.T) {
+	const raw = "tenant-fixture\x00principal-fixture"
+	digest := limitDigest(Limit{Name: "authenticated", Key: raw, Max: 1, Window: time.Minute})
+	if strings.Contains(string(digest[:]), raw) {
+		t.Fatal("raw identity was retained in limiter key")
 	}
 }

@@ -26,6 +26,8 @@ const (
 	AIProviderAnalyzePath         = "/api/v1/settings/ai-providers:analyze"
 )
 
+var errAIProviderReplayRollback = errors.New("ai provider: rollback unused replay credential")
+
 type aiAdvisoryRepository interface {
 	List(context.Context, tenancy.Scope) ([]aiadvisory.Account, error)
 	Get(context.Context, tenancy.Scope, string) (aiadvisory.Account, error)
@@ -139,34 +141,58 @@ func (api *aiAdvisoryAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	created, err := api.secrets.Create(r.Context(), scope, secrets.ClassAIProviderCredential, cmd.Credential)
-	zero(cmd.Credential)
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Credential could not be stored")
-		return
-	}
+	defer zero(cmd.Credential)
 	id := newApprovalID()
-	account, replayed, err := api.repository.CreateGoverned(r.Context(), scope, id, cmd, created.Reference.String(), correlation, digest, principal.SubjectRef, id+".e")
+	var replayed bool
+	var replayAccount aiadvisory.Account
+	account, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(txCtx context.Context) (aiadvisory.Account, error) {
+		var created secrets.Metadata
+		var account aiadvisory.Account
+		err := api.withSecrets(txCtx, scope, func(secretCtx context.Context) error {
+			var secretErr error
+			created, secretErr = api.secrets.Create(secretCtx, scope, secrets.ClassAIProviderCredential, cmd.Credential)
+			if secretErr != nil {
+				return secretErr
+			}
+			account, replayed, secretErr = api.repository.CreateGoverned(secretCtx, scope, id, cmd, created.Reference.String(), correlation, digest, principal.SubjectRef, id+".e")
+			if secretErr != nil {
+				return secretErr
+			}
+			if replayed {
+				replayAccount = account
+				return errAIProviderReplayRollback
+			}
+			return secretErr
+		})
+		return account, err
+	}, func(txCtx context.Context, created aiadvisory.Account) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "ai_provider_account.create", ResourceType: "ai_provider_account",
+			ResourceID: created.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"provider": string(created.Provider), "label": created.Label},
+		})
+		return captureErr
+	})
+	if errors.Is(err, errAIProviderReplayRollback) {
+		account, err = replayAccount, nil
+	}
 	if err != nil {
-		if created.Reference.Valid() {
-			_, _ = api.secrets.Revoke(r.Context(), scope, created.Reference)
+		if errors.Is(err, errSettingsAudit) || errors.Is(err, secrets.ErrTransactionUnavailable) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
 		}
 		if errors.Is(err, aiadvisory.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if replayed && created.Reference.Valid() {
-		_, _ = api.secrets.Revoke(r.Context(), scope, created.Reference)
-	}
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.create", ResourceType: "ai_provider_account",
-		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"provider": string(account.Provider), "label": account.Label},
-	}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		if errors.Is(err, aiadvisory.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusCreated, aiProviderAccountToView(account))
@@ -194,24 +220,48 @@ func (api *aiAdvisoryAPI) disable(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	account, _, err := api.repository.DisableGoverned(r.Context(), scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion, correlation, digest, principal.SubjectRef, newApprovalID())
+	var replayed bool
+	account, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(txCtx context.Context) (aiadvisory.Account, error) {
+		var disabled aiadvisory.Account
+		var disableErr error
+		disabled, replayed, disableErr = api.repository.DisableGoverned(txCtx, scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion, correlation, digest, principal.SubjectRef, newApprovalID())
+		return disabled, disableErr
+	}, func(txCtx context.Context, disabled aiadvisory.Account) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "ai_provider_account.disable", ResourceType: "ai_provider_account",
+			ResourceID: disabled.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"provider": string(disabled.Provider)},
+		})
+		return captureErr
+	})
 	if err != nil {
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, aiadvisory.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "ai_provider_account.disable", ResourceType: "ai_provider_account",
-		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"provider": string(account.Provider)},
-	}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		if errors.Is(err, aiadvisory.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusOK, aiProviderAccountToView(account))
+}
+
+func (api *aiAdvisoryAPI) withSecrets(ctx context.Context, scope tenancy.Scope, operation func(context.Context) error) error {
+	provider, ok := api.secrets.(secrets.TransactionalProvider)
+	if !ok {
+		return secrets.ErrTransactionUnavailable
+	}
+	return provider.WithinTransaction(ctx, scope, operation)
 }
 
 type aiAnalyzeRequest struct {

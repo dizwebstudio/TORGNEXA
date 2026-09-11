@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/securityedge"
@@ -21,6 +22,18 @@ import (
 type authnStub struct {
 	principal Principal
 	err       error
+}
+
+type authnFunc func(context.Context, *http.Request) (Principal, error)
+
+func (fn authnFunc) Authenticate(ctx context.Context, request *http.Request) (Principal, error) {
+	return fn(ctx, request)
+}
+
+type limiterFunc func(context.Context, securityedge.Limit) (securityedge.Decision, error)
+
+func (fn limiterFunc) Allow(ctx context.Context, limit securityedge.Limit) (securityedge.Decision, error) {
+	return fn(ctx, limit)
 }
 
 func (a authnStub) Authenticate(context.Context, *http.Request) (Principal, error) {
@@ -42,13 +55,14 @@ func (a authzStub) Authorize(context.Context, Principal, tenancy.Scope, string) 
 
 func edgeTestConfig() securityedge.Config {
 	return securityedge.Config{
-		TrustedProxyCIDRs: []string{"127.0.0.1/32"},
-		AdminCIDRs:        []string{"127.0.0.1/32"},
-		AllowedOrigins:    []string{"https://console.example.test"},
-		MaxRequestBytes:   1 << 20,
-		MaxUploadBytes:    1 << 19,
-		RatePerMinute:     100,
-		HSTSSeconds:       31536000,
+		TrustedProxyCIDRs:    []string{"127.0.0.1/32"},
+		AdminCIDRs:           []string{"127.0.0.1/32"},
+		AllowedOrigins:       []string{"https://console.example.test"},
+		MaxRequestBytes:      1 << 20,
+		MaxUploadBytes:       1 << 19,
+		PreAuthRatePerMinute: 1000,
+		RatePerMinute:        100,
+		HSTSSeconds:          31536000,
 	}
 }
 
@@ -359,6 +373,126 @@ func TestPublicWebhookRouteRateLimitBudgetIsIndependentOfTenantBudget(t *testing
 	// budget keyed under a different limiter key and must be unaffected.
 	if rr := webhookReq(); rr.Code != http.StatusOK {
 		t.Fatalf("webhook request should not share the exhausted tenant budget: status=%d", rr.Code)
+	}
+}
+
+func TestRateLimitHandlersUseInjectedSharedBudget(t *testing.T) {
+	cfg := edgeTestConfig()
+	cfg.RatePerMinute = 2
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "issuer", Subject: "subject"}
+	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+	sharedLimiter := securityedge.NewLimiter()
+	first, err := NewProductionHandler(testSecurityLogger(), cfg, sharedLimiter, authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := NewProductionHandler(testSecurityLogger(), cfg, sharedLimiter, authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	send := func(handler http.Handler) int {
+		req := httptest.NewRequest(http.MethodGet, "https://api.example.test/api/v1/private", nil)
+		req.RemoteAddr = "198.51.100.8:443"
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, req)
+		return response.Code
+	}
+	if send(first) != http.StatusNoContent || send(second) != http.StatusNoContent {
+		t.Fatal("initial requests failed")
+	}
+	if code := send(first); code != http.StatusTooManyRequests {
+		t.Fatalf("replica multiplication bypassed the shared budget: status=%d", code)
+	}
+}
+
+func TestRateLimitsSharedNATByIPWithoutSharingAuthenticatedPrincipalBudget(t *testing.T) {
+	cfg := edgeTestConfig()
+	cfg.PreAuthRatePerMinute = 3
+	cfg.RatePerMinute = 1
+	scope := validTestScope(t)
+	authn := authnFunc(func(_ context.Context, request *http.Request) (Principal, error) {
+		return Principal{Issuer: "issuer", Subject: request.Header.Get("Authorization")}, nil
+	})
+	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), authn, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	send := func(subject string) int {
+		request := httptest.NewRequest(http.MethodGet, "https://api.example.test/api/v1/private", nil)
+		request.RemoteAddr = "198.51.100.8:443"
+		request.Header.Set("Authorization", subject)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		return response.Code
+	}
+	for _, subject := range []string{"principal-a", "principal-b", "principal-c"} {
+		if status := send(subject); status != http.StatusNoContent {
+			t.Fatalf("subject %q status=%d", subject, status)
+		}
+	}
+	if status := send("principal-d"); status != http.StatusTooManyRequests {
+		t.Fatalf("shared NAT pre-auth budget status=%d", status)
+	}
+}
+
+func TestAuthenticatedBudgetCannotBeMultipliedAcrossSourceIPs(t *testing.T) {
+	cfg := edgeTestConfig()
+	cfg.RatePerMinute = 2
+	scope := validTestScope(t)
+	principal := Principal{Issuer: "issuer", Subject: "principal"}
+	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "private.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+	handler, err := NewProductionHandler(testSecurityLogger(), cfg, securityedge.NewLimiter(), authnStub{principal: principal}, tenantStub{scope: scope}, authzStub{}, []ProtectedRoute{route}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, remote := range []string{"198.51.100.1:443", "198.51.100.2:443", "198.51.100.3:443"} {
+		request := httptest.NewRequest(http.MethodGet, "https://api.example.test/api/v1/private", nil)
+		request.RemoteAddr = remote
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		want := http.StatusNoContent
+		if index == 2 {
+			want = http.StatusTooManyRequests
+		}
+		if response.Code != want {
+			t.Fatalf("request %d status=%d want=%d", index+1, response.Code, want)
+		}
+	}
+}
+
+func TestRateLimiterFailureIsFailClosedAndRetryable(t *testing.T) {
+	limiter := limiterFunc(func(context.Context, securityedge.Limit) (securityedge.Decision, error) {
+		return securityedge.Decision{}, securityedge.ErrLimiterUnavailable
+	})
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), limiter, nil, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "https://api.example.test"+HealthPath, nil)
+	request.RemoteAddr = "198.51.100.8:443"
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Retry-After") != "1" {
+		t.Fatalf("status=%d retry-after=%q body=%s", response.Code, response.Header().Get("Retry-After"), response.Body.String())
+	}
+}
+
+func TestRateLimitUsesBackendRetryAfterDeadline(t *testing.T) {
+	limiter := limiterFunc(func(context.Context, securityedge.Limit) (securityedge.Decision, error) {
+		return securityedge.Decision{RetryAfter: 1500 * time.Millisecond}, securityedge.ErrRateLimited
+	})
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), limiter, nil, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "https://api.example.test"+HealthPath, nil)
+	request.RemoteAddr = "198.51.100.8:443"
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") != "2" {
+		t.Fatalf("status=%d retry-after=%q", response.Code, response.Header().Get("Retry-After"))
 	}
 }
 

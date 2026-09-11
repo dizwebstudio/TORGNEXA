@@ -1078,10 +1078,18 @@ func validateImmutableImage(reference string) error {
 		"python":                       {},
 		"redis":                        {},
 		"ghcr.io/saleor/saleor":        {},
-		"quay.io/keycloak/keycloak":    {},
-		"tonistiigi/binfmt":            {},
-		"valkey/valkey":                {},
-		"wordpress":                    {},
+		// Community runtime images are built from the reviewed Dockerfiles in
+		// this repository and pinned in release-artifacts.json. Keep their
+		// repositories explicit here; the digest/artifact allowlist is checked
+		// separately by the license and release policy validators.
+		"ghcr.io/dizwebstudio/torgnexa-kafka":    {},
+		"ghcr.io/dizwebstudio/torgnexa-keycloak": {},
+		"ghcr.io/dizwebstudio/torgnexa-postgres": {},
+		"ghcr.io/dizwebstudio/torgnexa-valkey":   {},
+		"quay.io/keycloak/keycloak":              {},
+		"tonistiigi/binfmt":                      {},
+		"valkey/valkey":                          {},
+		"wordpress":                              {},
 	}
 	if _, ok := approved[repository]; !ok {
 		return fmt.Errorf("repository %q is not approved", repository)

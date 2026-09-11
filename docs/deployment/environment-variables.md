@@ -179,6 +179,36 @@ Volumes при этом не удаляются. Не используйте `do
 Увеличение пула умножается на количество процессов и экземпляров. Учитывайте
 общий лимит подключений PostgreSQL.
 
+## Распределённый лимит API
+
+Community Compose подключает API к общему Valkey, поэтому увеличение числа
+реплик API не увеличивает допустимое число запросов. Для отдельного production
+развёртывания параметры обязательны и должны совпадать у всех реплик одного
+API-кластера.
+
+| Переменная | Community | Ограничения |
+|---|---:|---|
+| `TORGNEXA_SECURITY_PRE_AUTH_RATE_PER_MINUTE` | `6000` | Общий минутный бюджет одного проверенного client IP до аутентификации; `1`–`1000000`. |
+| `TORGNEXA_SECURITY_RATE_PER_MINUTE` | `600` | Минутный бюджет organization/workspace/principal после аутентификации; `1`–`1000000`. |
+| `TORGNEXA_SECURITY_RATE_LIMIT_BACKEND` | `valkey` | Для API вне `development`/`test` допустим только `valkey`; `local` предназначен для development/test одного процесса. |
+| `TORGNEXA_SECURITY_RATE_LIMIT_NAMESPACE` | `torgnexa:community:edge:v1` | Одинаковое значение до 64 символов для всех реплик кластера; пробелы и `{}` запрещены. Смена значения сбрасывает действующие окна. |
+| `TORGNEXA_SECURITY_RATE_LIMIT_MAX_KEYS` | `100000` | Максимум активных ключей бюджета; `1`–`1000000`. |
+| `VALKEY_ADDR` | `valkey:6379` | Внутренний TCP-адрес `host:port`. |
+| `VALKEY_USERNAME` | не задан | ACL-пользователь отдельного API-кластера; при заданном имени обязателен пароль. |
+| `VALKEY_PASSWORD` | не задан | Секрет ACL. Не помещайте значение в журнал или диагностический пакет. |
+| `TORGNEXA_VALKEY_CONNECT_TIMEOUT` | `1s` | `50ms`–`5s`. |
+| `TORGNEXA_VALKEY_REQUEST_TIMEOUT` | `250ms` | `50ms`–`5s`. |
+| `TORGNEXA_VALKEY_MAX_CONNECTIONS` | `32` | Пул на одну реплику; `1`–`256`. Итоговая нагрузка на Valkey умножается на число реплик. |
+
+Valkey хранит только ограниченные по TTL SHA-256 ключи. Недоступность Valkey
+останавливает production API при старте, а во время работы приводит к `503` с
+`Retry-After: 1`; бизнес-обработчик не запускается. Настройте сигнал по событию
+`security.rate_limiter_unavailable` и счётчикам `Unavailable` и
+`CapacityLimited` из limiter adapter. Для public production размещайте Valkey
+в закрытом сегменте и ограничьте ACL ключами выбранного namespace и командами
+`PING`, `EVAL`, `TIME`, `EXISTS`, `ZREMRANGEBYSCORE`, `ZCARD`, `ZADD`,
+`PEXPIRE`, `INCR` и `PTTL`, которые использует утверждённый Lua-скрипт.
+
 ## OIDC
 
 | Переменная | По умолчанию | Как заполнять |

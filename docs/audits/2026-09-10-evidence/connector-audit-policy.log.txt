@@ -1,0 +1,21 @@
+./scripts/scan-supply-chain-lib-test.sh
+scan-supply-chain-lib-test: PASS
+./scripts/check-supply-chain.sh
+JS supply-chain policy (repository): PASS
+JS supply-chain lock verification: PASS
+all modules verified
+all modules verified
+go: no module dependencies to download
+all modules verified
+all modules verified
+go: no module dependencies to download
+all modules verified
+go: downloading golang.org/x/tools v0.49.0
+go: downloading golang.org/x/telemetry v0.0.0-20260811182544-a038080d80e5
+go: downloading golang.org/x/mod v0.40.0
+go: downloading golang.org/x/net v0.58.0
+go: downloading google.golang.org/grpc v1.83.1
+go: downloading golang.org/x/crypto v0.55.0
+all modules verified
+ok  	github.com/torgnexa/torgnexa/tools/contractcheck/internal/checker	(cached)
+Supply-chain policy validation passed

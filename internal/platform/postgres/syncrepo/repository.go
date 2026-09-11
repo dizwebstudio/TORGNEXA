@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 )
 
@@ -299,6 +300,14 @@ func (r *Repository) validate(ctx context.Context, scope tenancy.Scope) error {
 	return nil
 }
 func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, readOnly bool, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.database); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.database.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: readOnly})
 	if err != nil {
 		return fmt.Errorf("sync repository: begin: %w", err)

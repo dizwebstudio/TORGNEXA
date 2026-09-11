@@ -1,0 +1,6 @@
+=== RUN   TestRealtimeAuthorizationClosesDeniedStream
+    realtime_authorization_test.go:46: stream continued after authorization was revoked
+--- FAIL: TestRealtimeAuthorizationClosesDeniedStream (17.00s)
+FAIL
+FAIL	github.com/torgnexa/torgnexa/internal/app/api	17.129s
+FAIL

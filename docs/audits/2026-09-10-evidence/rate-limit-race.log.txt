@@ -1,0 +1,2 @@
+ok  	github.com/torgnexa/torgnexa/internal/platform/securityedge	1.020s
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.170s

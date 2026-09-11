@@ -14,9 +14,11 @@ import (
 const RealtimePath = "/api/v1/realtime"
 
 type realtimeTiming struct {
-	pollInterval      time.Duration
-	heartbeatInterval time.Duration
-	writeTimeout      time.Duration
+	pollInterval       time.Duration
+	heartbeatInterval  time.Duration
+	writeTimeout       time.Duration
+	revalidateInterval time.Duration
+	revalidateTimeout  time.Duration
 }
 
 // realtimeEvent is intentionally metadata-only: the browser receives an
@@ -47,16 +49,34 @@ func latestAuditID(ctx context.Context, repository auditReader, scope tenancy.Sc
 }
 
 func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
-	return newRealtimeRoutesWithTiming(repository, realtimeTiming{2 * time.Second, 15 * time.Second, 5 * time.Second})
+	return newRealtimeRoutesWithTiming(repository, realtimeTiming{pollInterval: 2 * time.Second, heartbeatInterval: 15 * time.Second, writeTimeout: 5 * time.Second})
 }
 
 func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) []ProtectedRoute {
+	if timing.revalidateInterval <= 0 {
+		timing.revalidateInterval = 15 * time.Second
+	}
+	if timing.revalidateTimeout <= 0 {
+		timing.revalidateTimeout = 5 * time.Second
+	}
 	return []ProtectedRoute{{Method: http.MethodGet, Path: RealtimePath, Permission: "operations.realtime.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		scope, ok := ScopeFromContext(r.Context())
 		if !ok || repository == nil {
 			writeProblem(w, http.StatusForbidden, "Forbidden")
 			return
 		}
+		streamRequest, stopAuthorization, err := authorizeRealtimeLifetime(r, scope, timing.revalidateInterval, timing.revalidateTimeout)
+		if err != nil {
+			if errors.Is(err, ErrUnauthenticated) {
+				w.Header().Set("WWW-Authenticate", `Bearer realm="torgnexa-api"`)
+				writeProblem(w, http.StatusUnauthorized, "Unauthorized")
+			} else {
+				writeProblem(w, http.StatusForbidden, "Forbidden")
+			}
+			return
+		}
+		defer stopAuthorization()
+		r = streamRequest
 		_, ok = unwrapFlusher(w)
 		if !ok {
 			writeProblem(w, http.StatusNotImplemented, "Streaming Unsupported")
@@ -87,7 +107,11 @@ func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) 
 			if err != nil {
 				return false
 			}
-			if err := controller.SetWriteDeadline(time.Now().Add(timing.writeTimeout)); err != nil {
+			deadline := time.Now().Add(timing.writeTimeout)
+			if expires, ok := r.Context().Deadline(); ok && expires.Before(deadline) {
+				deadline = expires
+			}
+			if err := controller.SetWriteDeadline(deadline); err != nil {
 				return false
 			}
 			if _, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, raw); err != nil {

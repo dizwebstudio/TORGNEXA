@@ -1,9 +1,46 @@
 package syncrepo
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestBootstrapScannersNormalizeDatabaseTime(t *testing.T) {
+	local := time.Date(2026, 9, 10, 15, 0, 0, 0, time.FixedZone("database", 3*60*60))
+	later := local.Add(time.Minute)
+	row := func(values ...any) syncScanRow {
+		return func(dest ...any) error {
+			for i := range values {
+				reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(values[i]))
+			}
+			return nil
+		}
+	}
+	assertUTC := func(values ...time.Time) {
+		t.Helper()
+		for _, value := range values {
+			if value.Location() != time.UTC || (!value.Equal(local) && !value.Equal(later)) {
+				t.Fatalf("database timestamp changed or not normalized: %v", value)
+			}
+		}
+	}
+	preview, err := scanPreview(row("preview", "account", int64(1), 1, 1, 0, local, later, &local))
+	if err != nil {
+		t.Fatal("preview", err)
+	}
+	assertUTC(preview.CreatedAt, preview.ExpiresAt, *preview.ConsumedAt)
+	schedule, err := scanSchedule(row("account", "incremental", 60, true, &later, &local, "job", int64(1), local, later))
+	if err != nil {
+		t.Fatal("schedule", err)
+	}
+	assertUTC(schedule.CreatedAt, schedule.UpdatedAt, *schedule.NextRunAt, *schedule.LastEnqueuedAt)
+	job, err := scanJob(row("job", "org", "workspace", "account", "initial_import", "incremental", "completed", "preview", "policy", 1, 1, 5, local, local, later, &local, &later, ""))
+	if err != nil {
+		t.Fatal("job", err)
+	}
+	assertUTC(job.AvailableAt, job.CreatedAt, job.UpdatedAt, *job.StartedAt, *job.CompletedAt)
+}
 
 type syncScanRow func(...any) error
 

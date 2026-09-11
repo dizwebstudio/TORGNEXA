@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -82,7 +80,7 @@ type connectorAccountRepository interface {
 type connectorOAuthExchange func(context.Context, sdk.OAuth2Configuration, connectorauth.OAuthClient, string, string, string, time.Duration) ([]byte, error)
 
 type connectorSyncStarter interface {
-	Start(context.Context, tenancy.Scope, string, string, time.Time) (int, error)
+	Start(context.Context, tenancy.Scope, string, string, string, time.Time) (int, error)
 }
 
 type connectorAccountCreateRequest struct {
@@ -291,23 +289,14 @@ func (api *connectorAccountAPI) credentials(w http.ResponseWriter, request *http
 			return
 		}
 	}
-	metadata, err := api.secrets.Create(request.Context(), scope, class, material)
-	if err != nil {
-		writeProblem(w, http.StatusBadRequest, "Bad Request")
-		return
-	}
-	bound, err := api.repository.BindSecret(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, sdk.SecretReference(metadata.Reference.String()), account.Version)
-	if err != nil {
-		_, _ = api.secrets.Revoke(request.Context(), scope, metadata.Reference)
+	bound, err := api.mutateAccount(request, scope, "connector.account.credentials_enrolled", audit.RiskWriteSensitive, func(ctx context.Context) (sdk.Account, error) {
+		return api.replaceCredential(ctx, scope, account, class, material)
+	})
+	if errors.Is(err, sdk.ErrAccountConflict) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	if account.SecretReference != "" {
-		if old, parseErr := secrets.ParseReference(string(account.SecretReference)); parseErr == nil {
-			_, _ = api.secrets.Revoke(request.Context(), scope, old)
-		}
-	}
-	if err := api.capture(request, scope, "connector.account.credentials_enrolled", bound, audit.RiskWriteSensitive); err != nil {
+	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -413,17 +402,25 @@ func (api *connectorAccountAPI) capabilities(w http.ResponseWriter, request *htt
 			return
 		}
 	}
-	updated, settings, err := api.repository.ReplaceAccountCapabilities(request.Context(), scope, account.ID, input.ExpectedVersion, manifest, input.Enabled)
+	var settings []sdk.AccountCapabilitySetting
+	updated, err := auditedSettingsMutation(request.Context(), scope, api.audit, func(ctx context.Context) (sdk.Account, error) {
+		var updated sdk.Account
+		var err error
+		updated, settings, err = api.repository.ReplaceAccountCapabilities(ctx, scope, account.ID, input.ExpectedVersion, manifest, input.Enabled)
+		return updated, err
+	}, func(ctx context.Context, updated sdk.Account) error {
+		return api.captureCapabilities(request.WithContext(ctx), scope, updated, settings)
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if errors.Is(err, sdk.ErrInvalidCapabilitySettings) {
 		writeProblem(w, http.StatusUnprocessableEntity, "Capability is not declared by connector manifest")
 		return
 	}
 	if err != nil {
 		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if err = api.captureCapabilities(request, scope, updated, settings); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusOK, accountViewWithCapabilities(updated, settings))
@@ -456,7 +453,13 @@ func (api *connectorAccountAPI) create(w http.ResponseWriter, request *http.Requ
 		return
 	}
 	command := sdk.AccountCreate{ID: input.AccountID, OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), ConnectorID: input.ConnectorID, SecretReference: secretReference}
-	account, err := api.repository.CreateAccount(request.Context(), command, manifest)
+	account, err := api.mutateAccount(request, scope, "connector.account.created", audit.RiskWriteSafe, func(ctx context.Context) (sdk.Account, error) {
+		return api.repository.CreateAccount(ctx, command, manifest)
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if err != nil {
 		existing, lookupErr := api.repository.AccountByID(request.Context(), command.OrganizationID, command.WorkspaceID, command.ID)
 		if lookupErr == nil && accountCreateFingerprint(existing) == commandCreateFingerprint(command) {
@@ -464,10 +467,6 @@ func (api *connectorAccountAPI) create(w http.ResponseWriter, request *http.Requ
 			return
 		}
 		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if err := api.capture(request, scope, "connector.account.created", account, audit.RiskWriteSafe); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusCreated, accountView(account))
@@ -492,7 +491,13 @@ func (api *connectorAccountAPI) disable(w http.ResponseWriter, request *http.Req
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	account, err := api.repository.ChangeAccountStatus(request.Context(), sdk.AccountStatusChange{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: input.AccountID, Status: sdk.AccountDisabled, ExpectedVersion: input.ExpectedVersion})
+	account, err := api.mutateAccount(request, scope, "connector.account.disabled", audit.RiskWriteSensitive, func(ctx context.Context) (sdk.Account, error) {
+		return api.repository.ChangeAccountStatus(ctx, sdk.AccountStatusChange{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: input.AccountID, Status: sdk.AccountDisabled, ExpectedVersion: input.ExpectedVersion})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if err != nil {
 		if errors.Is(err, sdk.ErrAccountConflict) {
 			writeProblem(w, http.StatusConflict, "Conflict")
@@ -501,10 +506,7 @@ func (api *connectorAccountAPI) disable(w http.ResponseWriter, request *http.Req
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	if err := api.capture(request, scope, "connector.account.disabled", account, audit.RiskWriteSensitive); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, http.StatusOK, accountView(account))
 }
 
@@ -594,15 +596,18 @@ func (api *connectorAccountAPI) check(w http.ResponseWriter, request *http.Reque
 			}
 		}
 	}
-	updated, err := api.repository.RecordAccountHealth(request.Context(), sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, Health: health, ExpectedVersion: account.Version})
+	updated, err := api.mutateAccount(request, scope, "connector.account.connection_checked", audit.RiskWriteSafe, func(ctx context.Context) (sdk.Account, error) {
+		return api.repository.RecordAccountHealth(ctx, sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, Health: health, ExpectedVersion: account.Version})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if err != nil {
 		writeProblem(w, 409, "Conflict")
 		return
 	}
-	if err = api.capture(request, scope, "connector.account.connection_checked", updated, audit.RiskWriteSafe); err != nil {
-		writeProblem(w, 500, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, 200, accountView(updated))
 }
 
@@ -619,7 +624,7 @@ func oauthPreparation(err error) string {
 
 func (api *connectorAccountAPI) oauthStart(w http.ResponseWriter, request *http.Request) {
 	scope, scopeOK := ScopeFromContext(request.Context())
-	principal, principalOK := PrincipalFromContext(request.Context())
+	_, principalOK := PrincipalFromContext(request.Context())
 	key := strings.TrimSpace(request.Header.Get("Idempotency-Key"))
 	var input connectorOAuthStartRequest
 	if !scopeOK || !principalOK || api == nil || api.repository == nil || api.oauthStore == nil || api.secrets == nil || api.callbacks == nil || key == "" || len(key) > 128 || decodeStrictJSON(request, &input) != nil || api.callbacks.Validate(input.CallbackURL) != nil {
@@ -657,42 +662,16 @@ func (api *connectorAccountAPI) oauthStart(w http.ResponseWriter, request *http.
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	payload, _ := json.Marshal(pending)
-	metadata, err := api.secrets.Create(request.Context(), scope, secrets.ClassOAuthState, payload)
-	clear(payload)
+	result, err := api.createOAuthStart(request, scope, account, configuration, client.ClientID, input.CallbackURL, pending, challenge)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
-	digest, _ := connectorauth.StateDigest(pending.State)
-	now := api.now().UTC()
-	proposed := connectorauth.Session{ID: newApprovalID(), AccountID: account.ID, AccountVersion: account.Version, ActorID: principal.Subject, StateDigest: digest, PendingSecretRef: metadata.Reference.String(), CallbackURL: input.CallbackURL, CorrelationID: key, Status: "pending", CreatedAt: now, ExpiresAt: now.Add(connectorauth.OAuthSessionTTL)}
-	stored, replayed, err := api.oauthStore.CreateOrReplay(request.Context(), scope, proposed)
-	if err != nil {
-		_, _ = api.secrets.Revoke(request.Context(), scope, metadata.Reference)
-		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if replayed {
-		_, _ = api.secrets.Revoke(request.Context(), scope, metadata.Reference)
-		pending, err = api.readPending(request.Context(), scope, stored.PendingSecretRef)
-		if err != nil {
+		if errors.Is(err, connectorauth.ErrSessionConflict) {
 			writeProblem(w, http.StatusConflict, "Conflict")
-			return
+		} else {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		}
-		digestBytes := sha256.Sum256([]byte(pending.CodeVerifier))
-		challenge = base64.RawURLEncoding.EncodeToString(digestBytes[:])
-	}
-	authorizationURL, err := connectorauth.AuthorizationURL(configuration, client.ClientID, stored.CallbackURL, pending.State, challenge)
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	if err = api.capture(request, scope, "connector.account.oauth_started", account, audit.RiskWriteSensitive); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
-	writeJSON(w, http.StatusOK, connectorOAuthStartResponse{AuthorizationURL: authorizationURL, ExpiresAt: stored.ExpiresAt.UTC().Format(time.RFC3339)})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (api *connectorAccountAPI) oauthCallback(w http.ResponseWriter, request *http.Request) {
@@ -709,22 +688,16 @@ func (api *connectorAccountAPI) oauthCallback(w http.ResponseWriter, request *ht
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	session, err := api.oauthStore.Consume(request.Context(), scope, digest, principal.Subject, input.CallbackURL, api.now().UTC())
+	claim, err := api.claimOAuthCallback(request, scope, digest, input.State, principal.Subject, input.CallbackURL)
 	if err != nil {
-		writeProblem(w, http.StatusConflict, "OAuth state is invalid or already used")
+		if errors.Is(err, errSettingsAudit) || errors.Is(err, secrets.ErrTransactionUnavailable) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		} else {
+			writeProblem(w, http.StatusConflict, "OAuth state is invalid or already used")
+		}
 		return
 	}
-	pendingReference, referenceErr := secrets.ParseReference(session.PendingSecretRef)
-	if referenceErr != nil {
-		writeProblem(w, http.StatusConflict, "OAuth state is invalid or already used")
-		return
-	}
-	defer func() { _, _ = api.secrets.Revoke(request.Context(), scope, pendingReference) }()
-	pending, err := api.readPending(request.Context(), scope, session.PendingSecretRef)
-	if err != nil || subtle.ConstantTimeCompare([]byte(pending.State), []byte(input.State)) != 1 {
-		writeProblem(w, http.StatusConflict, "OAuth state is invalid or already used")
-		return
-	}
+	session, pending := claim.session, claim.pending
 	account, err := api.repository.AccountByID(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), session.AccountID)
 	if err != nil || account.Version != session.AccountVersion || account.SecretReference == "" {
 		writeProblem(w, http.StatusConflict, "Conflict")
@@ -745,25 +718,25 @@ func (api *connectorAccountAPI) oauthCallback(w http.ResponseWriter, request *ht
 	}
 	bundle, err := api.oauthExchange(request.Context(), configuration, client, input.Code, input.CallbackURL, pending.CodeVerifier, min(time.Duration(manifest.RateLimit.RequestTimeoutMS)*time.Millisecond, 15*time.Second))
 	if err != nil {
-		_, _ = api.repository.RecordAccountHealth(request.Context(), sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, ExpectedVersion: account.Version, Health: sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "oauth_exchange_failed", CheckedAt: api.now().UTC()}})
+		_, healthErr := api.mutateAccount(request, scope, "connector.account.oauth_failed", audit.RiskWriteSafe, func(ctx context.Context) (sdk.Account, error) {
+			return api.repository.RecordAccountHealth(ctx, sdk.AccountHealthUpdate{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: account.ID, ExpectedVersion: account.Version, Health: sdk.Health{Status: sdk.HealthUnavailable, ReasonCode: "oauth_exchange_failed", CheckedAt: api.now().UTC()}})
+		})
+		if healthErr != nil {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		writeProblem(w, http.StatusBadGateway, "OAuth provider rejected the callback")
 		return
 	}
-	metadata, err := api.secrets.Create(request.Context(), scope, secrets.ClassOAuthRefresh, bundle)
-	clear(bundle)
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
-	bound, err := api.repository.BindSecret(request.Context(), scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, sdk.SecretReference(metadata.Reference.String()), account.Version)
-	if err != nil {
-		_, _ = api.secrets.Revoke(request.Context(), scope, metadata.Reference)
+	defer clear(bundle)
+	bound, err := api.mutateAccount(request, scope, "connector.account.oauth_completed", audit.RiskWriteSensitive, func(ctx context.Context) (sdk.Account, error) {
+		return api.replaceCredential(ctx, scope, account, secrets.ClassOAuthRefresh, bundle)
+	})
+	if errors.Is(err, sdk.ErrAccountConflict) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	oldReference, _ := secrets.ParseReference(string(account.SecretReference))
-	_, _ = api.secrets.Revoke(request.Context(), scope, oldReference)
-	if err = api.capture(request, scope, "connector.account.oauth_completed", bound, audit.RiskWriteSensitive); err != nil {
+	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -873,15 +846,18 @@ func (api *connectorAccountAPI) enable(w http.ResponseWriter, request *http.Requ
 		writeProblem(w, 422, "At least one account capability must be enabled")
 		return
 	}
-	updated, err := api.repository.ChangeAccountStatus(request.Context(), sdk.AccountStatusChange{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: current.ID, Status: sdk.AccountActive, ExpectedVersion: current.Version})
+	updated, err := api.mutateAccount(request, scope, "connector.account.enabled", audit.RiskWriteSensitive, func(ctx context.Context) (sdk.Account, error) {
+		return api.repository.ChangeAccountStatus(ctx, sdk.AccountStatusChange{OrganizationID: scope.OrganizationID().String(), WorkspaceID: scope.WorkspaceID().String(), AccountID: current.ID, Status: sdk.AccountActive, ExpectedVersion: current.Version})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if err != nil {
 		writeProblem(w, 409, "Conflict")
 		return
 	}
-	if err = api.capture(request, scope, "connector.account.enabled", updated, audit.RiskWriteSensitive); err != nil {
-		writeProblem(w, 500, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, 200, accountView(updated))
 }
 
@@ -911,7 +887,11 @@ func (api *connectorAccountAPI) syncNow(w http.ResponseWriter, request *http.Req
 		writeProblem(w, 422, "Active healthy account required")
 		return
 	}
-	count, err := api.sync.Start(request.Context(), scope, account.ID, principal.Subject, time.Now().UTC())
+	count, err := api.sync.Start(request.Context(), scope, account.ID, principal.Subject, strings.TrimSpace(request.Header.Get("Idempotency-Key")), time.Now().UTC())
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if errors.Is(err, syncengine.ErrPreviewUnavailable) {
 		writeProblem(w, http.StatusUnprocessableEntity, "Current bootstrap preview required before remote write")
 		return
@@ -928,7 +908,7 @@ func (api *connectorAccountAPI) capture(request *http.Request, scope tenancy.Sco
 	if !ok {
 		return ErrUnauthenticated
 	}
-	_, err := api.audit.Capture(request.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: action, ResourceType: "connector_account", ResourceID: account.ID, CorrelationID: request.Header.Get("Idempotency-Key"), Risk: risk, Summary: audit.Summary{"connector_id": account.ConnectorID, "status": string(account.Status), "version": account.Version, "has_secret_reference": account.SecretReference != ""}})
+	_, err := api.audit.Capture(request.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: action, ResourceType: "connector_account", ResourceID: account.ID, CorrelationID: request.Header.Get("Idempotency-Key"), Risk: risk, Summary: audit.Summary{"connector_id": account.ConnectorID, "status": string(account.Status), "version": account.Version}})
 	return err
 }
 
@@ -947,7 +927,7 @@ func (api *connectorAccountAPI) captureCapabilities(request *http.Request, scope
 		}
 	}
 	_, err := api.audit.Capture(request.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "connector.account.capabilities_changed",
+		ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "connector.account.capabilities_changed",
 		ResourceType: "connector_account", ResourceID: account.ID, CorrelationID: request.Header.Get("Idempotency-Key"),
 		Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"connector_id": account.ConnectorID, "version": account.Version, "enabled_count": enabled, "write_count": writes},
 	})

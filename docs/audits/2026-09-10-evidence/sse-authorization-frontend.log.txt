@@ -1,0 +1,104 @@
+✔ frontend/test/auth-retry.test.mjs (77.716247ms)
+✔ frontend/test/decoders.test.mjs (52.64843ms)
+✔ frontend/test/keycloak-session-race.test.mjs (71.663937ms)
+✔ frontend/test/navigation.test.mjs (45.947694ms)
+✔ frontend/test/realtime.test.mjs (43.842884ms)
+✔ frontend/test/session-isolation.test.mjs (47.774394ms)
+✔ frontend/test/session.test.mjs (48.87495ms)
+✔ frontend/test/settings-tabs.test.mjs (41.264837ms)
+✔ frontend/test/ui-experience.test.mjs (73.583678ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 100.513534
+Frontend connector catalog: PASS (61 connectors)
+Frontend static policy: PASS
+
+> @torgnexa/frontend@0.1.0 build
+> tsc --noEmit && vite build && npm run build:docs --outDir /tmp/torgnexa-frontend-build.OLzndV
+
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 163 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       1.22 kB │ gzip:  0.60 kB
+dist/assets/index-KCMeSAEx.css                      106.91 kB │ gzip: 20.30 kB
+dist/assets/quantity-QzepqXw7.js                      0.18 kB │ gzip:  0.18 kB │ map:     0.57 kB
+dist/assets/EmptyState-NVxm2yxo.js                    0.33 kB │ gzip:  0.24 kB │ map:     0.65 kB
+dist/assets/ids-BgzW81sK.js                           0.42 kB │ gzip:  0.31 kB │ map:     1.45 kB
+dist/assets/Page-DR4bFXfv.js                          0.52 kB │ gzip:  0.29 kB │ map:     1.05 kB
+dist/assets/IntegrationsPage-jl5FeyVD.js              0.54 kB │ gzip:  0.41 kB │ map:     0.74 kB
+dist/assets/formatters-B5R6Dejc.js                    0.68 kB │ gzip:  0.40 kB │ map:     2.88 kB
+dist/assets/PlaceholderPage-J5QwY01x.js               0.74 kB │ gzip:  0.54 kB │ map:     1.05 kB
+dist/assets/ApiState-BtfqqmhH.js                      0.77 kB │ gzip:  0.44 kB │ map:     1.95 kB
+dist/assets/jsx-runtime-DGeXAQPT.js                   0.98 kB │ gzip:  0.59 kB │ map:     1.92 kB
+dist/assets/Dialog-C2SJ7IIb.js                        1.06 kB │ gzip:  0.55 kB │ map:     2.05 kB
+dist/assets/ConnectorOAuthCallbackPage-BDHWsxIO.js    1.80 kB │ gzip:  1.02 kB │ map:     3.33 kB
+dist/assets/useMutation-CkdLUq2t.js                   2.37 kB │ gzip:  1.01 kB │ map:     8.35 kB
+dist/assets/AuditPage-Dm-IKnTB.js                     3.28 kB │ gzip:  1.58 kB │ map:     5.84 kB
+dist/assets/NotificationsPage-BOOkASZe.js             3.46 kB │ gzip:  1.54 kB │ map:     6.77 kB
+dist/assets/decoders-wXL_aYHf.js                      3.75 kB │ gzip:  1.16 kB │ map:    13.85 kB
+dist/assets/LineageTimeline-DgYhpX0a.js               4.44 kB │ gzip:  1.84 kB │ map:     9.02 kB
+dist/assets/DataTable-BR2WbJeO.js                     4.97 kB │ gzip:  1.94 kB │ map:    11.40 kB
+dist/assets/MarkingPage-DicEKiMo.js                   5.43 kB │ gzip:  2.20 kB │ map:     9.53 kB
+dist/assets/PricingPage-ClfIuibF.js                   5.49 kB │ gzip:  2.00 kB │ map:    10.53 kB
+dist/assets/ReplenishmentPage-h20OIuI2.js             6.11 kB │ gzip:  2.43 kB │ map:    12.33 kB
+dist/assets/ConnectorBootstrapControls-D61RpVzb.js    6.43 kB │ gzip:  2.37 kB │ map:    13.60 kB
+dist/assets/OperatorAssistantPage-BQxnwbdG.js         6.67 kB │ gzip:  2.55 kB │ map:    12.39 kB
+dist/assets/react-BhjfaixL.js                         7.57 kB │ gzip:  2.91 kB │ map:    27.17 kB
+dist/assets/PublicationQualityPage-Br_1dxRy.js        7.59 kB │ gzip:  2.70 kB │ map:    14.20 kB
+dist/assets/QueryClientProvider-e8eDH7aJ.js           7.90 kB │ gzip:  3.10 kB │ map:    34.98 kB
+dist/assets/SecurityPage-DNl7HKjN.js                  8.09 kB │ gzip:  2.85 kB │ map:    14.79 kB
+dist/assets/OrdersPage-vlFTTrEE.js                    8.34 kB │ gzip:  3.19 kB │ map:    17.07 kB
+dist/assets/EcosystemPage-DD2tgIX4.js                 8.63 kB │ gzip:  2.57 kB │ map:    15.70 kB
+dist/assets/ApprovalsPage-D9w7xtez.js                 9.85 kB │ gzip:  3.05 kB │ map:    18.33 kB
+dist/assets/IncidentCenterPage-CXwhGYfy.js           10.04 kB │ gzip:  3.33 kB │ map:    19.05 kB
+dist/assets/DashboardPage-DVFYxTWu.js                10.85 kB │ gzip:  3.80 kB │ map:    25.02 kB
+dist/assets/CompliancePage-DJDGmkrt.js               11.18 kB │ gzip:  3.56 kB │ map:    20.23 kB
+dist/assets/FinancePage-DlcMzg4Y.js                  12.35 kB │ gzip:  3.92 kB │ map:    26.07 kB
+dist/assets/CustomerServicePage-Bv-O-g4j.js          13.66 kB │ gzip:  4.40 kB │ map:    25.86 kB
+dist/assets/MarketplacePublicationPage-CnAPqafL.js   13.95 kB │ gzip:  4.20 kB │ map:    27.05 kB
+dist/assets/MarketplaceListingPage-DvFF2kSA.js       14.10 kB │ gzip:  4.31 kB │ map:    27.27 kB
+dist/assets/ReportsPage-B4Ums-HP.js                  14.54 kB │ gzip:  5.37 kB │ map:    31.28 kB
+dist/assets/WorkflowsPage-0lsiwxXv.js                15.29 kB │ gzip:  4.20 kB │ map:    29.01 kB
+dist/assets/IntegrationStatusPage-uFCGFGJL.js        15.78 kB │ gzip:  4.83 kB │ map:    30.08 kB
+dist/assets/CounterpartiesPage-BWEGVX8c.js           15.83 kB │ gzip:  4.32 kB │ map:    30.72 kB
+dist/assets/MassCatalogPage-DaEPJs6Y.js              15.91 kB │ gzip:  4.78 kB │ map:    29.80 kB
+dist/assets/ProcurementPage-CZVxBWrF.js              16.03 kB │ gzip:  4.60 kB │ map:    30.64 kB
+dist/assets/SyncPage-tcfCXs1A.js                     16.22 kB │ gzip:  4.40 kB │ map:    29.60 kB
+dist/assets/MarketplaceOperationsPage-BzsZaYDE.js    16.52 kB │ gzip:  4.64 kB │ map:    29.73 kB
+dist/assets/SocialPage-B_Oul7ld.js                   17.52 kB │ gzip:  4.90 kB │ map:    35.62 kB
+dist/assets/ReturnsPage-Di7Dug2M.js                  17.66 kB │ gzip:  5.54 kB │ map:    36.08 kB
+dist/assets/AdvertisingPage-Dx73IzRy.js              17.80 kB │ gzip:  4.94 kB │ map:    33.78 kB
+dist/assets/labels-DRBRdsOL.js                       17.86 kB │ gzip:  4.94 kB │ map:    26.95 kB
+dist/assets/FinancialAnalyticsPage--ikTc9w8.js       18.71 kB │ gzip:  5.17 kB │ map:    37.16 kB
+dist/assets/Icon-BNCW9My1.js                         19.70 kB │ gzip:  7.17 kB │ map:    68.74 kB
+dist/assets/CatalogPage-BnUlspko.js                  24.94 kB │ gzip:  6.71 kB │ map:    50.42 kB
+dist/assets/MobileWarehousePage-BcH_ScRK.js          25.54 kB │ gzip:  6.52 kB │ map:    50.30 kB
+dist/assets/connector-catalog-ltjf3Eun.js            37.21 kB │ gzip:  5.07 kB │ map:    76.15 kB
+dist/assets/InventoryPage-BgRpk_Mb.js                39.55 kB │ gzip:  8.59 kB │ map:    76.22 kB
+dist/assets/SettingsPage-D-h36jX8.js                 96.37 kB │ gzip: 21.95 kB │ map:   197.05 kB
+dist/assets/IntegrationCatalog-BQfEza0X.js          112.71 kB │ gzip: 21.09 kB │ map:   207.34 kB
+dist/assets/PublicDocumentationPage-JLibPHmJ.js     188.30 kB │ gzip: 44.28 kB │ map:   259.60 kB
+dist/assets/index-Cv3zZkmb.js                       380.38 kB │ gzip: 89.97 kB │ map: 1,307.82 kB
+
+✓ built in 663ms
+npm warn "/tmp/torgnexa-frontend-build.OLzndV" is being parsed as a normal command line argument.
+npm warn Unknown cli config "--outDir". This will stop working in the next major version of npm.
+
+> @torgnexa/frontend@0.1.0 build:docs
+> vite build --ssr src/ssr/docs-entry.tsx --outDir .prerender && node scripts/prerender-docs.mjs /tmp/torgnexa-frontend-build.OLzndV
+
+vite v8.0.16 building ssr environment for production...
+[2Ktransforming...✓ 4 modules transformed.
+rendering chunks...
+computing gzip size...
+.prerender/docs-entry.js  282.14 kB │ gzip: 53.45 kB │ map: 323.26 kB
+
+✓ built in 52ms
+Public docs prerendered: 22 pages under /home/mikhail/Desktop/torgnexa-codex-kit/frontend/dist/docs
+Frontend shell validation: PASS

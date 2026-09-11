@@ -2,7 +2,9 @@
 package agentgovernancerepo
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 )
 
 const applyScope = `SELECT set_config('app.organization_id',$1,true),set_config('app.workspace_id',$2,true)`
@@ -90,6 +93,57 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, policy.ID, scope.OrganizationID
 	})
 }
 
+// InstallPolicyGoverned installs one immutable policy version and completes an
+// idempotency receipt in the caller's transaction. An exact retry returns the
+// stored version and does not append policy or audit evidence again.
+func (r *Repository) InstallPolicyGoverned(ctx context.Context, scope tenancy.Scope, policy agentgovernance.Policy, change agentgovernance.Change, key string, digest []byte) (agentgovernance.Policy, bool, error) {
+	if err := validate(r, ctx, scope); err != nil || policy.Validate() != nil || change.Validate() != nil || !validMutationKey(key, digest) || policy.Version > math.MaxInt64 {
+		return agentgovernance.Policy{}, false, agentgovernance.ErrInvalid
+	}
+	canonical, err := agentgovernance.CanonicalRules(policy.Rules)
+	if err != nil {
+		return agentgovernance.Policy{}, false, err
+	}
+	raw, err := json.Marshal(canonical)
+	if err != nil {
+		return agentgovernance.Policy{}, false, agentgovernance.ErrInvalid
+	}
+	policy.Rules = canonical
+	var out agentgovernance.Policy
+	replayed := false
+	err = r.withTx(ctx, scope, func(tx *sql.Tx) error {
+		claimed, result, err := claimMutationReceipt(ctx, tx, scope, "mcp_agent_policy.install", key, digest)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			var receipt struct {
+				PolicyID string `json:"policy_id"`
+				Version  uint64 `json:"version"`
+			}
+			if json.Unmarshal(result, &receipt) != nil || receipt.PolicyID == "" || receipt.Version == 0 || receipt.Version > math.MaxInt64 {
+				return agentgovernance.ErrConflict
+			}
+			out, err = loadPolicyVersion(ctx, tx, scope, receipt.PolicyID, receipt.Version)
+			replayed = err == nil
+			return err
+		}
+		var until any
+		if policy.EffectiveUntil != nil {
+			until = policy.EffectiveUntil.UTC()
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO ai_agent_policies(id,organization_id,workspace_id,version,agent_id,integration_id,rules,effective_from,effective_until,changed_by,reason,created_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, policy.ID, scope.OrganizationID().String(), scope.WorkspaceID().String(), int64(policy.Version), policy.AgentID, policy.IntegrationID, raw, policy.EffectiveFrom.UTC(), until, change.ActorID, change.Reason, change.OccurredAt.UTC())
+		if err != nil {
+			return fmt.Errorf("agent governance repository: install governed policy: %w", err)
+		}
+		out = policy
+		result, _ = json.Marshal(map[string]any{"policy_id": policy.ID, "version": policy.Version})
+		return completeMutationReceipt(ctx, tx, scope, "mcp_agent_policy.install", key, "mcp_agent_policy", policy.ID, result)
+	})
+	return out, replayed, err
+}
+
 // LatestPolicyVersion returns the highest version ever installed for policyID,
 // or 0 if none exists — the caller's next InstallPolicy call uses version+1.
 // Unlike ResolveAgentPolicy this ignores effective_from/effective_until, since
@@ -123,6 +177,43 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, scope.OrganizationID().String(), scope.Work
 		}
 		return nil
 	})
+}
+
+// RecordKillSwitchGoverned appends one emergency-control revision with an
+// idempotency receipt in the caller's authoritative transaction.
+func (r *Repository) RecordKillSwitchGoverned(ctx context.Context, scope tenancy.Scope, change agentgovernance.KillChange, key string, digest []byte) (agentgovernance.KillChange, bool, error) {
+	if err := validate(r, ctx, scope); err != nil || change.Validate() != nil || !validMutationKey(key, digest) || change.Version > math.MaxInt64 {
+		return agentgovernance.KillChange{}, false, agentgovernance.ErrInvalid
+	}
+	out := change
+	replayed := false
+	err := r.withTx(ctx, scope, func(tx *sql.Tx) error {
+		claimed, result, err := claimMutationReceipt(ctx, tx, scope, "mcp_agent_kill_switch.set", key, digest)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			var receipt struct {
+				Scope     string `json:"scope"`
+				SubjectID string `json:"subject_id"`
+				Version   uint64 `json:"version"`
+			}
+			if json.Unmarshal(result, &receipt) != nil || receipt.Version == 0 || receipt.Version > math.MaxInt64 {
+				return agentgovernance.ErrConflict
+			}
+			out, err = loadKillChange(ctx, tx, scope, receipt.Scope, receipt.SubjectID, receipt.Version)
+			replayed = err == nil
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO ai_agent_kill_switches(organization_id,workspace_id,scope_kind,subject_id,version,disabled,changed_by,reason,changed_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), string(change.Scope), change.SubjectID, int64(change.Version), change.Disabled, change.Change.ActorID, change.Change.Reason, change.Change.OccurredAt.UTC())
+		if err != nil {
+			return fmt.Errorf("agent governance repository: record governed kill switch: %w", err)
+		}
+		result, _ = json.Marshal(map[string]any{"scope": change.Scope, "subject_id": change.SubjectID, "version": change.Version})
+		return completeMutationReceipt(ctx, tx, scope, "mcp_agent_kill_switch.set", key, "mcp_agent_kill_switch", change.SubjectID, result)
+	})
+	return out, replayed, err
 }
 
 func (r *Repository) AgentKillState(ctx context.Context, scope tenancy.Scope, agent agentgovernance.Agent) (agentgovernance.KillState, error) {
@@ -251,6 +342,14 @@ func validate(r *Repository, ctx context.Context, scope tenancy.Scope) error {
 }
 
 func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.database); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.database.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -266,6 +365,14 @@ func (r *Repository) withTx(ctx context.Context, scope tenancy.Scope, fn func(*s
 }
 
 func (r *Repository) withReadTx(ctx context.Context, scope tenancy.Scope, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, scope); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.database); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, err := r.database.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return err
@@ -278,4 +385,74 @@ func (r *Repository) withReadTx(ctx context.Context, scope tenancy.Scope, fn fun
 		return err
 	}
 	return tx.Commit()
+}
+
+func validMutationKey(key string, digest []byte) bool {
+	return key != "" && len(key) <= 128 && len(digest) == sha256.Size
+}
+
+func claimMutationReceipt(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, operation, key string, digest []byte) (bool, []byte, error) {
+	result, err := tx.ExecContext(ctx, `INSERT INTO operation_receipts(organization_id,workspace_id,operation,idempotency_key,request_sha256,state) VALUES($1,$2,$3,$4,$5,'pending') ON CONFLICT DO NOTHING`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, digest)
+	if err != nil {
+		return false, nil, fmt.Errorf("agent governance repository: claim receipt: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, nil, fmt.Errorf("agent governance repository: claim receipt result: %w", err)
+	}
+	if rows == 1 {
+		return true, nil, nil
+	}
+	var stored, encoded []byte
+	var state string
+	if err := tx.QueryRowContext(ctx, `SELECT request_sha256,state,result FROM operation_receipts WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key).Scan(&stored, &state, &encoded); err != nil {
+		return false, nil, fmt.Errorf("agent governance repository: read receipt: %w", err)
+	}
+	if !bytes.Equal(stored, digest) || state != "completed" || len(encoded) == 0 {
+		return false, nil, agentgovernance.ErrConflict
+	}
+	return false, encoded, nil
+}
+
+func completeMutationReceipt(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, operation, key, resourceType, resourceID string, encoded []byte) error {
+	result, err := tx.ExecContext(ctx, `UPDATE operation_receipts SET state='completed',resource_type=$5,resource_id=$6,result=$7::jsonb,completed_at=clock_timestamp() WHERE organization_id=$1 AND workspace_id=$2 AND operation=$3 AND idempotency_key=$4 AND state='pending'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), operation, key, resourceType, resourceID, string(encoded))
+	if err != nil {
+		return fmt.Errorf("agent governance repository: complete receipt: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil || rows != 1 {
+		return agentgovernance.ErrConflict
+	}
+	return nil
+}
+
+func loadPolicyVersion(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, id string, version uint64) (agentgovernance.Policy, error) {
+	var out agentgovernance.Policy
+	var raw []byte
+	var until sql.NullTime
+	err := tx.QueryRowContext(ctx, `SELECT id,version,agent_id,integration_id,rules,effective_from,effective_until FROM ai_agent_policies WHERE organization_id=$1 AND workspace_id=$2 AND id=$3 AND version=$4`, scope.OrganizationID().String(), scope.WorkspaceID().String(), id, int64(version)).Scan(&out.ID, &out.Version, &out.AgentID, &out.IntegrationID, &raw, &out.EffectiveFrom, &until)
+	if err != nil {
+		return agentgovernance.Policy{}, agentgovernance.ErrConflict
+	}
+	if json.Unmarshal(raw, &out.Rules) != nil {
+		return agentgovernance.Policy{}, agentgovernance.ErrConflict
+	}
+	if until.Valid {
+		value := until.Time.UTC()
+		out.EffectiveUntil = &value
+	}
+	out.EffectiveFrom = out.EffectiveFrom.UTC()
+	return out, out.Validate()
+}
+
+func loadKillChange(ctx context.Context, tx *sql.Tx, scope tenancy.Scope, scopeKind, subjectID string, version uint64) (agentgovernance.KillChange, error) {
+	var out agentgovernance.KillChange
+	var kind string
+	err := tx.QueryRowContext(ctx, `SELECT scope_kind,subject_id,version,disabled,changed_by,reason,changed_at FROM ai_agent_kill_switches WHERE organization_id=$1 AND workspace_id=$2 AND scope_kind=$3 AND subject_id=$4 AND version=$5`, scope.OrganizationID().String(), scope.WorkspaceID().String(), scopeKind, subjectID, int64(version)).Scan(&kind, &out.SubjectID, &out.Version, &out.Disabled, &out.Change.ActorID, &out.Change.Reason, &out.Change.OccurredAt)
+	if err != nil {
+		return agentgovernance.KillChange{}, agentgovernance.ErrConflict
+	}
+	out.Scope = agentgovernance.KillScope(kind)
+	out.Change.OccurredAt = out.Change.OccurredAt.UTC()
+	return out, out.Validate()
 }

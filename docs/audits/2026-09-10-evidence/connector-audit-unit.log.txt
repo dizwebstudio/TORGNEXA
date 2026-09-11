@@ -1,0 +1,104 @@
+=== RUN   TestConnectorMutationRequiresAtomicDependencies
+--- PASS: TestConnectorMutationRequiresAtomicDependencies (0.00s)
+=== RUN   TestConnectorAtomicFailureContract
+--- PASS: TestConnectorAtomicFailureContract (0.01s)
+=== RUN   TestConnectorOAuthStartIsIdempotentAndCallbackIsOneTime
+--- PASS: TestConnectorOAuthStartIsIdempotentAndCallbackIsOneTime (0.01s)
+=== RUN   TestConnectorAuditPostgresCredentialsRollback
+=== RUN   TestConnectorAuditPostgresCredentialsRollback/audit
+    connector_audit_postgres_test.go:27: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresCredentialsRollback/revoke
+    connector_audit_postgres_test.go:27: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresCredentialsRollback/commit
+    connector_audit_postgres_test.go:27: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresCredentialsRollback/cancel
+    connector_audit_postgres_test.go:27: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- PASS: TestConnectorAuditPostgresCredentialsRollback (0.00s)
+    --- SKIP: TestConnectorAuditPostgresCredentialsRollback/audit (0.00s)
+    --- SKIP: TestConnectorAuditPostgresCredentialsRollback/revoke (0.00s)
+    --- SKIP: TestConnectorAuditPostgresCredentialsRollback/commit (0.00s)
+    --- SKIP: TestConnectorAuditPostgresCredentialsRollback/cancel (0.00s)
+=== RUN   TestConnectorAuditPostgresAccountMutations
+=== RUN   TestConnectorAuditPostgresAccountMutations/create
+    connector_audit_postgres_test.go:123: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresAccountMutations/disable
+    connector_audit_postgres_test.go:123: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresAccountMutations/enable
+    connector_audit_postgres_test.go:123: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresAccountMutations/capabilities
+    connector_audit_postgres_test.go:123: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresAccountMutations/health
+    connector_audit_postgres_test.go:123: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- PASS: TestConnectorAuditPostgresAccountMutations (0.00s)
+    --- SKIP: TestConnectorAuditPostgresAccountMutations/create (0.00s)
+    --- SKIP: TestConnectorAuditPostgresAccountMutations/disable (0.00s)
+    --- SKIP: TestConnectorAuditPostgresAccountMutations/enable (0.00s)
+    --- SKIP: TestConnectorAuditPostgresAccountMutations/capabilities (0.00s)
+    --- SKIP: TestConnectorAuditPostgresAccountMutations/health (0.00s)
+=== RUN   TestConnectorAuditPostgresConcurrentCredentialReplacement
+    connector_audit_postgres_test.go:211: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- SKIP: TestConnectorAuditPostgresConcurrentCredentialReplacement (0.00s)
+=== RUN   TestConnectorAuditPostgresBootstrapMutations
+=== RUN   TestConnectorAuditPostgresBootstrapMutations/preview
+    connector_audit_postgres_test.go:251: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresBootstrapMutations/initial_job
+    connector_audit_postgres_test.go:251: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresBootstrapMutations/schedule
+    connector_audit_postgres_test.go:251: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- PASS: TestConnectorAuditPostgresBootstrapMutations (0.00s)
+    --- SKIP: TestConnectorAuditPostgresBootstrapMutations/preview (0.00s)
+    --- SKIP: TestConnectorAuditPostgresBootstrapMutations/initial_job (0.00s)
+    --- SKIP: TestConnectorAuditPostgresBootstrapMutations/schedule (0.00s)
+=== RUN   TestConnectorAuditPostgresRejectsDifferentTenantAndPool
+    connector_audit_postgres_test.go:321: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- SKIP: TestConnectorAuditPostgresRejectsDifferentTenantAndPool (0.00s)
+=== RUN   TestBootstrapPreviewIsMetadataOnlyAndAudited
+--- PASS: TestBootstrapPreviewIsMetadataOnlyAndAudited (0.00s)
+=== RUN   TestEnabledScheduleRequiresCurrentPreview
+--- PASS: TestEnabledScheduleRequiresCurrentPreview (0.00s)
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle/start_audit_failure
+    connector_oauth_audit_postgres_test.go:23: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle/claim_audit_failure
+    connector_oauth_audit_postgres_test.go:23: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle/completion_audit_failure
+    connector_oauth_audit_postgres_test.go:23: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle/exchange_failure
+    connector_oauth_audit_postgres_test.go:23: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+=== RUN   TestConnectorAuditPostgresOAuthLifecycle/exchange_failure_audit_failure
+    connector_oauth_audit_postgres_test.go:23: requires disposable PostgreSQL; see scripts/check-audit-postgres.sh
+--- PASS: TestConnectorAuditPostgresOAuthLifecycle (0.00s)
+    --- SKIP: TestConnectorAuditPostgresOAuthLifecycle/start_audit_failure (0.00s)
+    --- SKIP: TestConnectorAuditPostgresOAuthLifecycle/claim_audit_failure (0.00s)
+    --- SKIP: TestConnectorAuditPostgresOAuthLifecycle/completion_audit_failure (0.00s)
+    --- SKIP: TestConnectorAuditPostgresOAuthLifecycle/exchange_failure (0.00s)
+    --- SKIP: TestConnectorAuditPostgresOAuthLifecycle/exchange_failure_audit_failure (0.00s)
+=== RUN   TestConnectorReadinessListExposesCatalogWithStableCursor
+--- PASS: TestConnectorReadinessListExposesCatalogWithStableCursor (0.03s)
+=== RUN   TestConnectorReadinessDetailAndFiltersFailClosed
+--- PASS: TestConnectorReadinessDetailAndFiltersFailClosed (0.07s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.296s
+=== RUN   TestLocalEncryptedProviderRejectsNontransactionalRepository
+--- PASS: TestLocalEncryptedProviderRejectsNontransactionalRepository (0.00s)
+=== RUN   TestLocalEncryptedProviderLifecycle
+=== PAUSE TestLocalEncryptedProviderLifecycle
+=== CONT  TestLocalEncryptedProviderLifecycle
+--- PASS: TestLocalEncryptedProviderLifecycle (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/secrets	1.020s
+=== RUN   TestConnectorSDKMigrationHardensAccountModel
+--- PASS: TestConnectorSDKMigrationHardensAccountModel (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/connectorrepo	1.054s
+testing: warning: no tests to run
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/secretrepo	1.018s [no tests to run]
+=== RUN   TestBootstrapScannersNormalizeDatabaseTime
+--- PASS: TestBootstrapScannersNormalizeDatabaseTime (0.00s)
+=== RUN   TestScanPolicyNormalizesDatabaseTimeToUTC
+--- PASS: TestScanPolicyNormalizesDatabaseTimeToUTC (0.00s)
+=== RUN   TestBootstrapScheduleMigrationIsTenantScopedAndBounded
+--- PASS: TestBootstrapScheduleMigrationIsTenantScopedAndBounded (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/postgres/syncrepo	1.055s

@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -15,19 +14,19 @@ var ErrSpoofedForwarding = errors.New("securityedge: untrusted forwarded headers
 var ErrRateLimited = errors.New("securityedge: rate limited")
 
 const maxForwardedHops = 32
-const defaultMaxLimiterKeys = 100_000
 
 type Config struct {
 	TrustedProxyCIDRs               []string
 	AdminCIDRs                      []string
 	AllowedOrigins                  []string
 	MaxRequestBytes, MaxUploadBytes int64
+	PreAuthRatePerMinute            int
 	RatePerMinute                   int
 	HSTSSeconds                     int64
 }
 
 func (c Config) Validate() error {
-	if c.MaxRequestBytes <= 0 || c.MaxUploadBytes <= 0 || c.MaxRequestBytes < c.MaxUploadBytes || c.RatePerMinute < 1 || c.HSTSSeconds < 31536000 {
+	if c.MaxRequestBytes <= 0 || c.MaxUploadBytes <= 0 || c.MaxRequestBytes < c.MaxUploadBytes || c.PreAuthRatePerMinute < 1 || c.RatePerMinute < 1 || c.HSTSSeconds < 31536000 {
 		return ErrInvalid
 	}
 	for _, x := range append(append([]string{}, c.TrustedProxyCIDRs...), c.AdminCIDRs...) {
@@ -125,58 +124,6 @@ func CSRFAllowed(method, origin string, c Config) bool {
 	default:
 		return OriginAllowed(origin, c)
 	}
-}
-
-type Limiter struct {
-	mu        sync.Mutex
-	window    map[string]time.Time
-	count     map[string]int
-	lastSweep time.Time
-	maxKeys   int
-	Now       func() time.Time
-}
-
-func NewLimiter() *Limiter {
-	return &Limiter{window: map[string]time.Time{}, count: map[string]int{}, maxKeys: defaultMaxLimiterKeys, Now: time.Now}
-}
-func (l *Limiter) Allow(key string, c Config) error {
-	if l == nil || key == "" || c.RatePerMinute < 1 || l.Now == nil {
-		return ErrInvalid
-	}
-	now := l.Now().UTC()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Bound attacker-controlled key cardinality. Expired entries are swept at
-	// most once per minute, and a full live window fails closed for unseen keys
-	// instead of growing the process heap without limit.
-	if l.lastSweep.IsZero() || now.Sub(l.lastSweep) >= time.Minute {
-		for existing, start := range l.window {
-			if now.Sub(start) >= time.Minute {
-				delete(l.window, existing)
-				delete(l.count, existing)
-			}
-		}
-		l.lastSweep = now
-	}
-	maxKeys := l.maxKeys
-	if maxKeys <= 0 {
-		maxKeys = defaultMaxLimiterKeys
-	}
-	if _, exists := l.window[key]; !exists && len(l.window) >= maxKeys {
-		return ErrRateLimited
-	}
-
-	start := l.window[key]
-	if start.IsZero() || now.Sub(start) >= time.Minute {
-		l.window[key] = now
-		l.count[key] = 0
-	}
-	if l.count[key] >= c.RatePerMinute {
-		return ErrRateLimited
-	}
-	l.count[key]++
-	return nil
 }
 
 type SecuritySignal struct {

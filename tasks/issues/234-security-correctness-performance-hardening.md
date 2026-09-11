@@ -7,10 +7,88 @@ A01–A10 из аудита 2026-09-08 исправлены в указанно�
 
 ```yaml
 repository_status: in_progress
-release_blockers: [234.1, 234.3]
+release_blockers: [234.1]
 security_priority: high
 external_evidence_required: false
 ```
+
+## Выполнено 2026-09-11 — завершение атомарного аудита 234.3
+
+- [x] Manual policy run, connector-account sync и reconciliation job создают
+  deterministic run и authoritative audit в одной транзакции; replay не
+  добавляет строки.
+- [x] MCP/AI provider accounts и MCP agent policy/kill switch фиксируют
+  mutation, idempotency receipt и Settings audit атомарно. AI replay не
+  оставляет лишнюю secret reference.
+- [x] OAuth worker refresh до provider call фиксирует минимизированный
+  deterministic intent; ошибка evidence блокирует remote effect.
+- [x] PostgreSQL failure-injection под forced RLS проверяет rollback, retry,
+  replay, one-slot/bounded pools и отсутствие credential/reference данных в
+  refresh evidence.
+- [Отчёт](../../docs/audits/2026-09-11-privileged-audit-completion.md),
+  [ADR-0193](../../adr/0193-atomic-privileged-dispatch-and-refresh-intent.md).
+
+Пункт 234.3 закрыт в репозитории. Миграций нет; MCP policy и kill-switch
+клиенты должны передавать обязательный `Idempotency-Key`. Deployment не
+выполнялся.
+
+## Выполнено 2026-09-10 — общий rate limit для реплик API
+
+- [x] Production API использует общий Valkey limiter с атомарным Lua counter;
+  `local` разрешён только в development/test одного процесса.
+- [x] Разделены pre-auth IP, authenticated organization/workspace/principal и
+  public webhook бюджеты; ключи хешируются, cardinality и pool ограничены.
+- [x] Недоступность Valkey fail-closed: startup прекращается, runtime отвечает
+  `503 Retry-After: 1`; превышение отвечает `429` с фактическим TTL.
+- [x] Две независимые API-реплики с реальным Valkey, 128 concurrent requests,
+  shared NAT, distributed IP, capacity exhaustion и race suite — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-10-rate-limit-fix.md),
+  [ADR-0192](../../adr/0192-distributed-api-rate-limits.md).
+
+Пункт 234.8 закрыт в репозитории. Миграций нет; deployment не выполнялся.
+
+## Выполнено 2026-09-10 — атомарность connector account и audit
+
+- [x] Создание аккаунта, credentials, enable/disable, capabilities,
+  health/history, OAuth, bootstrap preview/job и schedule используют общую
+  tenant/pool-bound транзакцию с authoritative audit.
+- [x] Ошибки audit, отзыва старого секрета, COMMIT и cancellation откатывают
+  новую привязку и ciphertext; старый секрет остаётся доступен. Провайдер без
+  transaction capability отклоняется до mutation.
+- [x] OAuth claim и audit фиксируются до remote exchange. После claim callback
+  остаётся одноразовым даже при последующем сбое; необходим новый OAuth flow.
+  Replay start не оставляет временных секретов и повторных audit records.
+- [x] PostgreSQL/race: 19 новых конечных сценариев; весь gate — 33 теста верхнего
+  уровня, 94 PASS с подслучаями. Общие Go test/vet, contracts, architecture,
+  SDK/TypeScript, frontend tests/build и `make policy` — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-10-connector-audit-fix.md),
+  [ADR-0191](../../adr/0191-atomic-connector-account-audit.md).
+
+Выявленный дефект закрыт в репозитории. Миграций нет; deployment не выполнялся.
+На этом этапе общий пункт 234.3 оставался открытым для inventory security
+settings и отдельной проверки manual sync/reconciliation dispatch и worker
+refresh; эта область закрыта 2026-09-11 в ADR-0193.
+
+## Выполнено 2026-09-10 — повторная проверка доступа открытого SSE
+
+- [x] Каждые 15 секунд повторяется authn → canonical tenant → permission;
+  общий timeout проверки 5 секунд, отказ или сбой завершает поток.
+- [x] Первоначальный expiry токена отдельно ограничивает context и запись
+  кадра, включая клиента, который перестал читать. Сменить identity, session,
+  tenant или expiry внутри потока нельзя; поздний успех не отменяет timeout.
+- [x] PostgreSQL + production composition: активная сессия переживает проверки,
+  отзыв сессии, отключение участника и сбои хранилищ/IdP закрывают поток;
+  revoked/disabled state и единственность login evidence сохраняются.
+- [x] HTTP/1.1, HTTP/2, net.Pipe, race и прежние A10/browser regressions — PASS.
+  Общие Go test/vet, contracts, architecture, frontend и SDK checks — PASS.
+- [Отчёт и журналы](../../docs/audits/2026-09-10-sse-authorization-fix.md),
+  [ADR-0190](../../adr/0190-continuous-sse-authorization.md).
+
+Follow-up закрыт в репозитории. Проверка периодическая: 15 секунд до следующей
+проверки, до 5 секунд на неё, уже начатая запись ограничена своим deadline.
+Для применения обновить все API instances и завершить старые соединения.
+Миграция и изменение frontend runtime не нужны; deployment не выполнялся.
+Остальные пункты 234.6/234.7 и общий статус Task 234 не меняются.
 
 ## Выполнено 2026-09-10 — A10 / таймауты и восстановление SSE
 
@@ -126,7 +204,8 @@ A01 закрыта в репозитории. A09 и A10 закрыты 2026-09-
   payment reconciliation audit ID на UUIDv7.
 - A06 / часть 234.3: общая транзакция mutation + audit для member, workspace,
   profile/avatar removal, identity provider и connector runtime config.
-  Остальной inventory security/connector-account writes остаётся открытым.
+  Оставшийся на этом этапе inventory security/connector-account writes закрыт
+  позднее в ADR-0191 и ADR-0193.
 - A07 / 234.4: случайные subscription references с SHA-256 в tenant/account
   runtime config, exact topic, проверка до Inbox, revocation, OpenAPI/SDK и
   инструкция maintenance window.
@@ -203,17 +282,22 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.3 — Объединить привилегированные settings mutations с аудитом
 
-- [ ] Инвентаризировать member, workspace, profile, identity-provider,
+- [x] Инвентаризировать member, workspace, profile, identity-provider,
   security и connector-account writes, где `audit.Capture` вызывается после
   уже закоммиченной mutation.
-- [ ] Для `write_sensitive` и `legally_significant` путей писать authoritative
+- [x] Для `write_sensitive` и `legally_significant` путей писать authoritative
   audit record или durable audit intent в той же PostgreSQL-транзакции.
-- [ ] Ошибка обязательного аудита должна откатывать business mutation; retry с
+- [x] Ошибка обязательного аудита должна откатывать business mutation; retry с
   тем же idempotency key не должен создавать дубликаты.
-- [ ] Audit summary остаётся bounded/redacted и не получает email, raw OIDC
+- [x] Audit summary остаётся bounded/redacted и не получает email, raw OIDC
   subject, credentials или provider payload.
 - [x] Добавить тесты с injected audit failure для role/status, identity-provider
   enable/disable и profile update.
+- [x] Connector account/bootstrap inventory и PostgreSQL failure/retry/concurrency
+  закрыты в ADR-0191; runtime config ранее закрыт в ADR-0184.
+- [x] Завершить inventory остальных security settings и отдельно оценить
+  authoritative evidence для manual sync/reconciliation dispatch и worker
+  refresh с учётом неоткатываемых remote effects (ADR-0104, ADR-0193).
 
 ### 234.4 — Привязать commerce webhook topic к доверенному ожиданию
 
@@ -274,9 +358,10 @@ capability-based connector boundary и запрет на plaintext credentials.
   configured `WriteTimeout`, получает heartbeat и завершается по cancel.
 - [x] A10: bounded frame write/Flush и refresh при reconnect, включая
   пропущенные изменения, прежний/пустой cursor; браузерная проверка coalescing.
-- [ ] Определить bounded срок жизни/повторную проверку полномочий открытого
-  SSE при expiry токена, отзыве сессии и изменении прав; сейчас authn/authz
-  выполняются при установлении соединения, а не для каждого кадра.
+- [x] Повторная authn/tenant/authz проверка открытого SSE каждые 15 секунд,
+  timeout 5 секунд, fail-closed при revoke/disable/сбое. Первоначальный expiry
+  независимо ограничивает context и записи; identity/tenant/session неизменны.
+  Реальные HTTP/1.1/2, PostgreSQL и failure-injection tests — ADR-0190.
 - [ ] Заменить polling audit head каждые две секунды на каждого клиента одним
   tenant-scoped watcher/broadcaster или эквивалентным multiplexing. Durable
   event/outbox остаётся источником сигнала; SSE payload остаётся metadata-only.
@@ -286,16 +371,16 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.8 — Подготовить rate limiter к нескольким репликам
 
-- [ ] Ввести интерфейс limiter и распределённую Valkey-реализацию для
+- [x] Ввести интерфейс limiter и распределённую Valkey-реализацию для
   multi-replica deployment; in-memory вариант разрешать только для явно
   single-node/development topology.
-- [ ] Разделить pre-auth IP budget, authenticated tenant/principal budget и
+- [x] Разделить pre-auth IP budget, authenticated tenant/principal budget и
   public webhook budget без attacker-controlled unbounded key cardinality.
-- [ ] Убрать единый global mutex/O(n) sweep из request hot path: shard/expiry
+- [x] Убрать единый global mutex/O(n) sweep из request hot path: shard/expiry
   queue/background cleanup для локального fallback.
-- [ ] Зафиксировать fail-open/fail-closed поведение при недоступности Valkey,
+- [x] Зафиксировать fail-open/fail-closed поведение при недоступности Valkey,
   `Retry-After`, метрики и alerting.
-- [ ] Добавить тесты shared NAT, distributed IPs, replica multiplication,
+- [x] Добавить тесты shared NAT, distributed IPs, replica multiplication,
   cardinality exhaustion и concurrent access.
 
 ### 234.9 — Минимизировать OIDC subject reference в API/UI

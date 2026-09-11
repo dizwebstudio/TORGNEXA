@@ -10,6 +10,7 @@ import (
 	corepayments "github.com/torgnexa/torgnexa/internal/core/payments"
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/platform/builtinruntime"
+	"github.com/torgnexa/torgnexa/internal/platform/connectorauth"
 	"github.com/torgnexa/torgnexa/internal/platform/connectors"
 	"github.com/torgnexa/torgnexa/internal/platform/domain"
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
@@ -62,6 +63,10 @@ func (paymentReconcileSecretsStub) Revoke(context.Context, tenancy.Scope, secret
 }
 
 type paymentReconcileRefreshStub struct{}
+
+func (paymentReconcileRefreshStub) RecordRefreshIntent(context.Context, tenancy.Scope, connectorauth.RefreshIntent) error {
+	return nil
+}
 
 func (paymentReconcileRefreshStub) WithRefreshLock(context.Context, tenancy.Scope, secrets.Reference, func(context.Context) error) error {
 	return errors.New("not used")

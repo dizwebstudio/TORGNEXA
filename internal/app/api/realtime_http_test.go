@@ -40,7 +40,7 @@ func TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization(t *testing.T) {
 				_, _ = io.WriteString(w, "synthetic response after timeout")
 				flushed <- http.NewResponseController(w).Flush()
 			})}
-			handler, _ := a10Handler(t, head, realtimeTiming{time.Second, time.Second, time.Second}, a10Principal(), authzStub{}, extra)
+			handler, _ := a10Handler(t, head, realtimeTiming{pollInterval: time.Second, heartbeatInterval: time.Second, writeTimeout: time.Second}, a10Principal(), authzStub{}, extra)
 			server := httptest.NewUnstartedServer(handler)
 			server.Config.WriteTimeout = 50 * time.Millisecond
 			server.EnableHTTP2 = http2
@@ -80,7 +80,7 @@ func TestA10RealtimeKeepsOrdinaryTimeoutAndAuthorization(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			head := &a10AuditHead{scope: validTestScope(t)}
 			head.id.Store("synthetic-head")
-			handler, _ := a10Handler(t, head, realtimeTiming{time.Second, time.Second, time.Second}, tc.authn, tc.authz)
+			handler, _ := a10Handler(t, head, realtimeTiming{pollInterval: time.Second, heartbeatInterval: time.Second, writeTimeout: time.Second}, tc.authn, tc.authz)
 			server := httptest.NewServer(handler)
 			t.Cleanup(server.Close)
 			response, err := server.Client().Get(server.URL + RealtimePath)
@@ -132,7 +132,7 @@ func (c a10LocalConn) RemoteAddr() net.Addr {
 func TestA10RealtimeSlowClientReleasesHandler(t *testing.T) {
 	head := &a10AuditHead{scope: validTestScope(t)}
 	head.id.Store("synthetic-head")
-	timing := realtimeTiming{20 * time.Millisecond, 300 * time.Millisecond, 120 * time.Millisecond}
+	timing := realtimeTiming{pollInterval: 20 * time.Millisecond, heartbeatInterval: 300 * time.Millisecond, writeTimeout: 120 * time.Millisecond}
 	handler, done := a10Handler(t, head, timing, a10Principal(), authzStub{})
 	serverConn, clientConn := net.Pipe()
 	listener := &a10PipeListener{conn: a10LocalConn{serverConn}, closed: make(chan struct{})}
@@ -203,7 +203,7 @@ func a10Handler(t *testing.T, head *a10AuditHead, timing realtimeTiming, authn A
 }
 
 func a10Principal() Authenticator {
-	return authnStub{principal: Principal{Issuer: "https://synthetic.example.test", Subject: "synthetic-user"}}
+	return authnStub{principal: Principal{Issuer: "https://synthetic.example.test", Subject: "synthetic-user", ExpiresAt: time.Now().Add(time.Hour)}}
 }
 
 func a10Frame(t *testing.T, reader *bufio.Reader) (string, realtimeEvent) {
@@ -253,7 +253,7 @@ func TestA10RealtimeHTTPDeadlineAndReconnect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			head := &a10AuditHead{scope: validTestScope(t)}
 			head.id.Store("synthetic-audit-before")
-			timing := realtimeTiming{20 * time.Millisecond, 300 * time.Millisecond, 100 * time.Millisecond}
+			timing := realtimeTiming{pollInterval: 20 * time.Millisecond, heartbeatInterval: 300 * time.Millisecond, writeTimeout: 100 * time.Millisecond}
 			handler, done := a10Handler(t, head, timing, a10Principal(), authzStub{})
 			server := httptest.NewUnstartedServer(handler)
 			server.Config.WriteTimeout = 80 * time.Millisecond

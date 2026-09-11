@@ -61,10 +61,10 @@ or client-selected tenant. API reads after invalidation retain their normal
 authorization and RLS. Application-level slow writes are bounded; intermediate
 proxy buffering/idle timeouts require deployment qualification.
 
-Connection establishment retains the existing authentication policy. Ongoing
-revalidation of an already open stream on token expiry, session revocation or
-permission changes is a separate lifecycle follow-up in Task 234.7. This change
-does not claim instantaneous revocation of previously authorized streams.
+Connection establishment retains the existing authentication policy. The
+subsequent [ADR-0190](0190-continuous-sse-authorization.md) implements the
+Task 234.7 follow-up for open-stream credential expiry, session revocation and
+permission changes. Its periodic checks do not claim instantaneous revocation.
 
 Per-tenant fan-out, connection limits, shared watchers and production load
 qualification remain Task 234.7; the existing indexed audit-head polling stays

@@ -18,9 +18,12 @@ Only after all three stages succeed are the principal and tenant scope attached 
 context. Admin-only routes additionally require the validated client IP to be in the
 configured admin CIDRs.
 
-The same pipeline applies trusted-proxy/X-Forwarded-For validation, bounded rate limiting,
-request body limits, browser origin/CSRF policy and response security headers. Forwarded
-headers from an untrusted socket peer are rejected.
+The same pipeline applies trusted-proxy/X-Forwarded-For validation, distributed bounded rate
+limiting, request body limits, browser origin/CSRF policy and response security headers.
+Forwarded headers from an untrusted socket peer are rejected. The pre-auth client-IP budget
+runs before authentication. After canonical tenant resolution, a separate
+organization/workspace/issuer/subject budget runs before authorization and the application
+handler. Public webhooks use a third fixed budget.
 
 ## Drift prevention
 
@@ -33,4 +36,7 @@ Repository CI executes these tests before release.
 
 Production API deployments must set `TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS` explicitly.
 Admin CIDRs, browser origins, body limits, rate limit and HSTS lifetime are also loaded from
-validated security configuration. An invalid edge configuration aborts API startup.
+validated security configuration. They must select the `valkey` limiter backend and share the
+same namespace across replicas. Startup aborts if Valkey is unavailable. A request-time
+limiter failure returns `503` with `Retry-After: 1`; an exhausted budget returns `429` with
+the remaining-window `Retry-After`. An invalid edge configuration aborts API startup.

@@ -36,45 +36,61 @@ func TestLoadWithLookupDefaults(t *testing.T) {
 	if cfg.ClickHouse.Endpoint != "http://127.0.0.1:8123" || cfg.ClickHouse.QueryTimeout != 5*time.Second {
 		t.Fatalf("unexpected ClickHouse defaults: %+v", cfg.ClickHouse)
 	}
+	if cfg.Security.PreAuthRatePerMinute != 6000 || cfg.Security.RatePerMinute != 600 || cfg.Security.RateLimitBackend != RateLimitBackendLocal || cfg.Security.RateLimitNamespace != "torgnexa:edge:v1" || cfg.Security.RateLimitMaxKeys != 100_000 {
+		t.Fatalf("unexpected rate-limit defaults: %+v", cfg.Security)
+	}
+	if cfg.Valkey.Address != "" || cfg.Valkey.Username != "" || cfg.Valkey.Password != "" || cfg.Valkey.ConnectTimeout != time.Second || cfg.Valkey.RequestTimeout != 250*time.Millisecond || cfg.Valkey.MaxConnections != 32 {
+		t.Fatalf("unexpected Valkey defaults: %+v", cfg.Valkey)
+	}
 }
 
 func TestLoadWithLookupOverrides(t *testing.T) {
 	values := map[string]string{
-		"TORGNEXA_ENV":                          "staging-eu_1",
-		"TORGNEXA_LOG_LEVEL":                    "warn",
-		"TORGNEXA_LOG_FORMAT":                   "text",
-		"TORGNEXA_LOG_ADD_SOURCE":               "true",
-		"TORGNEXA_SHUTDOWN_TIMEOUT":             "45s",
-		"TORGNEXA_HTTP_ADDR":                    ":9090",
-		"TORGNEXA_HTTP_READ_HEADER_TIMEOUT":     "2s",
-		"TORGNEXA_HTTP_READ_TIMEOUT":            "20s",
-		"TORGNEXA_HTTP_WRITE_TIMEOUT":           "25s",
-		"TORGNEXA_HTTP_IDLE_TIMEOUT":            "2m",
-		"TORGNEXA_HTTP_MAX_HEADER_BYTES":        "32768",
-		"TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS": "10.0.0.0/8,192.168.1.0/24",
-		"TORGNEXA_SECURITY_ADMIN_CIDRS":         "10.1.0.0/16",
-		"TORGNEXA_SECURITY_ALLOWED_ORIGINS":     "https://console.example.test",
-		"TORGNEXA_SECURITY_MAX_REQUEST_BYTES":   "1048576",
-		"TORGNEXA_SECURITY_MAX_UPLOAD_BYTES":    "524288",
-		"TORGNEXA_SECURITY_RATE_PER_MINUTE":     "120",
-		"TORGNEXA_SECURITY_HSTS_SECONDS":        "63072000",
-		"DATABASE_URL":                          "postgres://db:5432/torgnexa?sslmode=require",
-		"TORGNEXA_DB_MAX_OPEN_CONNS":            "40",
-		"TORGNEXA_DB_MAX_IDLE_CONNS":            "12",
-		"TORGNEXA_DB_CONN_MAX_LIFETIME":         "45m",
-		"TORGNEXA_DB_CONN_MAX_IDLE_TIME":        "3m",
-		"TORGNEXA_DB_CONNECT_TIMEOUT":           "7s",
-		"CLICKHOUSE_DSN":                        "https://clickhouse.example.test",
-		"CLICKHOUSE_USERNAME":                   "reports",
-		"CLICKHOUSE_PASSWORD":                   "fixture-value",
-		"TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT":     "4s",
-		"S3_ENDPOINT":                           "https://objects.example.test",
-		"S3_BUCKET":                             "tenant-files",
-		"S3_REGION":                             "ru-central-1",
-		"S3_ACCESS_KEY":                         "fixture-access",
-		"S3_SECRET_KEY":                         "fixture-value",
-		"TORGNEXA_S3_REQUEST_TIMEOUT":           "12s",
-		"TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS":    "login.example.test,id.example.test",
+		"TORGNEXA_ENV":                               "staging-eu_1",
+		"TORGNEXA_LOG_LEVEL":                         "warn",
+		"TORGNEXA_LOG_FORMAT":                        "text",
+		"TORGNEXA_LOG_ADD_SOURCE":                    "true",
+		"TORGNEXA_SHUTDOWN_TIMEOUT":                  "45s",
+		"TORGNEXA_HTTP_ADDR":                         ":9090",
+		"TORGNEXA_HTTP_READ_HEADER_TIMEOUT":          "2s",
+		"TORGNEXA_HTTP_READ_TIMEOUT":                 "20s",
+		"TORGNEXA_HTTP_WRITE_TIMEOUT":                "25s",
+		"TORGNEXA_HTTP_IDLE_TIMEOUT":                 "2m",
+		"TORGNEXA_HTTP_MAX_HEADER_BYTES":             "32768",
+		"TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS":      "10.0.0.0/8,192.168.1.0/24",
+		"TORGNEXA_SECURITY_ADMIN_CIDRS":              "10.1.0.0/16",
+		"TORGNEXA_SECURITY_ALLOWED_ORIGINS":          "https://console.example.test",
+		"TORGNEXA_SECURITY_MAX_REQUEST_BYTES":        "1048576",
+		"TORGNEXA_SECURITY_MAX_UPLOAD_BYTES":         "524288",
+		"TORGNEXA_SECURITY_PRE_AUTH_RATE_PER_MINUTE": "1200",
+		"TORGNEXA_SECURITY_RATE_PER_MINUTE":          "120",
+		"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND":       "valkey",
+		"TORGNEXA_SECURITY_RATE_LIMIT_NAMESPACE":     "torgnexa:test:edge:v1",
+		"TORGNEXA_SECURITY_RATE_LIMIT_MAX_KEYS":      "3210",
+		"TORGNEXA_SECURITY_HSTS_SECONDS":             "63072000",
+		"VALKEY_ADDR":                                "valkey.example.test:6380",
+		"VALKEY_USERNAME":                            "torgnexa-api",
+		"VALKEY_PASSWORD":                            "fixture-valkey-password",
+		"TORGNEXA_VALKEY_CONNECT_TIMEOUT":            "2s",
+		"TORGNEXA_VALKEY_REQUEST_TIMEOUT":            "750ms",
+		"TORGNEXA_VALKEY_MAX_CONNECTIONS":            "20",
+		"DATABASE_URL":                               "postgres://db:5432/torgnexa?sslmode=require",
+		"TORGNEXA_DB_MAX_OPEN_CONNS":                 "40",
+		"TORGNEXA_DB_MAX_IDLE_CONNS":                 "12",
+		"TORGNEXA_DB_CONN_MAX_LIFETIME":              "45m",
+		"TORGNEXA_DB_CONN_MAX_IDLE_TIME":             "3m",
+		"TORGNEXA_DB_CONNECT_TIMEOUT":                "7s",
+		"CLICKHOUSE_DSN":                             "https://clickhouse.example.test",
+		"CLICKHOUSE_USERNAME":                        "reports",
+		"CLICKHOUSE_PASSWORD":                        "fixture-value",
+		"TORGNEXA_CLICKHOUSE_QUERY_TIMEOUT":          "4s",
+		"S3_ENDPOINT":                                "https://objects.example.test",
+		"S3_BUCKET":                                  "tenant-files",
+		"S3_REGION":                                  "ru-central-1",
+		"S3_ACCESS_KEY":                              "fixture-access",
+		"S3_SECRET_KEY":                              "fixture-value",
+		"TORGNEXA_S3_REQUEST_TIMEOUT":                "12s",
+		"TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS":         "login.example.test,id.example.test",
 	}
 
 	cfg, err := LoadWithLookup(ServiceAPI, mapLookup(values))
@@ -90,8 +106,11 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 	if cfg.HTTP.Address != ":9090" || cfg.HTTP.ReadHeaderTimeout != 2*time.Second || cfg.HTTP.ReadTimeout != 20*time.Second || cfg.HTTP.WriteTimeout != 25*time.Second || cfg.HTTP.IdleTimeout != 2*time.Minute || cfg.HTTP.MaxHeaderBytes != 32768 {
 		t.Fatalf("unexpected HTTP config: %+v", cfg.HTTP)
 	}
-	if len(cfg.Security.TrustedProxyCIDRs) != 2 || cfg.Security.AdminCIDRs[0] != "10.1.0.0/16" || cfg.Security.AllowedOrigins[0] != "https://console.example.test" || cfg.Security.MaxRequestBytes != 1048576 || cfg.Security.MaxUploadBytes != 524288 || cfg.Security.RatePerMinute != 120 || cfg.Security.HSTSSeconds != 63072000 {
+	if len(cfg.Security.TrustedProxyCIDRs) != 2 || cfg.Security.AdminCIDRs[0] != "10.1.0.0/16" || cfg.Security.AllowedOrigins[0] != "https://console.example.test" || cfg.Security.MaxRequestBytes != 1048576 || cfg.Security.MaxUploadBytes != 524288 || cfg.Security.PreAuthRatePerMinute != 1200 || cfg.Security.RatePerMinute != 120 || cfg.Security.RateLimitBackend != RateLimitBackendValkey || cfg.Security.RateLimitNamespace != "torgnexa:test:edge:v1" || cfg.Security.RateLimitMaxKeys != 3210 || cfg.Security.HSTSSeconds != 63072000 {
 		t.Fatalf("unexpected security config: %+v", cfg.Security)
+	}
+	if cfg.Valkey.Address != "valkey.example.test:6380" || cfg.Valkey.Username != "torgnexa-api" || cfg.Valkey.Password != "fixture-valkey-password" || cfg.Valkey.ConnectTimeout != 2*time.Second || cfg.Valkey.RequestTimeout != 750*time.Millisecond || cfg.Valkey.MaxConnections != 20 {
+		t.Fatalf("unexpected Valkey config: %+v", cfg.Valkey)
 	}
 	if cfg.Database.URL == "" || cfg.Database.MaxOpenConns != 40 || cfg.Database.MaxIdleConns != 12 || cfg.Database.ConnMaxLifetime != 45*time.Minute || cfg.Database.ConnMaxIdleTime != 3*time.Minute || cfg.Database.ConnectTimeout != 7*time.Second {
 		t.Fatalf("unexpected database config: %+v", cfg.Database)
@@ -153,6 +172,8 @@ func TestLoadWithLookupRequiresExplicitProductionAPIAddress(t *testing.T) {
 		"TORGNEXA_ENV":                          "production",
 		"TORGNEXA_HTTP_ADDR":                    ":8080",
 		"TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS": "127.0.0.1/32",
+		"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND":  "valkey",
+		"VALKEY_ADDR":                           "valkey:6379",
 	}))
 	if err != nil {
 		t.Fatalf("LoadWithLookup() explicit production address error = %v", err)
@@ -169,6 +190,39 @@ func TestLoadWithLookupRequiresExplicitProductionSecurityEdge(t *testing.T) {
 	}))
 	if err == nil || !strings.Contains(err.Error(), "SECURITY_TRUSTED_PROXY_CIDRS") {
 		t.Fatalf("LoadWithLookup() error = %v", err)
+	}
+}
+
+func TestLoadWithLookupRequiresDistributedLimiterForProductionAPI(t *testing.T) {
+	base := map[string]string{
+		"TORGNEXA_ENV":                          "production",
+		"TORGNEXA_HTTP_ADDR":                    ":8080",
+		"TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS": "127.0.0.1/32",
+	}
+	_, err := LoadWithLookup(ServiceAPI, mapLookup(base))
+	if err == nil || !strings.Contains(err.Error(), "RATE_LIMIT_BACKEND must be valkey") {
+		t.Fatalf("local production limiter error = %v", err)
+	}
+	base["TORGNEXA_SECURITY_RATE_LIMIT_BACKEND"] = "valkey"
+	_, err = LoadWithLookup(ServiceAPI, mapLookup(base))
+	if err == nil || !strings.Contains(err.Error(), "VALKEY_ADDR is required") {
+		t.Fatalf("missing Valkey address error = %v", err)
+	}
+}
+
+func TestLoadWithLookupRestrictsLocalLimiterToDevelopmentAndTest(t *testing.T) {
+	_, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{
+		"TORGNEXA_ENV":                         "staging",
+		"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND": "local",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "restricted to development or test") {
+		t.Fatalf("staging local limiter error = %v", err)
+	}
+	if _, err := LoadWithLookup(ServiceAPI, mapLookup(map[string]string{
+		"TORGNEXA_ENV":                         "test",
+		"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND": "local",
+	})); err != nil {
+		t.Fatalf("test local limiter error = %v", err)
 	}
 }
 
@@ -306,6 +360,14 @@ func TestLoadWithLookupRejectsInvalidConfiguration(t *testing.T) {
 		{name: "headers", service: ServiceAPI, values: map[string]string{"TORGNEXA_HTTP_MAX_HEADER_BYTES": "1024"}, want: "between"},
 		{name: "security request", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_MAX_REQUEST_BYTES": "512"}, want: "between"},
 		{name: "security upload", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_MAX_REQUEST_BYTES": "4096", "TORGNEXA_SECURITY_MAX_UPLOAD_BYTES": "8192"}, want: "between"},
+		{name: "security pre-auth rate", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_PRE_AUTH_RATE_PER_MINUTE": "0"}, want: "between"},
+		{name: "security rate backend", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND": "memory"}, want: "must be local or valkey"},
+		{name: "security rate namespace", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_RATE_LIMIT_NAMESPACE": "bad{namespace"}, want: "invalid characters"},
+		{name: "security rate max keys", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_RATE_LIMIT_MAX_KEYS": "0"}, want: "between"},
+		{name: "valkey address", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_RATE_LIMIT_BACKEND": "valkey", "VALKEY_ADDR": "valkey"}, want: "host:port"},
+		{name: "valkey password", service: ServiceAPI, values: map[string]string{"VALKEY_PASSWORD": "bad\nsecret"}, want: "invalid characters"},
+		{name: "valkey username without password", service: ServiceAPI, values: map[string]string{"VALKEY_USERNAME": "api"}, want: "VALKEY_PASSWORD is required"},
+		{name: "valkey timeout", service: ServiceAPI, values: map[string]string{"TORGNEXA_VALKEY_REQUEST_TIMEOUT": "10ms"}, want: "between"},
 		{name: "security hsts", service: ServiceAPI, values: map[string]string{"TORGNEXA_SECURITY_HSTS_SECONDS": "10"}, want: "between"},
 		{name: "database URL whitespace", service: ServiceAPI, values: map[string]string{"DATABASE_URL": "postgres://fixture@db:5432/db bad"}, want: "forbidden"},
 		{name: "database open", service: ServiceAPI, values: map[string]string{"TORGNEXA_DB_MAX_OPEN_CONNS": "0"}, want: "between"},

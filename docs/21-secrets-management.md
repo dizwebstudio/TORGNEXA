@@ -39,6 +39,22 @@ correctness lock.
 
 Both tables use forced organization/workspace RLS. The application role requires `SELECT/INSERT/UPDATE` on `secret_references` and only `SELECT/INSERT` on `secret_versions`; it must not receive delete/truncate privileges or `BYPASSRLS`.
 
+Connector enrollment and OAuth setup/completion require the optional
+`TransactionalProvider` interface (ADR-0191). Its callback must join the caller's
+tenant/pool-bound authoritative transaction without independently committing.
+The Community provider supports this through `secretrepo`; an incompatible
+provider or repository fails closed before secret mutation. External providers
+need an explicitly reviewed implementation of this guarantee before admission
+to those flows.
+
+Stable-reference worker refresh keeps ADR-0104's advisory-lock boundary and now
+adds ADR-0193 durable intent before calling the provider. The intent is
+idempotent for tenant/account/connector/reference-version, while the persisted
+row omits the opaque reference and all request/response material. If intent
+persistence fails, the provider is not called. PostgreSQL still cannot roll back
+a provider-side token transition after the call starts; normalized health and
+retry/re-authorization behavior cover that later boundary.
+
 ## Rules
 
 - Database/application contracts persist opaque references, never plaintext credential columns.

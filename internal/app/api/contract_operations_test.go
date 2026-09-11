@@ -29,6 +29,17 @@ func (store *contractRunStore) CreateRun(_ context.Context, _ tenancy.Scope, run
 	return run, nil
 }
 
+func (store *contractRunStore) CreateRunWithReplay(_ context.Context, _ tenancy.Scope, run reconciliation.Run) (reconciliation.Run, bool, error) {
+	if store.run.ID != "" {
+		if store.run.ID != run.ID || store.run.PolicyID != run.PolicyID || store.run.Mode != run.Mode {
+			return reconciliation.Run{}, false, reconciliation.ErrConflict
+		}
+		return store.run, true, nil
+	}
+	store.run = run
+	return run, false, nil
+}
+
 func (store *contractRunStore) Run(_ context.Context, _ tenancy.Scope, id string) (reconciliation.Run, error) {
 	if store.run.ID != id {
 		return reconciliation.Run{}, reconciliation.ErrNotFound
@@ -80,17 +91,18 @@ func TestCreateReconciliationJobChecksCapabilityAndIsRetrySafe(t *testing.T) {
 	policies := &syncPolicyReaderStub{}
 	guard := &syncCapabilityGuardStub{}
 	store := &contractRunStore{}
+	auditor := &syncAuditStub{}
 	for attempt := 0; attempt < 2; attempt++ {
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/reconciliation/jobs", strings.NewReader(`{"policy_id":"policy-1"}`))
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Idempotency-Key", "reconcile-policy-1")
 		response := httptest.NewRecorder()
-		createReconciliationJob(response, productionRequestContext(t, request), policies, store, guard)
+		createReconciliationJob(response, productionRequestContext(t, request), policies, store, auditor, guard)
 		if response.Code != http.StatusAccepted || !strings.Contains(response.Body.String(), `"policy_id":"policy-1"`) {
 			t.Fatalf("attempt %d: status=%d body=%s", attempt, response.Code, response.Body.String())
 		}
 	}
-	if guard.calls != 2 || store.run.ID == "" || store.run.TriggerRef == "user|opaque" || !strings.HasPrefix(store.run.TriggerRef, "actor.") {
+	if guard.calls != 2 || store.run.ID == "" || store.run.TriggerRef == "user|opaque" || !strings.HasPrefix(store.run.TriggerRef, "actor.") || len(auditor.entries) != 1 {
 		t.Fatalf("guard=%d run=%+v", guard.calls, store.run)
 	}
 }

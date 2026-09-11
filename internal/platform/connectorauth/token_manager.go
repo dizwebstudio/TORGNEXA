@@ -3,8 +3,10 @@ package connectorauth
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -24,8 +26,13 @@ var (
 // RefreshCoordinator serializes refresh-token use across API and worker
 // processes. Implementations must release the lock when context is cancelled.
 type RefreshCoordinator interface {
+	RecordRefreshIntent(context.Context, tenancy.Scope, RefreshIntent) error
 	WithRefreshLock(context.Context, tenancy.Scope, secrets.Reference, func(context.Context) error) error
 }
+
+// RefreshIntent aliases the secrets-layer evidence contract used by refresh
+// coordinators. It contains no credential reference or provider payload.
+type RefreshIntent = secrets.RefreshIntent
 
 // TokenManager resolves only a callback-scoped access token from encrypted
 // OAuth material. It never exposes refresh tokens or client credentials to a
@@ -113,6 +120,10 @@ func (manager *TokenManager) UseAccessToken(ctx context.Context, scope tenancy.S
 	if bundle.RefreshToken == "" || manager.locks == nil {
 		return ErrOAuthReauthorizationRequired
 	}
+	intent := refreshIntent(scope, account, reference, metadata.CurrentVersion, manager.now().UTC())
+	if err := manager.locks.RecordRefreshIntent(ctx, scope, intent); err != nil {
+		return ErrOAuthRefreshUnavailable
+	}
 	var accessToken string
 	err = manager.locks.WithRefreshLock(ctx, scope, reference, func(lockContext context.Context) error {
 		latest, readErr := manager.readBundle(lockContext, scope, reference)
@@ -152,6 +163,13 @@ func (manager *TokenManager) UseAccessToken(ctx context.Context, scope tenancy.S
 		return ErrOAuthRefreshUnavailable
 	}
 	return deliverAccessToken(accessToken, consumer)
+}
+
+func refreshIntent(scope tenancy.Scope, account sdk.Account, reference secrets.Reference, version uint64, occurredAt time.Time) RefreshIntent {
+	runtimeID := account.ConnectorID
+	digest := sha256.Sum256([]byte(scope.OrganizationID().String() + "\x00" + scope.WorkspaceID().String() + "\x00" + account.ID + "\x00" + runtimeID + "\x00" + reference.String() + "\x00" + fmt.Sprint(version)))
+	id := fmt.Sprintf("oauth_refresh.%x", digest[:20])
+	return RefreshIntent{ID: id, AccountID: account.ID, RuntimeID: runtimeID, CorrelationID: id, SecretVersion: version, OccurredAt: occurredAt.UTC()}
 }
 
 func (manager *TokenManager) readBundle(ctx context.Context, scope tenancy.Scope, reference secrets.Reference) (TokenBundle, error) {

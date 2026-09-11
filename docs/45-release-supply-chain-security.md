@@ -73,6 +73,12 @@ and Docker action references an allowlisted registry and repository plus
 `latest`, variable/interpolated, short, or malformed digests are forbidden;
 `FROM scratch` is the only base-image exception.
 
+The four reviewed Community runtime repositories
+`ghcr.io/dizwebstudio/torgnexa-{postgres,kafka,keycloak,valkey}` are explicit
+first-party entries in this repository allowlist. Their exact tag-plus-digest
+references must still appear in `supply-chain/license-policy.json` and the
+release inventory; approving a repository does not approve an unreviewed image.
+
 The networked gate resolves every digest and verifies every declared target
 platform. Missing manifests, missing platforms, registry errors, or scanner
 errors fail closed.

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -108,6 +109,27 @@ type Metadata struct {
 	RevokedAt      *time.Time
 }
 
+// RefreshIntent is minimized, idempotent evidence committed before a remote
+// credential refresh. It excludes the secret reference and all provider
+// request/response material.
+type RefreshIntent struct {
+	ID            string
+	AccountID     string
+	RuntimeID     string
+	CorrelationID string
+	SecretVersion uint64
+	OccurredAt    time.Time
+}
+
+// Valid reports whether an intent can be persisted as bounded security
+// evidence. Connector and account identifiers are host-derived metadata.
+func (intent RefreshIntent) Valid() bool {
+	return len(intent.ID) > len("oauth_refresh.") && len(intent.ID) <= 128 && strings.HasPrefix(intent.ID, "oauth_refresh.") &&
+		strings.TrimSpace(intent.AccountID) == intent.AccountID && intent.AccountID != "" && len(intent.AccountID) <= 128 &&
+		strings.TrimSpace(intent.RuntimeID) == intent.RuntimeID && intent.RuntimeID != "" && len(intent.RuntimeID) <= 128 &&
+		intent.CorrelationID == intent.ID && intent.SecretVersion > 0 && intent.SecretVersion <= math.MaxInt64 && !intent.OccurredAt.IsZero()
+}
+
 // EncryptedVersion is ciphertext-only persistence material. Plaintext is never part of this type.
 type EncryptedVersion struct {
 	Reference      Reference
@@ -165,6 +187,18 @@ type SecretProvider interface {
 	Revoke(context.Context, tenancy.Scope, Reference) (Metadata, error)
 }
 
+// TransactionalProvider can join the caller's authoritative tenant transaction.
+// Implementations must reject incompatible transaction boundaries, never commit
+// independently inside one, and roll back all lifecycle changes on failure.
+type TransactionalProvider interface {
+	SecretProvider
+	WithinTransaction(context.Context, tenancy.Scope, func(context.Context) error) error
+}
+
+// ErrTransactionUnavailable denies operations requiring atomic secret changes
+// when a provider or its repository cannot join the authoritative transaction.
+var ErrTransactionUnavailable = errors.New("secrets: transaction unavailable")
+
 // LocalEncryptedProvider is the Community provider: AES-256-GCM at rest, with master keys supplied outside PostgreSQL.
 type LocalEncryptedProvider struct {
 	repository Repository
@@ -174,6 +208,21 @@ type LocalEncryptedProvider struct {
 }
 
 var _ SecretProvider = (*LocalEncryptedProvider)(nil)
+var _ TransactionalProvider = (*LocalEncryptedProvider)(nil)
+
+// WithinTransaction delegates atomic lifecycle work to a compatible repository.
+func (local *LocalEncryptedProvider) WithinTransaction(ctx context.Context, scope tenancy.Scope, operation func(context.Context) error) error {
+	if err := local.validateCall(ctx, scope); err != nil {
+		return err
+	}
+	boundary, ok := local.repository.(interface {
+		WithinTransaction(context.Context, tenancy.Scope, func(context.Context) error) error
+	})
+	if !ok || operation == nil {
+		return ErrTransactionUnavailable
+	}
+	return boundary.WithinTransaction(ctx, scope, operation)
+}
 
 func NewLocalEncryptedProvider(repository Repository, keys MasterKeySource) (*LocalEncryptedProvider, error) {
 	if repository == nil || keys == nil {

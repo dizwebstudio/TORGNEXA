@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 	"github.com/torgnexa/torgnexa/internal/platform/syncengine"
 )
@@ -52,6 +53,7 @@ type reconciliationReader interface {
 
 type reconciliationWriter interface {
 	CreateRun(context.Context, tenancy.Scope, reconciliation.Run) (reconciliation.Run, error)
+	CreateRunWithReplay(context.Context, tenancy.Scope, reconciliation.Run) (reconciliation.Run, bool, error)
 }
 type reconciliationRepository interface {
 	reconciliationReader
@@ -64,12 +66,16 @@ type connectorManualSync struct {
 	policies syncPolicyReader
 	runs     reconciliationWriter
 	guard    syncPolicyCapabilityGuard
+	audit    auditCapturer
 	previews interface {
 		HasCurrentBootstrapPreview(context.Context, tenancy.Scope, string, time.Time) (bool, error)
 	}
 }
 
-func (s connectorManualSync) Start(ctx context.Context, scope tenancy.Scope, accountID, actor string, at time.Time) (int, error) {
+func (s connectorManualSync) Start(ctx context.Context, scope tenancy.Scope, accountID, actor, key string, at time.Time) (int, error) {
+	if s.audit == nil || !validIdempotencyKey(key) {
+		return 0, errSettingsAudit
+	}
 	items, err := s.policies.ListPolicies(ctx, scope, 100)
 	if err != nil {
 		return 0, err
@@ -94,14 +100,30 @@ func (s connectorManualSync) Start(ctx context.Context, scope tenancy.Scope, acc
 			return 0, syncengine.ErrPreviewUnavailable
 		}
 	}
-	count := 0
-	for _, policy := range candidates {
-		id := "sync." + newApprovalID()
-		_, err = s.runs.CreateRun(ctx, scope, reconciliation.Run{ID: id, PolicyID: policy.ID, Mode: reconciliation.ModeOnDemand, TriggerRef: actor, Status: reconciliation.RunRunning, Version: 1, StartedAt: at.UTC(), UpdatedAt: at.UTC()})
-		if err != nil {
-			return count, err
+	createdAny := false
+	count, err := auditedSettingsMutation(ctx, scope, s.audit, func(txCtx context.Context) (int, error) {
+		for _, policy := range candidates {
+			id := stableID("sync.", 40, scope, key+"\x00"+policy.ID)
+			_, replayed, createErr := s.runs.CreateRunWithReplay(txCtx, scope, reconciliation.Run{ID: id, PolicyID: policy.ID, Mode: reconciliation.ModeOnDemand, TriggerRef: boundedActorRef(actor), Status: reconciliation.RunRunning, Version: 1, StartedAt: at.UTC(), UpdatedAt: at.UTC()})
+			if createErr != nil {
+				return 0, createErr
+			}
+			createdAny = createdAny || !replayed
 		}
-		count++
+		return len(candidates), nil
+	}, func(txCtx context.Context, count int) error {
+		if !createdAny {
+			return nil
+		}
+		_, captureErr := s.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(actor), Source: "api", Action: "connector.account.sync_queued",
+			ResourceType: "connector_account", ResourceID: accountID, CorrelationID: key,
+			Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"policy_count": count},
+		})
+		return captureErr
+	})
+	if err != nil {
+		return 0, err
 	}
 	if count == 0 {
 		return 0, reconciliation.ErrNotFound
@@ -144,7 +166,7 @@ type syncDriftView struct {
 	DetectedAt        time.Time                  `json:"detected_at"`
 }
 
-func newSyncRoutes(policies syncPolicyRepository, reconciliations reconciliationRepository, guards ...syncPolicyCapabilityGuard) []ProtectedRoute {
+func newSyncRoutes(policies syncPolicyRepository, reconciliations reconciliationRepository, auditService auditCapturer, guards ...syncPolicyCapabilityGuard) []ProtectedRoute {
 	var guard syncPolicyCapabilityGuard
 	if len(guards) > 0 {
 		guard = guards[0]
@@ -176,9 +198,9 @@ func newSyncRoutes(policies syncPolicyRepository, reconciliations reconciliation
 		}
 		writeJSON(w, http.StatusCreated, policyView(policy))
 	})}, {Method: http.MethodPatch, Path: SyncPoliciesPath + "/", PathPrefix: true, Permission: "sync.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		syncPolicyAction(w, r, policies, reconciliations, guard)
+		syncPolicyAction(w, r, policies, reconciliations, auditService, guard)
 	})}, {Method: http.MethodPost, Path: SyncPoliciesPath + "/", PathPrefix: true, Permission: "sync.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		syncPolicyAction(w, r, policies, reconciliations, guard)
+		syncPolicyAction(w, r, policies, reconciliations, auditService, guard)
 	})}, {Method: http.MethodPost, Path: SyncDriftsPath + "/", PathPrefix: true, Permission: "sync.write", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resolveSyncDrift(w, r, reconciliations)
 	})}, {Method: http.MethodGet, Path: SyncStatusPath, Permission: "sync.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -242,7 +264,7 @@ func driftView(v reconciliation.Drift) syncDriftView {
 	return syncDriftView{v.ID, v.RunID, v.PolicyID, v.Kind, v.LocalEntityID, v.RemoteID, v.LocalStatus, v.RemoteStatus, v.Status, v.RecommendedAction, v.Version, v.DetectedAt}
 }
 
-func syncPolicyAction(w http.ResponseWriter, r *http.Request, policies syncPolicyRepository, runs reconciliationWriter, guard syncPolicyCapabilityGuard) {
+func syncPolicyAction(w http.ResponseWriter, r *http.Request, policies syncPolicyRepository, runs reconciliationWriter, auditService auditCapturer, guard syncPolicyCapabilityGuard) {
 	if strings.TrimSpace(r.Header.Get("Idempotency-Key")) == "" {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
@@ -259,6 +281,10 @@ func syncPolicyAction(w http.ResponseWriter, r *http.Request, policies syncPolic
 			writeProblem(w, http.StatusForbidden, "Forbidden")
 			return
 		}
+		if auditService == nil {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		policy, err := policies.Policy(r.Context(), scope, parts[0])
 		if err != nil || !policy.Enabled {
 			writeProblem(w, http.StatusUnprocessableEntity, "Enabled policy required")
@@ -269,8 +295,29 @@ func syncPolicyAction(w http.ResponseWriter, r *http.Request, policies syncPolic
 			writeProblem(w, http.StatusUnprocessableEntity, "Connector account capability required")
 			return
 		}
+		key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 		now := time.Now().UTC()
-		run, err := runs.CreateRun(r.Context(), scope, reconciliation.Run{ID: "sync." + newApprovalID(), PolicyID: policy.ID, Mode: reconciliation.ModeOnDemand, TriggerRef: principal.Subject, Status: reconciliation.RunRunning, Version: 1, StartedAt: now, UpdatedAt: now})
+		var replayed bool
+		run, err := auditedSettingsMutation(r.Context(), scope, auditService, func(txCtx context.Context) (reconciliation.Run, error) {
+			var created reconciliation.Run
+			var createErr error
+			created, replayed, createErr = runs.CreateRunWithReplay(txCtx, scope, reconciliation.Run{ID: stableID("sync.", 40, scope, key+"\x00"+policy.ID), PolicyID: policy.ID, Mode: reconciliation.ModeOnDemand, TriggerRef: boundedActorRef(principal.Subject), Status: reconciliation.RunRunning, Version: 1, StartedAt: now, UpdatedAt: now})
+			return created, createErr
+		}, func(txCtx context.Context, created reconciliation.Run) error {
+			if replayed {
+				return nil
+			}
+			_, captureErr := auditService.Capture(txCtx, scope, audit.Entry{
+				ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "sync.reconciliation.queued",
+				ResourceType: "reconciliation_run", ResourceID: created.ID, CorrelationID: key,
+				Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"policy_id": policy.ID, "mode": string(reconciliation.ModeOnDemand)},
+			})
+			return captureErr
+		})
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if err != nil {
 			writeProblem(w, http.StatusConflict, "Conflict")
 			return

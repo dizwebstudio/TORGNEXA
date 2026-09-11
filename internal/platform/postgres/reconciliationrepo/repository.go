@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	txboundary "github.com/torgnexa/torgnexa/internal/platform/postgres/database"
 	"github.com/torgnexa/torgnexa/internal/platform/reconciliation"
 )
 
@@ -24,19 +25,42 @@ func New(db *sql.DB) (*Repository, error) {
 	return &Repository{db: db}, nil
 }
 func (r *Repository) CreateRun(ctx context.Context, s tenancy.Scope, v reconciliation.Run) (reconciliation.Run, error) {
+	out, replayed, err := r.CreateRunWithReplay(ctx, s, v)
+	if replayed && err == nil {
+		return reconciliation.Run{}, reconciliation.ErrConflict
+	}
+	return out, err
+}
+
+// CreateRunWithReplay inserts one deterministic reconciliation run. An exact
+// retry returns the existing run; reuse of its identifier for different input
+// fails closed.
+func (r *Repository) CreateRunWithReplay(ctx context.Context, s tenancy.Scope, v reconciliation.Run) (reconciliation.Run, bool, error) {
 	if err := r.valid(ctx, s); err != nil {
-		return reconciliation.Run{}, err
+		return reconciliation.Run{}, false, err
 	}
 	if v.Validate() != nil {
-		return reconciliation.Run{}, reconciliation.ErrInvalid
+		return reconciliation.Run{}, false, reconciliation.ErrInvalid
 	}
 	var out reconciliation.Run
+	replayed := false
 	err := r.tx(ctx, s, false, func(tx *sql.Tx) error {
-		var e error
-		out, e = scanRun(tx.QueryRowContext(ctx, `INSERT INTO reconciliation_runs(id,organization_id,workspace_id,policy_id,mode,trigger_ref,status,cursor,scanned_count,drift_count,version,started_at,updated_at,completed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id,policy_id,mode,trigger_ref,status,cursor,scanned_count,drift_count,version,started_at,updated_at,completed_at`, v.ID, s.OrganizationID().String(), s.WorkspaceID().String(), v.PolicyID, string(v.Mode), null(v.TriggerRef), string(v.Status), v.Cursor, v.ScannedCount, v.DriftCount, v.Version, v.StartedAt, v.UpdatedAt, v.CompletedAt))
-		return e
+		var err error
+		out, err = scanRun(tx.QueryRowContext(ctx, `INSERT INTO reconciliation_runs(id,organization_id,workspace_id,policy_id,mode,trigger_ref,status,cursor,scanned_count,drift_count,version,started_at,updated_at,completed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (id) DO NOTHING RETURNING id,policy_id,mode,trigger_ref,status,cursor,scanned_count,drift_count,version,started_at,updated_at,completed_at`, v.ID, s.OrganizationID().String(), s.WorkspaceID().String(), v.PolicyID, string(v.Mode), null(v.TriggerRef), string(v.Status), v.Cursor, v.ScannedCount, v.DriftCount, v.Version, v.StartedAt.UTC(), v.UpdatedAt.UTC(), v.CompletedAt))
+		if !errors.Is(err, reconciliation.ErrNotFound) {
+			return err
+		}
+		replayed = true
+		out, err = scanRun(tx.QueryRowContext(ctx, `SELECT id,policy_id,mode,trigger_ref,status,cursor,scanned_count,drift_count,version,started_at,updated_at,completed_at FROM reconciliation_runs WHERE organization_id=$1 AND workspace_id=$2 AND id=$3`, s.OrganizationID().String(), s.WorkspaceID().String(), v.ID))
+		if err != nil {
+			return err
+		}
+		if !sameRunRequest(out, v) {
+			return reconciliation.ErrConflict
+		}
+		return nil
 	})
-	return out, err
+	return out, replayed, err
 }
 func (r *Repository) Run(ctx context.Context, s tenancy.Scope, id string) (reconciliation.Run, error) {
 	if err := r.valid(ctx, s); err != nil {
@@ -259,6 +283,14 @@ func (r *Repository) valid(ctx context.Context, s tenancy.Scope) error {
 	return nil
 }
 func (r *Repository) tx(ctx context.Context, s tenancy.Scope, read bool, fn func(*sql.Tx) error) error {
+	if err := txboundary.CheckScope(ctx, s); err != nil {
+		return err
+	}
+	if tx, err := txboundary.CurrentTransaction(ctx, r.db); err != nil {
+		return err
+	} else if tx != nil {
+		return fn(tx)
+	}
 	tx, e := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: read})
 	if e != nil {
 		return fmt.Errorf("reconciliation repository: begin: %w", e)
@@ -275,6 +307,13 @@ func (r *Repository) tx(ctx context.Context, s tenancy.Scope, read bool, fn func
 		return e
 	}
 	return tx.Commit()
+}
+
+func sameRunRequest(left, right reconciliation.Run) bool {
+	return left.ID == right.ID && left.PolicyID == right.PolicyID && left.Mode == right.Mode &&
+		left.TriggerRef == right.TriggerRef && left.Status == right.Status && left.Cursor == right.Cursor &&
+		left.ScannedCount == right.ScannedCount && left.DriftCount == right.DriftCount &&
+		left.Version == right.Version && (left.CompletedAt == nil) == (right.CompletedAt == nil)
 }
 
 type scanner interface{ Scan(...any) error }

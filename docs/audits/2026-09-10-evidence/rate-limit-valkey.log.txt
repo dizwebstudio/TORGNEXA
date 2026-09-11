@@ -1,0 +1,21 @@
+=== RUN   TestValkeyLimiterReplicasShareBudget
+=== RUN   TestValkeyLimiterReplicasShareBudget/concurrent
+--- PASS: TestValkeyLimiterReplicasShareBudget (0.01s)
+    --- PASS: TestValkeyLimiterReplicasShareBudget/concurrent (0.01s)
+=== RUN   TestValkeyLimiterBoundsAttackerControlledCardinality
+--- PASS: TestValkeyLimiterBoundsAttackerControlledCardinality (0.00s)
+=== RUN   TestValkeyKeysDoNotContainRawIdentity
+--- PASS: TestValkeyKeysDoNotContainRawIdentity (0.00s)
+=== RUN   TestValkeyLimiterStartupFailsClosedWhenBackendIsUnavailable
+--- PASS: TestValkeyLimiterStartupFailsClosedWhenBackendIsUnavailable (0.00s)
+=== RUN   TestValkeyLimiterRejectsUsernameWithoutPassword
+--- PASS: TestValkeyLimiterRejectsUsernameWithoutPassword (0.00s)
+=== RUN   TestValkeyLimiterBoundsSecretConfiguration
+--- PASS: TestValkeyLimiterBoundsSecretConfiguration (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/platform/securityedge	1.027s
+=== RUN   TestRateLimitReplicasShareBudget
+--- PASS: TestRateLimitReplicasShareBudget (0.00s)
+PASS
+ok  	github.com/torgnexa/torgnexa/internal/app/api	1.148s
+Valkey rate-limit integration: PASS

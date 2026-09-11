@@ -227,7 +227,7 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 		return Principal{}, ErrAuthenticationUnavailable
 	}
 	profile := profileFromOIDCClaims(claims, info, subjectRef)
-	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, Email: profile.Email, VerifiedEmail: verifiedUserInfoEmail(info), Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), Email: profile.Email, VerifiedEmail: verifiedUserInfoEmail(info), Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
 }
 
 // Verification belongs to the email in this authenticated UserInfo response.

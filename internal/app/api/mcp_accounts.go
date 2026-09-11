@@ -156,14 +156,38 @@ func (api *mcpAccountsAPI) create(w http.ResponseWriter, r *http.Request) {
 	}
 	id := newApprovalID()
 	tokenHash := mcpaccounts.HashSecret(secret)
-	account, replayed, err := api.repository.CreateGoverned(r.Context(), scope, id, cmd, tokenHash, time.Now().UTC().Add(time.Duration(expiresInDays)*24*time.Hour), correlation, digest, principal.SubjectRef, id+".e")
+	var replayed bool
+	account, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(txCtx context.Context) (mcpaccounts.Account, error) {
+		var created mcpaccounts.Account
+		var createErr error
+		created, replayed, createErr = api.repository.CreateGoverned(txCtx, scope, id, cmd, tokenHash, time.Now().UTC().Add(time.Duration(expiresInDays)*24*time.Hour), correlation, digest, principal.SubjectRef, id+".e")
+		return created, createErr
+	}, func(txCtx context.Context, created mcpaccounts.Account) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "mcp_client_account.create", ResourceType: "mcp_client_account",
+			ResourceID: created.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"label": created.Label, "permissions": created.Permissions},
+		})
+		return captureErr
+	})
 	if err != nil {
 		zero(secret)
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, mcpaccounts.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
+		if errors.Is(err, mcpaccounts.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	token := ""
@@ -171,14 +195,6 @@ func (api *mcpAccountsAPI) create(w http.ResponseWriter, r *http.Request) {
 		token = mcpaccounts.EncodeToken(scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, secret)
 	}
 	zero(secret)
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "mcp_client_account.create", ResourceType: "mcp_client_account",
-		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"label": account.Label, "permissions": account.Permissions},
-	}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
-		return
-	}
 	writeJSON(w, http.StatusCreated, mcpAccountCreateResponse{Account: mcpAccountToView(account), Token: token, Replayed: replayed})
 }
 
@@ -204,21 +220,37 @@ func (api *mcpAccountsAPI) disable(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	account, _, err := api.repository.RevokeGoverned(r.Context(), scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion, correlation, digest, principal.SubjectRef, newApprovalID())
+	var replayed bool
+	account, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(txCtx context.Context) (mcpaccounts.Account, error) {
+		var revoked mcpaccounts.Account
+		var revokeErr error
+		revoked, replayed, revokeErr = api.repository.RevokeGoverned(txCtx, scope, strings.TrimSpace(input.AccountID), input.ExpectedVersion, correlation, digest, principal.SubjectRef, newApprovalID())
+		return revoked, revokeErr
+	}, func(txCtx context.Context, revoked mcpaccounts.Account) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "mcp_client_account.disable", ResourceType: "mcp_client_account",
+			ResourceID: revoked.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"label": revoked.Label},
+		})
+		return captureErr
+	})
 	if err != nil {
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, mcpaccounts.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
-		return
-	}
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "mcp_client_account.disable", ResourceType: "mcp_client_account",
-		ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"label": account.Label},
-	}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
+		if errors.Is(err, mcpaccounts.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	writeJSON(w, http.StatusOK, mcpAccountToView(account))
@@ -262,22 +294,42 @@ func (api *mcpAccountsAPI) rotate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer zero(secret)
 	newID := newApprovalID()
-	account, replayed, err := api.repository.RotateGoverned(r.Context(), scope, strings.TrimSpace(input.AccountID), newID, input.ExpectedVersion, mcpaccounts.HashSecret(secret), time.Now().UTC().Add(time.Duration(days)*24*time.Hour), correlation, digest, principal.SubjectRef, newID+".e")
+	var replayed bool
+	account, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(txCtx context.Context) (mcpaccounts.Account, error) {
+		var rotated mcpaccounts.Account
+		var rotateErr error
+		rotated, replayed, rotateErr = api.repository.RotateGoverned(txCtx, scope, strings.TrimSpace(input.AccountID), newID, input.ExpectedVersion, mcpaccounts.HashSecret(secret), time.Now().UTC().Add(time.Duration(days)*24*time.Hour), correlation, digest, principal.SubjectRef, newID+".e")
+		return rotated, rotateErr
+	}, func(txCtx context.Context, rotated mcpaccounts.Account) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(txCtx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "mcp_client_account.rotate", ResourceType: "mcp_client_account",
+			ResourceID: rotated.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"rotated_from_id": rotated.RotatedFromID, "expires_at": rotated.ExpiresAt},
+		})
+		return captureErr
+	})
 	if err != nil {
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, mcpaccounts.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
+		if errors.Is(err, mcpaccounts.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 	token := ""
 	if !replayed {
 		token = mcpaccounts.EncodeToken(scope.OrganizationID().String(), scope.WorkspaceID().String(), account.ID, secret)
-	}
-	if _, auditErr := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: "mcp_client_account.rotate", ResourceType: "mcp_client_account", ResourceID: account.ID, CorrelationID: correlation, Risk: audit.RiskWriteSensitive, Summary: audit.Summary{"rotated_from_id": account.RotatedFromID, "expires_at": account.ExpiresAt}}); auditErr != nil {
-		writeProblem(w, http.StatusServiceUnavailable, "Audit evidence unavailable")
-		return
 	}
 	writeJSON(w, http.StatusCreated, mcpAccountCreateResponse{Account: mcpAccountToView(account), Token: token, Replayed: replayed})
 }

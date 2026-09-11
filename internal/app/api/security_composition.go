@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
 	"github.com/torgnexa/torgnexa/internal/core/userprofile"
@@ -34,7 +35,10 @@ type Principal struct {
 	Email      string
 	// VerifiedEmail is invitation-binding evidence from authenticated UserInfo,
 	// distinct from the optional, possibly unverified profile email. Memory only.
-	VerifiedEmail  string `json:"-"`
+	VerifiedEmail string `json:"-"`
+	// ExpiresAt is the verified credential deadline, used to bound long-lived
+	// streams. It is request-local and never part of a public projection.
+	ExpiresAt      time.Time `json:"-"`
 	Profile        userprofile.Identity
 	Roles          []string
 	OrganizationID string
@@ -104,6 +108,14 @@ const webhookPathPrefix = "/api/v1/webhooks/"
 const webhookRatePerMinute = 240
 const webhookMaxBodyBytes = 1 << 20
 
+const (
+	preAuthRateLimitName      = "api_pre_auth_ip"
+	authenticatedLimitName    = "api_authenticated"
+	publicWebhookLimitName    = "api_public_webhook_ip"
+	rateLimitWindow           = time.Minute
+	rateLimiterUnavailableFor = time.Second
+)
+
 type securityDependencies struct {
 	authenticator Authenticator
 	tenant        TenantResolver
@@ -138,7 +150,7 @@ func ClientIPFromContext(ctx context.Context) (netip.Addr, bool) {
 // Startup fails closed when a private route is configured without every
 // security dependency. webhooks registers the separate, unauthenticated
 // PublicWebhookRoute table (ADR-0105); pass nil when a deployment has none.
-func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter *securityedge.Limiter, authn Authenticator, tenant TenantResolver, authz Authorizer, routes []ProtectedRoute, webhooks []PublicWebhookRoute) (http.Handler, error) {
+func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter securityedge.Limiter, authn Authenticator, tenant TenantResolver, authz Authorizer, routes []ProtectedRoute, webhooks []PublicWebhookRoute) (http.Handler, error) {
 	if logger == nil || edge.Validate() != nil || limiter == nil {
 		return nil, ErrSecurityCompositionInvalid
 	}
@@ -192,7 +204,7 @@ func NewProductionHandler(logger *slog.Logger, edge securityedge.Config, limiter
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serveComposedRoute(w, r, edge, limiter, deps, table, prefixes, webhookTable, webhookPrefixes)
+		serveComposedRoute(w, r, logger, edge, limiter, deps, table, prefixes, webhookTable, webhookPrefixes)
 	})
 	return recoverPanics(logger, handler), nil
 }
@@ -225,7 +237,7 @@ func validateProtectedRoute(route ProtectedRoute, deps securityDependencies) err
 
 func routeKey(method, path string) string { return method + " " + path }
 
-func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedge.Config, limiter *securityedge.Limiter, deps securityDependencies, table map[string]ProtectedRoute, prefixes []ProtectedRoute, webhookTable map[string]PublicWebhookRoute, webhookPrefixes []PublicWebhookRoute) {
+func serveComposedRoute(w http.ResponseWriter, r *http.Request, logger *slog.Logger, edge securityedge.Config, limiter securityedge.Limiter, deps securityDependencies, table map[string]ProtectedRoute, prefixes []ProtectedRoute, webhookTable map[string]PublicWebhookRoute, webhookPrefixes []PublicWebhookRoute) {
 	for name, value := range securityedge.SecurityHeaders(edge) {
 		w.Header().Set(name, value)
 	}
@@ -243,17 +255,13 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 	// or get gated behind, authenticated tenant traffic. They never reach
 	// CORS/Origin handling either — no browser ever calls this path.
 	if strings.HasPrefix(r.URL.Path, webhookPathPrefix) {
-		serveWebhookRoute(w, r, limiter, clientIP, webhookTable, webhookPrefixes)
+		serveWebhookRoute(w, r, logger, limiter, clientIP, webhookTable, webhookPrefixes)
 		return
 	}
 
-	if err = limiter.Allow(clientIP.String(), edge); err != nil {
-		if errors.Is(err, securityedge.ErrRateLimited) {
-			w.Header().Set("Retry-After", "60")
-			writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
-			return
-		}
-		writeProblem(w, http.StatusBadRequest, "Bad Request")
+	if !allowRequest(w, r, logger, limiter, securityedge.Limit{
+		Name: preAuthRateLimitName, Key: clientIP.String(), Max: edge.PreAuthRatePerMinute, Window: rateLimitWindow,
+	}) {
 		return
 	}
 
@@ -323,6 +331,15 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 		writeProblem(w, http.StatusForbidden, "Forbidden")
 		return
 	}
+	if !allowRequest(w, r, logger, limiter, securityedge.Limit{
+		Name: authenticatedLimitName,
+		Key: strings.Join([]string{
+			scope.OrganizationID().String(), scope.WorkspaceID().String(), principal.Issuer, principal.Subject,
+		}, "\x00"),
+		Max: edge.RatePerMinute, Window: rateLimitWindow,
+	}) {
+		return
+	}
 	if route.AdminOnly && !securityedge.AdminAllowed(clientIP, edge) {
 		writeProblem(w, http.StatusForbidden, "Forbidden")
 		return
@@ -332,6 +349,11 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 		return
 	}
 	ctx = context.WithValue(ctx, requestScopeKey{}, scope)
+	ctx = context.WithValue(ctx, requestReauthorizationKey{}, requestReauthorization{
+		deps: deps, issuer: principal.Issuer, subject: principal.Subject,
+		sessionRef: principal.SessionRef, subjectRef: principal.SubjectRef,
+		expiresAt: principal.ExpiresAt, scope: scope, permission: route.Permission,
+	})
 	route.Handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
@@ -342,14 +364,10 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, edge securityedg
 // owns proving the caller is who it claims to be before trusting anything in
 // the request, and never sees PrincipalFromContext/ScopeFromContext because
 // neither is ever populated on this path.
-func serveWebhookRoute(w http.ResponseWriter, r *http.Request, limiter *securityedge.Limiter, clientIP netip.Addr, table map[string]PublicWebhookRoute, prefixes []PublicWebhookRoute) {
-	if err := limiter.Allow("webhook:"+clientIP.String(), securityedge.Config{RatePerMinute: webhookRatePerMinute}); err != nil {
-		if errors.Is(err, securityedge.ErrRateLimited) {
-			w.Header().Set("Retry-After", "60")
-			writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
-			return
-		}
-		writeProblem(w, http.StatusBadRequest, "Bad Request")
+func serveWebhookRoute(w http.ResponseWriter, r *http.Request, logger *slog.Logger, limiter securityedge.Limiter, clientIP netip.Addr, table map[string]PublicWebhookRoute, prefixes []PublicWebhookRoute) {
+	if !allowRequest(w, r, logger, limiter, securityedge.Limit{
+		Name: publicWebhookLimitName, Key: clientIP.String(), Max: webhookRatePerMinute, Window: rateLimitWindow,
+	}) {
 		return
 	}
 	if r.Body != nil {
@@ -368,4 +386,28 @@ func serveWebhookRoute(w http.ResponseWriter, r *http.Request, limiter *security
 		return
 	}
 	route.Handler.ServeHTTP(w, r)
+}
+
+func allowRequest(w http.ResponseWriter, r *http.Request, logger *slog.Logger, limiter securityedge.Limiter, limit securityedge.Limit) bool {
+	decision, err := limiter.Allow(r.Context(), limit)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, securityedge.ErrRateLimited) {
+		w.Header().Set("Retry-After", retryAfterSeconds(decision.RetryAfter))
+		writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
+		return false
+	}
+	logger.ErrorContext(r.Context(), "rate limiter unavailable", "event", "security.rate_limiter_unavailable", "budget", limit.Name)
+	w.Header().Set("Retry-After", retryAfterSeconds(rateLimiterUnavailableFor))
+	writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
+	return false
+}
+
+func retryAfterSeconds(duration time.Duration) string {
+	seconds := int64((duration + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	return fmt.Sprintf("%d", seconds)
 }

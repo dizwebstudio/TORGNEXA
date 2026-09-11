@@ -61,13 +61,36 @@ type HTTP struct {
 
 // Security contains mandatory HTTP edge policy used by the API composition root.
 type Security struct {
-	TrustedProxyCIDRs []string
-	AdminCIDRs        []string
-	AllowedOrigins    []string
-	MaxRequestBytes   int64
-	MaxUploadBytes    int64
-	RatePerMinute     int
-	HSTSSeconds       int64
+	TrustedProxyCIDRs    []string
+	AdminCIDRs           []string
+	AllowedOrigins       []string
+	MaxRequestBytes      int64
+	MaxUploadBytes       int64
+	PreAuthRatePerMinute int
+	RatePerMinute        int
+	RateLimitBackend     RateLimitBackend
+	RateLimitNamespace   string
+	RateLimitMaxKeys     int
+	HSTSSeconds          int64
+}
+
+// RateLimitBackend selects the API admission-state implementation.
+type RateLimitBackend string
+
+const (
+	RateLimitBackendLocal  RateLimitBackend = "local"
+	RateLimitBackendValkey RateLimitBackend = "valkey"
+)
+
+// Valkey contains the bounded ephemeral-state connection configuration.
+// Password is secret-bearing and must never be copied into logs or errors.
+type Valkey struct {
+	Address        string
+	Username       string
+	Password       string
+	ConnectTimeout time.Duration
+	RequestTimeout time.Duration
+	MaxConnections int
 }
 
 // Database contains bounded PostgreSQL connection-pool configuration. URL is
@@ -162,6 +185,7 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	HTTP            HTTP
 	Security        Security
+	Valkey          Valkey
 	Database        Database
 	ClickHouse      ClickHouse
 	ObjectStorage   ObjectStorage
@@ -203,11 +227,16 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 			MaxHeaderBytes:    64 << 10,
 		},
 		Security: Security{
-			MaxRequestBytes: 32 << 20,
-			MaxUploadBytes:  16 << 20,
-			RatePerMinute:   600,
-			HSTSSeconds:     31536000,
+			MaxRequestBytes:      32 << 20,
+			MaxUploadBytes:       16 << 20,
+			PreAuthRatePerMinute: 6000,
+			RatePerMinute:        600,
+			RateLimitBackend:     RateLimitBackendLocal,
+			RateLimitNamespace:   "torgnexa:edge:v1",
+			RateLimitMaxKeys:     100_000,
+			HSTSSeconds:          31536000,
 		},
+		Valkey: Valkey{ConnectTimeout: time.Second, RequestTimeout: 250 * time.Millisecond, MaxConnections: 32},
 		Database: Database{
 			MaxOpenConns:    20,
 			MaxIdleConns:    10,
@@ -510,6 +539,39 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 	if cfg.Security.RatePerMinute, err = readInt(lookup, "SECURITY_RATE_PER_MINUTE", cfg.Security.RatePerMinute, 1, 1_000_000); err != nil {
 		return Config{}, err
 	}
+	if cfg.Security.PreAuthRatePerMinute, err = readInt(lookup, "SECURITY_PRE_AUTH_RATE_PER_MINUTE", cfg.Security.PreAuthRatePerMinute, 1, 1_000_000); err != nil {
+		return Config{}, err
+	}
+	if cfg.Security.RateLimitBackend, err = readRateLimitBackend(lookup, cfg.Security.RateLimitBackend); err != nil {
+		return Config{}, err
+	}
+	if cfg.Security.RateLimitNamespace, err = readSafeString(lookup, "SECURITY_RATE_LIMIT_NAMESPACE", cfg.Security.RateLimitNamespace, 64); err != nil || strings.ContainsAny(cfg.Security.RateLimitNamespace, "{}") {
+		return Config{}, fmt.Errorf("%sSECURITY_RATE_LIMIT_NAMESPACE contains invalid characters", envPrefix)
+	}
+	if cfg.Security.RateLimitMaxKeys, err = readInt(lookup, "SECURITY_RATE_LIMIT_MAX_KEYS", cfg.Security.RateLimitMaxKeys, 1, 1_000_000); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.Address, err = readOptionalTCPAddress(lookup, "VALKEY_ADDR"); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.Username, _, err = readExternalOptionalOrEmpty(lookup, "VALKEY_USERNAME", 128); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.Password, _, err = readExternalRawOptional(lookup, "VALKEY_PASSWORD", 4096); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.Username != "" && cfg.Valkey.Password == "" {
+		return Config{}, fmt.Errorf("VALKEY_PASSWORD is required when VALKEY_USERNAME is set")
+	}
+	if cfg.Valkey.ConnectTimeout, err = readDuration(lookup, "VALKEY_CONNECT_TIMEOUT", cfg.Valkey.ConnectTimeout, 50*time.Millisecond, 5*time.Second); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.RequestTimeout, err = readDuration(lookup, "VALKEY_REQUEST_TIMEOUT", cfg.Valkey.RequestTimeout, 50*time.Millisecond, 5*time.Second); err != nil {
+		return Config{}, err
+	}
+	if cfg.Valkey.MaxConnections, err = readInt(lookup, "VALKEY_MAX_CONNECTIONS", cfg.Valkey.MaxConnections, 1, 256); err != nil {
+		return Config{}, err
+	}
 	if cfg.Security.HSTSSeconds, err = readInt64(lookup, "SECURITY_HSTS_SECONDS", cfg.Security.HSTSSeconds, 31536000, 63072000); err != nil {
 		return Config{}, err
 	}
@@ -520,9 +582,42 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 		if len(cfg.Security.TrustedProxyCIDRs) == 0 {
 			return Config{}, fmt.Errorf("%sSECURITY_TRUSTED_PROXY_CIDRS must be set explicitly in production", envPrefix)
 		}
+		if service == ServiceAPI && cfg.Security.RateLimitBackend != RateLimitBackendValkey {
+			return Config{}, fmt.Errorf("%sSECURITY_RATE_LIMIT_BACKEND must be valkey for production API", envPrefix)
+		}
+	}
+	if service == ServiceAPI && cfg.Security.RateLimitBackend == RateLimitBackendLocal && cfg.Environment != EnvironmentDevelopment && cfg.Environment != EnvironmentTest {
+		return Config{}, fmt.Errorf("%sSECURITY_RATE_LIMIT_BACKEND=local is restricted to development or test API topology", envPrefix)
+	}
+	if cfg.Security.RateLimitBackend == RateLimitBackendValkey && cfg.Valkey.Address == "" {
+		return Config{}, fmt.Errorf("VALKEY_ADDR is required when %sSECURITY_RATE_LIMIT_BACKEND=valkey", envPrefix)
 	}
 
 	return cfg, nil
+}
+
+func readRateLimitBackend(lookup func(string) (string, bool), fallback RateLimitBackend) (RateLimitBackend, error) {
+	raw, ok, err := readOptional(lookup, "SECURITY_RATE_LIMIT_BACKEND")
+	if err != nil || !ok {
+		return fallback, err
+	}
+	backend := RateLimitBackend(raw)
+	if backend != RateLimitBackendLocal && backend != RateLimitBackendValkey {
+		return "", fmt.Errorf("%sSECURITY_RATE_LIMIT_BACKEND must be local or valkey", envPrefix)
+	}
+	return backend, nil
+}
+
+func readOptionalTCPAddress(lookup func(string) (string, bool), key string) (string, error) {
+	raw, ok := lookup(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	value := strings.TrimSpace(raw)
+	if err := validateTCPAddress(value); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return value, nil
 }
 
 func readDatabaseURL(lookup func(string) (string, bool)) (string, bool, error) {

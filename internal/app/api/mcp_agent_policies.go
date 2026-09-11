@@ -22,6 +22,7 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/agentgovernance"
 	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/mcpaccounts"
+	"github.com/torgnexa/torgnexa/internal/platform/trustcontrol"
 )
 
 const (
@@ -58,13 +59,13 @@ type mcpAccountFinder interface {
 
 type agentPolicyStore interface {
 	ResolveAgentPolicy(context.Context, tenancy.Scope, agentgovernance.Agent, time.Time) (agentgovernance.Policy, error)
-	InstallPolicy(context.Context, tenancy.Scope, agentgovernance.Policy, agentgovernance.Change) error
+	InstallPolicyGoverned(context.Context, tenancy.Scope, agentgovernance.Policy, agentgovernance.Change, string, []byte) (agentgovernance.Policy, bool, error)
 	LatestPolicyVersion(context.Context, tenancy.Scope, string) (uint64, error)
 }
 
 type agentKillSwitchStore interface {
 	AgentKillState(context.Context, tenancy.Scope, agentgovernance.Agent) (agentgovernance.KillState, error)
-	RecordKillSwitch(context.Context, tenancy.Scope, agentgovernance.KillChange) error
+	RecordKillSwitchGoverned(context.Context, tenancy.Scope, agentgovernance.KillChange, string, []byte) (agentgovernance.KillChange, bool, error)
 }
 
 type mcpAgentPoliciesAPI struct {
@@ -213,7 +214,8 @@ func mcpAgentPolicyRulesFor(account mcpaccounts.Account, input mcpAgentPolicyIns
 
 func (api *mcpAgentPoliciesAPI) installPolicy(w http.ResponseWriter, r *http.Request, scope tenancy.Scope, account mcpaccounts.Account) {
 	principal, principalOK := PrincipalFromContext(r.Context())
-	if !principalOK || api.audit == nil {
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !principalOK || api.audit == nil || !validIdempotencyKey(key) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -226,6 +228,11 @@ func (api *mcpAgentPoliciesAPI) installPolicy(w http.ResponseWriter, r *http.Req
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	_, digest, err := trustcontrol.DigestJSON(map[string]any{"account_id": account.ID, "policy": input})
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
 	policyID := stableID("aip_", 40, scope, account.AgentID+"\x00"+account.IntegrationID)
 	latest, err := api.policies.LatestPolicyVersion(r.Context(), scope, policyID)
 	if err != nil {
@@ -235,19 +242,39 @@ func (api *mcpAgentPoliciesAPI) installPolicy(w http.ResponseWriter, r *http.Req
 	now := time.Now().UTC()
 	policy := agentgovernance.Policy{ID: policyID, Version: latest + 1, AgentID: account.AgentID, IntegrationID: account.IntegrationID, Rules: rules, EffectiveFrom: now}
 	change := agentgovernance.Change{ActorID: boundedActorRef(principal.Subject), Reason: "settings.mcp_accounts:install-policy", OccurredAt: now}
-	if err := api.policies.InstallPolicy(r.Context(), scope, policy, change); err != nil {
+	var replayed bool
+	policy, err = auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (agentgovernance.Policy, error) {
+		var installed agentgovernance.Policy
+		var installErr error
+		installed, replayed, installErr = api.policies.InstallPolicyGoverned(ctx, scope, policy, change, key, digest)
+		return installed, installErr
+	}, func(ctx context.Context, installed agentgovernance.Policy) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(ctx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.mcp_agent_policy.installed", ResourceType: "mcp_agent_policy",
+			ResourceID: installed.ID, CorrelationID: key, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"account_id": account.ID, "agent_id": account.AgentID, "integration_id": account.IntegrationID, "version": installed.Version, "tool_count": len(installed.Rules)},
+		})
+		return captureErr
+	})
+	if err != nil {
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, agentgovernance.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
+		if errors.Is(err, agentgovernance.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "mcp_agent_policy.install", ResourceType: "mcp_agent_policy",
-		ResourceID: policyID, CorrelationID: newApprovalID(), Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"account_id": account.ID, "agent_id": account.AgentID, "integration_id": account.IntegrationID, "version": policy.Version, "tool_count": len(rules)},
-	})
 	writeJSON(w, http.StatusOK, mcpAgentPolicyToView(policy))
 }
 
@@ -273,7 +300,8 @@ type mcpAgentKillSwitchRequest struct {
 func (api *mcpAgentPoliciesAPI) setKillSwitch(w http.ResponseWriter, r *http.Request) {
 	scope, ok := ScopeFromContext(r.Context())
 	principal, principalOK := PrincipalFromContext(r.Context())
-	if !ok || !principalOK || api == nil || api.kills == nil || api.audit == nil {
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !ok || !principalOK || api == nil || api.kills == nil || api.audit == nil || !validIdempotencyKey(key) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -283,6 +311,11 @@ func (api *mcpAgentPoliciesAPI) setKillSwitch(w http.ResponseWriter, r *http.Req
 	}
 	reason := strings.TrimSpace(input.Reason)
 	if reason == "" {
+		writeProblem(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+	_, digest, err := trustcontrol.DigestJSON(input)
+	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -296,18 +329,38 @@ func (api *mcpAgentPoliciesAPI) setKillSwitch(w http.ResponseWriter, r *http.Req
 		Scope: agentgovernance.KillTenant, SubjectID: "*", Version: state.Version + 1, Disabled: input.Disabled,
 		Change: agentgovernance.Change{ActorID: boundedActorRef(principal.Subject), Reason: reason, OccurredAt: now},
 	}
-	if err := api.kills.RecordKillSwitch(r.Context(), scope, change); err != nil {
+	var replayed bool
+	change, err = auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (agentgovernance.KillChange, error) {
+		var recorded agentgovernance.KillChange
+		var recordErr error
+		recorded, replayed, recordErr = api.kills.RecordKillSwitchGoverned(ctx, scope, change, key, digest)
+		return recorded, recordErr
+	}, func(ctx context.Context, recorded agentgovernance.KillChange) error {
+		if replayed {
+			return nil
+		}
+		_, captureErr := api.audit.Capture(ctx, scope, audit.Entry{
+			ActorID: boundedActorRef(principal.Subject), Source: "api", Action: "settings.mcp_agent_kill_switch.updated", ResourceType: "mcp_agent_kill_switch",
+			ResourceID: "tenant", CorrelationID: key, Risk: audit.RiskWriteSensitive,
+			Summary: audit.Summary{"disabled": recorded.Disabled, "reason": recorded.Change.Reason, "version": recorded.Version},
+		})
+		return captureErr
+	})
+	if err != nil {
+		if errors.Is(err, errSettingsAudit) {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
 		if errors.Is(err, agentgovernance.ErrInvalid) {
 			writeProblem(w, http.StatusBadRequest, "Bad Request")
 			return
 		}
-		writeProblem(w, http.StatusConflict, "Conflict")
+		if errors.Is(err, agentgovernance.ErrConflict) {
+			writeProblem(w, http.StatusConflict, "Conflict")
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	_, _ = api.audit.Capture(r.Context(), scope, audit.Entry{
-		ActorID: principal.Subject, Source: "api", Action: "mcp_agent_kill_switch.set", ResourceType: "mcp_agent_kill_switch",
-		ResourceID: "tenant", CorrelationID: newApprovalID(), Risk: audit.RiskWriteSensitive,
-		Summary: audit.Summary{"disabled": input.Disabled, "reason": reason, "version": change.Version},
-	})
-	writeJSON(w, http.StatusOK, map[string]any{"disabled": input.Disabled, "version": change.Version})
+	writeJSON(w, http.StatusOK, map[string]any{"disabled": change.Disabled, "version": change.Version})
 }

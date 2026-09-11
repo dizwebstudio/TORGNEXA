@@ -26,9 +26,9 @@ type connectorBootstrapAccountStore interface {
 
 type connectorBootstrapStore interface {
 	syncPolicyReader
-	CreateBootstrapPreview(context.Context, tenancy.Scope, syncengine.BootstrapPreview) (syncengine.BootstrapPreview, error)
+	CreateBootstrapPreviewWithReplay(context.Context, tenancy.Scope, syncengine.BootstrapPreview) (syncengine.BootstrapPreview, bool, error)
 	HasCurrentBootstrapPreview(context.Context, tenancy.Scope, string, time.Time) (bool, error)
-	CreateInitialJob(context.Context, tenancy.Scope, string, string, time.Time) (syncengine.SyncJob, error)
+	CreateInitialJobWithReplay(context.Context, tenancy.Scope, string, string, time.Time) (syncengine.SyncJob, bool, error)
 	PutAccountSchedule(context.Context, tenancy.Scope, syncengine.AccountSchedule, int64) (syncengine.AccountSchedule, error)
 	ListBootstrapPreviews(context.Context, tenancy.Scope, int) ([]syncengine.BootstrapPreview, error)
 	ListAccountSchedules(context.Context, tenancy.Scope, int) ([]syncengine.AccountSchedule, error)
@@ -154,15 +154,27 @@ func (api connectorBootstrapAPI) preview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	now := api.now().UTC()
-	preview, err := api.store.CreateBootstrapPreview(r.Context(), scope, syncengine.BootstrapPreview{ID: key, AccountID: account.ID, AccountVersion: account.Version, PolicyCount: policyCount, ReadCount: reads, WriteCount: writes, CreatedAt: now, ExpiresAt: now.Add(bootstrapPreviewTTL)})
+	var replayed bool
+	preview, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (syncengine.BootstrapPreview, error) {
+		var value syncengine.BootstrapPreview
+		var err error
+		value, replayed, err = api.store.CreateBootstrapPreviewWithReplay(ctx, scope, syncengine.BootstrapPreview{ID: key, AccountID: account.ID, AccountVersion: account.Version, PolicyCount: policyCount, ReadCount: reads, WriteCount: writes, CreatedAt: now, ExpiresAt: now.Add(bootstrapPreviewTTL)})
+		return value, err
+	}, func(ctx context.Context, preview syncengine.BootstrapPreview) error {
+		if replayed {
+			return nil
+		}
+		return api.capture(r.WithContext(ctx), scope, "connector.account.bootstrap_previewed", account.ID, audit.RiskWriteSafe, audit.Summary{"account_version": account.Version, "policy_count": policyCount, "read_count": reads, "write_count": writes})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	if err = api.capture(r, scope, "connector.account.bootstrap_previewed", account.ID, audit.RiskWriteSafe, audit.Summary{"account_version": account.Version, "policy_count": policyCount, "read_count": reads, "write_count": writes}); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, http.StatusCreated, previewView(preview))
 }
 
@@ -174,7 +186,22 @@ func (api connectorBootstrapAPI) start(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	job, err := api.store.CreateInitialJob(r.Context(), scope, input.PreviewID, key, api.now().UTC())
+	var replayed bool
+	job, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (syncengine.SyncJob, error) {
+		var value syncengine.SyncJob
+		var err error
+		value, replayed, err = api.store.CreateInitialJobWithReplay(ctx, scope, input.PreviewID, key, api.now().UTC())
+		return value, err
+	}, func(ctx context.Context, job syncengine.SyncJob) error {
+		if replayed {
+			return nil
+		}
+		return api.capture(r.WithContext(ctx), scope, "connector.account.initial_import_queued", job.AccountID, audit.RiskWriteSafe, audit.Summary{"job_id": job.ID, "preview_id": job.PreviewID})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if errors.Is(err, syncengine.ErrPreviewUnavailable) {
 		writeProblem(w, http.StatusUnprocessableEntity, "Current unconsumed preview required")
 		return
@@ -183,10 +210,7 @@ func (api connectorBootstrapAPI) start(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
 	}
-	if err = api.capture(r, scope, "connector.account.initial_import_queued", job.AccountID, audit.RiskWriteSafe, audit.Summary{"job_id": job.ID, "preview_id": job.PreviewID}); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, http.StatusAccepted, jobView(job))
 }
 
@@ -224,7 +248,15 @@ func (api connectorBootstrapAPI) putSchedule(w http.ResponseWriter, r *http.Requ
 		value := now.Add(time.Duration(input.IntervalMinutes) * time.Minute)
 		next = &value
 	}
-	schedule, err := api.store.PutAccountSchedule(r.Context(), scope, syncengine.AccountSchedule{AccountID: account.ID, Mode: input.Mode, IntervalMinutes: input.IntervalMinutes, Enabled: input.Enabled, NextRunAt: next, Version: 1, CreatedAt: now, UpdatedAt: now}, input.ExpectedVersion)
+	schedule, err := auditedSettingsMutation(r.Context(), scope, api.audit, func(ctx context.Context) (syncengine.AccountSchedule, error) {
+		return api.store.PutAccountSchedule(ctx, scope, syncengine.AccountSchedule{AccountID: account.ID, Mode: input.Mode, IntervalMinutes: input.IntervalMinutes, Enabled: input.Enabled, NextRunAt: next, Version: 1, CreatedAt: now, UpdatedAt: now}, input.ExpectedVersion)
+	}, func(ctx context.Context, schedule syncengine.AccountSchedule) error {
+		return api.capture(r.WithContext(ctx), scope, "connector.account.schedule_updated", account.ID, audit.RiskWriteSensitive, audit.Summary{"enabled": schedule.Enabled, "mode": string(schedule.Mode), "interval_minutes": schedule.IntervalMinutes, "schedule_version": schedule.Version})
+	})
+	if errors.Is(err, errSettingsAudit) {
+		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	if errors.Is(err, syncengine.ErrScheduleConflict) {
 		writeProblem(w, http.StatusConflict, "Conflict")
 		return
@@ -233,10 +265,7 @@ func (api connectorBootstrapAPI) putSchedule(w http.ResponseWriter, r *http.Requ
 		writeProblem(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
-	if err = api.capture(r, scope, "connector.account.schedule_updated", account.ID, audit.RiskWriteSensitive, audit.Summary{"enabled": schedule.Enabled, "mode": string(schedule.Mode), "interval_minutes": schedule.IntervalMinutes, "schedule_version": schedule.Version}); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error")
-		return
-	}
+
 	writeJSON(w, http.StatusOK, accountScheduleView(schedule))
 }
 
@@ -281,7 +310,7 @@ func (api connectorBootstrapAPI) capture(r *http.Request, scope tenancy.Scope, a
 	if !ok {
 		return ErrUnauthenticated
 	}
-	_, err := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: principal.Subject, Source: "api", Action: action, ResourceType: "connector_account", ResourceID: resourceID, CorrelationID: r.Header.Get("Idempotency-Key"), Risk: risk, Summary: summary})
+	_, err := api.audit.Capture(r.Context(), scope, audit.Entry{ActorID: boundedActorRef(principal.Subject), Source: "api", Action: action, ResourceType: "connector_account", ResourceID: resourceID, CorrelationID: r.Header.Get("Idempotency-Key"), Risk: risk, Summary: summary})
 	return err
 }
 

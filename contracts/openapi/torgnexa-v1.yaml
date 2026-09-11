@@ -9,6 +9,10 @@ info:
     database details. Invalid or revoked sessions still return 401. This shared
     authentication behavior applies before operation-specific authorization
     and handlers; no business mutation runs when the session check fails.
+    API admission limits are shared by all replicas. An exhausted pre-auth IP,
+    authenticated tenant/principal, or public-webhook budget returns 429 with
+    an integer Retry-After header. If distributed limiter state is unavailable,
+    admission fails closed with 503 and Retry-After: 1 before any handler runs.
 servers:
   - url: /api/v1
 paths:
@@ -934,10 +938,11 @@ paths:
         schema: {type: string, minLength: 1, maxLength: 128}
     post:
       operationId: runSyncPolicy
+      description: The deterministic reconciliation run and authoritative audit record commit together; identical retries append neither a duplicate run nor duplicate audit.
       parameters:
         - {name: policy_id, in: path, required: true, schema: {type: string}}
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
-      responses: {'202': {description: On-demand policy run durably queued}, '422': {description: Policy is disabled or no longer supported by the connector runtime/account capabilities}}
+      responses: {'202': {description: On-demand policy run durably queued}, '422': {description: Policy is disabled or no longer supported by the connector runtime/account capabilities}, '500': {description: Reconciliation run and authoritative audit could not commit}}
   /sync/drifts/{drift_id}/actions:
     parameters:
       - name: drift_id
@@ -1215,9 +1220,10 @@ paths:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountCreate'}}}}
       responses:
-        '201': {description: AI provider account created; credential stored through the secrets provider, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
+        '201': {description: 'AI provider account, credential reference and authoritative audit committed together; credential stored through the secrets provider', content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
         '400': {description: 'Invalid provider, label, model, base_url, folder_id, or credential'}
         '403': {description: Caller lacks settings.ai_providers.write}
+        '500': {description: Account mutation and authoritative audit could not commit}
   /settings/ai-providers:disable:
     post:
       operationId: disableAIProviderAccount
@@ -1226,8 +1232,9 @@ paths:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccountDisable'}}}}
       responses:
-        '200': {description: AI provider account disabled with optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
+        '200': {description: AI provider account disable and authoritative audit committed together with an optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/AIProviderAccount'}}}}
         '409': {description: Optimistic version conflict}
+        '500': {description: Account mutation and authoritative audit could not commit}
   /settings/ai-providers:analyze:
     post:
       operationId: analyzeWithAIProvider
@@ -1277,9 +1284,10 @@ paths:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreate'}}}}
       responses:
-        '201': {description: MCP client account created; the bearer token is returned once and never again, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreateResponse'}}}}
+        '201': {description: MCP client account and authoritative audit committed together; the bearer token is returned once and never again, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreateResponse'}}}}
         '400': {description: 'Invalid label, agent_id, model_id, integration_id, or permissions'}
         '403': {description: Caller lacks settings.mcp_accounts.write}
+        '500': {description: Account mutation and authoritative audit could not commit}
   /settings/mcp-accounts:disable:
     post:
       operationId: disableMCPAccount
@@ -1288,8 +1296,9 @@ paths:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountDisable'}}}}
       responses:
-        '200': {description: MCP client account disabled with optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccount'}}}}
+        '200': {description: MCP client account disable and authoritative audit committed together with an optimistic version transition, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccount'}}}}
         '409': {description: Optimistic version conflict}
+        '500': {description: Account mutation and authoritative audit could not commit}
   /settings/mcp-accounts:rotate:
     post:
       operationId: rotateMCPAccount
@@ -1298,8 +1307,9 @@ paths:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountRotate'}}}}
       responses:
-        '201': {description: Replacement token returned once and predecessor revoked atomically, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreateResponse'}}}}
+        '201': {description: 'Replacement token, predecessor revocation and authoritative audit committed atomically; replacement returned once', content: {application/json: {schema: {$ref: '#/components/schemas/MCPAccountCreateResponse'}}}}
         '409': {description: Version or idempotency conflict}
+        '500': {description: Token rotation and authoritative audit could not commit}
   /settings/connector-replay:run:
     post:
       operationId: runConnectorReplay
@@ -1337,12 +1347,16 @@ paths:
     post:
       operationId: installMCPAccountPolicy
       security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentPolicyInstall'}}}}
       responses:
-        '200': {description: 'A new immutable policy version installed, with tool rules derived from the account own granted permissions', content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentPolicy'}}}}
+        '200': {description: 'An immutable policy version, idempotency receipt and authoritative audit committed together; an identical retry returns the original version', content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentPolicy'}}}}
         '400': {description: 'Invalid spending limits, or no granted permission maps to a governed MCP tool'}
         '403': {description: Caller lacks settings.mcp_accounts.write}
         '404': {description: Account not found in tenant scope}
+        '409': {description: Idempotency key conflicts with another policy request}
+        '500': {description: Policy and authoritative audit could not commit}
   /settings/mcp-agents:kill-switch:
     get:
       operationId: getMCPAgentKillSwitch
@@ -1353,11 +1367,15 @@ paths:
     post:
       operationId: setMCPAgentKillSwitch
       security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentKillSwitchWrite'}}}}
       responses:
-        '200': {description: 'Tenant-wide kill switch updated; while disabled every tools/list and tools/call is denied for this tenant', content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentKillSwitchState'}}}}
+        '200': {description: 'Tenant-wide kill-switch revision, idempotency receipt and authoritative audit committed together; identical retries return the original revision', content: {application/json: {schema: {$ref: '#/components/schemas/MCPAgentKillSwitchState'}}}}
         '400': {description: Reason is required}
         '403': {description: Caller lacks settings.mcp_accounts.write}
+        '409': {description: Idempotency key conflicts with another kill-switch request}
+        '500': {description: Kill-switch revision and authoritative audit could not commit}
   /settings/members:
     get:
       operationId: listWorkspaceMembers
@@ -1961,6 +1979,7 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or permission}
     post:
       operationId: createConnectorAccount
+      description: Account creation and authoritative audit commit together; identical replays append no duplicate audit.
       security: [{bearerAuth: []}]
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
@@ -1985,6 +2004,7 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Account id already binds different configuration}
         '422': {description: Connector is not executable through the generic integration runtime}
+        '500': {description: Mutation and authoritative audit could not commit}
   /marking/overview:
     get:
       operationId: getMarkingOverview
@@ -2293,6 +2313,7 @@ paths:
   /connector-accounts:disable:
     post:
       operationId: disableConnectorAccount
+      description: Account status and authoritative audit commit together.
       security: [{bearerAuth: []}]
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
@@ -2311,9 +2332,11 @@ paths:
         '401': {description: Missing or invalid OIDC bearer token}
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Concurrent account update}
+        '500': {description: Account status and authoritative audit could not commit}
   /connector-accounts:credentials:
     post:
       operationId: enrollConnectorCredentials
+      description: New encrypted material, account binding, old reference revocation and authoritative audit commit together. A failed transaction preserves the previous binding and leaves no new secret.
       security: [{bearerAuth: []}]
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
@@ -2333,6 +2356,7 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Concurrent account update}
         '422': {description: Connector authentication kind is unsupported}
+        '500': {description: Atomic credential transaction unavailable or failed}
   /connector-accounts:runtime-config:
     get:
       operationId: getConnectorRuntimeConfig
@@ -2373,6 +2397,7 @@ paths:
   /connector-accounts:oauth-start:
     post:
       operationId: startConnectorOAuth
+      description: Encrypted PKCE material, pending state and authoritative audit commit together. Replaying the same start returns the original URL without creating another secret or audit record.
       security: [{bearerAuth: []}]
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
@@ -2389,9 +2414,11 @@ paths:
         '400': {description: Callback is outside the exact deployment allowlist or request is invalid}
         '409': {description: Account version or idempotency conflict}
         '422': {description: Connector does not declare a browser authorization-code flow or client registration is missing}
+        '500': {description: Atomic OAuth start and audit could not commit}
   /connector-accounts:oauth-callback:
     post:
       operationId: completeConnectorOAuth
+      description: The one-time state claim, temporary material revocation and claim audit commit before the remote exchange. Token binding and completion audit then commit together. Failure after the claim does not reopen the state; start a fresh OAuth flow with a new idempotency key.
       security: [{bearerAuth: []}]
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
@@ -2408,10 +2435,12 @@ paths:
         '400': {description: Callback is outside the exact deployment allowlist or request is invalid}
         '409': {description: 'State is expired, already consumed, actor-bound to another session or account version changed'}
         '422': {description: Connector OAuth configuration is invalid}
+        '500': {description: Claim or completion transaction failed; the previous account binding is preserved but state may already be consumed}
         '502': {description: OAuth provider rejected or did not complete the bounded exchange}
   /connector-accounts:capabilities:
     put:
       operationId: replaceConnectorAccountCapabilities
+      description: Capability history, account version and authoritative audit commit together.
       security: [{bearerAuth: []}]
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
@@ -2431,12 +2460,14 @@ paths:
         '403': {description: Identity has no reviewed tenant mapping or write permission}
         '409': {description: Concurrent account update}
         '422': {description: A selected capability is not declared by the manifest or has no executable route in the current runtime}
+        '500': {description: Capability mutation and authoritative audit could not commit}
   /connector-accounts:check:
     post:
       operationId: checkConnectorAccount
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'200': {description: Concrete runtime adapter called with encrypted credentials and normalized health persisted}, '409': {description: Version conflict}, '422': {description: Connector is not executable through the generic runtime}}
+      description: The remote probe runs before the transaction; persisted health, history and authoritative audit commit together.
+      responses: {'200': {description: Concrete runtime adapter called with encrypted credentials and normalized health persisted}, '409': {description: Version conflict}, '422': {description: Connector is not executable through the generic runtime}, '500': {description: Health and authoritative audit could not commit}}
   /connector-accounts:health-history:
     get:
       operationId: listConnectorAccountHealthHistory
@@ -2451,22 +2482,26 @@ paths:
       operationId: enableConnectorAccount
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'200': {description: Healthy connector account enabled}, '422': {description: 'Runtime support, valid non-secret configuration, executable capabilities and a successful connection check are required'}}
+      description: Account activation and authoritative audit commit together.
+      responses: {'200': {description: Healthy connector account enabled}, '409': {description: Version conflict}, '422': {description: 'Runtime support, valid non-secret configuration, executable capabilities and a successful connection check are required'}, '500': {description: Activation and authoritative audit could not commit}}
   /connector-accounts:sync:
     post:
       operationId: syncConnectorAccount
+      description: Deterministic reconciliation runs and one authoritative account-sync audit record commit together; identical retries append no duplicates.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorAccountAction'}}}}
-      responses: {'202': {description: On-demand reconciliation runs durably started for enabled runtime-supported account policies}, '422': {description: 'Runtime support, active healthy account and current preview evidence are required before execution'}}
+      responses: {'202': {description: On-demand reconciliation runs durably started for enabled runtime-supported account policies}, '422': {description: 'Runtime support, active healthy account and current preview evidence are required before execution'}, '500': {description: Reconciliation runs and authoritative audit could not commit}}
   /connector-accounts:bootstrap-preview:
     post:
       operationId: previewConnectorBootstrap
+      description: Preview evidence and authoritative audit commit together; identical replays append no duplicate audit.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapPreviewWrite'}}}}
       responses:
         '201': {description: Immutable metadata-only dry-run evidence created without remote IO, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapPreview'}}}}
         '409': {description: Account version or idempotency evidence conflict}
         '422': {description: 'Active healthy account, enabled policies and account capabilities are required'}
+        '500': {description: Preview and authoritative audit could not commit}
   /connector-accounts:bootstrap:
     get:
       operationId: getConnectorBootstrapState
@@ -2474,21 +2509,25 @@ paths:
         '200': {description: 'Tenant-scoped previews, durable schedules and bootstrap dispatch progress', content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapState'}}}}
     post:
       operationId: startConnectorBootstrap
+      description: Preview consumption, durable job and authoritative audit commit together; identical replays append no duplicate audit.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorBootstrapStart'}}}}
       responses:
         '202': {description: Resumable initial-import dispatch job durably queued, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncJob'}}}}
         '409': {description: Idempotency conflict}
         '422': {description: Current unconsumed preview evidence with at least one inbound policy required}
+        '500': {description: Dispatch and authoritative audit could not commit}
   /connector-accounts:schedule:
     put:
       operationId: putConnectorSyncSchedule
+      description: Schedule mutation and authoritative audit commit together.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncScheduleWrite'}}}}
       responses:
         '200': {description: Durable server-side interval schedule created or optimistically updated, content: {application/json: {schema: {$ref: '#/components/schemas/ConnectorSyncSchedule'}}}}
         '409': {description: Account or schedule optimistic version conflict}
         '422': {description: Active healthy account and current preview evidence required when enabling}
+        '500': {description: Schedule and authoritative audit could not commit}
   /products:
     post:
       operationId: createProduct
@@ -2744,6 +2783,7 @@ paths:
   /reconciliation/jobs:
     post:
       operationId: createReconciliationJob
+      description: The deterministic reconciliation run and authoritative audit record commit together; identical retries append neither a duplicate run nor duplicate audit.
       security: [{bearerAuth: []}]
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
@@ -2757,6 +2797,7 @@ paths:
           content: {application/json: {schema: {$ref: '#/components/schemas/ReconciliationRunStatus'}}}
         '400': {description: Invalid job request or idempotency key}
         '409': {description: Idempotency key conflicts with another request}
+        '500': {description: Reconciliation run and authoritative audit could not commit}
   /approvals:
     get:
       operationId: listApprovals
@@ -3682,6 +3723,15 @@ paths:
         with a 5-second deadline for each frame write and flush, cleared while
         idle. A write or flush failure ends the stream; clients reconnect with
         backoff. No business entity or audit payload is sent through SSE.
+        An open stream repeats authentication, canonical tenant resolution and
+        permission checks every 15 seconds with a 5-second total check timeout.
+        A denied or unavailable check cancels the stream; a write already in
+        progress retains its bounded write deadline. The original credential
+        expiry independently ends the stream and caps every frame deadline.
+        A connection cannot switch identity, session, tenant or credential
+        expiry during revalidation. After streaming has started, loss of access
+        closes the stream without sending a JSON error or an authentication
+        event; reconnect passes the normal authorization checks again.
       responses:
         '200':
           description: Streaming text/event-stream response
