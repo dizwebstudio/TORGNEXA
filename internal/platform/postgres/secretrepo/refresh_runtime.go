@@ -2,9 +2,10 @@ package secretrepo
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"math/rand/v2"
+	"math/big"
 	"sync/atomic"
 	"time"
 )
@@ -69,7 +70,7 @@ type OAuthRefreshPoolMetrics struct {
 // for OAuth refresh admission, distributed-lock wait, provider/local rotation
 // outcome, and the shared PostgreSQL pool.
 type OAuthRefreshRuntimeMetrics struct {
-	ConcurrencyLimit  uint64
+	ConcurrencyLimit  int
 	InFlight          int64
 	PeakInFlight      int64
 	Waiting           int64
@@ -88,7 +89,7 @@ type OAuthRefreshRuntimeMetrics struct {
 type atomicDurationMetrics struct {
 	bounds  []time.Duration
 	count   atomic.Uint64
-	totalNS atomic.Uint64
+	totalNS atomic.Int64
 	buckets []atomic.Uint64
 }
 
@@ -104,7 +105,7 @@ func (metrics *atomicDurationMetrics) record(value time.Duration) {
 		value = 0
 	}
 	metrics.count.Add(1)
-	metrics.totalNS.Add(uint64(value))
+	metrics.totalNS.Add(int64(value))
 	for index, bound := range metrics.bounds {
 		if value <= bound {
 			metrics.buckets[index].Add(1)
@@ -233,7 +234,11 @@ func jitteredOAuthRefreshBackoff(retry uint) time.Duration {
 		retry--
 	}
 	floor := ceiling / 2
-	return floor + time.Duration(rand.Int64N(int64(ceiling-floor)+1))
+	random, err := rand.Int(rand.Reader, big.NewInt(int64(ceiling-floor)+1))
+	if err != nil {
+		return floor
+	}
+	return floor + time.Duration(random.Int64())
 }
 
 func (runtime *oauthRefreshRuntime) samplePool() OAuthRefreshPoolMetrics {
@@ -262,7 +267,7 @@ func (runtime *oauthRefreshRuntime) samplePool() OAuthRefreshPoolMetrics {
 
 func (runtime *oauthRefreshRuntime) snapshot() OAuthRefreshRuntimeMetrics {
 	return OAuthRefreshRuntimeMetrics{
-		ConcurrencyLimit:  uint64(cap(runtime.slots)),
+		ConcurrencyLimit:  cap(runtime.slots),
 		InFlight:          runtime.inFlight.Load(),
 		PeakInFlight:      runtime.peakInFlight.Load(),
 		Waiting:           runtime.waiting.Load(),

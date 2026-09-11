@@ -48,9 +48,8 @@ forced RLS и выполняет connector-auth сценарии с `go test -ra
 ## Результаты
 
 - `gofmt` для изменённых Go-файлов — PASS.
-- `go test ./internal/platform/postgres/secretrepo ./internal/platform/connectorauth` — PASS.
+- `go test ./...` и `go vet ./...` — PASS.
+- repository `gosec` policy — PASS: 0 High/Critical findings.
+- contracts, architecture, migrations и package index gates — PASS.
 - `./scripts/check-audit-postgres.sh` — PASS с `-race`, включая два новых и
   один расширенный PostgreSQL-сценарий 234.5.
-
-Полный repository gate (`go test ./...`, `go vet ./...`, contracts,
-architecture и package index) выполняется в том же change перед отправкой.

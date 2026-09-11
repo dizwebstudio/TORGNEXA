@@ -15,8 +15,16 @@ import (
 )
 
 func TestA08PostgresRefreshBoundedPool(t *testing.T) {
-	for _, poolSize := range []int{1, 4} {
-		t.Run(fmt.Sprint(poolSize), func(t *testing.T) {
+	for _, testCase := range []struct {
+		poolSize              int
+		expectedRefresh       int64
+		expectedRefreshMetric uint64
+	}{
+		{poolSize: 1, expectedRefresh: 1, expectedRefreshMetric: 1},
+		{poolSize: 4, expectedRefresh: 4, expectedRefreshMetric: 4},
+	} {
+		t.Run(fmt.Sprint(testCase.poolSize), func(t *testing.T) {
+			poolSize := testCase.poolSize
 			ctx, db, _, scope := auditPostgres(t)
 			db.SetMaxOpenConns(poolSize)
 			repo, err := secretrepo.New(db)
@@ -76,15 +84,15 @@ func TestA08PostgresRefreshBoundedPool(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if calls.Load() != int64(poolSize) {
-				t.Fatalf("refreshes=%d want=%d", calls.Load(), poolSize)
+			if calls.Load() != testCase.expectedRefresh {
+				t.Fatalf("refreshes=%d want=%d", calls.Load(), testCase.expectedRefresh)
 			}
 			metrics := repo.OAuthRefreshMetrics()
 			wantLimit := poolSize
 			if poolSize > 1 {
 				wantLimit--
 			}
-			if metrics.ConcurrencyLimit != uint64(wantLimit) || metrics.PeakInFlight > int64(wantLimit) || metrics.RefreshSuccesses != uint64(poolSize) || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != uint64(poolSize) {
+			if metrics.ConcurrencyLimit != wantLimit || metrics.PeakInFlight > int64(wantLimit) || metrics.RefreshSuccesses != testCase.expectedRefreshMetric || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != testCase.expectedRefreshMetric {
 				t.Fatalf("unexpected refresh metrics: %+v", metrics)
 			}
 			for _, account := range accounts {
