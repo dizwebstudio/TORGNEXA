@@ -11,6 +11,21 @@ security_priority: high
 external_evidence_required: false
 ```
 
+## Выполнено 2026-09-12 — минимизация OIDC subject в API/UI
+
+- [x] Member API и Settings UI больше не возвращают и не показывают stable
+  provider subject; вместо него новый API всегда отдаёт `identity_bound`.
+- [x] OpenAPI/SDK подняты до additive minor `0.22.0`; boolean остаётся optional
+  на rolling-upgrade окне для совместимости со старыми API replicas.
+- [x] Privacy exports также содержат только boolean; trusted lookup сохраняет
+  opaque subject, а restrict/delete/anonymize обнуляют привязку.
+- [x] Contract policy запрещает внутреннее поле в REST и event schemas;
+  API/PostgreSQL regression проверяет responses, audit, outbox, export и delete.
+- [ADR-0197](../../adr/0197-oidc-subject-surface-minimization.md),
+  [отчёт](../../docs/audits/2026-09-12-oidc-subject-minimization.md).
+
+Пункт 234.9 закрыт в репозитории. Миграций нет; deployment не выполнялся.
+
 ## Выполнено 2026-09-11 — завершение атомарного аудита 234.3
 
 - [x] Manual policy run, connector-account sync и reconciliation job создают
@@ -407,14 +422,14 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.9 — Минимизировать OIDC subject reference в API/UI
 
-- [ ] Убрать отображение `oidc_subject` из member UI и перестать возвращать
+- [x] Убрать отображение `oidc_subject` из member UI и перестать возвращать
   внутренний stable reference в обычном member response.
-- [ ] Если UI нужен статус привязки, вернуть неперсональный boolean
+- [x] Если UI нужен статус привязки, вернуть неперсональный boolean
   `identity_bound`; провести совместимое изменение OpenAPI/SDK по действующей
   compatibility policy.
-- [ ] Сохранить OIDC reference только внутри trusted application/privacy
+- [x] Сохранить OIDC reference только внутри trusted application/privacy
   boundaries и проверить export/retention/delete semantics.
-- [ ] Добавить contract/API тест, запрещающий internal identity reference в
+- [x] Добавить contract/API тест, запрещающий internal identity reference в
   member response и audit/event payload.
 
 ### 234.10 — Закрепить security и performance regression gates

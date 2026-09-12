@@ -8,6 +8,13 @@ Task 060 remains the policy registry. Task 061 does not redefine purposes, legal
 
 Subject requests support access/export, correction, deletion and restriction. A subject is represented by an opaque `{kind, id}` reference rather than email, phone, name or other raw PII. Correction bytes are not persisted in the workflow tables: only an upload/artifact reference is stored, and a production adapter must resolve/revalidate that reference through the Task-088 release gate immediately before use.
 
+OIDC subject references are valid only as internal opaque locators. Workspace
+member and profile exports omit that stable provider reference and return the
+boolean `identity_bound` status. Restriction, deletion and anonymization clear
+the membership binding; a later member-ID export reports
+`identity_bound=false`. Audit evidence and event payloads never carry the raw
+reference.
+
 Retention expiry supports `delete`, `anonymize` and `archive_then_delete`. `manual_review` creates a blocked non-mutating workflow. Tenant deletion is a dedicated action and cannot start unless at least one authoritative store adapter is registered.
 
 ## Resumability

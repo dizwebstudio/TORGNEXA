@@ -31,15 +31,15 @@ type memberUpdateRequest struct {
 	ExpectedVersion int64  `json:"expected_version"`
 }
 type memberView struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"display_name"`
-	OIDCSubject string    `json:"oidc_subject,omitempty"`
-	Role        string    `json:"role"`
-	Status      string    `json:"status"`
-	Version     int64     `json:"version"`
-	InvitedAt   time.Time `json:"invited_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Email         string    `json:"email"`
+	DisplayName   string    `json:"display_name"`
+	IdentityBound bool      `json:"identity_bound"`
+	Role          string    `json:"role"`
+	Status        string    `json:"status"`
+	Version       int64     `json:"version"`
+	InvitedAt     time.Time `json:"invited_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func newMemberSettingsRoutes(repository *tenancyrepo.Repository, auditService auditCapturer, profileStore ...userProfileStore) []ProtectedRoute {
@@ -177,7 +177,7 @@ func (a *memberSettingsAPI) update(w http.ResponseWriter, r *http.Request) {
 }
 
 func memberToView(m tenancyrepo.Member) memberView {
-	return memberView{ID: m.ID, Email: m.Email, DisplayName: m.DisplayName, OIDCSubject: m.OIDCSubject, Role: m.Role, Status: m.Status, Version: m.Version, InvitedAt: m.InvitedAt, UpdatedAt: m.UpdatedAt}
+	return memberView{ID: m.ID, Email: m.Email, DisplayName: m.DisplayName, IdentityBound: m.OIDCSubject != "", Role: m.Role, Status: m.Status, Version: m.Version, InvitedAt: m.InvitedAt, UpdatedAt: m.UpdatedAt}
 }
 
 func (a *memberSettingsAPI) getProfile(w http.ResponseWriter, r *http.Request) {

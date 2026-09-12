@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TORGNEXA API
-  version: 0.21.2
+  version: 0.22.0
   description: >-
     Protected operations fail closed during authoritative OIDC session checks.
     Access-token signatures are verified locally against an issuer-bound JWKS;
@@ -8142,7 +8142,9 @@ components:
         id: {type: string, minLength: 1, maxLength: 128}
         email: {type: string, format: email, maxLength: 254}
         display_name: {type: string, maxLength: 160}
-        oidc_subject: {type: string, minLength: 1, maxLength: 255}
+        identity_bound:
+          type: boolean
+          description: True when the member has a trusted external identity binding; the provider subject reference is never exposed.
         role: {type: string, enum: [admin, manager, operator, viewer]}
         status: {type: string, enum: [invited, active, disabled]}
         version: {type: integer, minimum: 1}

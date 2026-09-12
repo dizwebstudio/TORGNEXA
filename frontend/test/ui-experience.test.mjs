@@ -181,6 +181,9 @@ test("profile card presents stored profile details and an offline demo avatar", 
   for (const token of ["Профиль пользователя", "Должность", "Подразделение", "Дата рождения", "Электронная почта", "Телефон", "хранятся в TORGNEXA", "getCurrentUserProfile", "uploadCurrentUserAvatar", "createCurrentUserProfilePrivacyRequest", "profileDisplayName", "Изменить профиль", "Удалить фото", "Запросить выгрузку", "Запросить удаление"]) assert.match(settings, new RegExp(token));
   const members = read("features/settings/MemberSettings.tsx");
   for (const token of ["getWorkspaceMemberProfile", "updateWorkspaceMemberProfile", "Профиль", "Сохранить профиль"]) assert.match(members, new RegExp(token));
+  assert.match(members, /identity_bound/);
+  assert.match(members, /Учётная запись привязана/);
+  assert.doesNotMatch(members, /oidc_subject/);
   for (const token of ["jobTitle", "department", "birthdate", "phoneNumber", "picture"]) { assert.match(model, new RegExp(token)); assert.match(adapter, new RegExp(token)); }
   assert.match(avatar, /demo-avatar\.svg/);
   assert.match(css, /\.profile-hero/);

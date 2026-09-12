@@ -54,13 +54,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 683
-- adrs: 196
+- docs: 684
+- adrs: 197
 - tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3667
+- total source files (excluding local secrets/build/dependency/cache trees): 3673
 
 
 ## Connector category layout
@@ -747,6 +747,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0194-bounded-oauth-refresh-admission.md`
 - `adr/0195-local-oidc-authentication-hot-path.md`
 - `adr/0196-tenant-scoped-sse-broadcaster.md`
+- `adr/0197-oidc-subject-surface-minimization.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -2136,6 +2137,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/audits/2026-09-11-privileged-audit-completion.md`
 - `docs/audits/2026-09-12-oauth-refresh-admission.md`
 - `docs/audits/2026-09-12-oidc-hot-path.md`
+- `docs/audits/2026-09-12-oidc-subject-minimization.md`
 - `docs/audits/2026-09-12-sse-broadcaster.md`
 - `docs/billing/086-cloud-billing-lifecycle.md`
 - `docs/compliance/083-egais-government-connector.md`
@@ -2951,6 +2953,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/mcp_agent_policies.go`
 - `internal/app/api/mcp_agent_policies_test.go`
 - `internal/app/api/member_settings.go`
+- `internal/app/api/member_settings_privacy_test.go`
 - `internal/app/api/mobile_warehouse.go`
 - `internal/app/api/notification_delivery.go`
 - `internal/app/api/notification_routes.go`
@@ -3462,6 +3465,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/platform/postgres/reportrepo/repository_test.go`
 - `internal/platform/postgres/retentionrepo/migration_test.go`
 - `internal/platform/postgres/retentionrepo/privacy_store.go`
+- `internal/platform/postgres/retentionrepo/privacy_store_test.go`
 - `internal/platform/postgres/retentionrepo/repository.go`
 - `internal/platform/postgres/returnsrepo/migration_test.go`
 - `internal/platform/postgres/returnsrepo/repository.go`
@@ -4160,6 +4164,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `tools/contractcheck/internal/checker/json.go`
 - `tools/contractcheck/internal/checker/openapi.go`
 - `tools/contractcheck/internal/checker/policy_test.go`
+- `tools/contractcheck/internal/checker/privacy.go`
+- `tools/contractcheck/internal/checker/privacy_test.go`
 - `tools/contractcheck/internal/checker/protobuf.go`
 - `tools/contractcheck/internal/checker/protocols_test.go`
 - `tools/contractcheck/internal/checker/schemas.go`

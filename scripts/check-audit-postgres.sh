@@ -68,4 +68,4 @@ if ! docker exec -i "$container_name" psql -X -v ON_ERROR_STOP=1 -U postgres -d 
 fi
 export TORGNEXA_TEST_DATABASE_URL="host=$scratch/socket user=audit_integration dbname=audit sslmode=disable"
 export TORGNEXA_TEST_ADMIN_DATABASE_URL="host=$scratch/socket user=postgres dbname=audit sslmode=disable"
-go test -count=1 -race -v ./internal/app/api ./internal/app/worker ./internal/platform/connectorauth -run 'TestA0[2-9]Postgres|TestRealtimePostgres|TestConnectorAuditPostgres'
+go test -count=1 -race -v ./internal/app/api ./internal/app/worker ./internal/platform/connectorauth -run 'TestA0[2-9]Postgres|TestRealtimePostgres|TestConnectorAuditPostgres|TestOIDCSubjectPrivacyPostgres'

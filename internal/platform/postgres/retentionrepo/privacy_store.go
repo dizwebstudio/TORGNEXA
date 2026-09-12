@@ -60,7 +60,7 @@ func (s *PrivacyStore) Step(ctx context.Context, scope tenancy.Scope, step reten
 	}
 	switch step.Action {
 	case retention.ActionExport:
-		raw, _ := json.Marshal(map[string]any{"id": member.ID, "email": member.Email, "display_name": member.DisplayName, "oidc_subject": member.OIDCSubject, "role": member.Role, "status": member.Status})
+		raw, _ := json.Marshal(privacyMemberExport(member))
 		metadata, err := s.secrets.Create(ctx, scope, secrets.ClassPrivacyExport, raw)
 		clear(raw)
 		if err != nil {
@@ -124,7 +124,7 @@ func (s *PrivacyStore) profileStep(ctx context.Context, scope tenancy.Scope, ste
 	case retention.ActionExport:
 		raw, _ := json.Marshal(map[string]any{
 			"profile":          map[string]any{"username": profile.Username, "email": profile.Email, "given_name": profile.GivenName, "family_name": profile.FamilyName, "birthdate": profile.Birthdate, "job_title": profile.JobTitle, "department": profile.Department, "phone_number": profile.PhoneNumber, "picture_upload_id": profile.PictureUploadID},
-			"workspace_member": map[string]any{"id": member.ID, "email": member.Email, "display_name": member.DisplayName, "role": member.Role, "status": member.Status},
+			"workspace_member": privacyMemberExport(member),
 		})
 		metadata, err := s.secrets.Create(ctx, scope, secrets.ClassPrivacyExport, raw)
 		clear(raw)
@@ -181,6 +181,17 @@ func (s *PrivacyStore) profileStep(ctx context.Context, scope tenancy.Scope, ste
 		return retention.StepResult{}, retention.ErrUnsupported
 	}
 	return retention.StepResult{Processed: 1, Digest: retention.EvidenceDigest(step.JobID, s.Name(), string(step.Action), step.Subject.OpaqueID), Done: true}, nil
+}
+
+func privacyMemberExport(member privacyMember) map[string]any {
+	return map[string]any{
+		"id":             member.ID,
+		"email":          member.Email,
+		"display_name":   member.DisplayName,
+		"identity_bound": member.OIDCSubject != "",
+		"role":           member.Role,
+		"status":         member.Status,
+	}
 }
 
 func (s *PrivacyStore) profile(ctx context.Context, scope tenancy.Scope, subjectRef string) (privacyProfile, bool, error) {

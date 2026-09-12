@@ -24,6 +24,7 @@ func Check(ctx context.Context, root string) error {
 	yamlDocuments := checkYAMLSyntax(ctx, files.yamlFiles, &problems)
 	schemas := checkJSONSchemas(ctx, files.schemaFiles, jsonDocuments, &problems)
 	checkGovernanceInstances(ctx, root, schemas, &problems)
+	checkPublicIdentityReferences(files.openAPIFiles, files.schemaFiles, yamlDocuments, jsonDocuments, &problems)
 	checkOpenAPI(ctx, files.openAPIFiles, yamlDocuments, &problems)
 	checkProtobuf(ctx, files.protoFiles, &problems)
 	checkEvents(ctx, files.schemaFiles, jsonDocuments, &problems)

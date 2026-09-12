@@ -59,6 +59,23 @@ The helper deliberately does not attempt arbitrary free-text identity inference.
 
 Structured logging and append-only audit sanitization consume this shared privacy boundary. Raw maps/structs are still not accepted as normal log contracts.
 
+## External identity-link minimization
+
+An OIDC subject is a stable pseudonymous personal identifier. It is retained
+only in the tenant-scoped membership table and used inside the authentication
+and privacy-workflow boundaries to resolve a member or profile. Ordinary REST
+responses, generated SDK contracts, UI, audit summaries and event contracts
+must not contain the provider subject or its field name. Member surfaces expose
+only the non-identifying `identity_bound` boolean.
+
+Subject access exports follow the same minimization rule: they include
+`identity_bound` and omit the provider reference. The privacy workflow may
+still accept the opaque subject as an internal lookup selector. Restriction,
+deletion and anonymization clear the stored binding; deletion/anonymization
+also disable and anonymize the member record. Corrections do not replace the
+identity reference because rebinding is an authentication operation rather
+than a profile correction.
+
 ## PostgreSQL invariants
 
 Migration `000006_privacy_foundation.sql` creates `privacy_purposes` and `privacy_retention_policies` with:
