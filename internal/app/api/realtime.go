@@ -20,8 +20,8 @@ type realtimeTiming struct {
 	writeTimeout         time.Duration
 	revalidateInterval   time.Duration
 	revalidateTimeout    time.Duration
-	maxClientsPerTenant  int
-	maxClientsPerProcess int
+	maxClientsPerTenant  uint64
+	maxClientsPerProcess uint64
 	subscriberBuffer     int
 }
 

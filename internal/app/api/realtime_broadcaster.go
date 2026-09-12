@@ -47,6 +47,7 @@ type realtimeTenantWatcher struct {
 	ready       chan struct{}
 	latest      string
 	nextID      uint64
+	clients     uint64
 	subscribers map[uint64]chan realtimeSignal
 }
 
@@ -67,7 +68,7 @@ type realtimeBroadcasterCounters struct {
 // exposed as metric labels.
 type RealtimeBroadcasterMetrics struct {
 	ActiveTenants    int
-	ActiveClients    int
+	ActiveClients    uint64
 	PeakClients      uint64
 	AcceptedClients  uint64
 	RejectedTenant   uint64
@@ -91,7 +92,7 @@ type realtimeBroadcaster struct {
 
 	mu       sync.Mutex
 	tenants  map[string]*realtimeTenantWatcher
-	clients  int
+	clients  uint64
 	counters realtimeBroadcasterCounters
 }
 
@@ -110,7 +111,7 @@ func (b *realtimeBroadcaster) subscribe(ctx context.Context, scope tenancy.Scope
 
 	b.mu.Lock()
 	watcher := b.tenants[key]
-	if watcher != nil && len(watcher.subscribers) >= b.timing.maxClientsPerTenant {
+	if watcher != nil && watcher.clients >= b.timing.maxClientsPerTenant {
 		b.counters.rejectedTenant.Add(1)
 		b.mu.Unlock()
 		return nil, errRealtimeTenantClientLimit
@@ -137,6 +138,7 @@ func (b *realtimeBroadcaster) subscribe(ctx context.Context, scope tenancy.Scope
 	id := watcher.nextID
 	queue := make(chan realtimeSignal, b.timing.subscriberBuffer)
 	watcher.subscribers[id] = queue
+	watcher.clients++
 	b.clients++
 	b.counters.accepted.Add(1)
 	b.updatePeakLocked()
@@ -175,8 +177,9 @@ func (b *realtimeBroadcaster) unsubscribe(watcher *realtimeTenantWatcher, id uin
 		return
 	}
 	delete(watcher.subscribers, id)
+	watcher.clients--
 	b.clients--
-	if len(watcher.subscribers) == 0 {
+	if watcher.clients == 0 {
 		delete(b.tenants, watcher.key)
 		watcher.cancel()
 	}
@@ -251,7 +254,7 @@ func (b *realtimeBroadcaster) publishLocked(watcher *realtimeTenantWatcher, sign
 }
 
 func (b *realtimeBroadcaster) updatePeakLocked() {
-	current := uint64(b.clients)
+	current := b.clients
 	for {
 		peak := b.counters.peakClients.Load()
 		if current <= peak || b.counters.peakClients.CompareAndSwap(peak, current) {
