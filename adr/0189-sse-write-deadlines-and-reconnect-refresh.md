@@ -66,9 +66,10 @@ subsequent [ADR-0190](0190-continuous-sse-authorization.md) implements the
 Task 234.7 follow-up for open-stream credential expiry, session revocation and
 permission changes. Its periodic checks do not claim instantaneous revocation.
 
-Per-tenant fan-out, connection limits, shared watchers and production load
-qualification remain Task 234.7; the existing indexed audit-head polling stays
-in place. There is no production capacity claim or deployment in this change.
+[ADR-0196](0196-tenant-scoped-sse-broadcaster.md) completes the Task 234.7
+follow-up with per-tenant fan-out, fixed connection limits, one-element client
+queues and reconnect/multi-client query-count profiles. This ADR's write and
+reconnect behavior remains unchanged.
 
 ## Validation
 

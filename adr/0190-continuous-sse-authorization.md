@@ -46,15 +46,14 @@ when the monitor cancels access. Bytes already delivered or buffered cannot be
 retracted; proxy behavior and scheduler delays are outside these application
 timers. Credential expiry independently limits both the context and writes.
 
-Checks deliberately use authoritative membership/session stores and existing
-OIDC UserInfo validation; no allow-on-error or authorization cache is added.
-Consequently an IdP/store outage closes established streams as well. The cost
-is up to four additional complete checks per minute per connection: UserInfo,
-session observation and both existing membership resolutions. Session checks
-can update last_seen through the established repository and must not duplicate
-login evidence or reactivate revoked sessions. Shared watchers, connection
-caps, JWKS validation, membership deduplication and last_seen throttling remain
-Task 234.6/234.7; this change makes no production capacity claim.
+Checks use ADR-0195 local JWT/JWKS verification, an authoritative session check
+and a direct membership lookup that bypasses the ordinary one-second cache.
+Warm checks normally make no IdP call, one session transaction and one
+membership transaction; `last_seen_at` writes remain throttled. There is no
+allow-on-error path: unavailable authoritative session or membership storage
+closes the stream. [ADR-0196](0196-tenant-scoped-sse-broadcaster.md) shares only
+the tenant audit watcher; this identity-specific monitor remains one per
+connection.
 
 ## Compatibility, migration and privacy
 

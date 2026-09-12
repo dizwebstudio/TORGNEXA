@@ -6,15 +6,32 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/torgnexa/torgnexa/internal/core/tenancy"
+	"github.com/torgnexa/torgnexa/internal/platform/audit"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/auditrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/securitysettingsrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/postgres/tenancyrepo"
 	"github.com/torgnexa/torgnexa/internal/platform/securityedge"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
 )
+
+type realtimePostgresQueryCounter struct {
+	repository *auditrepo.Repository
+	calls      atomic.Int32
+}
+
+func (c *realtimePostgresQueryCounter) List(ctx context.Context, scope tenancy.Scope, limit int, cursor string) ([]audit.Record, string, error) {
+	return c.repository.List(ctx, scope, limit, cursor)
+}
+
+func (c *realtimePostgresQueryCounter) LatestID(ctx context.Context, scope tenancy.Scope) (string, error) {
+	c.calls.Add(1)
+	return c.repository.LatestID(ctx, scope)
+}
 
 func TestRealtimePostgresReauthorization(t *testing.T) {
 	for _, scenario := range []string{"active_then_revoke", "member_disabled", "membership_unavailable", "session_check_failure"} {
@@ -112,5 +129,97 @@ func TestRealtimePostgresReauthorization(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRealtimePostgresBroadcasterFanOutQueryCount(t *testing.T) {
+	const clients = 32
+	ctx, db, _, scope := auditPostgres(t)
+	repository, err := auditrepo.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counter := &realtimePostgresQueryCounter{repository: repository}
+	routes, broadcaster := newRealtimeRoutesWithBroadcaster(counter, realtimeTiming{
+		pollInterval:      time.Hour,
+		heartbeatInterval: time.Hour,
+		writeTimeout:      time.Second,
+	})
+
+	cancels := make([]context.CancelFunc, 0, clients)
+	recorders := make([]*realtimeLoadRecorder, 0, clients)
+	done := make(chan struct{}, clients)
+	for range clients {
+		clientContext, cancel := context.WithCancel(realtimeAuthorizedTestContext(ctx, scope))
+		cancels = append(cancels, cancel)
+		recorder := newRealtimeLoadRecorder()
+		recorders = append(recorders, recorder)
+		request := httptest.NewRequest(http.MethodGet, RealtimePath, nil).WithContext(clientContext)
+		go func() {
+			defer func() { done <- struct{}{} }()
+			routes[0].Handler.ServeHTTP(recorder, request)
+		}()
+	}
+	for _, recorder := range recorders {
+		select {
+		case <-recorder.ready:
+		case <-time.After(3 * time.Second):
+			t.Fatal("PostgreSQL fan-out client did not connect")
+		}
+	}
+	if counter.calls.Load() != 1 {
+		t.Fatalf("initial PostgreSQL audit-head queries=%d, want 1 for %d clients", counter.calls.Load(), clients)
+	}
+
+	service, err := audit.NewService(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Capture(ctx, scope, audit.Entry{
+		ActorID:       "synthetic-load-test",
+		Source:        "api",
+		Action:        "realtime.load_test",
+		ResourceType:  "workspace",
+		ResourceID:    scope.WorkspaceID().String(),
+		CorrelationID: auditFixtureID(),
+		Risk:          audit.RiskRead,
+		Summary:       audit.Summary{"clients": clients},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	broadcaster.mu.Lock()
+	var watcher *realtimeTenantWatcher
+	for _, candidate := range broadcaster.tenants {
+		watcher = candidate
+	}
+	broadcaster.mu.Unlock()
+	if watcher == nil {
+		t.Fatal("tenant watcher disappeared during load")
+	}
+	broadcaster.poll(watcher, false)
+	for _, recorder := range recorders {
+		select {
+		case <-recorder.invalidation:
+		case <-time.After(3 * time.Second):
+			t.Fatal("PostgreSQL audit invalidation did not fan out")
+		}
+	}
+	if counter.calls.Load() != 2 {
+		t.Fatalf("fan-out PostgreSQL audit-head queries=%d, want one initial and one changed-head query", counter.calls.Load())
+	}
+	metrics := broadcaster.RealtimeBroadcasterMetrics()
+	if metrics.ActiveClients != clients || metrics.ActiveTenants != 1 || metrics.DeliveriesQueued != clients {
+		t.Fatalf("unexpected PostgreSQL fan-out metrics: %+v", metrics)
+	}
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for range clients {
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Fatal("PostgreSQL fan-out client did not stop")
+		}
 	}
 }

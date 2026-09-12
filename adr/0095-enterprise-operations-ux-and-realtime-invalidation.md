@@ -42,6 +42,9 @@ Operators can work on cursor-sized pages regardless of tenant dataset size, rece
 
 The audit-head poll gives low-latency refresh for audited API mutations. Heartbeats provide liveness/fallback; if sub-second worker-originated notifications become an SLO later, a durable event-to-realtime gateway may be introduced under a separate event-platform review rather than coupling browser delivery directly to Kafka.
 
+[ADR-0196](0196-tenant-scoped-sse-broadcaster.md) subsequently replaces one
+poll loop per client with one bounded process-local watcher per active tenant.
+
 ## Testing and rollback
 
 Frontend regression coverage expands from 18 to 23 deterministic tests. A focused API handler test proves that a scoped realtime stream emits a ready frame and does not leak raw audit content. The generated SDK gate confirms the additive operation/version. Rollback is the previous API/frontend pair; there is no schema rollback.

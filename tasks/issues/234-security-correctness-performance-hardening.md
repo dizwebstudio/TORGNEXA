@@ -381,12 +381,15 @@ capability-based connector boundary и запрет на plaintext credentials.
   timeout 5 секунд, fail-closed при revoke/disable/сбое. Первоначальный expiry
   независимо ограничивает context и записи; identity/tenant/session неизменны.
   Реальные HTTP/1.1/2, PostgreSQL и failure-injection tests — ADR-0190.
-- [ ] Заменить polling audit head каждые две секунды на каждого клиента одним
+- [x] Заменить polling audit head каждые две секунды на каждого клиента одним
   tenant-scoped watcher/broadcaster или эквивалентным multiplexing. Durable
   event/outbox остаётся источником сигнала; SSE payload остаётся metadata-only.
-- [ ] Ограничить clients per tenant/process, bounded buffers и slow-consumer
+- [x] Ограничить clients per tenant/process, bounded buffers и slow-consumer
   поведение; не удерживать неограниченную историю в памяти.
-- [ ] Добавить reconnect-storm и multi-client load profile с DB query count.
+- [x] Добавить reconnect-storm и multi-client load profile с DB query count.
+
+Реализация, лимиты и rollout: [ADR-0196](../../adr/0196-tenant-scoped-sse-broadcaster.md).
+Проверка: [отчёт 2026-09-12](../../docs/audits/2026-09-12-sse-broadcaster.md).
 
 ### 234.8 — Подготовить rate limiter к нескольким репликам
 

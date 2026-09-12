@@ -41,6 +41,21 @@ unavailable outcomes increase. A healthy warm request performs zero IdP calls,
 one authoritative session DB check, zero or one cached membership lookup and
 normally no session timestamp write.
 
+## Realtime SSE broadcaster
+
+ADR-0196 exposes a label-free process snapshot for the tenant-scoped SSE
+broadcaster. Export active tenants, active/peak clients, accepted clients,
+tenant-limit and process-limit rejections, audit-head query/error counts,
+published signals, queued deliveries and coalesced deliveries. Do not attach
+tenant, workspace, identity, cursor, route or raw error labels.
+
+Alert before active clients approach the fixed process limit of 1024, on
+sustained 429 rejections, on audit-head error growth and on a sharp increase in
+coalesced deliveries. Capacity expectations are one
+audit-head query every two seconds per active tenant on each API replica, not
+one query per browser. The per-connection reauthorization transactions are a
+separate security-path cost and must be included in API/database sizing.
+
 ## Workflow automation (Task 163)
 
 The workflow control plane exposes the same correlation/causation context as

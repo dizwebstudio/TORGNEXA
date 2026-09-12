@@ -14,11 +14,15 @@ import (
 const RealtimePath = "/api/v1/realtime"
 
 type realtimeTiming struct {
-	pollInterval       time.Duration
-	heartbeatInterval  time.Duration
-	writeTimeout       time.Duration
-	revalidateInterval time.Duration
-	revalidateTimeout  time.Duration
+	pollInterval         time.Duration
+	pollTimeout          time.Duration
+	heartbeatInterval    time.Duration
+	writeTimeout         time.Duration
+	revalidateInterval   time.Duration
+	revalidateTimeout    time.Duration
+	maxClientsPerTenant  int
+	maxClientsPerProcess int
+	subscriberBuffer     int
 }
 
 // realtimeEvent is intentionally metadata-only: the browser receives an
@@ -53,12 +57,51 @@ func newRealtimeRoutes(repository auditReader) []ProtectedRoute {
 }
 
 func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) []ProtectedRoute {
+	routes, _ := newRealtimeRoutesWithBroadcaster(repository, timing)
+	return routes
+}
+
+func normalizeRealtimeTiming(timing realtimeTiming) realtimeTiming {
+	if timing.pollInterval <= 0 {
+		timing.pollInterval = 2 * time.Second
+	}
+	if timing.pollTimeout <= 0 {
+		timing.pollTimeout = defaultRealtimePollTimeout
+	}
+	if timing.heartbeatInterval <= 0 {
+		timing.heartbeatInterval = 15 * time.Second
+	}
+	if timing.writeTimeout <= 0 {
+		timing.writeTimeout = 5 * time.Second
+	}
 	if timing.revalidateInterval <= 0 {
 		timing.revalidateInterval = 15 * time.Second
 	}
 	if timing.revalidateTimeout <= 0 {
 		timing.revalidateTimeout = 5 * time.Second
 	}
+	if timing.maxClientsPerTenant <= 0 {
+		timing.maxClientsPerTenant = defaultRealtimeMaxClientsPerTenant
+	} else if timing.maxClientsPerTenant > defaultRealtimeMaxClientsPerTenant {
+		timing.maxClientsPerTenant = defaultRealtimeMaxClientsPerTenant
+	}
+	if timing.maxClientsPerProcess <= 0 {
+		timing.maxClientsPerProcess = defaultRealtimeMaxClientsPerProcess
+	} else if timing.maxClientsPerProcess > defaultRealtimeMaxClientsPerProcess {
+		timing.maxClientsPerProcess = defaultRealtimeMaxClientsPerProcess
+	}
+	if timing.maxClientsPerTenant > timing.maxClientsPerProcess {
+		timing.maxClientsPerTenant = timing.maxClientsPerProcess
+	}
+	if timing.subscriberBuffer <= 0 || timing.subscriberBuffer > defaultRealtimeSubscriberBuffer {
+		timing.subscriberBuffer = defaultRealtimeSubscriberBuffer
+	}
+	return timing
+}
+
+func newRealtimeRoutesWithBroadcaster(repository auditReader, timing realtimeTiming) ([]ProtectedRoute, *realtimeBroadcaster) {
+	broadcaster := newRealtimeBroadcaster(repository, timing)
+	timing = broadcaster.timing
 	return []ProtectedRoute{{Method: http.MethodGet, Path: RealtimePath, Permission: "operations.realtime.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		scope, ok := ScopeFromContext(r.Context())
 		if !ok || repository == nil {
@@ -94,6 +137,16 @@ func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) 
 			}
 			return
 		}
+		subscription, err := broadcaster.subscribe(r.Context(), scope)
+		if err != nil {
+			if errors.Is(err, errRealtimeTenantClientLimit) || errors.Is(err, errRealtimeProcessClientLimit) {
+				w.Header().Set("Retry-After", "5")
+				_ = controller.SetWriteDeadline(time.Now().Add(timing.writeTimeout))
+				writeProblem(w, http.StatusTooManyRequests, "Too Many Requests")
+			}
+			return
+		}
+		defer subscription.close()
 		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store, no-transform")
 		w.Header().Set("Connection", "keep-alive")
@@ -123,10 +176,7 @@ func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) 
 			return controller.SetWriteDeadline(time.Time{}) == nil
 		}
 
-		latest := ""
-		if id, err := latestAuditID(r.Context(), repository, scope); err == nil {
-			latest = id
-		}
+		latest := subscription.initial
 		if !write("ready", realtimeEvent{Reason: "connected", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
 			return
 		}
@@ -138,20 +188,14 @@ func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) 
 			return
 		}
 
-		poll := time.NewTicker(timing.pollInterval)
 		heartbeat := time.NewTicker(timing.heartbeatInterval)
-		defer poll.Stop()
 		defer heartbeat.Stop()
 		for {
 			select {
 			case <-r.Context().Done():
 				return
-			case <-poll.C:
-				id, err := latestAuditID(r.Context(), repository, scope)
-				if err != nil || id == "" || id == latest {
-					continue
-				}
-				latest = id
+			case signal := <-subscription.events:
+				latest = signal.cursor
 				if !write("invalidate", realtimeEvent{Reason: "audit", Cursor: latest, At: time.Now().UTC().Format(time.RFC3339Nano)}) {
 					return
 				}
@@ -161,7 +205,7 @@ func newRealtimeRoutesWithTiming(repository auditReader, timing realtimeTiming) 
 				}
 			}
 		}
-	})}}
+	})}}, broadcaster
 }
 
 // unwrapFlusher walks ResponseWriter wrappers that expose the standard

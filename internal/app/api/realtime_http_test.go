@@ -164,10 +164,19 @@ func TestA10RealtimeSlowClientReleasesHandler(t *testing.T) {
 		t.Fatal("missing ready frame before backpressure")
 	}
 	// Do not close/cancel/read the connection. The next frame must time out on
-	// its own; the handler must not remain stuck in Flush or keep polling.
+	// its own; the handler must not remain stuck in Flush. The tenant watcher
+	// may poll independently while the frame is blocked, but it must stop when
+	// the last subscriber is released.
 	a10AwaitExit(t, done)
-	if head.calls.Load() != 1 {
-		t.Fatal("failed flush kept polling after the slow client stopped reading")
+	calls := head.calls.Load()
+	if calls < 1 || calls > 10 {
+		t.Fatalf("unexpected audit-head query count during bounded slow write: %d", calls)
+	}
+	time.Sleep(3 * timing.pollInterval)
+	stoppedCalls := head.calls.Load()
+	time.Sleep(3 * timing.pollInterval)
+	if head.calls.Load() != stoppedCalls {
+		t.Fatal("failed flush retained the tenant watcher after its last client stopped")
 	}
 }
 

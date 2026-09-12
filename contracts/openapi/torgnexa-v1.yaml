@@ -3735,6 +3735,14 @@ paths:
         expiry during revalidation. After streaming has started, loss of access
         closes the stream without sending a JSON error or an authentication
         event; reconnect passes the normal authorization checks again.
+        Within one API process, all clients for an organization/workspace share
+        one bounded audit-head watcher, so polling scales with active tenants
+        rather than connected browsers. Each client queue keeps only the newest
+        pending invalidation; intermediate cursors are coalesced and no event
+        history is retained in memory. The process admits at most 64 clients per
+        tenant and 1024 clients total. Excess connections receive 429 with
+        Retry-After before text/event-stream headers. Every API replica owns its
+        watchers for the clients connected to that replica.
       responses:
         '200':
           description: Streaming text/event-stream response
@@ -3743,6 +3751,7 @@ paths:
               schema: {type: string}
         '401': {description: Authenticated tenant scope missing}
         '403': {description: Realtime read capability required}
+        '429': {description: Tenant or API-process realtime client limit reached; retry according to Retry-After}
         '501': {description: Response writer does not support streaming with write deadlines}
         '503': {description: Streaming controls or authoritative session storage unavailable before streaming begins}
 

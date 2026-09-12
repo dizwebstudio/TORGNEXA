@@ -54,13 +54,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 682
-- adrs: 195
+- docs: 683
+- adrs: 196
 - tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3663
+- total source files (excluding local secrets/build/dependency/cache trees): 3667
 
 
 ## Connector category layout
@@ -746,6 +746,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0193-atomic-privileged-dispatch-and-refresh-intent.md`
 - `adr/0194-bounded-oauth-refresh-admission.md`
 - `adr/0195-local-oidc-authentication-hot-path.md`
+- `adr/0196-tenant-scoped-sse-broadcaster.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -2135,6 +2136,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/audits/2026-09-11-privileged-audit-completion.md`
 - `docs/audits/2026-09-12-oauth-refresh-admission.md`
 - `docs/audits/2026-09-12-oidc-hot-path.md`
+- `docs/audits/2026-09-12-sse-broadcaster.md`
 - `docs/billing/086-cloud-billing-lifecycle.md`
 - `docs/compliance/083-egais-government-connector.md`
 - `docs/connectors/aliexpress-ru/README.md`
@@ -2986,6 +2988,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/realtime_authorization.go`
 - `internal/app/api/realtime_authorization_postgres_test.go`
 - `internal/app/api/realtime_authorization_test.go`
+- `internal/app/api/realtime_broadcaster.go`
+- `internal/app/api/realtime_broadcaster_test.go`
 - `internal/app/api/realtime_http_test.go`
 - `internal/app/api/realtime_test.go`
 - `internal/app/api/remaining_settings_audit_postgres_test.go`
