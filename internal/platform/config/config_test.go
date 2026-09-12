@@ -42,6 +42,9 @@ func TestLoadWithLookupDefaults(t *testing.T) {
 	if cfg.Valkey.Address != "" || cfg.Valkey.Username != "" || cfg.Valkey.Password != "" || cfg.Valkey.ConnectTimeout != time.Second || cfg.Valkey.RequestTimeout != 250*time.Millisecond || cfg.Valkey.MaxConnections != 32 {
 		t.Fatalf("unexpected Valkey defaults: %+v", cfg.Valkey)
 	}
+	if cfg.OIDC.ClientID != "torgnexa-web" || cfg.OIDC.Audience != "torgnexa-api" || cfg.OIDC.RequestTimeout != 3*time.Second {
+		t.Fatalf("unexpected OIDC defaults: %+v", cfg.OIDC)
+	}
 }
 
 func TestLoadWithLookupOverrides(t *testing.T) {
@@ -92,6 +95,11 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 		"S3_SECRET_KEY":                              syntheticValues[1],
 		"TORGNEXA_S3_REQUEST_TIMEOUT":                "12s",
 		"TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS":         "login.example.test,id.example.test",
+		"TORGNEXA_OIDC_ISSUER":                       "https://login.example.test/realms/main",
+		"TORGNEXA_OIDC_JWKS_URL":                     "https://login.example.test/realms/main/certs",
+		"TORGNEXA_OIDC_USERINFO_URL":                 "https://login.example.test/realms/main/userinfo",
+		"TORGNEXA_OIDC_CLIENT_ID":                    "web-client",
+		"TORGNEXA_OIDC_AUDIENCE":                     "api-client",
 	}
 
 	cfg, err := LoadWithLookup(ServiceAPI, mapLookup(values))
@@ -124,6 +132,9 @@ func TestLoadWithLookupOverrides(t *testing.T) {
 	}
 	if len(cfg.OIDC.ManagedIssuerHosts) != 2 || cfg.OIDC.ManagedIssuerHosts[0] != "login.example.test" {
 		t.Fatalf("unexpected managed OIDC issuer hosts: %+v", cfg.OIDC.ManagedIssuerHosts)
+	}
+	if cfg.OIDC.Issuer != "https://login.example.test/realms/main" || cfg.OIDC.JWKSURL != "https://login.example.test/realms/main/certs" || cfg.OIDC.UserInfoURL != "https://login.example.test/realms/main/userinfo" || cfg.OIDC.ClientID != "web-client" || cfg.OIDC.Audience != "api-client" {
+		t.Fatalf("unexpected OIDC config: %+v", cfg.OIDC)
 	}
 }
 

@@ -2,6 +2,14 @@
 
 REST base `/api/v1`; contract-first OpenAPI. OIDC bearer auth; tenant/workspace context derived from auth. Cursor pagination. Idempotency for retryable mutations. RFC7807-style problems. Correlation/request IDs.
 
+The production OIDC boundary verifies RS256 access-token signatures locally
+through an issuer-bound rotating JWKS cache and validates `iss`, API `aud`,
+client `azp`, `exp`, `nbf`, `iat` and `sub`. UserInfo is bounded profile and
+verified-email hydration rather than a per-request authentication call.
+Application session revocation remains database-authoritative on every request;
+membership is resolved once and passed to authorization through typed request
+context. See ADR-0195.
+
 ## OpenAPI and production routing
 
 The current v1 contract is the source of truth for the public HTTP operation

@@ -72,6 +72,7 @@
         "pkce.code.challenge.method": "S256"
       },
       "protocolMappers": [
+        {"name": "torgnexa-api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "torgnexa-api", "id.token.claim": "false", "access.token.claim": "true"}},
         {"name": "picture", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "picture", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "picture", "jsonType.label": "String"}},
         {"name": "birthdate", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "birthdate", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "birthdate", "jsonType.label": "String"}},
         {"name": "job_title", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"userinfo.token.claim": "true", "user.attribute": "job_title", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "job_title", "jsonType.label": "String"}},

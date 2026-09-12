@@ -54,13 +54,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 681
-- adrs: 194
+- docs: 682
+- adrs: 195
 - tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3657
+- total source files (excluding local secrets/build/dependency/cache trees): 3663
 
 
 ## Connector category layout
@@ -745,6 +745,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `adr/0192-distributed-api-rate-limits.md`
 - `adr/0193-atomic-privileged-dispatch-and-refresh-intent.md`
 - `adr/0194-bounded-oauth-refresh-admission.md`
+- `adr/0195-local-oidc-authentication-hot-path.md`
 - `architecture/policy.json`
 - `architecture/reviews/003-audit-base.json`
 - `architecture/reviews/004-catalog-domain.json`
@@ -2133,6 +2134,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/audits/2026-09-11-evidence/privileged-audit-vet.log.txt`
 - `docs/audits/2026-09-11-privileged-audit-completion.md`
 - `docs/audits/2026-09-12-oauth-refresh-admission.md`
+- `docs/audits/2026-09-12-oidc-hot-path.md`
 - `docs/billing/086-cloud-billing-lifecycle.md`
 - `docs/compliance/083-egais-government-connector.md`
 - `docs/connectors/aliexpress-ru/README.md`
@@ -2952,8 +2954,12 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `internal/app/api/notification_routes.go`
 - `internal/app/api/notifications.go`
 - `internal/app/api/notifications_test.go`
+- `internal/app/api/oidc_hotpath.go`
+- `internal/app/api/oidc_hotpath_test.go`
 - `internal/app/api/oidc_invitation_postgres_test.go`
 - `internal/app/api/oidc_invitation_test.go`
+- `internal/app/api/oidc_jwt.go`
+- `internal/app/api/oidc_jwt_test.go`
 - `internal/app/api/oidc_membership_test.go`
 - `internal/app/api/oidc_profile_test.go`
 - `internal/app/api/oidc_security.go`

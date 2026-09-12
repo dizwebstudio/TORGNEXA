@@ -351,19 +351,22 @@ capability-based connector boundary и запрет на plaintext credentials.
 - [x] A09: идемпотентная первая регистрация сессии, единственное login event,
   сериализация с Revoke и различение 401/503; PostgreSQL regression с двумя
   пулами и восемью одновременными запросами. См. ADR-0188.
-- [ ] Проверять подпись JWT локально через issuer-bound JWKS cache с rotation;
+- [x] Проверять подпись JWT локально через issuer-bound JWKS cache с rotation;
   валидировать issuer, audience/authorized party, expiry/not-before и subject.
   Неподписанный decoded payload не является authorization evidence.
-- [ ] Убрать обязательный UserInfo HTTP round-trip с каждого API-запроса;
+- [x] Убрать обязательный UserInfo HTTP round-trip с каждого API-запроса;
   использовать его для bounded profile hydration/refresh, а не для каждой
   проверки доступа.
-- [ ] Разрешать membership один раз и передавать database-authoritative member
+- [x] Разрешать membership один раз и передавать database-authoritative member
   в authorizer через typed request context.
-- [ ] Проверку revoked session сохранить fail-closed, но обновление
+- [x] Проверку revoked session сохранить fail-closed, но обновление
   `last_seen_at` coalesce/throttle, чтобы активный пользователь не создавал
   запись в PostgreSQL на каждый запрос.
-- [ ] Добавить метрики количества IdP/DB calls на запрос и authenticated load
+- [x] Добавить метрики количества IdP/DB calls на запрос и authenticated load
   profile с p50/p95/p99, Keycloak outage и revoked-session сценариями.
+
+Реализация и границы rollout: [ADR-0195](../../adr/0195-local-oidc-authentication-hot-path.md).
+Проверка: [отчёт 2026-09-12](../../docs/audits/2026-09-12-oidc-hot-path.md).
 
 ### 234.7 — Исправить lifecycle и fan-out realtime SSE
 

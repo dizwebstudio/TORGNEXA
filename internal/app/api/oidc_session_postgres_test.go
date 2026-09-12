@@ -430,3 +430,93 @@ func TestA09PostgresObservationPreservesBindingAndTenant(t *testing.T) {
 	a09EventCounts(t, ctx, repo, scope, 1, 0)
 	a09EventCounts(t, ctx, repo, otherScope, 1, 0)
 }
+
+func TestA09PostgresSessionLastSeenWriteIsThrottledButRevocationIsAuthoritative(t *testing.T) {
+	ctx, db, _, scope := auditPostgres(t)
+	repo, err := securitysettingsrepo.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := a09Observation()
+	result, err := repo.ObserveDetailed(ctx, scope, initial)
+	if err != nil || !result.Created || !result.TimestampsUpdated {
+		t.Fatalf("initial observation=%+v err=%v", result, err)
+	}
+	withinWindow := initial
+	withinWindow.EventID = auditFixtureID()
+	withinWindow.ObservedAt = initial.ObservedAt.Add(30 * time.Second)
+	result, err = repo.ObserveDetailed(ctx, scope, withinWindow)
+	if err != nil || result.Created || result.TimestampsUpdated {
+		t.Fatalf("unthrottled observation=%+v err=%v", result, err)
+	}
+	if saved := a09Session(t, ctx, repo, scope); !saved.LastSeenAt.Equal(initial.ObservedAt) {
+		t.Fatal("throttled observation changed last_seen_at")
+	}
+	afterWindow := withinWindow
+	afterWindow.EventID = auditFixtureID()
+	afterWindow.ObservedAt = initial.ObservedAt.Add(61 * time.Second)
+	result, err = repo.ObserveDetailed(ctx, scope, afterWindow)
+	if err != nil || result.Created || !result.TimestampsUpdated {
+		t.Fatalf("coalesced observation=%+v err=%v", result, err)
+	}
+	if saved := a09Session(t, ctx, repo, scope); !saved.LastSeenAt.Equal(afterWindow.ObservedAt) {
+		t.Fatal("last_seen_at did not advance after throttle interval")
+	}
+	if _, err := repo.Revoke(ctx, scope, securitysettings.RevokeCommand{EventID: auditFixtureID(), SessionRef: initial.SessionRef, ActorID: "synthetic-admin", CorrelationID: "last-seen-revoke", OccurredAt: afterWindow.ObservedAt.Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.ObserveDetailed(ctx, scope, afterWindow); !errors.Is(err, securitysettings.ErrSessionRevoked) {
+		t.Fatal("throttled write path bypassed revocation", err)
+	}
+}
+
+func TestA09PostgresAuthenticatedHotPathLoadMetrics(t *testing.T) {
+	const requests = 32
+	ctx, db, _, scope := auditPostgres(t)
+	db.SetMaxOpenConns(8)
+	sessions, err := securitysettingsrepo.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	members, err := tenancyrepo.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a02Invite(t, ctx, members, scope, a02InvitedEmail, "viewer")
+	fixture := newA02OIDCFixture(t, scope, sessions, a02EmailCase{email: a02InvitedEmail, verification: "true"})
+	cache := newMembershipCache(members, fixture.authenticator.metrics)
+	route := ProtectedRoute{Method: http.MethodGet, Path: "/api/v1/private", Permission: "orders.read", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+	handler, err := NewProductionHandler(testSecurityLogger(), edgeTestConfig(), securityedge.NewLimiter(), fixture.authenticator, claimTenantResolver{memberships: members, cache: cache}, roleAuthorizer{memberships: members, cache: cache}, []ProtectedRoute{route}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	statuses := make(chan int, requests)
+	var wait sync.WaitGroup
+	for range requests {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, fixture.request().WithContext(ctx))
+			statuses <- response.Code
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(statuses)
+	for status := range statuses {
+		if status != http.StatusNoContent {
+			t.Fatalf("authenticated PostgreSQL load status=%d", status)
+		}
+	}
+	metrics := fixture.authenticator.OIDCHotPathMetrics()
+	if metrics.Requests != requests || metrics.Authorized != requests || metrics.JWKSHTTPCalls != 1 || metrics.UserInfoHTTPCalls != 1 ||
+		metrics.SessionDBCalls != requests || metrics.SessionLastSeenWrites != 1 || metrics.SessionWritesThrottled != requests-1 || metrics.MembershipDBCalls != 1 ||
+		metrics.IdPCallsPerRequest.TotalCalls != 2 || metrics.DBCallsPerRequest.TotalCalls != requests+1 || metrics.Latency.Count != requests || metrics.Latency.P99 <= 0 {
+		t.Fatalf("PostgreSQL hot-path metrics=%+v", metrics)
+	}
+	a09Session(t, ctx, sessions, scope)
+	a09EventCounts(t, ctx, sessions, scope, 1, 0)
+}

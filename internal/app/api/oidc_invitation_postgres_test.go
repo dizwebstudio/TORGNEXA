@@ -70,9 +70,7 @@ func TestA02PostgresInvitationOwnershipAndReplay(t *testing.T) {
 			invitation := a02Invite(t, ctx, members, scope, a02InvitedEmail, "admin")
 			fixture := newA02OIDCFixture(t, scope, sessions, emailCase)
 			want := http.StatusForbidden
-			if emailCase.unauthenticated {
-				want = http.StatusUnauthorized
-			} else if emailCase.wantVerified == a02InvitedEmail {
+			if emailCase.wantVerified == a02InvitedEmail {
 				want = http.StatusNoContent
 			}
 			for range 2 {

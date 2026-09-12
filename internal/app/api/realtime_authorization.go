@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -25,7 +26,17 @@ func (a requestReauthorization) check(ctx context.Context, request *http.Request
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	ctx = withMembershipCacheBypass(withResolvedMembership(ctx))
+	authorizedRequest, unavailableRequest := false, false
+	if instrumenter, ok := a.deps.authenticator.(oidcHotPathInstrumenter); ok {
+		var finish func(bool, bool)
+		ctx, finish = instrumenter.beginOIDCHotPath(ctx)
+		defer func() { finish(authorizedRequest, unavailableRequest) }()
+	}
 	principal, err := a.deps.authenticator.Authenticate(ctx, request.WithContext(ctx))
+	if errors.Is(err, ErrAuthenticationUnavailable) {
+		unavailableRequest = true
+	}
 	if err != nil || !principal.Valid() || principal.Issuer != a.issuer || principal.Subject != a.subject ||
 		principal.SessionRef != a.sessionRef || principal.SubjectRef != a.subjectRef ||
 		!principal.ExpiresAt.Equal(a.expiresAt) || !time.Now().Before(principal.ExpiresAt) {
@@ -40,6 +51,7 @@ func (a requestReauthorization) check(ctx context.Context, request *http.Request
 	if err := a.deps.authorizer.Authorize(ctx, principal, scope, a.permission); err != nil {
 		return ErrUnauthorized
 	}
+	authorizedRequest = true
 	// A dependency may have returned just as its deadline elapsed. A late
 	// successful check never revives an expired/cancelled authorization.
 	return ctx.Err()

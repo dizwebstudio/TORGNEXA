@@ -220,6 +220,12 @@ Valkey хранит только ограниченные по TTL SHA-256 кл�
 
 | Переменная | По умолчанию | Как заполнять |
 |---|---:|---|
+| `TORGNEXA_OIDC_ISSUER` | пусто | Exact issuer from the access-token `iss` claim. HTTPS outside development. |
+| `TORGNEXA_OIDC_JWKS_URL` | пусто | Issuer-bound JWKS endpoint. Community uses the Keycloak backchannel URL. |
+| `TORGNEXA_OIDC_USERINFO_URL` | пусто | Issuer-bound bounded profile hydration endpoint; it is not called on every request. |
+| `TORGNEXA_OIDC_CLIENT_ID` | `torgnexa-web` | Required access-token authorized party (`azp`). |
+| `TORGNEXA_OIDC_AUDIENCE` | `torgnexa-api` | Required access-token audience (`aud`). |
+| `TORGNEXA_OIDC_REQUEST_TIMEOUT` | `3s` | Bound for JWKS and optional UserInfo calls, `100ms`–`30s`. |
 | `TORGNEXA_OIDC_MANAGED_ISSUER_HOSTS` | пусто | CSV-список разрешённых host внешних issuer без схемы, пути и пробелов. Пустое значение означает default deny. |
 
 Пример:

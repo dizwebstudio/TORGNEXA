@@ -17,7 +17,7 @@ import (
 )
 
 func TestRealtimePostgresReauthorization(t *testing.T) {
-	for _, scenario := range []string{"active_then_revoke", "member_disabled", "membership_unavailable", "session_write_failure", "provider_rejects_subject"} {
+	for _, scenario := range []string{"active_then_revoke", "member_disabled", "membership_unavailable", "session_check_failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, db, admin, scope := auditPostgres(t)
 			db.SetMaxOpenConns(2)
@@ -82,16 +82,14 @@ func TestRealtimePostgresReauthorization(t *testing.T) {
 						t.Error(e)
 					}
 				})
-			case "session_write_failure":
-				_, err = admin.ExecContext(ctx, `REVOKE UPDATE ON settings_identity_sessions FROM audit_integration`)
+			case "session_check_failure":
+				_, err = admin.ExecContext(ctx, `REVOKE SELECT,UPDATE ON settings_identity_sessions FROM audit_integration`)
 				t.Cleanup(func() {
-					_, e := admin.ExecContext(context.Background(), `GRANT UPDATE ON settings_identity_sessions TO audit_integration`)
+					_, e := admin.ExecContext(context.Background(), `GRANT SELECT,UPDATE ON settings_identity_sessions TO audit_integration`)
 					if e != nil {
 						t.Error(e)
 					}
 				})
-			case "provider_rejects_subject":
-				fixture.setInfo(t, a02EmailCase{email: a02InvitedEmail, verification: "true", subject: "different-synthetic-subject"})
 			}
 			if err != nil {
 				t.Fatal(err)

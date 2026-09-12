@@ -13,6 +13,7 @@ import (
 )
 
 const applyScope = `SELECT set_config('app.organization_id',$1,true),set_config('app.workspace_id',$2,true)`
+const sessionObservationWriteSeconds = 60
 
 // Repository stores minimized OIDC session evidence in PostgreSQL.
 type Repository struct{ database *sql.DB }
@@ -28,13 +29,22 @@ func New(database *sql.DB) (*Repository, error) {
 // Observe registers a validated OIDC session exactly once under concurrent
 // first requests, or rejects a previously revoked or differently bound session.
 func (r *Repository) Observe(ctx context.Context, scope tenancy.Scope, value securitysettings.Observation) error {
+	_, err := r.ObserveDetailed(ctx, scope, value)
+	return err
+}
+
+// ObserveDetailed performs the authoritative session check on every call but
+// coalesces last_seen_at writes to at most once per minute for an unchanged
+// access-token expiry.
+func (r *Repository) ObserveDetailed(ctx context.Context, scope tenancy.Scope, value securitysettings.Observation) (securitysettings.ObservationResult, error) {
 	if err := validate(ctx, r, scope); err != nil {
-		return err
+		return securitysettings.ObservationResult{}, err
 	}
 	if !validObservation(value) {
-		return securitysettings.ErrInvalid
+		return securitysettings.ObservationResult{}, securitysettings.ErrInvalid
 	}
-	return r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
+	var outcome securitysettings.ObservationResult
+	err := r.withTx(ctx, scope, false, func(tx *sql.Tx) error {
 		var status, subjectRef string
 		readSession := func() error {
 			return tx.QueryRowContext(ctx, `SELECT status,subject_ref FROM settings_identity_sessions WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 FOR UPDATE`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef).Scan(&status, &subjectRef)
@@ -51,6 +61,8 @@ func (r *Repository) Observe(ctx context.Context, scope tenancy.Scope, value sec
 			}
 			if inserted == 1 {
 				_, err = tx.ExecContext(ctx, `INSERT INTO settings_login_events(id,organization_id,workspace_id,session_ref,event_type,client_kind,occurred_at) VALUES($1,$2,$3,$4,'session_observed',$5,$6)`, value.EventID, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ClientKind, value.ObservedAt.UTC())
+				outcome.Created = err == nil
+				outcome.TimestampsUpdated = err == nil
 				return err
 			}
 			// FOR UPDATE cannot lock a missing row. A concurrent creator won the
@@ -67,9 +79,18 @@ func (r *Repository) Observe(ctx context.Context, scope tenancy.Scope, value sec
 		if status != "active" || subjectRef != value.SubjectRef {
 			return securitysettings.ErrInvalid
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE settings_identity_sessions SET last_seen_at=GREATEST(last_seen_at,$4),expires_at=GREATEST(expires_at,$5) WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 AND status='active'`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ObservedAt.UTC(), value.ExpiresAt.UTC())
-		return err
+		result, err := tx.ExecContext(ctx, `UPDATE settings_identity_sessions SET last_seen_at=GREATEST(last_seen_at,$4::timestamptz),expires_at=GREATEST(expires_at,$5::timestamptz) WHERE organization_id=$1 AND workspace_id=$2 AND session_ref=$3 AND status='active' AND (last_seen_at <= $4::timestamptz-make_interval(secs => $6) OR expires_at < $5::timestamptz)`, scope.OrganizationID().String(), scope.WorkspaceID().String(), value.SessionRef, value.ObservedAt.UTC(), value.ExpiresAt.UTC(), sessionObservationWriteSeconds)
+		if err != nil {
+			return fmt.Errorf("update identity session observation: %w", err)
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("count updated identity sessions: %w", err)
+		}
+		outcome.TimestampsUpdated = updated == 1
+		return nil
 	})
+	return outcome, err
 }
 
 // ListSessions returns a stable tenant-scoped page using an opaque hash cursor.

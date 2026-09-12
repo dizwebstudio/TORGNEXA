@@ -52,7 +52,9 @@ must additionally define these values:
 |---|---|---|
 | `KEYCLOAK_HOSTNAME` | `auth.example.ru` | Public HTTPS hostname used by Keycloak behind the host reverse proxy. |
 | `TORGNEXA_OIDC_ISSUER` | `https://auth.example.ru/realms/torgnexa` | HTTPS issuer URL matching the realm and browser configuration. |
+| `TORGNEXA_OIDC_JWKS_URL` | `https://auth.example.ru/realms/torgnexa/protocol/openid-connect/certs` | HTTPS JWKS endpoint used for local access-token signature verification. |
 | `TORGNEXA_OIDC_USERINFO_URL` | `https://auth.example.ru/realms/torgnexa/protocol/openid-connect/userinfo` | HTTPS userinfo URL reachable by the API. |
+| `TORGNEXA_OIDC_AUDIENCE` | `torgnexa-api` | Required access-token audience; keep `TORGNEXA_OIDC_CLIENT_ID=torgnexa-web` as the required authorized party. |
 | `TORGNEXA_PUBLIC_URL` | `https://app.example.ru` | Public frontend URL without a trailing slash. It is baked into documentation canonical, Open Graph, JSON-LD and sitemap during the frontend image build. |
 | `TORGNEXA_SECURITY_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32` | Only the address range of the trusted local reverse proxy. |
 | `TORGNEXA_SECURITY_ADMIN_CIDRS` | `127.0.0.1/32` | Explicit admin-edge allowlist. |
@@ -68,6 +70,10 @@ After the first Keycloak start, update the `torgnexa-web` client in the
 bundled development realm with the exact public frontend origin, for example
 `https://app.example.ru/*` and `https://app.example.ru`. Realm JSON imports are
 not a substitute for reviewing the live production client after bootstrap.
+Before deploying an ADR-0195 API replica, also install the bundled
+`torgnexa-api-audience` protocol mapper on that client and confirm a newly
+issued access token contains `aud=torgnexa-api` and `azp=torgnexa-web`. Apply
+the mapper first; tokens minted without this audience are rejected locally.
 
 ## Host prerequisites
 

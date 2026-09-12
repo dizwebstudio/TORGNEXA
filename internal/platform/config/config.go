@@ -127,8 +127,10 @@ type ObjectStorage struct {
 // URLs and claim names are configuration, while bearer tokens are never stored.
 type OIDC struct {
 	Issuer                  string
+	JWKSURL                 string
 	UserInfoURL             string
 	ClientID                string
+	Audience                string
 	OrganizationClaim       string
 	WorkspaceClaim          string
 	DevelopmentOrganization string
@@ -250,6 +252,7 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 		},
 		OIDC: OIDC{
 			ClientID:          "torgnexa-web",
+			Audience:          "torgnexa-api",
 			OrganizationClaim: "organization_id",
 			WorkspaceClaim:    "workspace_id",
 			RequestTimeout:    3 * time.Second,
@@ -376,10 +379,16 @@ func LoadWithLookup(service Service, lookup func(string) (string, bool)) (Config
 	if cfg.OIDC.Issuer, _, err = readOptional(lookup, "OIDC_ISSUER"); err != nil {
 		return Config{}, err
 	}
+	if cfg.OIDC.JWKSURL, _, err = readOptional(lookup, "OIDC_JWKS_URL"); err != nil {
+		return Config{}, err
+	}
 	if cfg.OIDC.UserInfoURL, _, err = readOptional(lookup, "OIDC_USERINFO_URL"); err != nil {
 		return Config{}, err
 	}
 	if cfg.OIDC.ClientID, err = readSafeString(lookup, "OIDC_CLIENT_ID", cfg.OIDC.ClientID, 128); err != nil {
+		return Config{}, err
+	}
+	if cfg.OIDC.Audience, err = readSafeString(lookup, "OIDC_AUDIENCE", cfg.OIDC.Audience, 128); err != nil {
 		return Config{}, err
 	}
 	if cfg.OIDC.OrganizationClaim, err = readSafeString(lookup, "OIDC_ORGANIZATION_CLAIM", cfg.OIDC.OrganizationClaim, 128); err != nil {

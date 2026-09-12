@@ -51,6 +51,19 @@ type Observation struct {
 	ObservedAt      time.Time
 }
 
+// ObservationResult reports whether ObserveDetailed created or updated durable
+// session timestamps. The authoritative active/revoked check always runs.
+type ObservationResult struct {
+	Created           bool
+	TimestampsUpdated bool
+}
+
+// DetailedStore adds write-coalescing evidence without widening the public
+// settings API. Authentication uses it when the backing store supports it.
+type DetailedStore interface {
+	ObserveDetailed(context.Context, tenancy.Scope, Observation) (ObservationResult, error)
+}
+
 // RevokeCommand carries append-only actor and correlation evidence.
 type RevokeCommand struct {
 	EventID       string

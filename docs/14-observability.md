@@ -24,6 +24,23 @@ payload or raw error labels. Alert on sustained admission waiters or pool
 saturation and on a refresh failure-rate increase; a single provider rejection
 can be an expected reauthorization event.
 
+## OIDC authenticated hot path
+
+ADR-0195 exposes one label-free process snapshot from the production OIDC
+composition. Export authorized, denied and unavailable outcomes; JWKS and
+UserInfo HTTP calls/cache hits; session DB checks and timestamp writes skipped
+or performed; membership DB calls/cache hits; per-request IdP/DB call-count
+distributions; and fixed-bucket authenticated latency with p50/p95/p99 upper
+bounds. The latency ends after authorization and excludes the business handler
+and SSE stream lifetime. Do not label these metrics with issuer URL, tenant,
+workspace, subject, session, route, token, email or raw errors.
+
+Alert when IdP calls per request rise after cache warm-up, membership DB calls
+approach one per request, session timestamp writes approach session checks, or
+unavailable outcomes increase. A healthy warm request performs zero IdP calls,
+one authoritative session DB check, zero or one cached membership lookup and
+normally no session timestamp write.
+
 ## Workflow automation (Task 163)
 
 The workflow control plane exposes the same correlation/causation context as

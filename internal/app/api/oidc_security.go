@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -33,21 +32,27 @@ type oidcAuthenticator struct {
 	userinfoHost string
 	environment  config.Environment
 	sessions     securitysettings.Store
+	verifier     *oidcJWTVerifier
+	profiles     *oidcProfileCache
+	metrics      *oidcHotPathRecorder
 }
 
 type oidcEgressBoundary struct {
 	issuerHost   string
 	userinfoHost string
+	jwksHost     string
 }
 
 type oidcClaims struct {
-	Issuer      string `json:"iss"`
-	Subject     string `json:"sub"`
-	Authorized  string `json:"azp"`
-	ExpiresAt   int64  `json:"exp"`
-	IssuedAt    int64  `json:"iat"`
-	AuthTime    int64  `json:"auth_time"`
-	SessionID   string `json:"sid"`
+	Issuer      string       `json:"iss"`
+	Subject     string       `json:"sub"`
+	Authorized  string       `json:"azp"`
+	Audience    oidcAudience `json:"aud"`
+	ExpiresAt   int64        `json:"exp"`
+	NotBefore   int64        `json:"nbf"`
+	IssuedAt    int64        `json:"iat"`
+	AuthTime    int64        `json:"auth_time"`
+	SessionID   string       `json:"sid"`
 	RealmAccess struct {
 		Roles []string `json:"roles"`
 	} `json:"realm_access"`
@@ -96,45 +101,74 @@ func newOIDCSecurity(cfg config.Config, sessions securitysettings.Store, members
 		Proxy: nil,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, splitErr := net.SplitHostPort(address)
-			if splitErr != nil || !strings.EqualFold(strings.Trim(host, "[]"), boundary.userinfoHost) {
-				return nil, fmt.Errorf("oidc userinfo egress denied")
+			host = strings.ToLower(strings.Trim(host, "[]"))
+			if splitErr != nil || (host != boundary.userinfoHost && host != boundary.jwksHost) {
+				return nil, fmt.Errorf("oidc identity egress denied")
 			}
 			return (&net.Dialer{Timeout: cfg.OIDC.RequestTimeout}).DialContext(ctx, network, net.JoinHostPort(host, port))
 		},
 	}
-	authenticator := &oidcAuthenticator{cfg: cfg.OIDC, userinfoHost: boundary.issuerHost, environment: cfg.Environment, sessions: sessions, client: &http.Client{
+	client := &http.Client{
 		Transport:     transport,
 		Timeout:       cfg.OIDC.RequestTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}}
+	}
+	metrics := &oidcHotPathRecorder{}
+	authenticator := &oidcAuthenticator{cfg: cfg.OIDC, userinfoHost: boundary.issuerHost, environment: cfg.Environment, sessions: sessions, client: client, metrics: metrics}
+	authenticator.verifier = &oidcJWTVerifier{config: cfg.OIDC, cache: newIssuerJWKSCache(client, cfg.OIDC.JWKSURL, boundary.issuerHost, metrics), now: time.Now}
+	authenticator.profiles = newOIDCProfileCache(metrics)
 	if memberships == nil {
 		return nil, nil, nil, ErrSecurityCompositionInvalid
 	}
-	resolver := claimTenantResolver{environment: cfg.Environment, organizationID: cfg.OIDC.DevelopmentOrganization, workspaceID: cfg.OIDC.DevelopmentWorkspace, memberships: memberships}
-	return authenticator, resolver, roleAuthorizer{memberships: memberships}, nil
+	membership := newMembershipCache(memberships, metrics)
+	resolver := claimTenantResolver{environment: cfg.Environment, organizationID: cfg.OIDC.DevelopmentOrganization, workspaceID: cfg.OIDC.DevelopmentWorkspace, memberships: memberships, cache: membership}
+	return authenticator, resolver, roleAuthorizer{memberships: memberships, cache: membership}, nil
 }
 
 func validateOIDCConfig(cfg config.Config) (oidcEgressBoundary, error) {
-	if cfg.OIDC.Issuer == "" || cfg.OIDC.UserInfoURL == "" || cfg.OIDC.ClientID == "" || cfg.OIDC.RequestTimeout <= 0 {
+	if cfg.OIDC.Issuer == "" || cfg.OIDC.JWKSURL == "" || cfg.OIDC.UserInfoURL == "" || cfg.OIDC.ClientID == "" || cfg.OIDC.Audience == "" || cfg.OIDC.RequestTimeout <= 0 {
 		return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 	}
-	parsedURLs := make([]*url.URL, 0, 2)
-	for _, raw := range []string{cfg.OIDC.Issuer, cfg.OIDC.UserInfoURL} {
+	parsedURLs := make([]*url.URL, 0, 3)
+	for _, raw := range []string{cfg.OIDC.Issuer, cfg.OIDC.UserInfoURL, cfg.OIDC.JWKSURL} {
 		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		if err != nil || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 		}
-		if parsed.Scheme != "https" && cfg.Environment != config.EnvironmentDevelopment {
+		if parsed.Scheme != "https" && (cfg.Environment != config.EnvironmentDevelopment || parsed.Scheme != "http") {
 			return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 		}
 		parsedURLs = append(parsedURLs, parsed)
 	}
 	issuerHost := strings.ToLower(parsedURLs[0].Hostname())
 	userinfoHost := strings.ToLower(parsedURLs[1].Hostname())
-	if userinfoHost != issuerHost && !(cfg.Environment == config.EnvironmentDevelopment && allowedDevelopmentOIDCHost(userinfoHost)) {
+	jwksHost := strings.ToLower(parsedURLs[2].Hostname())
+	if cfg.Environment != config.EnvironmentDevelopment &&
+		(!sameOIDCOrigin(parsedURLs[0], parsedURLs[1]) || !sameOIDCOrigin(parsedURLs[0], parsedURLs[2])) {
 		return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
 	}
-	return oidcEgressBoundary{issuerHost: parsedURLs[0].Host, userinfoHost: userinfoHost}, nil
+	if cfg.Environment == config.EnvironmentDevelopment &&
+		((userinfoHost != issuerHost && !allowedDevelopmentOIDCHost(userinfoHost)) ||
+			(jwksHost != issuerHost && !allowedDevelopmentOIDCHost(jwksHost))) {
+		return oidcEgressBoundary{}, ErrSecurityCompositionInvalid
+	}
+	return oidcEgressBoundary{issuerHost: parsedURLs[0].Host, userinfoHost: userinfoHost, jwksHost: jwksHost}, nil
+}
+
+func sameOIDCOrigin(first, second *url.URL) bool {
+	return strings.EqualFold(first.Scheme, second.Scheme) &&
+		strings.EqualFold(first.Hostname(), second.Hostname()) &&
+		effectiveOIDCPort(first) == effectiveOIDCPort(second)
+}
+
+func effectiveOIDCPort(value *url.URL) string {
+	if port := value.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(value.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 func allowedDevelopmentOIDCHost(host string) bool {
@@ -146,7 +180,7 @@ func allowedDevelopmentOIDCHost(host string) bool {
 }
 
 func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, request *http.Request) (Principal, error) {
-	if authenticator == nil || authenticator.client == nil || request == nil {
+	if authenticator == nil || authenticator.client == nil || authenticator.verifier == nil || request == nil {
 		return Principal{}, ErrUnauthenticated
 	}
 	header := request.Header.Get("Authorization")
@@ -157,32 +191,21 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if len(token) < 32 || len(token) > 16_384 || strings.ContainsAny(token, "\r\n\t ") {
 		return Principal{}, ErrUnauthenticated
 	}
-	// #nosec G704 -- UserInfoURL is accepted only by validateOIDCConfig and the transport enforces the exact allowlisted host.
-	userinfoRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, authenticator.cfg.UserInfoURL, nil)
+	claims, err := authenticator.verifier.verify(ctx, token)
+	if errors.Is(err, errOIDCJWKSUnavailable) {
+		return Principal{}, ErrAuthenticationUnavailable
+	}
 	if err != nil {
 		return Principal{}, ErrUnauthenticated
 	}
-	userinfoRequest.Header.Set("Authorization", "Bearer "+token)
-	// Community deployments use an internal backchannel address while Keycloak
-	// validates requests against its public issuer hostname.
-	userinfoRequest.Host = authenticator.userinfoHost
-	// #nosec G704 -- redirects are disabled and the client transport has an exact-host egress boundary.
-	response, err := authenticator.client.Do(userinfoRequest)
+	subjectRef := identityReference(claims.Issuer, claims.Subject)
+	info, _, err := authenticator.profiles.resolve(ctx, subjectRef, func() (userInfoClaims, bool, error) {
+		return authenticator.fetchUserInfo(ctx, token, claims.Subject)
+	})
 	if err != nil {
-		return Principal{}, ErrUnauthenticated
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxUserInfoResponse))
-		return Principal{}, ErrUnauthenticated
-	}
-	var info userInfoClaims
-	decoder := json.NewDecoder(io.LimitReader(response.Body, maxUserInfoResponse))
-	if err := decoder.Decode(&info); err != nil || info.Subject == "" {
-		return Principal{}, ErrUnauthenticated
-	}
-	claims, err := decodeValidatedTokenClaims(token)
-	if err != nil || claims.Subject != info.Subject || claims.Issuer != authenticator.cfg.Issuer || claims.Authorized != authenticator.cfg.ClientID || claims.ExpiresAt <= time.Now().Unix() {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return Principal{}, ErrAuthenticationUnavailable
+		}
 		return Principal{}, ErrUnauthenticated
 	}
 	roles := make([]string, 0, len(claims.RealmAccess.Roles))
@@ -199,7 +222,6 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 		return Principal{}, ErrUnauthenticated
 	}
 	sessionRef := identityReference(claims.Issuer, claims.Subject+"\x00"+sessionSeed)
-	subjectRef := identityReference(claims.Issuer, claims.Subject)
 	organizationID, workspaceID := claims.OrganizationID, claims.WorkspaceID
 	if authenticator.environment == config.EnvironmentDevelopment && organizationID == "" && workspaceID == "" {
 		organizationID, workspaceID = authenticator.cfg.DevelopmentOrganization, authenticator.cfg.DevelopmentWorkspace
@@ -218,7 +240,17 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	if authenticator.sessions == nil {
 		return Principal{}, ErrAuthenticationUnavailable
 	}
-	if err := authenticator.sessions.Observe(ctx, scope, securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}); err != nil {
+	observation := securitysettings.Observation{EventID: newApprovalID(), SessionRef: sessionRef, SubjectRef: subjectRef, ClientKind: oidcClientKind(request.UserAgent()), AuthenticatedAt: authenticatedAt, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), ObservedAt: time.Now().UTC()}
+	written := true
+	if detailed, ok := authenticator.sessions.(securitysettings.DetailedStore); ok {
+		result, observeErr := detailed.ObserveDetailed(ctx, scope, observation)
+		err = observeErr
+		written = result.Created || result.TimestampsUpdated
+	} else {
+		err = authenticator.sessions.Observe(ctx, scope, observation)
+	}
+	authenticator.metrics.recordSessionDBCall(ctx, written && err == nil, !written && err == nil)
+	if err != nil {
 		if errors.Is(err, securitysettings.ErrSessionRevoked) || errors.Is(err, securitysettings.ErrInvalid) {
 			return Principal{}, ErrUnauthenticated
 		}
@@ -228,6 +260,48 @@ func (authenticator *oidcAuthenticator) Authenticate(ctx context.Context, reques
 	}
 	profile := profileFromOIDCClaims(claims, info, subjectRef)
 	return Principal{Issuer: claims.Issuer, Subject: claims.Subject, SessionRef: sessionRef, SubjectRef: subjectRef, ExpiresAt: time.Unix(claims.ExpiresAt, 0).UTC(), Email: profile.Email, VerifiedEmail: verifiedUserInfoEmail(info), Profile: profile, Roles: roles, OrganizationID: claims.OrganizationID, WorkspaceID: claims.WorkspaceID}, nil
+}
+
+// OIDCHotPathMetrics returns the bounded process-local authentication snapshot.
+func (authenticator *oidcAuthenticator) OIDCHotPathMetrics() OIDCHotPathMetrics {
+	if authenticator == nil {
+		return OIDCHotPathMetrics{}
+	}
+	return authenticator.metrics.snapshot()
+}
+
+func (authenticator *oidcAuthenticator) beginOIDCHotPath(ctx context.Context) (context.Context, func(bool, bool)) {
+	return authenticator.metrics.begin(ctx)
+}
+
+func (authenticator *oidcAuthenticator) fetchUserInfo(ctx context.Context, token, subject string) (userInfoClaims, bool, error) {
+	authenticator.metrics.recordUserInfoHTTPCall(ctx)
+	// #nosec G704 -- UserInfoURL is accepted only by validateOIDCConfig and the transport enforces the exact allowlisted host.
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, authenticator.cfg.UserInfoURL, nil)
+	if err != nil {
+		return userInfoClaims{}, false, nil
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Host = authenticator.userinfoHost
+	// #nosec G704 -- redirects are disabled and the client transport has an exact-host egress boundary.
+	response, err := authenticator.client.Do(request)
+	if err != nil {
+		if ctx.Err() != nil {
+			return userInfoClaims{}, false, ctx.Err()
+		}
+		return userInfoClaims{}, false, nil
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxUserInfoResponse))
+		return userInfoClaims{}, false, nil
+	}
+	var info userInfoClaims
+	decoder := json.NewDecoder(io.LimitReader(response.Body, maxUserInfoResponse))
+	if err := decoder.Decode(&info); err != nil || info.Subject == "" || info.Subject != subject {
+		return userInfoClaims{}, false, nil
+	}
+	return info, true, nil
 }
 
 // Verification belongs to the email in this authenticated UserInfo response.
@@ -351,28 +425,12 @@ func oidcClientKind(userAgent string) string {
 	}
 }
 
-func decodeValidatedTokenClaims(token string) (oidcClaims, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return oidcClaims{}, ErrUnauthenticated
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || len(payload) > maxUserInfoResponse {
-		return oidcClaims{}, ErrUnauthenticated
-	}
-	var claims oidcClaims
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
-	if err := decoder.Decode(&claims); err != nil {
-		return oidcClaims{}, ErrUnauthenticated
-	}
-	return claims, nil
-}
-
 type claimTenantResolver struct {
 	environment    config.Environment
 	organizationID string
 	workspaceID    string
 	memberships    workspaceMembershipStore
+	cache          *membershipCache
 }
 
 func (resolver claimTenantResolver) ResolveTenant(ctx context.Context, principal Principal, _ *http.Request) (tenancy.Scope, error) {
@@ -388,7 +446,16 @@ func (resolver claimTenantResolver) ResolveTenant(ctx context.Context, principal
 		return tenancy.Scope{}, ErrUnauthorized
 	}
 	identity := tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef, VerifiedEmail: principal.VerifiedEmail}
-	if _, err := resolver.memberships.ResolveActiveMember(ctx, scope, identity); err != nil {
+	var member tenancyrepo.Member
+	if resolver.cache != nil && !membershipCacheBypassed(ctx) {
+		member, err = resolver.cache.resolve(ctx, scope, identity)
+	} else {
+		if resolver.cache != nil {
+			resolver.cache.metrics.recordMembershipDBCall(ctx)
+		}
+		member, err = resolver.memberships.ResolveActiveMember(ctx, scope, identity)
+	}
+	if err != nil {
 		if resolver.environment != config.EnvironmentDevelopment || !principalHasRole(principal, "admin") {
 			return tenancy.Scope{}, ErrUnauthorized
 		}
@@ -396,22 +463,38 @@ func (resolver claimTenantResolver) ResolveTenant(ctx context.Context, principal
 		if email == "" {
 			email = "dev-" + principal.SubjectRef[:16] + "@local.invalid"
 		}
-		if _, bootstrapErr := resolver.memberships.BootstrapDevelopmentAdministrator(ctx, scope, principal.SubjectRef, email); bootstrapErr != nil {
+		member, err = resolver.memberships.BootstrapDevelopmentAdministrator(ctx, scope, principal.SubjectRef, email)
+		if err != nil {
 			return tenancy.Scope{}, ErrUnauthorized
 		}
+		if resolver.cache != nil {
+			resolver.cache.put(scope, principal.SubjectRef, member)
+		}
 	}
+	storeResolvedMembership(ctx, scope, principal.SubjectRef, member)
 	return scope, nil
 }
 
-type roleAuthorizer struct{ memberships workspaceMembershipStore }
+type roleAuthorizer struct {
+	memberships workspaceMembershipStore
+	cache       *membershipCache
+}
 
 func (authorizer roleAuthorizer) Authorize(ctx context.Context, principal Principal, scope tenancy.Scope, permission string) error {
 	if authorizer.memberships == nil {
 		return ErrUnauthorized
 	}
-	member, err := authorizer.memberships.ResolveActiveMember(ctx, scope, tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef})
-	if err != nil {
-		return ErrUnauthorized
+	member, ok := loadResolvedMembership(ctx, scope, principal.SubjectRef)
+	if !ok {
+		var err error
+		if authorizer.cache != nil {
+			member, err = authorizer.cache.resolve(ctx, scope, tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef})
+		} else {
+			member, err = authorizer.memberships.ResolveActiveMember(ctx, scope, tenancyrepo.MemberIdentity{SubjectRef: principal.SubjectRef})
+		}
+		if err != nil {
+			return ErrUnauthorized
+		}
 	}
 	role := member.Role
 	readPermission := permission == "connectors.accounts.read" || permission == "integrations.center.read" || permission == "products.read" || permission == "orders.read" || permission == "orders.returns.read" || permission == "stock.read" || permission == "wms.read" || permission == "compliance.read" || permission == "notifications.read" || permission == "reports.read" || permission == "finance.reports.read" || permission == "finance.reports.detail.read" || permission == "ads.read" || permission == "promotions.read" || permission == "audit.read" || permission == "sync.read" || permission == "approvals.read" || permission == "workflows.read" || permission == "settings.workspace.read" || permission == "settings.profile.read" || permission == "lineage.read" || permission == "counterparties.read" || permission == "entitlements.read" || permission == "webhooks.read" || permission == "settlements.read" || permission == "fx.read" || permission == "cloud.subscription.read" || permission == "plugins.read" || permission == "operations.realtime.read" || permission == "settings.ai_providers.read" || permission == "settings.mcp_accounts.read" || permission == "settings.ai_governance.read" || permission == "assistant.read" || permission == "customer_service.read" || permission == "procurement.suppliers.read" || permission == "procurement.offers.read" || permission == "procurement.purchase_orders.read" || permission == "procurement.reconciliation.read" || permission == "ecosystem.read"

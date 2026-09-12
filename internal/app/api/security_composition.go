@@ -122,6 +122,10 @@ type securityDependencies struct {
 	authorizer    Authorizer
 }
 
+type oidcHotPathInstrumenter interface {
+	beginOIDCHotPath(context.Context) (context.Context, func(bool, bool))
+}
+
 type requestIdentityKey struct{}
 type requestScopeKey struct{}
 type requestClientIPKey struct{}
@@ -312,9 +316,21 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, logger *slog.Log
 		route.Handler.ServeHTTP(w, r.WithContext(ctx))
 		return
 	}
+	ctx = withResolvedMembership(ctx)
+	authorizedRequest, unavailableRequest := false, false
+	var finishHotPath func(bool, bool)
+	if instrumenter, ok := deps.authenticator.(oidcHotPathInstrumenter); ok {
+		ctx, finishHotPath = instrumenter.beginOIDCHotPath(ctx)
+		defer func() {
+			if finishHotPath != nil {
+				finishHotPath(authorizedRequest, unavailableRequest)
+			}
+		}()
+	}
 
 	principal, err := deps.authenticator.Authenticate(ctx, r)
 	if errors.Is(err, ErrAuthenticationUnavailable) {
+		unavailableRequest = true
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Retry-After", "5")
 		writeProblem(w, http.StatusServiceUnavailable, "Service Unavailable")
@@ -348,12 +364,17 @@ func serveComposedRoute(w http.ResponseWriter, r *http.Request, logger *slog.Log
 		writeProblem(w, http.StatusForbidden, "Forbidden")
 		return
 	}
+	authorizedRequest = true
 	ctx = context.WithValue(ctx, requestScopeKey{}, scope)
 	ctx = context.WithValue(ctx, requestReauthorizationKey{}, requestReauthorization{
 		deps: deps, issuer: principal.Issuer, subject: principal.Subject,
 		sessionRef: principal.SessionRef, subjectRef: principal.SubjectRef,
 		expiresAt: principal.ExpiresAt, scope: scope, permission: route.Permission,
 	})
+	if finishHotPath != nil {
+		finishHotPath(authorizedRequest, unavailableRequest)
+		finishHotPath = nil
+	}
 	route.Handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
