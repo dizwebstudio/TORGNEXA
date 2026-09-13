@@ -1,5 +1,12 @@
 # Task 021 — Secrets Provider
 
+## Status
+
+`complete` — repository implementation and canonical CI/PostgreSQL
+qualification are complete. Target-production secret-backend, rotation and
+recovery evidence remains part of the P4 deployment gate rather than this
+foundation task.
+
 Define `SecretProvider`, opaque secret references, shared redaction helpers, rotation/revocation model, and the local encrypted Community implementation. No plaintext token/credential columns.
 
 ## Acceptance
@@ -19,9 +26,14 @@ Define `SecretProvider`, opaque secret references, shared redaction helpers, rot
 - [x] JSON Schema contract and valid/invalid fixtures cover safe reference metadata.
 - [x] Architecture policy/review registers the secrets capability and PostgreSQL adapter without changing frozen pillars.
 - [x] Unit/static migration checks pass in the repository-compatible local toolchain run.
-- [ ] Deployment PostgreSQL smoke must run in an environment with Docker/PostgreSQL available before release qualification.
-- [ ] Canonical Go 1.26.5 CI must repeat root test/vet/build; this sandbox cannot download the required toolchain.
+- [x] Canonical CI runs the disposable digest-pinned PostgreSQL smoke, including
+  full migrations, forced tenant RLS and secret rotation/revocation invariants.
+- [x] Canonical Go 1.26.7 CI repeats root test/vet/build through
+  `scripts/check.sh` with `GOTOOLCHAIN=local`.
 
 ## Repository status
 
-Repository implementation complete. Operational/deployment qualification follows the same release-gate rules as the earlier foundation tasks and does not block starting Task 060 repository work.
+Repository implementation and its required CI qualification are complete. The
+2026-09-13 canonical CI run passed repository checks, PostgreSQL tenancy/RLS,
+logical restore and physical PITR. Live production secret-management posture
+is still verified by Task 118/P4 and is not inferred from this result.

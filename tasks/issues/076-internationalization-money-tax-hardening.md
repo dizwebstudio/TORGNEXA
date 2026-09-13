@@ -1,7 +1,9 @@
 # Task 076: Internationalization/money/tax hardening
 
 ## Status
-Repository implementation complete — stages `076a` and `076b` are complete. Canonical Go 1.26.5 / PostgreSQL runtime qualification remains a CI/staging obligation.
+`complete` — stages `076a` and `076b`, canonical Go 1.26.7 CI and PostgreSQL
+runtime qualification are complete. Provider-specific live tax/currency
+behavior remains subject to each connector's release qualification.
 
 ## Objective
 Audit core for locale/currency/timezone/tax assumptions and introduce provider-neutral abstractions.
@@ -27,7 +29,8 @@ Audit core for locale/currency/timezone/tax assumptions and introduce provider-n
 - [x] Country/provider-specific tax decisions are behind `TaxProvider` and are not embedded in generic core types.
 - [x] Draft 2020-12 contracts and positive/negative fixtures exist for Money, Quantity, UTCInstant, Locale/Timezone, Address and TaxTreatment.
 - [x] ADR `0022` remains the governing decision and the architecture review records the implementation inside the existing shared-types pillar.
-- [ ] Canonical Go 1.26.5 CI must repeat root test/vet/build and semantic contract checks; this sandbox cannot download the required toolchain/dependencies.
+- [x] Canonical Go 1.26.7 CI repeats root test/vet/build and semantic contract
+  checks through `scripts/check.sh` with `GOTOOLCHAIN=local`.
 
 ## Stage 076b — commerce-core audit
 
@@ -42,4 +45,10 @@ Audit core for locale/currency/timezone/tax assumptions and introduce provider-n
 No float money; UTC persistence; locale/tax tests.
 
 ## Repository status
-Parent Task `076` repository implementation complete. Stage `076b` audits the frozen-Core mirrors in Pricing/Inventory/Orders against the shared Task-076 primitives, hardens Catalog UTC wire contracts, and adds executable source/migration/schema plus cross-locale/currency/timezone/tax regression coverage. No provider implementation exists yet; the architecture/provider gate continues to enforce that future provider-local representations are translated at connector boundaries. Exact Go 1.26.5 and live PostgreSQL qualification must repeat in CI/staging.
+Parent Task `076` is complete. Stage `076b` audits the frozen-Core mirrors in
+Pricing/Inventory/Orders against the shared Task-076 primitives, hardens
+Catalog UTC wire contracts, and adds executable source/migration/schema plus
+cross-locale/currency/timezone/tax regression coverage. Canonical Go 1.26.7
+and disposable PostgreSQL qualification passed in CI on 2026-09-13. The
+architecture/provider gate continues to require future provider-local
+representations to be translated at connector boundaries.

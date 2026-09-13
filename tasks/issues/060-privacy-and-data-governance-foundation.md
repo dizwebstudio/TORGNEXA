@@ -1,5 +1,11 @@
 # Task 060 — Privacy and Data Governance Foundation
 
+## Status
+
+`complete` — repository implementation and canonical CI/PostgreSQL
+qualification are complete. Subject-level execution remains owned by Task 061;
+target-production evidence remains part of the P4 deployment gate.
+
 Implement the frozen privacy/data-governance capability before domain PII is introduced: canonical data classes, processing-purpose/legal-basis metadata, tenant-scoped retention policy metadata, and default PII redaction for audit/log/support surfaces.
 
 ## Dependencies
@@ -25,8 +31,11 @@ Implement the frozen privacy/data-governance capability before domain PII is int
 - [x] Draft 2020-12 contracts and valid/invalid fixtures cover processing-purpose and retention-policy metadata.
 - [x] Backup/restore and PostgreSQL runtime rehearsals include privacy-registry preservation and RLS checks.
 - [x] Architecture policy/review registers the privacy capability and PostgreSQL adapter without changing frozen pillars.
-- [ ] Deployment PostgreSQL smoke must run in an environment with Docker/PostgreSQL available before release qualification.
-- [ ] Canonical Go 1.26.5 CI must repeat root test/vet/build and semantic contract checks; this sandbox cannot download the required toolchain/dependencies.
+- [x] Canonical CI runs the disposable digest-pinned PostgreSQL smoke, including
+  privacy-registry cross-tenant isolation, lifecycle guards, restore and PITR
+  preservation.
+- [x] Canonical Go 1.26.7 CI repeats root test/vet/build and semantic contract
+  checks through `scripts/check.sh` with `GOTOOLCHAIN=local`.
 
 ## Scope boundary
 
@@ -34,4 +43,8 @@ Task 060 stores and enforces policy metadata only. Task 061 owns subject access/
 
 ## Repository status
 
-Repository implementation complete once the listed deterministic checks pass. Operational/deployment qualification remains subject to the existing foundation release gates.
+Repository implementation and its required deterministic CI qualification are
+complete. The 2026-09-13 canonical CI run passed repository checks,
+PostgreSQL tenancy/RLS, logical restore and physical PITR. Deployment-specific
+privacy execution and production posture remain governed by Task 061 and the
+P4 release gates.
