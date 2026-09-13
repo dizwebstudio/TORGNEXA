@@ -79,31 +79,43 @@ func TestA08PostgresRefreshBoundedPool(t *testing.T) {
 				}
 			}
 			close(start)
-			for range poolSize * 4 {
-				if err := <-results; err != nil {
-					t.Fatal(err)
+			if !t.Run("operations", func(t *testing.T) {
+				for range poolSize * 4 {
+					if err := <-results; err != nil {
+						t.Fatal(err)
+					}
 				}
+			}) {
+				return
 			}
-			if calls.Load() != testCase.expectedRefresh {
-				t.Fatalf("refreshes=%d want=%d", calls.Load(), testCase.expectedRefresh)
-			}
+			t.Run("refresh_count", func(t *testing.T) {
+				if calls.Load() != testCase.expectedRefresh {
+					t.Fatalf("refreshes=%d want=%d", calls.Load(), testCase.expectedRefresh)
+				}
+			})
 			metrics := repo.OAuthRefreshMetrics()
 			wantLimit := poolSize
 			if poolSize > 1 {
 				wantLimit--
 			}
-			if metrics.ConcurrencyLimit != wantLimit || metrics.PeakInFlight > int64(wantLimit) || metrics.RefreshSuccesses != testCase.expectedRefreshMetric || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != testCase.expectedRefreshMetric {
-				t.Fatalf("unexpected refresh metrics: %+v", metrics)
-			}
-			for _, account := range accounts {
-				metadata, err := provider.Describe(ctx, scope, secrets.Reference(account.SecretReference))
-				if err != nil || metadata.CurrentVersion != 2 {
-					t.Fatalf("rotation version=%d error=%v", metadata.CurrentVersion, err)
+			t.Run("metrics", func(t *testing.T) {
+				if metrics.ConcurrencyLimit != wantLimit || metrics.PeakInFlight > int64(wantLimit) || metrics.RefreshSuccesses != testCase.expectedRefreshMetric || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != testCase.expectedRefreshMetric {
+					t.Fatalf("unexpected refresh metrics: %+v", metrics)
 				}
-			}
-			if db.Stats().InUse != 0 {
-				t.Fatal("connection leaked")
-			}
+			})
+			t.Run("rotation_versions", func(t *testing.T) {
+				for _, account := range accounts {
+					metadata, err := provider.Describe(ctx, scope, secrets.Reference(account.SecretReference))
+					if err != nil || metadata.CurrentVersion != 2 {
+						t.Fatalf("rotation version=%d error=%v", metadata.CurrentVersion, err)
+					}
+				}
+			})
+			t.Run("connections_released", func(t *testing.T) {
+				if db.Stats().InUse != 0 {
+					t.Fatal("connection leaked")
+				}
+			})
 		})
 	}
 }
