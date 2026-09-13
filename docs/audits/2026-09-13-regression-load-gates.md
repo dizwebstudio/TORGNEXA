@@ -17,6 +17,14 @@
 auth/DB/IdP, OAuth pool saturation и SSE broadcaster; каталог удаляется после
 run.
 
+Повторные CI-запуски выявили ошибку наблюдаемости в момент передачи OAuth
+admission slot: старый код сначала освобождал slot и только затем уменьшал
+`in_flight`, поэтому следующий waiter мог записать ложный peak выше лимита.
+Release теперь сначала исключает завершившуюся операцию из `in_flight`, затем
+делает slot доступным. Отдельные assertions проверяют concurrency limit, peak,
+refresh successes/failures и latency count; после исправления полный
+PostgreSQL gate пять раз подряд прошёл под `-race`.
+
 Release qualification оставляет health probe отдельным и дополнительно получает
 короткоживущий JWT из одноразового Keycloak realm. Direct grant включается только
 в этом disposable project. `runtime-load.py` удерживает 32 авторизованных SSE

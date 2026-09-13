@@ -27,6 +27,9 @@ external_evidence_required: false
 - [x] CI и release сохраняют redacted JSON с commit SHA, scanner versions,
   p50/p95/p99, DB/IdP calls, pool saturation, SSE fan-out и результатами
   failure injection.
+- [x] OAuth admission metrics retire завершившуюся операцию до передачи slot
+  следующему waiter; `peak_in_flight` больше не получает ложный кратковременный
+  пик выше реального concurrency limit.
 - [Отчёт](../../docs/audits/2026-09-13-regression-load-gates.md).
 
 ## Выполнено 2026-09-12 — минимизация OIDC subject в API/UI

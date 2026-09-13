@@ -207,8 +207,11 @@ func (runtime *oauthRefreshRuntime) admitted() {
 }
 
 func (runtime *oauthRefreshRuntime) release() {
-	<-runtime.slots
+	// Retire the completed operation before making its slot visible to a
+	// waiter. Reversing these steps lets the waiter increment inFlight first
+	// and records a false peak above the channel's concurrency limit.
 	runtime.inFlight.Add(-1)
+	<-runtime.slots
 	runtime.samplePool()
 }
 
