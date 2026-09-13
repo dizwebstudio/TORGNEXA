@@ -98,9 +98,29 @@ func TestA08PostgresRefreshBoundedPool(t *testing.T) {
 			if poolSize > 1 {
 				wantLimit--
 			}
-			t.Run("metrics", func(t *testing.T) {
-				if metrics.ConcurrencyLimit != wantLimit || metrics.PeakInFlight > int64(wantLimit) || metrics.RefreshSuccesses != testCase.expectedRefreshMetric || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != testCase.expectedRefreshMetric {
-					t.Fatalf("unexpected refresh metrics: %+v", metrics)
+			t.Run("metrics_concurrency_limit", func(t *testing.T) {
+				if metrics.ConcurrencyLimit != wantLimit {
+					t.Fatalf("concurrency limit=%d want=%d", metrics.ConcurrencyLimit, wantLimit)
+				}
+			})
+			t.Run("metrics_peak_in_flight", func(t *testing.T) {
+				if metrics.PeakInFlight > int64(wantLimit) {
+					t.Fatalf("peak in flight=%d limit=%d", metrics.PeakInFlight, wantLimit)
+				}
+			})
+			t.Run("metrics_refresh_successes", func(t *testing.T) {
+				if metrics.RefreshSuccesses != testCase.expectedRefreshMetric {
+					t.Fatalf("refresh successes=%d want=%d", metrics.RefreshSuccesses, testCase.expectedRefreshMetric)
+				}
+			})
+			t.Run("metrics_refresh_failures", func(t *testing.T) {
+				if metrics.RefreshFailures != 0 {
+					t.Fatalf("refresh failures=%d want=0", metrics.RefreshFailures)
+				}
+			})
+			t.Run("metrics_refresh_latency_count", func(t *testing.T) {
+				if metrics.RefreshLatency.Count != testCase.expectedRefreshMetric {
+					t.Fatalf("refresh latency count=%d want=%d", metrics.RefreshLatency.Count, testCase.expectedRefreshMetric)
 				}
 			})
 			t.Run("rotation_versions", func(t *testing.T) {
