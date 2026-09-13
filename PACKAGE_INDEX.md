@@ -60,7 +60,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3681
+- total source files (excluding local secrets/build/dependency/cache trees): 3682
 
 
 ## Connector category layout
@@ -3883,6 +3883,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `supply-chain/risk-exceptions.json`
 - `supply-chain/synthetic-secret-fixtures.json`
 - `supply-chain/tool-versions.json`
+- `supply-chain/trivy-secret-report-policy.jq`
 - `tasks/BACKLOG.md`
 - `tasks/EPICS.md`
 - `tasks/EXECUTION_PLAN.md`

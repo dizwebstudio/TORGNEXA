@@ -16,6 +16,7 @@ tool_manifest="$repo_root/supply-chain/tool-versions.json"
 license_policy="$repo_root/supply-chain/license-policy.json"
 risk_exceptions="$repo_root/supply-chain/risk-exceptions.json"
 synthetic_secret_policy="$repo_root/supply-chain/synthetic-secret-fixtures.json"
+trivy_secret_report_policy="$repo_root/supply-chain/trivy-secret-report-policy.jq"
 mode="dry-run"
 scope="source"
 source_revision=""
@@ -244,14 +245,7 @@ validate_trivy_report() {
       jq -e '[.Results[]?.Misconfigurations[]? | select((.Severity | ascii_upcase) == "HIGH" or (.Severity | ascii_upcase) == "CRITICAL")] | length == 0' "$report" >/dev/null || policy_status=$?
       ;;
     secret)
-      jq -e '
-        [.Results[]?.Secrets[]? | select(.Classification != "synthetic_fixture")] | length == 0 and
-        ([.Results[]?.Secrets[]?] | all(
-          .Classification == "synthetic_fixture" and
-          (.FixtureID | type == "string" and length > 0) and
-          (has("Match") | not) and (has("Secret") | not) and (has("Code") | not)
-        ))
-      ' "$report" >/dev/null || policy_status=$?
+      jq -e -f "$trivy_secret_report_policy" "$report" >/dev/null || policy_status=$?
       ;;
     license)
       true
