@@ -82,6 +82,18 @@ python3 scripts/regression_evidence.py postgres \
   --source-revision "$source_revision" \
   --tool-versions supply-chain/tool-versions.json \
   --output "$regression_report" || report_status=$?
+if ((test_status != 0 || report_status != 0)); then
+  diagnostics='{"report":"unavailable"}'
+  if [[ -f "$regression_report" ]]; then
+    diagnostics="$(jq -c '.diagnostics' "$regression_report")"
+  fi
+  echo "Task 234 PostgreSQL regression diagnostics: $diagnostics" >&2
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    # The report contains only test-suite names and missing metric/task keys, so
+    # it is safe to expose as a check annotation without raw test output.
+    echo "::error title=Task 234 PostgreSQL regression failed::$diagnostics" >&2
+  fi
+fi
 if ((test_status != 0)); then
   python3 - "$events" <<'PY' >&2
 import json, sys
