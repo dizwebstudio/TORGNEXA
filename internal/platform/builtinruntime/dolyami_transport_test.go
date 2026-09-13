@@ -14,7 +14,7 @@ func TestParseDolyamiCredentialRequiresLoginPasswordAndMatchingMTLSBundle(t *tes
 	}
 	certificatePEM := parts[0]
 	privateKeyPEM := "-----BEGIN PRIVATE KEY-----" + parts[1]
-	secret, err := json.Marshal(dolyamiCredential{Login: "demo-login", Password: "demo-password", CertificatePEM: certificatePEM, PrivateKeyPEM: privateKeyPEM})
+	secret, err := json.Marshal(dolyamiCredential{Login: "demo-login", Password: "demo-password", CertificatePEM: certificatePEM, PrivateKeyPEM: privateKeyPEM}) // #nosec G117 -- synthetic credential fixture is passed directly to the parser.
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -43,6 +43,19 @@ telemetry on the exact topology. Evidence must state:
 External marketplace availability is never included in the TORGNEXA SLO.
 Connector remote health, rate limits and freshness remain separate signals.
 
+`scripts/check-production-qualification.sh` is the release implementation of
+this gate. It first runs the Task 234 PostgreSQL failure/concurrency suite, then
+loads at least two authenticated API routes while 32 SSE connections are held
+open against the disposable deployment. A health request burst remains a
+separate readiness measurement and cannot satisfy the authenticated gate.
+
+The retained `security-performance-regression.json` is deliberately redacted.
+It binds the run to the Git commit and pinned gosec/govulncheck/Trivy/Syft
+versions, and contains percentile, throughput, DB/IdP call, OAuth pool and SSE
+fan-out aggregates plus named pass/fail failure scenarios. Access tokens,
+credentials, raw HTTP bodies, raw test output, identity values and tenant labels
+are excluded by construction.
+
 ## Alert / incident handoff
 
 A sustained SLO breach consumes the 30-day error budget and becomes Task-077

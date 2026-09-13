@@ -54,13 +54,13 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 
 ## Summary
 
-- docs: 684
+- docs: 685
 - adrs: 197
 - tasks: 236
 - milestones: 14
 - contracts: 266
 - templates: 18
-- total source files (excluding local secrets/build/dependency/cache trees): 3673
+- total source files (excluding local secrets/build/dependency/cache trees): 3681
 
 
 ## Connector category layout
@@ -2139,6 +2139,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `docs/audits/2026-09-12-oidc-hot-path.md`
 - `docs/audits/2026-09-12-oidc-subject-minimization.md`
 - `docs/audits/2026-09-12-sse-broadcaster.md`
+- `docs/audits/2026-09-13-regression-load-gates.md`
 - `docs/billing/086-cloud-billing-lifecycle.md`
 - `docs/compliance/083-egais-government-connector.md`
 - `docs/connectors/aliexpress-ru/README.md`
@@ -3787,6 +3788,8 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/check-trust-control-postgres.sh`
 - `scripts/check-workflow-qualification.sh`
 - `scripts/check.sh`
+- `scripts/classify-trivy-secrets.py`
+- `scripts/classify_trivy_secrets_test.py`
 - `scripts/community-demo-member.sql`
 - `scripts/community-e2e.mjs`
 - `scripts/community-e2e.sh`
@@ -3835,7 +3838,11 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `scripts/production_golden_path.py`
 - `scripts/production_golden_path_test.py`
 - `scripts/promote-github-release.sh`
+- `scripts/qualification-oidc-token.py`
+- `scripts/regression_evidence.py`
+- `scripts/regression_evidence_test.py`
 - `scripts/runtime-load.py`
+- `scripts/runtime_load_test.py`
 - `scripts/saleor-smoke.sh`
 - `scripts/scan-supply-chain-lib-test.sh`
 - `scripts/scan-supply-chain-lib.sh`
@@ -3874,6 +3881,7 @@ The file list below is a package snapshot; runtime/OIDC/GitHub/backup/live-provi
 - `supply-chain/license-policy.json`
 - `supply-chain/release-artifacts.json`
 - `supply-chain/risk-exceptions.json`
+- `supply-chain/synthetic-secret-fixtures.json`
 - `supply-chain/tool-versions.json`
 - `tasks/BACKLOG.md`
 - `tasks/EPICS.md`

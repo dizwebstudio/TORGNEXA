@@ -81,6 +81,20 @@ jobs:
         run: ./scripts/check-js-supply-chain.sh repository
       - name: Verify PostgreSQL tenancy migration and RLS
         run: ./scripts/check-tenancy-postgres.sh
+      - name: Verify Task 234 PostgreSQL failure and concurrency regressions
+        env:
+          REGRESSION_DIR: ${{ runner.temp }}/torgnexa-regression
+        run: |
+          mkdir -m 0700 -- "$REGRESSION_DIR"
+          TORGNEXA_REGRESSION_REPORT="$REGRESSION_DIR/postgres-regression.json" ./scripts/check-audit-postgres.sh
+      - name: Retain the redacted PostgreSQL regression report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: task-234-postgres-regression-${{ github.run_id }}
+          path: ${{ runner.temp }}/torgnexa-regression
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify PostgreSQL logical restore and physical PITR
         run: ./scripts/check-postgres-backup-restore.sh
       - name: Rehearse PostgreSQL upgrade and resumable backfill

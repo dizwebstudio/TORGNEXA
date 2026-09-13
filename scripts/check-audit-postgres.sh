@@ -4,7 +4,7 @@ umask 077
 export GOTOOLCHAIN=local GOTELEMETRY=off LC_ALL=C TZ=UTC
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_root"
-for required in docker python3 jq go; do command -v "$required" >/dev/null; done
+for required in docker git python3 jq go; do command -v "$required" >/dev/null; done
 scratch="$(mktemp -d /tmp/torgnexa-audit-pg.XXXXXXXX)"
 container_name="torgnexa-audit-regression-${BASHPID}"
 started=false
@@ -68,4 +68,32 @@ if ! docker exec -i "$container_name" psql -X -v ON_ERROR_STOP=1 -U postgres -d 
 fi
 export TORGNEXA_TEST_DATABASE_URL="host=$scratch/socket user=audit_integration dbname=audit sslmode=disable"
 export TORGNEXA_TEST_ADMIN_DATABASE_URL="host=$scratch/socket user=postgres dbname=audit sslmode=disable"
-go test -count=1 -race -v ./internal/app/api ./internal/app/worker ./internal/platform/connectorauth -run 'TestA0[2-9]Postgres|TestRealtimePostgres|TestConnectorAuditPostgres|TestOIDCSubjectPrivacyPostgres'
+events="$scratch/go-test.jsonl"
+set +e
+go test -count=1 -race -json ./internal/app/api ./internal/app/worker ./internal/platform/connectorauth \
+  -run 'TestA0[1-9]Postgres|TestRealtimePostgres|TestConnectorAuditPostgres|TestOIDCSubjectPrivacyPostgres' >"$events"
+test_status=$?
+set -e
+source_revision="$(git rev-parse HEAD)"
+regression_report="${TORGNEXA_REGRESSION_REPORT:-$scratch/postgres-regression.json}"
+report_status=0
+python3 scripts/regression_evidence.py postgres \
+  --events "$events" \
+  --source-revision "$source_revision" \
+  --tool-versions supply-chain/tool-versions.json \
+  --output "$regression_report" || report_status=$?
+if ((test_status != 0)); then
+  python3 - "$events" <<'PY' >&2
+import json, sys
+for raw in open(sys.argv[1], encoding="utf-8"):
+    event = json.loads(raw)
+    if event.get("Action") == "output" and event.get("Output"):
+        sys.stderr.write(event["Output"])
+PY
+  exit "$test_status"
+fi
+((report_status == 0)) || exit "$report_status"
+echo "Task 234 PostgreSQL failure/concurrency regression: PASS"
+if [[ -n "${TORGNEXA_REGRESSION_REPORT:-}" ]]; then
+  echo "redacted evidence: $regression_report"
+fi

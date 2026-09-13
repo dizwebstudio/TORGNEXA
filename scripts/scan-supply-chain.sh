@@ -15,6 +15,7 @@ inventory="$repo_root/supply-chain/release-artifacts.json"
 tool_manifest="$repo_root/supply-chain/tool-versions.json"
 license_policy="$repo_root/supply-chain/license-policy.json"
 risk_exceptions="$repo_root/supply-chain/risk-exceptions.json"
+synthetic_secret_policy="$repo_root/supply-chain/synthetic-secret-fixtures.json"
 mode="dry-run"
 scope="source"
 source_revision=""
@@ -99,7 +100,7 @@ if [[ -n "$trivy_cache_dir" ]]; then
     die "--trivy-cache-dir must be a separate child of $safe_root"
 fi
 
-for command_name in awk cp date go jq mktemp realpath sha256sum sleep tail wc; do
+for command_name in awk cp date find go jq mktemp python3 realpath sha256sum sleep tail wc; do
   command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
 done
 
@@ -243,7 +244,14 @@ validate_trivy_report() {
       jq -e '[.Results[]?.Misconfigurations[]? | select((.Severity | ascii_upcase) == "HIGH" or (.Severity | ascii_upcase) == "CRITICAL")] | length == 0' "$report" >/dev/null || policy_status=$?
       ;;
     secret)
-      jq -e '[.Results[]?.Secrets[]?] | length == 0' "$report" >/dev/null || policy_status=$?
+      jq -e '
+        [.Results[]?.Secrets[]? | select(.Classification != "synthetic_fixture")] | length == 0 and
+        ([.Results[]?.Secrets[]?] | all(
+          .Classification == "synthetic_fixture" and
+          (.FixtureID | type == "string" and length > 0) and
+          (has("Match") | not) and (has("Secret") | not) and (has("Code") | not)
+        ))
+      ' "$report" >/dev/null || policy_status=$?
       ;;
     license)
       true
@@ -344,6 +352,47 @@ run_trivy_json_check() {
   fi
 }
 
+run_trivy_secret_check() {
+  local check_name=$1
+  local destination=$2
+  shift 2
+  local raw="$work_dir/raw/${check_name}.json"
+  local classified="$work_dir/raw/${check_name}.classified.json"
+  local command_status sanitize_status
+
+  if run_trivy_json_with_retries "$trivy" "$raw" \
+    "$work_dir/raw/${check_name}.stderr" 3 2 "$@"; then
+    command_status=0
+  else
+    command_status=$?
+    echo "scan-supply-chain: $check_name failed after 3 scanner attempts" >&2
+  fi
+  sanitize_status=0
+  if ((command_status == 0)); then
+    python3 "$repo_root/scripts/classify-trivy-secrets.py" \
+      --input "$raw" --policy "$synthetic_secret_policy" --output "$classified" || sanitize_status=$?
+  else
+    sanitize_status=1
+  fi
+  if ((sanitize_status == 0)); then
+    sanitize_json "$classified" "$destination" || sanitize_status=$?
+  fi
+  if ((sanitize_status == 0)); then
+    normalize_trivy_report "$destination" || sanitize_status=$?
+  fi
+  if ((sanitize_status != 0)); then
+    rm -f -- "$destination"
+    jq -n --arg check "$check_name" \
+      '{version: 1, status: "scanner_error", check: $check}' >"$destination"
+    command_status=1
+  fi
+  if ((command_status == 0)); then
+    record_status "$check_name" passed
+  else
+    record_status "$check_name" failed
+  fi
+}
+
 run_image_vulnerability_check() {
   local check_name=$1
   local destination=$2
@@ -392,11 +441,31 @@ run_image_vulnerability_check() {
 }
 
 go -C "$repo_root/tools/contractcheck" run ./cmd/supplychaincheck -root ../..
-for module_dir in "$repo_root" "$repo_root/tools/contractcheck" "$repo_root/tools/securitytools"; do
+all_go_module_dirs=(
+  "$repo_root"
+  "$repo_root/sdk/examples/go"
+  "$repo_root/sdk/go"
+  "$repo_root/tools/contractcheck"
+  "$repo_root/tools/sdkgen"
+  "$repo_root/tools/securitytools"
+)
+scan_go_module_names=(root sdk-examples-go sdk-go contractcheck sdkgen)
+scan_go_module_dirs=(
+  "$repo_root"
+  "$repo_root/sdk/examples/go"
+  "$repo_root/sdk/go"
+  "$repo_root/tools/contractcheck"
+  "$repo_root/tools/sdkgen"
+)
+scan_go_module_relative_from_tools=(../.. ../../sdk/examples/go ../../sdk/go ../contractcheck ../sdkgen)
+for module_dir in "${all_go_module_dirs[@]}"; do
   go -C "$module_dir" mod tidy -diff
   GOFLAGS=-mod=readonly go -C "$module_dir" mod download
   go -C "$module_dir" mod verify
 done
+if [[ -n "$(find "$repo_root/tools/securitytools" -type f -name '*.go' -print -quit)" ]]; then
+  die "tools/securitytools unexpectedly contains source packages; add it to the SAST scan set"
+fi
 
 run_command_with_retries 3 2 "$trivy" image --cache-dir "$trivy_cache_dir" \
   --download-db-only >/dev/null || die "Trivy vulnerability database download failed after 3 attempts"
@@ -425,23 +494,30 @@ govulncheck_version="$(jq -er '.go_tools[] | select(.name == "govulncheck") | .v
 if [[ "$scope" == source || "$scope" == all ]]; then
   "$repo_root/scripts/check-secret-canary.sh" --trivy "$trivy"
 
-  run_json_check govuln-root "$output_dir/govuln-root.json" \
-    env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool govulncheck -C ../.. -test -format json ./...
-  validate_govuln_report "$output_dir/govuln-root.json" govuln-root
-  run_json_check govuln-contractcheck "$output_dir/govuln-contractcheck.json" \
-    env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool govulncheck -C ../contractcheck -test -format json ./...
-  validate_govuln_report "$output_dir/govuln-contractcheck.json" govuln-contractcheck
+  for module_index in "${!scan_go_module_names[@]}"; do
+    module_name="${scan_go_module_names[$module_index]}"
+    module_dir="${scan_go_module_dirs[$module_index]}"
+    module_relative="${scan_go_module_relative_from_tools[$module_index]}"
+    run_json_check "govuln-$module_name" "$output_dir/govuln-$module_name.json" \
+      env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool govulncheck \
+        -C "$module_relative" -test -format json ./...
+    validate_govuln_report "$output_dir/govuln-$module_name.json" "govuln-$module_name"
+  done
+  record_status go-module-securitytools-no-runtime-packages passed
 
   run_json_check gosec-root "$output_dir/gosec-root.json" \
     env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool gosec -no-fail -tests \
       -nosec-require-rules -nosec-require-justification -fmt=json \
-      "$repo_root/..."
+      -exclude-dir="$repo_root/sdk" -exclude-dir="$repo_root/tools" "$repo_root/..."
   validate_gosec_report "$output_dir/gosec-root.json" gosec-root
-  run_json_check gosec-contractcheck "$output_dir/gosec-contractcheck.json" \
-    env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool gosec -no-fail -tests \
-      -nosec-require-rules -nosec-require-justification -fmt=json \
-      "$repo_root/tools/contractcheck/..."
-  validate_gosec_report "$output_dir/gosec-contractcheck.json" gosec-contractcheck
+  for module_index in 1 2 3 4; do
+    module_name="${scan_go_module_names[$module_index]}"
+    module_dir="${scan_go_module_dirs[$module_index]}"
+    run_json_check "gosec-$module_name" "$output_dir/gosec-$module_name.json" \
+      env GOFLAGS=-mod=readonly go -C "$repo_root/tools/securitytools" tool gosec -no-fail -tests \
+        -nosec-require-rules -nosec-require-justification -fmt=json "$module_dir/..."
+    validate_gosec_report "$output_dir/gosec-$module_name.json" "gosec-$module_name"
+  done
 
   run_trivy_json_check trivy-source-vulnerability "$output_dir/trivy-source-vulnerability.json" \
     fs --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
@@ -456,7 +532,7 @@ if [[ "$scope" == source || "$scope" == all ]]; then
     fs --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
     --scanners misconfig --exit-code 0 "$repo_root"
   validate_trivy_report "$output_dir/trivy-source-misconfiguration.json" trivy-source-misconfiguration misconfiguration
-  run_trivy_json_check trivy-source-secret "$output_dir/trivy-source-secret.json" \
+  run_trivy_secret_check trivy-source-secret "$output_dir/trivy-source-secret.json" \
     fs --cache-dir "$trivy_cache_dir" "${trivy_update_flags[@]}" \
     --scanners secret --exit-code 0 "$repo_root"
   validate_trivy_report "$output_dir/trivy-source-secret.json" trivy-source-secret secret

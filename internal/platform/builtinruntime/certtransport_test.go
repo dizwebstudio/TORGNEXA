@@ -115,7 +115,7 @@ func TestCertHTTPTransportPresentsClientCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sawClientCert = len(r.TLS.PeerCertificates) == 1 && r.TLS.PeerCertificates[0].Subject.CommonName == "sbp-merchant-1"
 		w.WriteHeader(http.StatusOK)
 	})}

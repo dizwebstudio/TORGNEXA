@@ -106,7 +106,7 @@ jobs:
 
   runtime-qualification:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
     env:

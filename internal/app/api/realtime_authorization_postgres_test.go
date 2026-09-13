@@ -211,6 +211,8 @@ func TestRealtimePostgresBroadcasterFanOutQueryCount(t *testing.T) {
 	if metrics.ActiveClients != clients || metrics.ActiveTenants != 1 || metrics.DeliveriesQueued != clients {
 		t.Fatalf("unexpected PostgreSQL fan-out metrics: %+v", metrics)
 	}
+	t.Logf(`TORGNEXA_REGRESSION_METRIC {"name":"sse_broadcaster","clients":%d,"active_tenants":%d,"audit_head_queries":%d,"deliveries_queued":%d,"peak_clients":%d,"client_limit":%d}`,
+		clients, metrics.ActiveTenants, metrics.AuditHeadQueries, metrics.DeliveriesQueued, metrics.PeakClients, defaultRealtimeMaxClientsPerTenant)
 
 	for _, cancel := range cancels {
 		cancel()

@@ -164,12 +164,24 @@ trivy_version="$(jq -er '.tools.trivy' "$source_gate")"
 gosec_version="$(jq -er '.tools.gosec' "$source_gate")"
 govuln_version="$(jq -er '.tools.govulncheck' "$source_gate")"
 
-jq -s '{version: 1, reports: .}' \
-  "$report_dir/gosec-root.json" "$report_dir/gosec-contractcheck.json" \
+source_sast_reports=(
+  "$report_dir/gosec-root.json"
+  "$report_dir/gosec-sdk-examples-go.json"
+  "$report_dir/gosec-sdk-go.json"
+  "$report_dir/gosec-contractcheck.json"
+  "$report_dir/gosec-sdkgen.json"
+)
+source_dependency_reports=(
+  "$report_dir/govuln-root.json"
+  "$report_dir/govuln-sdk-examples-go.json"
+  "$report_dir/govuln-sdk-go.json"
+  "$report_dir/govuln-contractcheck.json"
+  "$report_dir/govuln-sdkgen.json"
+  "$report_dir/trivy-source-vulnerability.json"
+)
+jq -s '{version: 1, reports: .}' "${source_sast_reports[@]}" \
   >"$evidence_dir/reports/source-sast.json"
-jq -s '{version: 1, reports: .}' \
-  "$report_dir/govuln-root.json" "$report_dir/govuln-contractcheck.json" \
-  "$report_dir/trivy-source-vulnerability.json" \
+jq -s '{version: 1, reports: .}' "${source_dependency_reports[@]}" \
   >"$evidence_dir/reports/source-dependency.json"
 copy_regular "$report_dir/trivy-source-license.json" "$evidence_dir/reports/source-license.json"
 copy_regular "$report_dir/trivy-source-secret.json" "$evidence_dir/reports/source-secret.json"

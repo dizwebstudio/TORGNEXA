@@ -517,6 +517,10 @@ func TestA09PostgresAuthenticatedHotPathLoadMetrics(t *testing.T) {
 		metrics.IdPCallsPerRequest.TotalCalls != 2 || metrics.DBCallsPerRequest.TotalCalls != requests+1 || metrics.Latency.Count != requests || metrics.Latency.P99 <= 0 {
 		t.Fatalf("PostgreSQL hot-path metrics=%+v", metrics)
 	}
+	t.Logf(`TORGNEXA_REGRESSION_METRIC {"name":"oidc_hot_path","requests":%d,"authorized":%d,"db_calls_total":%d,"db_calls_max":%d,"idp_calls_total":%d,"idp_calls_max":%d,"session_last_seen_writes":%d,"session_writes_throttled":%d,"p50_ns":%d,"p95_ns":%d,"p99_ns":%d}`,
+		metrics.Requests, metrics.Authorized, metrics.DBCallsPerRequest.TotalCalls, metrics.DBCallsPerRequest.MaximumCalls,
+		metrics.IdPCallsPerRequest.TotalCalls, metrics.IdPCallsPerRequest.MaximumCalls, metrics.SessionLastSeenWrites,
+		metrics.SessionWritesThrottled, metrics.Latency.P50.Nanoseconds(), metrics.Latency.P95.Nanoseconds(), metrics.Latency.P99.Nanoseconds())
 	a09Session(t, ctx, sessions, scope)
 	a09EventCounts(t, ctx, sessions, scope, 1, 0)
 }

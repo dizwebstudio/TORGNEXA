@@ -166,7 +166,7 @@ func TestTokenManagerSerializesRefreshAndRotatesBundleOnce(t *testing.T) {
 		if current.RefreshToken != "old-refresh-token-123" {
 			return nil, errors.New("unexpected refresh token")
 		}
-		return json.Marshal(TokenBundle{AccessToken: "rotated-access-token-123", RefreshToken: "rotated-refresh-token-123", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+		return json.Marshal(TokenBundle{AccessToken: "rotated-access-token-123", RefreshToken: "rotated-refresh-token-123", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store rotation.
 	}
 	const callers = 12
 	errorsByCaller := make(chan error, callers)
@@ -254,7 +254,7 @@ func TestTokenManagerMeasuresCoordinatorCommitFailureAsRefreshFailure(t *testing
 	manager, _ := NewTokenManager(store, coordinator)
 	manager.now = func() time.Time { return now }
 	manager.refresh = func(_ context.Context, _ sdk.OAuth2Configuration, current TokenBundle, _ time.Duration, at time.Time) ([]byte, error) {
-		return json.Marshal(TokenBundle{AccessToken: "new-access-token-123", RefreshToken: "new-refresh-token-123", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+		return json.Marshal(TokenBundle{AccessToken: "new-access-token-123", RefreshToken: "new-refresh-token-123", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store rotation.
 	}
 	if err := manager.Prepare(context.Background(), tokenManagerScope(t), oauthAccount(grantID(t, "authorization_code"))); !errors.Is(err, ErrOAuthRefreshUnavailable) {
 		t.Fatalf("unexpected error: %v", err)
@@ -271,7 +271,7 @@ func TestTokenManagerExchangesClientCredentialsWithoutExposingClientSecret(t *te
 		if configuration.GrantType != "client_credentials" || client.ClientSecret != "client-secret" {
 			t.Fatal("invalid client credential exchange")
 		}
-		return json.Marshal(TokenBundle{AccessToken: "client-access-token-123", TokenType: "Bearer", ClientID: client.ClientID, ClientSecret: client.ClientSecret})
+		return json.Marshal(TokenBundle{AccessToken: "client-access-token-123", TokenType: "Bearer", ClientID: client.ClientID, ClientSecret: client.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store exchange.
 	}
 	var observed string
 	err := manager.UseAccessToken(context.Background(), tokenManagerScope(t), oauthAccount(grantID(t, "client_credentials")), func(token []byte) error { observed = string(token); return nil })

@@ -2,14 +2,32 @@
 
 ## Статус
 
-`in_progress` — follow-up по результатам security/performance-аудитов;
-A01–A10 из аудита 2026-09-08 исправлены в указанной ниже области.
+`complete` — подтверждённые security/performance-дефекты закрыты и закреплены
+обязательными PostgreSQL, supply-chain и deployment load gates.
 
 ```yaml
-repository_status: in_progress
+repository_status: complete
 security_priority: high
 external_evidence_required: false
 ```
+
+## Выполнено 2026-09-13 — regression/load gates 234.10
+
+- [x] Общий forced-RLS PostgreSQL gate теперь включает 234.1–234.5, в том числе
+  реальную конкурентную проверку last-admin invariant и digest-bound replay.
+- [x] Release qualification выполняет аутентифицированный mix нескольких API
+  маршрутов при 32 одновременно открытых SSE-клиентах; `/health` остаётся лишь
+  отдельной базовой пробой.
+- [x] Gosec и govulncheck сканируют каждый Go module ровно один раз; модуль
+  securitytools отдельно проверяется как package-less carrier закреплённых
+  scanner binaries.
+- [x] Trivy различает credential candidates и только точно зарегистрированные
+  synthetic fixtures по path/rule/SHA-256; сырое совпадение удаляется до
+  сохранения отчёта.
+- [x] CI и release сохраняют redacted JSON с commit SHA, scanner versions,
+  p50/p95/p99, DB/IdP calls, pool saturation, SSE fan-out и результатами
+  failure injection.
+- [Отчёт](../../docs/audits/2026-09-13-regression-load-gates.md).
 
 ## Выполнено 2026-09-12 — минимизация OIDC subject в API/UI
 
@@ -434,17 +452,17 @@ capability-based connector boundary и запрет на plaintext credentials.
 
 ### 234.10 — Закрепить security и performance regression gates
 
-- [ ] Добавить PostgreSQL failure/concurrency suite для 234.1–234.5; unit fakes
+- [x] Добавить PostgreSQL failure/concurrency suite для 234.1–234.5; unit fakes
   не заменяют проверку isolation/commit semantics.
-- [ ] Расширить production qualification authenticated request mix и множеством
+- [x] Расширить production qualification authenticated request mix и множеством
   SSE clients; один `/health` burst не считается покрытием auth hot path.
-- [ ] Разобрать текущий gosec baseline: исправить реальные находки, устранить
+- [x] Разобрать текущий gosec baseline: исправить реальные находки, устранить
   двойное сканирование и оставить только узкие `#nosec RULE -- justification`
   для доказанно безопасных casts, synthetic fixtures и provider-required
   legacy crypto.
-- [ ] `govulncheck` запускать для root и всех вложенных Go modules; Trivy secret
+- [x] `govulncheck` запускать для root и всех вложенных Go modules; Trivy secret
   scan должен отличать synthetic fixtures от настоящих credentials.
-- [ ] Сохранить redacted отчёт с commit SHA, scanner versions, p50/p95/p99,
+- [x] Сохранить redacted отчёт с commit SHA, scanner versions, p50/p95/p99,
   DB/IdP call counts, pool saturation и injected-failure results.
 
 ## Definition of Done

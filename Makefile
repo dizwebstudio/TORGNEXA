@@ -3,7 +3,7 @@ SHELL := /bin/bash
 export GOTOOLCHAIN := local
 export GOWORK := off
 
-.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime rate-limit-runtime backup-restore-runtime upgrade-runtime policy scan-supply-chain-lib-test sandbox conformance connector-readiness-qualification financial-completeness-qualification financial-warehouse-qualification customer-service-qualification mobile-warehouse-qualification mass-catalog-qualification ecosystem-support-qualification marking-qualification marketplace-publication-qualification marketplace-listing-qualification marketplace-remote-evidence marketplace-remote-evidence-test marketplace-live-smoke marketplace-compensation-evidence marketplace-growth-qualification order-fulfillment-qualification production-golden-path performance workflow-qualification production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-demo-user community-e2e community-down community-status package-index package-index-check check build
+.PHONY: fmt fmt-check test vet contracts sdk-generate sdk-check frontend-check js-policy architecture migrations migration-baseline migration-rebaseline migrations-runtime rate-limit-runtime backup-restore-runtime upgrade-runtime policy scan-supply-chain-lib-test regression-evidence-test sandbox conformance connector-readiness-qualification financial-completeness-qualification financial-warehouse-qualification customer-service-qualification mobile-warehouse-qualification mass-catalog-qualification ecosystem-support-qualification marking-qualification marketplace-publication-qualification marketplace-listing-qualification marketplace-remote-evidence marketplace-remote-evidence-test marketplace-live-smoke marketplace-compensation-evidence marketplace-growth-qualification order-fulfillment-qualification production-golden-path performance workflow-qualification production-qualification p3-qualification p4-qualification p4-publish p4-policy community-check community-init community-up community-demo-user community-e2e community-down community-status package-index package-index-check check build
 fmt:
 	find . -type f -name '*.go' -not -path './vendor/*' -print0 | xargs -0 -r gofmt -w
 fmt-check:
@@ -50,6 +50,8 @@ policy:
 	./scripts/check-supply-chain.sh
 scan-supply-chain-lib-test:
 	./scripts/scan-supply-chain-lib-test.sh
+regression-evidence-test:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=scripts python3 -m unittest scripts/regression_evidence_test.py scripts/runtime_load_test.py scripts/classify_trivy_secrets_test.py
 sandbox:
 	./scripts/check-connector-sandbox-linux.sh
 conformance:
@@ -127,6 +129,6 @@ package-index:
 	python3 scripts/generate-package-index.py
 package-index-check:
 	python3 scripts/generate-package-index.py --check
-check: fmt-check test vet contracts architecture migrations policy sandbox conformance connector-readiness-qualification financial-completeness-qualification mobile-warehouse-qualification mass-catalog-qualification ecosystem-support-qualification marketplace-remote-evidence-test performance sdk-check frontend-check js-policy p4-policy community-check package-index-check
+check: fmt-check test vet contracts architecture migrations policy regression-evidence-test sandbox conformance connector-readiness-qualification financial-completeness-qualification mobile-warehouse-qualification mass-catalog-qualification ecosystem-support-qualification marketplace-remote-evidence-test performance sdk-check frontend-check js-policy p4-policy community-check package-index-check
 build:
 	go build -trimpath -buildvcs=false ./cmd/...

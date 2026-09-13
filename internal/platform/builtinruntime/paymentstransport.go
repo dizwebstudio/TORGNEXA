@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- Robokassa's external protocol requires MD5 signatures; it is not used as an internal security primitive.
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -639,7 +639,7 @@ func splitRobokassaRefundCredential(secret []byte) (login, password3 []byte, err
 }
 
 func robokassaMD5Hex(v string) string {
-	sum := md5.Sum([]byte(v))
+	sum := md5.Sum([]byte(v)) // #nosec G401 -- provider-required Robokassa signature over the provider's canonical string.
 	return hex.EncodeToString(sum[:])
 }
 

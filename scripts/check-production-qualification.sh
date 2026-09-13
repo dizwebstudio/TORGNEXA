@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 command -v docker >/dev/null 2>&1 || { echo "Docker is required for P3 production qualification" >&2; exit 1; }
 docker compose version >/dev/null
-command -v python3 >/dev/null 2>&1 || { echo "python3 is required for bounded load qualification" >&2; exit 1; }
+for required in git go jq python3; do
+  command -v "$required" >/dev/null 2>&1 || { echo "$required is required for security/performance qualification" >&2; exit 1; }
+done
 command -v base64 >/dev/null 2>&1 || { echo "base64 is required for disposable qualification credentials" >&2; exit 1; }
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 evidence="${TORGNEXA_QUALIFICATION_EVIDENCE_DIR:-$root/qualification/evidence/$stamp}"
 mkdir -p "$evidence"
+secret_dir="$(mktemp -d /tmp/torgnexa-qualification-secrets.XXXXXXXX)"
+postgres_regression="$evidence/postgres-regression.json"
 project="torgnexa-p3q-$RANDOM-$$"
 qualification_rate_limit="${TORGNEXA_QUALIFICATION_RATE_PER_MINUTE:-10000}"
 if [[ ! "$qualification_rate_limit" =~ ^[1-9][0-9]{0,6}$ ]]; then
@@ -56,10 +61,12 @@ export CLICKHOUSE_HTTP_PORT="$(pick_free_port)"
 export CLICKHOUSE_NATIVE_PORT="$(pick_free_port)"
 export S3_PORT="$(pick_free_port)"
 export KEYCLOAK_PORT="$(pick_free_port)"
+export TORGNEXA_QUALIFICATION_OIDC_ISSUER="http://127.0.0.1:$KEYCLOAK_PORT/realms/torgnexa"
 export TORGNEXA_API_PORT="$(pick_free_port)"
 export TORGNEXA_MCP_PORT="$(pick_free_port)"
 export TORGNEXA_FRONTEND_PORT="$(pick_free_port)"
 cleanup() {
+  rm -rf -- "$secret_dir"
   if [[ "${TORGNEXA_QUALIFICATION_KEEP_CONTAINERS:-0}" == "1" ]]; then
     echo "qualification containers kept for inspection: $project" >&2
     return
@@ -68,11 +75,12 @@ cleanup() {
   if [[ "$generated_env" == 1 ]]; then rm -f .env; fi
 }
 trap cleanup EXIT
+TORGNEXA_REGRESSION_REPORT="$postgres_regression" ./scripts/check-audit-postgres.sh
 
-# The black-box SLO probe intentionally sends a short burst of 5000 requests.
-# Keep the deployment's normal edge rate limit unchanged, but give this
-# disposable qualification project a bounded higher budget so the probe
-# measures API availability/latency rather than the security throttle itself.
+# The black-box probes send a bounded health sample, an authenticated request
+# mix and one 32-client SSE wave. Keep the deployment's normal edge rate limit
+# unchanged, but give this disposable project enough budget to measure the
+# auth/database/SSE path rather than the security throttle itself.
 export TORGNEXA_QUALIFICATION_RATE_PER_MINUTE="$qualification_rate_limit"
 dc=(docker compose -f docker-compose.yml -f docker-compose.qualification.yml -p "$project" --env-file .env)
 wait_healthy() {
@@ -175,6 +183,7 @@ PY
 ${dc[@]} up -d --build api worker
 wait_healthy postgres
 wait_healthy kafka
+wait_healthy keycloak
 wait_healthy api
 wait_running worker
 wait_worker_ready
@@ -182,7 +191,39 @@ qualify_runtime runtime-initial
 api_binding="$(${dc[@]} port api 8080 | tail -n 1)"
 api_port="${api_binding##*:}"
 [[ "$api_port" =~ ^[0-9]+$ ]] || { echo "unable to resolve published API port from: $api_binding" >&2; exit 1; }
-python3 scripts/runtime-load.py --url "http://127.0.0.1:$api_port/api/v1/health" --output "$evidence/api-load.json"
+python3 scripts/runtime-load.py --profile health --requests 500 --concurrency 32 \
+  --url "http://127.0.0.1:$api_port/api/v1/health" --output "$evidence/api-health-load.json"
+
+# Password grant remains disabled in the checked-in realm and every normal
+# deployment. This disposable qualification realm enables it only long enough
+# to exercise the real JWT/JWKS/UserInfo, membership, authorization and SSE
+# path with the pre-created synthetic demo identity.
+${dc[@]} exec -T keycloak sh -eu -c '
+  kcadm=/opt/keycloak/bin/kcadm.sh
+  config=/tmp/torgnexa-qualification-kcadm.config
+  "$kcadm" config credentials --server http://127.0.0.1:8080 --realm master \
+    --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" \
+    --config "$config" >/dev/null
+  client_id=$("$kcadm" get clients -r torgnexa -q clientId=torgnexa-web \
+    --fields id --format csv --noquotes --config "$config" | sed -n "1p" | tr -d "\r")
+  [ -n "$client_id" ]
+  "$kcadm" update "clients/$client_id" -r torgnexa \
+    -s directAccessGrantsEnabled=true --config "$config" >/dev/null
+  rm -f -- "$config"
+'
+token_file="$secret_dir/access-token"
+TORGNEXA_QUALIFICATION_OIDC_PASSWORD="${TORGNEXA_QUALIFICATION_OIDC_PASSWORD:-demo-local-only}" \
+  python3 scripts/qualification-oidc-token.py \
+    --endpoint "$TORGNEXA_QUALIFICATION_OIDC_ISSUER/protocol/openid-connect/token" \
+    --client-id torgnexa-web --username demo --output "$token_file"
+python3 scripts/runtime-load.py --profile authenticated --requests 1200 --concurrency 32 \
+  --base-url "http://127.0.0.1:$api_port" --token-file "$token_file" \
+  --path /api/v1/settings/workspace \
+  --path '/api/v1/settings/members?limit=20' \
+  --path '/api/v1/audit?limit=20' \
+  --sse-clients 32 --availability-min 0.999 --p99-max-ms 2000 --throughput-min 20 \
+  --output "$evidence/authenticated-load.json"
+rm -f -- "$token_file"
 
 # Graceful application restart drill.
 ${dc[@]} stop -t 15 worker >/dev/null
@@ -215,6 +256,15 @@ wait_healthy_after_restart postgres "$postgres_started_at"
 wait_running worker
 wait_worker_ready
 qualify_runtime runtime-after-postgres-restart
+
+source_revision="$(git rev-parse HEAD)"
+python3 scripts/regression_evidence.py complete \
+  --postgres "$postgres_regression" \
+  --runtime "$evidence/authenticated-load.json" \
+  --qualification-dir "$evidence" \
+  --source-revision "$source_revision" \
+  --tool-versions supply-chain/tool-versions.json \
+  --output "$evidence/security-performance-regression.json"
 
 python3 - "$evidence" "$project" <<'PY'
 import json, os, platform, subprocess, sys, time

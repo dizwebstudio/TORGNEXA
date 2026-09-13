@@ -236,6 +236,12 @@ services:
   garage-config:
     image: ghcr.io/dizwebstudio/torgnexa-postgres:v0.21.14-build.34648191406.1@sha256:589613b26a521835258e182bc7dd4dde356ec0e86f82d90ea6715f1beca0ccd0
     restart: "no"
+    # The hardened Postgres image defaults to its unprivileged postgres user,
+    # while a new Docker volume is root-owned. This one-shot writer needs root
+    # only to create the 0600 Garage config; it has no network and no Linux
+    # capabilities, and the Garage runtime mounts the result read-only.
+    user: "0:0"
+    network_mode: none
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?run scripts/init-community-env.sh}
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?run scripts/init-community-env.sh}

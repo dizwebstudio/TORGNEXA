@@ -3,7 +3,7 @@ package ok
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- Odnoklassniki's documented API signature protocol requires MD5; it is not used for password storage or an internal security primitive.
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -226,7 +226,7 @@ func sign(params []Param, token, appSecret []byte) (string, error) {
 		}
 		return pairs[i].Name < pairs[j].Name
 	})
-	inner := md5.Sum(append(append([]byte(nil), token...), appSecret...))
+	inner := md5.Sum(append(append([]byte(nil), token...), appSecret...)) // #nosec G401 -- provider-required first stage of the Odnoklassniki API signature.
 	secretKey := []byte(hex.EncodeToString(inner[:]))
 	defer clear(secretKey)
 	var b strings.Builder
@@ -240,7 +240,7 @@ func sign(params []Param, token, appSecret []byte) (string, error) {
 	}
 	payload := append([]byte(b.String()), secretKey...)
 	defer clear(payload)
-	out := md5.Sum(payload)
+	out := md5.Sum(payload) // #nosec G401 -- provider-required final Odnoklassniki API signature over a bounded canonical payload.
 	return hex.EncodeToString(out[:]), nil
 }
 

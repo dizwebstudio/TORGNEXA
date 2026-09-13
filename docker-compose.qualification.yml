@@ -5,3 +5,4 @@ services:
   api:
     environment:
       TORGNEXA_SECURITY_RATE_PER_MINUTE: "${TORGNEXA_QUALIFICATION_RATE_PER_MINUTE:-10000}"
+      TORGNEXA_OIDC_ISSUER: "${TORGNEXA_QUALIFICATION_OIDC_ISSUER:?set by check-production-qualification.sh}"

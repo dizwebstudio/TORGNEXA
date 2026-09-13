@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/torgnexa/torgnexa/internal/core/tenancy"
@@ -24,6 +25,94 @@ import (
 	"github.com/torgnexa/torgnexa/internal/platform/secrets"
 	"github.com/torgnexa/torgnexa/internal/platform/securitysettings"
 )
+
+func TestA01PostgresLastAdministratorConcurrencyAndReplay(t *testing.T) {
+	for _, mutation := range []struct {
+		name   string
+		role   string
+		status string
+	}{
+		{name: "concurrent_demotion", role: "viewer", status: "active"},
+		{name: "concurrent_disable", role: "admin", status: "disabled"},
+	} {
+		t.Run(mutation.name, func(t *testing.T) {
+			ctx, db, admin, scope := auditPostgres(t)
+			db.SetMaxOpenConns(4)
+			repository, err := tenancyrepo.New(db)
+			if err != nil {
+				t.Fatal(err)
+			}
+			memberIDs := []string{auditFixtureID(), auditFixtureID()}
+			for index, memberID := range memberIDs {
+				if _, err := admin.ExecContext(ctx, `INSERT INTO workspace_members(id,organization_id,workspace_id,email,display_name,role_code,status,invitation_key) VALUES($1,$2,$3,$4,'Concurrent synthetic administrator','admin','active',$5)`, memberID, scope.OrganizationID().String(), scope.WorkspaceID().String(), fmt.Sprintf("administrator-%d@example.test", index), "administrator-"+memberID); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			start := make(chan struct{})
+			outcomes := make(chan error, len(memberIDs))
+			var callers sync.WaitGroup
+			for index, memberID := range memberIDs {
+				callers.Add(1)
+				go func(index int, memberID string) {
+					defer callers.Done()
+					<-start
+					_, updateErr := repository.UpdateMember(ctx, scope, memberID, mutation.role, mutation.status, fmt.Sprintf("administrator-mutation-%d", index), 1)
+					outcomes <- updateErr
+				}(index, memberID)
+			}
+			close(start)
+			callers.Wait()
+			close(outcomes)
+
+			succeeded, rejected := 0, 0
+			for outcome := range outcomes {
+				switch {
+				case outcome == nil:
+					succeeded++
+				case errors.Is(outcome, tenancyrepo.ErrLastAdministrator):
+					rejected++
+				default:
+					t.Fatalf("unexpected concurrent mutation error: %v", outcome)
+				}
+			}
+			if succeeded != 1 || rejected != 1 {
+				t.Fatalf("concurrent mutation outcomes: succeeded=%d rejected=%d", succeeded, rejected)
+			}
+			var activeAdministrators int
+			if err := admin.QueryRowContext(ctx, `SELECT count(*) FROM workspace_members WHERE organization_id=$1 AND workspace_id=$2 AND role_code='admin' AND status='active'`, scope.OrganizationID().String(), scope.WorkspaceID().String()).Scan(&activeAdministrators); err != nil {
+				t.Fatal(err)
+			}
+			if activeAdministrators != 1 {
+				t.Fatalf("active administrators=%d, want 1", activeAdministrators)
+			}
+		})
+	}
+
+	t.Run("idempotency_digest_replay", func(t *testing.T) {
+		ctx, db, admin, scope := auditPostgres(t)
+		repository, err := tenancyrepo.New(db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		memberID := auditFixtureID()
+		if _, err := admin.ExecContext(ctx, `INSERT INTO workspace_members(id,organization_id,workspace_id,email,display_name,role_code,status,invitation_key) VALUES($1,$2,$3,'replay@example.test','Replay synthetic member','viewer','active',$4)`, memberID, scope.OrganizationID().String(), scope.WorkspaceID().String(), "replay-"+memberID); err != nil {
+			t.Fatal(err)
+		}
+		const mutationKey = "member-replay-regression"
+		first, err := repository.UpdateMember(ctx, scope, memberID, "viewer", "disabled", mutationKey, 1)
+		if err != nil || first.Replayed || first.Version != 2 {
+			t.Fatalf("first mutation=%+v error=%v", first, err)
+		}
+		replayed, err := repository.UpdateMember(ctx, scope, memberID, "viewer", "disabled", mutationKey, 1)
+		if err != nil || !replayed.Replayed || replayed.Version != first.Version {
+			t.Fatalf("replayed mutation=%+v error=%v", replayed, err)
+		}
+		if _, err := repository.UpdateMember(ctx, scope, memberID, "operator", "active", mutationKey, 1); !errors.Is(err, tenancyrepo.ErrMemberConflict) {
+			t.Fatalf("changed payload replay error=%v, want conflict", err)
+		}
+	})
+}
 
 func auditFixtureRequest(ctx context.Context, scope tenancy.Scope, method, path, key, body string) *http.Request {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
@@ -42,7 +131,7 @@ func auditFailureSwitch(t *testing.T, ctx context.Context, admin *sql.DB, scope 
 	if _, err := admin.ExecContext(ctx, `CREATE OR REPLACE FUNCTION audit_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic audit write failure'; END $$`); err != nil {
 		t.Fatal(err)
 	}
-	query := fmt.Sprintf(`CREATE TRIGGER %s BEFORE INSERT ON audit_records FOR EACH ROW WHEN (NEW.workspace_id='%s') EXECUTE FUNCTION audit_fixture_failure()`, name, scope.WorkspaceID().String())
+	query := fmt.Sprintf(`CREATE TRIGGER %s BEFORE INSERT ON audit_records FOR EACH ROW WHEN (NEW.workspace_id='%s') EXECUTE FUNCTION audit_fixture_failure()`, name, scope.WorkspaceID().String()) // #nosec G201 -- the trigger identifier and UUID literal are generated by this synthetic PostgreSQL fixture, not request input.
 	if _, err := admin.ExecContext(ctx, query); err != nil {
 		t.Fatal(err)
 	}

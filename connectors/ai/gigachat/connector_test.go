@@ -37,7 +37,7 @@ func (f *fixtureTransport) Do(_ context.Context, request Request) (Response, err
 	f.requests = append(f.requests, request)
 	switch request.Path {
 	case "/api/v2/oauth":
-		body, _ := json.Marshal(tokenResponse{AccessToken: "giga-access-token", ExpiresAt: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()})
+		body, _ := json.Marshal(tokenResponse{AccessToken: "giga-access-token", ExpiresAt: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()}) // #nosec G117 -- synthetic provider response fixture.
 		return Response{StatusCode: 200, Body: body}, nil
 	case "/api/v1/chat/completions":
 		if f.rejectCompletionAuthorization != "" && request.Headers["Authorization"] == f.rejectCompletionAuthorization {

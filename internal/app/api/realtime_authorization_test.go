@@ -69,7 +69,7 @@ func TestRealtimeAuthorizationBoundsBlockedWriteAtExpiry(t *testing.T) {
 	handler, done := a10Handler(t, head, realtimeTiming{pollInterval: time.Second, heartbeatInterval: time.Second, writeTimeout: 5 * time.Second}, authnStub{principal: p}, authzStub{})
 	serverConn, clientConn := net.Pipe()
 	listener := &a10PipeListener{conn: a10LocalConn{serverConn}, closed: make(chan struct{})}
-	server := &http.Server{Handler: handler, WriteTimeout: time.Hour}
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: time.Second, WriteTimeout: time.Hour}
 	served := make(chan error, 1)
 	go func() { served <- server.Serve(listener) }()
 	t.Cleanup(func() {

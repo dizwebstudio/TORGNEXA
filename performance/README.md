@@ -16,3 +16,12 @@ qualification must replace synthetic observations with measurements from the
 actual deployment topology while applying the same `internal/platform/slo`
 objectives. Capacity evidence must record hardware, replicas, dataset size,
 concurrency, software versions and duration.
+
+Task 234 adds an executable security/performance regression layer around this
+baseline. `scripts/check-audit-postgres.sh` emits a redacted PostgreSQL report
+when `TORGNEXA_REGRESSION_REPORT` is set. Release qualification combines that
+report with a real authenticated multi-route load and 32 concurrent SSE clients
+in `security-performance-regression.json`. The combined artifact records the
+source commit, pinned scanner versions, p50/p95/p99, bounded DB/IdP call counts,
+OAuth pool saturation and passed injected-failure scenarios. It never contains
+tokens, credentials, raw responses, test logs, identities or tenant labels.

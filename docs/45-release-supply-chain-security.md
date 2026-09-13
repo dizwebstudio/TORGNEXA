@@ -126,6 +126,20 @@ Pinned tools perform secret scanning, SAST, Go dependency analysis, and
 container scanning. Every Go module and every pinned shipped/development image
 is covered. Scanners emit machine-readable, sanitized reports.
 
+Root gosec excludes nested module roots; every nested module is then scanned
+once under its own module boundary. Govulncheck follows the same complete module
+inventory. `tools/securitytools` contains no Go source package and is checked as
+the pinned tool carrier; adding a source package there fails until the module is
+added to both scan sets. This prevents both missing modules and duplicate root
+plus nested findings.
+
+Before a Trivy secret report is retained, each finding is classified. The only
+permitted synthetic classification requires an exact checked-in tuple of target,
+rule ID and SHA-256 of the raw match. Missing or duplicate registered fixtures
+fail closed. Every other finding remains a `credential_candidate` and blocks the
+gate; match/code/snippet fields are removed before the report leaves the private
+scanner scratch directory.
+
 Container vulnerability evidence combines an OS-package scan of the immutable
 image with a language-package scan of its Syft SPDX SBOM. The two Trivy schema
 version 2 reports are validated and merged into one image report. Because the

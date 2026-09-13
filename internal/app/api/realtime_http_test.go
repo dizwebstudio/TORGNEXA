@@ -136,7 +136,7 @@ func TestA10RealtimeSlowClientReleasesHandler(t *testing.T) {
 	handler, done := a10Handler(t, head, timing, a10Principal(), authzStub{})
 	serverConn, clientConn := net.Pipe()
 	listener := &a10PipeListener{conn: a10LocalConn{serverConn}, closed: make(chan struct{})}
-	server := &http.Server{Handler: handler, WriteTimeout: time.Second, ErrorLog: nil}
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: time.Second, WriteTimeout: time.Second, ErrorLog: nil}
 	served := make(chan error, 1)
 	go func() { served <- server.Serve(listener) }()
 	t.Cleanup(func() {

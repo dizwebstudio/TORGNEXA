@@ -51,11 +51,11 @@ func TestA08PostgresRefreshBoundedPool(t *testing.T) {
 				if current.RefreshToken != "synthetic-old-refresh" {
 					return nil, errors.New("rotated token reused")
 				}
-				return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+				return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store rotation.
 			}
 			accounts := make([]sdk.Account, poolSize)
 			for i := range accounts {
-				raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "synthetic-client", ClientSecret: "synthetic-secret"})
+				raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "synthetic-client", ClientSecret: "synthetic-secret"}) // #nosec G117 -- synthetic credentials are encrypted immediately.
 				metadata, err := provider.Create(ctx, scope, secrets.ClassOAuthRefresh, raw)
 				if err != nil {
 					t.Fatal(err)
@@ -143,11 +143,11 @@ func TestA08PostgresRefreshBoundsConcurrentAccountsAndReportsPoolSaturation(t *t
 		}
 		started <- struct{}{}
 		<-release
-		return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+		return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store rotation.
 	}
 	accounts := make([]sdk.Account, 10)
 	for index := range accounts {
-		raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"})
+		raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"}) // #nosec G117 -- synthetic credentials are encrypted immediately.
 		metadata, createErr := provider.Create(ctx, scope, secrets.ClassOAuthRefresh, raw)
 		if createErr != nil {
 			t.Fatal(createErr)
@@ -191,6 +191,25 @@ func TestA08PostgresRefreshBoundsConcurrentAccountsAndReportsPoolSaturation(t *t
 	if peak.Load() != 8 || metrics.PeakInFlight != 8 || metrics.AdmissionWaits < 2 || metrics.AdmissionWait.Count < 2 || metrics.RefreshSuccesses != 10 || metrics.RefreshFailures != 0 || metrics.RefreshLatency.Count != 10 || metrics.InFlight != 0 || metrics.Waiting != 0 {
 		t.Fatalf("unexpected bounded refresh metrics: peak=%d metrics=%+v", peak.Load(), metrics)
 	}
+	t.Logf(`TORGNEXA_REGRESSION_METRIC {"name":"oauth_refresh_pool","operations":%d,"concurrency_limit":%d,"peak_in_flight":%d,"admission_waits":%d,"peak_saturation_ppm":%d,"refresh_p50_ns":%d,"refresh_p95_ns":%d,"refresh_p99_ns":%d}`,
+		metrics.RefreshLatency.Count, metrics.ConcurrencyLimit, metrics.PeakInFlight, metrics.AdmissionWaits, metrics.Pool.PeakSaturationPPM,
+		durationPercentileUpperBound(metrics.RefreshLatency, 50).Nanoseconds(), durationPercentileUpperBound(metrics.RefreshLatency, 95).Nanoseconds(), durationPercentileUpperBound(metrics.RefreshLatency, 99).Nanoseconds())
+}
+
+func durationPercentileUpperBound(metrics secretrepo.DurationMetrics, percentile uint64) time.Duration {
+	if metrics.Count == 0 || percentile == 0 || percentile > 100 {
+		return 0
+	}
+	target := (metrics.Count*percentile + 99) / 100
+	for _, bucket := range metrics.Buckets {
+		if bucket.Count >= target {
+			return bucket.LessThanOrEqual
+		}
+	}
+	if len(metrics.Buckets) == 0 {
+		return 0
+	}
+	return metrics.Buckets[len(metrics.Buckets)-1].LessThanOrEqual
 }
 
 func TestA08PostgresRefreshRetriesContendedAdvisoryLockWithJitteredBackoff(t *testing.T) {
@@ -244,7 +263,7 @@ func TestA08PostgresRefreshRollbackAndCancellation(t *testing.T) {
 	keys, _ := secrets.NewStaticKeyring("synthetic", map[string][]byte{"synthetic": make([]byte, 32)})
 	provider, _ := secrets.NewLocalEncryptedProvider(repo, keys)
 	now := time.Now().UTC()
-	raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"})
+	raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"}) // #nosec G117 -- synthetic credentials are encrypted immediately.
 	metadata, err := provider.Create(ctx, scope, secrets.ClassOAuthRefresh, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -299,7 +318,7 @@ func TestConnectorAuditPostgresRefreshIntentPrecedesRemoteEffect(t *testing.T) {
 	keys, _ := secrets.NewStaticKeyring("synthetic", map[string][]byte{"synthetic": make([]byte, 32)})
 	provider, _ := secrets.NewLocalEncryptedProvider(repo, keys)
 	now := time.Now().UTC()
-	raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"})
+	raw, _ := json.Marshal(TokenBundle{AccessToken: "synthetic-old-access", RefreshToken: "synthetic-old-refresh", TokenType: "Bearer", ExpiresAt: now.Add(-time.Minute).Format(time.RFC3339), ClientID: "client", ClientSecret: "synthetic"}) // #nosec G117 -- synthetic credentials are encrypted immediately.
 	metadata, err := provider.Create(ctx, scope, secrets.ClassOAuthRefresh, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -311,7 +330,7 @@ func TestConnectorAuditPostgresRefreshIntentPrecedesRemoteEffect(t *testing.T) {
 	var calls atomic.Int64
 	manager.refresh = func(_ context.Context, _ sdk.OAuth2Configuration, current TokenBundle, _ time.Duration, at time.Time) ([]byte, error) {
 		calls.Add(1)
-		return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret})
+		return json.Marshal(TokenBundle{AccessToken: "synthetic-new-access", RefreshToken: "synthetic-new-refresh", TokenType: "Bearer", ExpiresAt: at.Add(time.Hour).Format(time.RFC3339), ClientID: current.ClientID, ClientSecret: current.ClientSecret}) // #nosec G117 -- synthetic credentials exercise encrypted-store rotation.
 	}
 	_, err = admin.ExecContext(ctx, `CREATE FUNCTION fail_oauth_refresh_intent() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION USING ERRCODE=''55000'', MESSAGE=''synthetic refresh evidence failure''; END'; CREATE TRIGGER fail_oauth_refresh_intent BEFORE INSERT ON security_evidence FOR EACH ROW WHEN (NEW.evidence_type='connector.oauth_refresh.requested') EXECUTE FUNCTION fail_oauth_refresh_intent()`)
 	if err != nil {

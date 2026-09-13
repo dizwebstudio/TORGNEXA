@@ -258,7 +258,7 @@ func HTTPExchange(ctx context.Context, configuration sdk.OAuth2Configuration, cl
 	if token.ExpiresIn > 0 {
 		bundle.ExpiresAt = time.Now().UTC().Add(time.Duration(token.ExpiresIn) * time.Second).Format(time.RFC3339)
 	}
-	return json.Marshal(bundle)
+	return json.Marshal(bundle) // #nosec G117 -- serialized only as plaintext input to the encrypted secret store.
 }
 
 // HTTPRefresh exchanges one encrypted authorization-code refresh token and
@@ -321,7 +321,7 @@ func refreshedTokenBundle(current TokenBundle, body []byte, now time.Time) ([]by
 	if token.ExpiresIn > 0 {
 		updated.ExpiresAt = now.UTC().Add(time.Duration(token.ExpiresIn) * time.Second).Format(time.RFC3339)
 	}
-	return json.Marshal(updated)
+	return json.Marshal(updated) // #nosec G117 -- serialized only as plaintext input to the encrypted secret store.
 }
 
 type remoteResponse struct {
